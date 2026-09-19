@@ -2535,20 +2535,13 @@ function pendingCount(){
 function updateOfflineBar(){
   let bar = document.getElementById('offlineBar');
   const n = pendingCount();
-  const show = offlineMode || n > 0 || (typeof lastLoadError !== 'undefined' && !!lastLoadError)
-    || (typeof lastSaveError !== 'undefined' && !!lastSaveError);
+  const show = offlineMode || n > 0 || (typeof lastLoadError !== 'undefined' && !!lastLoadError);
   if(!show){ if(bar) bar.remove(); return; }
   if(!bar){
     bar = document.createElement('div');
     bar.id = 'offlineBar';
     bar.className = 'offline-bar';
     document.body.appendChild(bar);
-  }
-  // السيرفر رفض الحفظ (مش مشكلة نت) — نعرض السبب الحقيقي بالأحمر
-  if(typeof lastSaveError !== 'undefined' && lastSaveError){
-    bar.textContent = `⚠️ السيرفر رفض الحفظ${n ? ` (${n} تعديل مستني)` : ''}: ` + lastSaveError;
-    bar.style.background = '#B91C1C';
-    return;
   }
   // فيه سبب فشل محدد؟ نعرضه — أنفع بكتير من "مفيش نت" لما النت شغال
   if(typeof lastLoadError !== 'undefined' && lastLoadError){
@@ -2572,40 +2565,6 @@ function exitOfflineMode(){
 
 // آخر سبب فشل — بيظهر في الشريط عشان المستخدم يعرف المشكلة الحقيقية
 let lastLoadError = '';
-// آخر سبب رفض من السيرفر وقت الحفظ (صلاحيات/اشتراك/ترايجر...) — مش مشكلة نت
-let lastSaveError = '';
-
-// هل الغلطة دي "النت فاصل" ولا "السيرفر رد وقال لأ"؟
-// Supabase لما النت يقع بيرجّع رسالة زي Failed to fetch من غير code.
-// لما السيرفر نفسه يرفض بيرجّع code (زي 42501 للصلاحيات).
-function isNetworkError(e){
-  if(!isOnline()) return true;
-  if(!e) return false;
-  if(e.code && !/^(ECONN|ETIMEDOUT)/.test(String(e.code))) return false;
-  const m = String(e.message || e.details || e || '');
-  return /Failed to fetch|NetworkError|Load failed|network|fetch failed|اتأخر أكتر من/i.test(m);
-}
-// نص واضح للغلطة: الرسالة + الكود + التلميح
-function describeError(e){
-  if(!e) return 'خطأ غير معروف';
-  const parts = [e.message || String(e)];
-  if(e.code) parts.push('كود ' + e.code);
-  if(e.hint) parts.push(e.hint);
-  if(e.details && e.details !== e.message) parts.push(e.details);
-  return parts.filter(Boolean).join(' — ');
-}
-// بيقرر نعمل إيه لما الحفظ يفشل
-function handleSaveFailure(e, where){
-  console.error('فشل ' + where + ':', e);
-  if(isNetworkError(e)){
-    lastSaveError = '';
-    enterOfflineMode();
-  } else {
-    lastSaveError = describeError(e);
-    offlineMode = false;   // النت شغال — مش هنقول «أوفلاين» ونكدب
-    updateOfflineBar();
-  }
-}
 
 // ============================================================
 // تحميل الأجهزة — مزامنة تزايدية
@@ -2840,36 +2799,28 @@ async function persist(){
 
   try{
     if(changed.length){
-      const { error } = await withTimeout(sb.from('devices_data').upsert(
+      const { error } = await sb.from('devices_data').upsert(
         changed.map(d => ({ id: d.id, data: d, updated_at: new Date().toISOString() }))
-      ), 20000, 'حفظ التعديل');
+      );
       if(error) throw error;
     }
     for(const id of removed){
-      const { error } = await withTimeout(sb.from('devices_data').delete().eq('id', id), 20000, 'حذف جهاز');
-      if(error) throw error;
+      await sb.from('devices_data').delete().eq('id', id);
     }
     changed.forEach(d => { lastSynced[d.id] = JSON.stringify(d); });
     removed.forEach(id => { delete lastSynced[id]; });
-    if(lastSaveError){ lastSaveError = ''; updateOfflineBar(); }
   }catch(e){
-    // التعديل ميضيعش أبداً — بيستنى في الطابور في الحالتين.
-    // بس بنفرّق: نت فاصل (برتقاني) ولا السيرفر رفض (أحمر بالسبب الحقيقي)
+    // فشل الحفظ = نعامله كأوفلاين: التعديل ميضيعش أبداً
     queueOps(changed, removed);
-    handleSaveFailure(e, 'الحفظ');
+    enterOfflineMode();
   }finally{
     setSaving(false);
   }
 }
 
 // رفع الطابور المعلّق أول ما النت يرجع
-let _flushing = false;   // منع تشغيل الرفع مرتين في نفس الوقت (المؤقت + رجوع النت)
 async function flushQueue(){
-  if(!isOnline() || _flushing) return;
-  _flushing = true;
-  try{ await _flushQueueInner(); } finally { _flushing = false; }
-}
-async function _flushQueueInner(){
+  if(!isOnline()) return;
   const q = readQueue();
   const ups = Object.values(q.upserts);
   if(!ups.length && !q.deletes.length){
@@ -2878,26 +2829,20 @@ async function _flushQueueInner(){
   }
   try{
     if(ups.length){
-      const { error } = await withTimeout(sb.from('devices_data').upsert(
+      const { error } = await sb.from('devices_data').upsert(
         ups.map(d => ({ id: d.id, data: d, updated_at: new Date().toISOString() }))
-      ), 30000, 'رفع التعديلات المعلّقة');
+      );
       if(error) throw error;
     }
     for(const id of q.deletes){
-      const { error } = await withTimeout(sb.from('devices_data').delete().eq('id', id), 20000, 'حذف جهاز');
-      if(error) throw error;
+      await sb.from('devices_data').delete().eq('id', id);
     }
     writeQueue({upserts:{}, deletes:[]});
-    ups.forEach(d => { lastSynced[d.id] = JSON.stringify(d); });
-    lastSaveError = '';
     exitOfflineMode();
     // نحدّث صفحات متابعة الأجهزة اللي اترفعت
     ups.forEach(d => { if(d.trackToken) syncTrack(d); });
     await loadDevices();   // نجيب أحدث نسخة من السيرفر (فيها شغل باقي الموظفين)
-  }catch(e){
-    // قبل كده كانت الغلطة بتتبلع هنا — دلوقتي بتظهر لو مش مشكلة نت
-    handleSaveFailure(e, 'رفع المعلّق');
-  }
+  }catch(e){ /* لسه مفيش نت فعلي — هنحاول تاني */ }
 }
 if(typeof window !== 'undefined'){
   window.addEventListener('online', () => setTimeout(flushQueue, 1500));
@@ -7452,6 +7397,62 @@ let invTechLists = {};
 // ============================================================
 let invView = null;
 
+// ============================================================
+// 🗂️ الأجهزة اللي مش مكتوب ليها فني
+// ------------------------------------------------------------
+// قبل كده: الجهاز من غير فني كان بيتشال من قسم الفنيين في الجرد
+// خالص — فأجهزة النظام القديم اللي بتدخل المرتجعات مكانش حد
+// بيشوفها هنا أصلاً.
+//
+// دلوقتي بتتلم في كارت خاص بيها:
+//   🗂️ النظام القديم → جهاز مستورد من النظام القديم
+//   ❓ من غير فني     → جهاز من النظام الحالي وملوش فني لسه
+//
+// ⚠️ والجهاز اللي **مكتوب** ليه فني بيفضل في كارت الفني بتاعه
+//    زي ما هو — الكود ده مبيلمسش حاجة في ده.
+//
+// ⚠️ ليه كارتين مش كارت واحد؟ لأن "مش مكتوب ليه فني" مش معناها
+//    "قديم". فيه أجهزة جديدة اتسجّلت ولسه محدش اتسند ليها. لو
+//    حطّينا الاتنين في كارت اسمه "النظام القديم" هنقول على جهاز
+//    النهاردة إنه قديم — وده غلط في وش المحاسب.
+// ============================================================
+const INV_LEGACY_BY = 'النظام القديم';   // القيمة المتخزّنة في الأجهزة وقت الاستيراد
+
+function invIsEn(){
+  try{ return typeof I18N !== 'undefined' && I18N.getLang() === 'en'; }catch(e){ return false; }
+}
+function invLegacyName(){ return invIsEn() ? 'Old system'     : 'النظام القديم'; }
+function invNoTechName(){ return invIsEn() ? 'No technician'  : 'من غير فني'; }
+
+// الجهاز ده جاي من النظام القديم؟
+// بنشوف أكتر من علامة عشان أي طريقة استيراد اتعملت بيها تتمسك:
+//   • id بيبدأ بـ old_  ← اللي normalizeImportIds بتعمله لما يكون فيه legacyId
+//   • اسم المحاسب اللي سجّله أو اللي أنشأه
+//   • أول سطر في سجل الحالات (بواسطة: النظام القديم)
+function invIsLegacy(d){
+  if(!d) return false;
+  if(String(d.id || '').indexOf('old_') === 0) return true;
+  if(String(d.registeredBy || '').trim() === INV_LEGACY_BY) return true;
+  if(String(d.createdBy   || '').trim() === INV_LEGACY_BY) return true;
+  const h = d.statusHistory;
+  if(Array.isArray(h) && h.length && String(h[0].by || '').trim() === INV_LEGACY_BY) return true;
+  return false;
+}
+
+// اسم الكارت اللي الجهاز ده المفروض يقف فيه
+function invTechKey(d){
+  const tech = (d.technician || '').trim();
+  if(tech) return tech;                                   // مكتوب ليه فني → كارت الفني
+  return invIsLegacy(d) ? invLegacyName() : invNoTechName();
+}
+
+// الأيقونة اللي قدّام اسم الكارت
+function invTechIcon(name){
+  if(name === invLegacyName()) return '🗂️';
+  if(name === invNoTechName()) return '❓';
+  return '🔧';
+}
+
 function openInvView(kind, key){
   invView = { kind, key };
   invOpenCard = null; invOpenTech = null;   // نقفل أي أكورديون فاتح
@@ -7470,7 +7471,7 @@ function invViewData(){
   if(!invView) return null;
   if(invView.kind === 'tech'){
     return {
-      title: '🔧 ' + invView.key,
+      title: invTechIcon(invView.key) + ' ' + invView.key,
       list:  invTechLists[invView.key] || []
     };
   }
@@ -7602,12 +7603,22 @@ function renderSummaries(){
   // ===== كروت الفنيين: الأجهزة اللي معاهم ولسه ما اتسلمتش =====
   const withTech = {};
   devices.forEach(d => {
-    if(!d.technician) return;
     if(!TECH_ACTIVE_STATUSES.includes(d.status)) return;   // "تم الصيانة" و"تم التسليم" و"المرفوض" بيخرجوا، والمرتجع بيفضل
-    (withTech[d.technician] = withTech[d.technician] || []).push(d);
+    // ⚠️ مفيش "return" للجهاز اللي من غير فني. invTechKey بترجّع
+    //    اسم كارت مناسب ليه (النظام القديم / من غير فني) بدل ما
+    //    الجهاز يختفي من الجرد زي ما كان بيحصل قبل كده.
+    const key = invTechKey(d);
+    (withTech[key] = withTech[key] || []).push(d);
   });
   invTechLists = withTech;
-  const techNames = Object.keys(withTech).sort((a,b) => withTech[b].length - withTech[a].length);
+  // الفنيين الأول (الأكتر أجهزة فوق)، وكروت "من غير فني" في الآخر دايماً —
+  // عشان عين المحاسب تقع على الفنيين الأول، والباقي يبقى ذيل القايمة.
+  const _invExtra = [invLegacyName(), invNoTechName()];
+  const techNames = Object.keys(withTech).sort((a,b) => {
+    const ea = _invExtra.indexOf(a) !== -1, eb = _invExtra.indexOf(b) !== -1;
+    if(ea !== eb) return ea ? 1 : -1;
+    return withTech[b].length - withTech[a].length;
+  });
 
   const techCards = techNames.length === 0
     ? `<div class="empty-col">${t('inv.noTechDevices')}</div>`
@@ -7617,7 +7628,7 @@ function renderSummaries(){
           const safe = esc(techName).replace(/'/g, "\\'");
           return `<div class="inv-card" onclick="openInvView('tech','${safe}')" title="${t('inv.techTapToView')}">
             <div class="inv-card-num" style="color:#0891A8;">${withTech[techName].length}</div>
-            <div class="inv-card-label">🔧 ${esc(techName)}</div>
+            <div class="inv-card-label">${invTechIcon(techName)} ${esc(techName)}</div>
             ${late ? `<div style="font-size:11.5px;color:var(--danger);font-weight:800;margin-top:4px;">${late} ${t('inv.lateCount')}</div>` : ''}
             <div class="inv-card-more">${t('inv.showDevices')} ←</div>
           </div>`;
