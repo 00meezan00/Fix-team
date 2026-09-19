@@ -455,6 +455,29 @@
     color:var(--muted);cursor:default;}
   .rw-ok0.done:active{transform:none;}
 
+  /* ===== 🏪 خانات الموردين =====
+     الفني بيكتب القطعة، وبعدين لازم يقول جابها منين. من غير ما يختار
+     مورد، زرار الحفظ بيفضل أحمر ومش بيحفظ — عشان المحاسب عمره ما
+     يلاقي قطعة متسجّلة من غير مصدر. */
+  .rw-sup{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:9px;}
+  .rw-sup-lbl{font-size:11.5px;font-weight:800;color:var(--muted);width:100%;margin-bottom:1px;}
+  .rw-chip{border:1.5px solid var(--line);background:var(--card);color:var(--ink);
+    border-radius:999px;font:800 12.5px/1 inherit;padding:9px 15px;cursor:pointer;white-space:nowrap;}
+  .rw-chip:active{transform:scale(.96);}
+  /* المورد المختار — نفس أزرق «جاري الصيانة» عشان يبان إنه متعلّم */
+  .rw-chip.on{border-color:var(--repairing);background:var(--repairing-bg);color:var(--repairing);}
+  /* «➕ إضافة مورد» متقطّع — عشان يبان إنه مش اسم مورد، ده زرار إضافة */
+  .rw-chip.add{border-style:dashed;color:var(--muted);}
+  /* 💾 الحفظ وهو لسه مقفول (مفيش مورد متختار) — أحمر صارخ */
+  .rw-save.lock{background:var(--red);}
+  html[data-theme="dark"] .rw-save.lock{color:#1B0906;}
+  /* بعد ما يختار المورد — أخضر هادي: يعني اتفضّل، تقدر تحفظ */
+  .rw-save.ready{background:var(--done);}
+  html[data-theme="dark"] .rw-save.ready{color:#0E1721;}
+  /* رجّة صغيرة لما يدوس حفظ من غير مورد — عشان عينه تروح للخانات */
+  @keyframes rwshake{10%,90%{transform:translateX(-2px);}30%,70%{transform:translateX(3px);}50%{transform:translateX(-3px);}}
+  .rw-shake{animation:rwshake .4s ease;}
+
   /* ===== ألوان الكارت (إشارة المرور) =====
      🟠 need = محتاج رد · ⚪ pend = داس «لسه مجبتش» النهاردة · 🟢 ok = قطع الغيار مكتوبة */
   .rw-card.need{border-color:var(--waiting);background:var(--waiting-bg);}
@@ -998,6 +1021,7 @@ async function boot(){
         const p = JSON.parse(u); ME = p.name || ''; MY_EMAIL = p.email || '';
         devices = (JSON.parse(c) || []).map(adapt); reindexSearch();
         offline = true; showOffline();
+        SUPPLIERS = supLoadCache();       // الموردين من الكاش — الأوفلاين مبيمنعش العرض
         finish(); return;
       }catch(e){}
     }
@@ -1060,6 +1084,7 @@ async function boot(){
 
   localStorage.setItem('ifix_tech_me', JSON.stringify({ name:ME, email:MY_EMAIL, disp }));
   loadNotices();   // من غير await — ما توقفش عرض الصفحة
+  supLoad();       // 🏪 قايمة الموردين — من غير await برضه، الكاش بيغطّي لحد ما توصل
   try{
     localStorage.setItem('ifix-last-role', 'technician');
     localStorage.setItem('ifix-last-email', MY_EMAIL);
@@ -1203,6 +1228,171 @@ function rwIsRejected(d){ return d.status === 'rejected' || d.status === 'reject
 //   ٢) الجهاز يتحسب 🟢 خلاص ومبيمنعش الانصراف — زي أي كومنت متكتوب.
 const RW_NONE_TXT = 'مفيش — الجهاز خلص ومحتاجش قطع غيار';
 
+// ============================================================
+// 🏪 الموردين — «القطعة دي جبتها منين؟»
+// ------------------------------------------------------------
+// تحت مربع الكتابة بيظهر صف خانات: اكرامي · الزكي · ➕ إضافة مورد.
+// الفني بيكتب القطعة، يدوس على اسم المورد، وبعدين يحفظ.
+//
+// 🔴 من غير مورد مفيش حفظ: زرار الحفظ بيفضل **أحمر**، ولو داس عليه
+//    بيطلع له إنذار «لازم تختار المورد الأول» والخانات بترجّ.
+//    أول ما يختار مورد، الزرار بيتحوّل **أخضر هادي** ويحفظ عادي.
+//    ليه؟ عشان المحاسب عمره ما يلاقي قطعة متسجّلة من غير مصدر.
+//
+// القايمة **مشتركة**: متخزّنة على السيرفر في app_data تحت مفتاح
+// 'parts-suppliers'. أي فني يضيف مورد، باقي الفنيين بيلاقوه عندهم.
+//
+// ⚠️ الفني مش مسموح له يكتب في app_data مباشرة (RLS) — فالقراءة
+//    والإضافة بيعدّوا من دالتين على السيرفر (SECURITY DEFINER):
+//        parts_suppliers_list()       → بترجّع القايمة
+//        parts_suppliers_add(p_name)  → بتضيف اسم وبترجّع القايمة
+//    الملف: 56-parts-suppliers.sql — لازم يتشغّل قبل ما ده يشتغل.
+//    ولو مااتشغّلش، القايمة بترجع للاسمين الافتراضيين والإضافة بس
+//    هي اللي بتفشل برسالة واضحة — الشاشة مبتقفش.
+//
+// ⚠️ المورد **مش** حقل جديد في قاعدة البيانات. بيتكتب في نفس خانة
+//    قطع الغيار (partsComment) في آخر السطر بالشكل ده:
+//        «شاشة ايفون 11 · 🏪 المورد: اكرامي»
+//    ليه؟ عشان يبان فوراً للمحاسب والديسباتشر في «مراجعة قطع الغيار»
+//    من غير أي تعديل على الجداول ولا صلاحيات جديدة ولا device_tech_fields.
+// ============================================================
+const SUP_DEFAULT   = ['اكرامي', 'الزكي'];
+const SUP_CACHE_KEY = 'ifix_parts_suppliers';
+const SUP_MARK      = ' · 🏪 المورد: ';
+let   SUPPLIERS     = [];
+const SUP_PICK      = {};   // اختيار الفني الحالي لكل جهاز (قبل الحفظ)
+
+// تبسيط الاسم قبل المقارنة — «الزكى» و«الزكي » و«الزكي» حاجة واحدة
+function supNorm(s){
+  return String(s || '').trim().replace(/\s+/g, ' ')
+    .replace(/[أإآ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه').toLowerCase();
+}
+
+// تنضيف أي رد جاي من السيرفر: مصفوفة أسماء من غير فاضي ولا مكرر
+function supClean(v){
+  let a = v;
+  if(typeof a === 'string'){ try{ a = JSON.parse(a); }catch(e){ a = []; } }
+  if(!Array.isArray(a)) return [];
+  const seen = new Set(), out = [];
+  a.forEach(x => {
+    const n = String(x == null ? '' : x).trim();
+    const k = supNorm(n);
+    if(n && !seen.has(k)){ seen.add(k); out.push(n); }
+  });
+  return out;
+}
+
+function supLoadCache(){
+  try{
+    const c = JSON.parse(localStorage.getItem(SUP_CACHE_KEY) || 'null');
+    const l = supClean(c);
+    if(l.length) return l;
+  }catch(e){}
+  return SUP_DEFAULT.slice();
+}
+
+// بتجيب القايمة من السيرفر. الكاش بيتعرض فوراً والسيرفر بيصحّحه بعدين،
+// فالفني مبيستناش صف الخانات يظهر.
+async function supLoad(){
+  if(!SUPPLIERS.length) SUPPLIERS = supLoadCache();
+  if(!navigator.onLine) return;
+  try{
+    const { data, error } = await sb.rpc('parts_suppliers_list');
+    if(error) throw error;
+    const list = supClean(data);
+    if(list.length){
+      SUPPLIERS = list;
+      try{ localStorage.setItem(SUP_CACHE_KEY, JSON.stringify(list)); }catch(e){}
+      if(RW.open) supPaintAll();
+    }
+  }catch(e){
+    // مش كارثة — بنكمّل بالكاش. الإضافة هي اللي هتقول السبب لو فشلت.
+    console.warn('قايمة الموردين مش متاحة:', e && e.message ? e.message : e);
+  }
+}
+
+// بنفصل المورد عن كلام قطع الغيار — عشان المربع يفضل فيه القطع بس
+// والمورد يبان كخانة متعلّمة، مش كلام مكتوب جوه النص.
+function supSplit(comment){
+  const raw = String(comment || '');
+  const i = raw.lastIndexOf(SUP_MARK);
+  if(i === -1) return { text: raw.trim(), sup: '' };
+  return { text: raw.slice(0, i).trim(), sup: raw.slice(i + SUP_MARK.length).trim() };
+}
+function supJoin(text, sup){
+  const tt = String(text || '').trim();
+  const ss = String(sup  || '').trim();
+  return ss ? (tt + SUP_MARK + ss) : tt;
+}
+
+// جوه صف الخانات. بنبعت **رقم** المورد مش اسمه — عشان اسم فيه
+// علامة اقتباس ميكسرش الـ onclick.
+function supChipsInner(id){
+  const cur = SUP_PICK[id] || '';
+  const chips = SUPPLIERS.map((n, i) =>
+    `<button type="button" class="rw-chip${(cur && supNorm(n) === supNorm(cur)) ? ' on' : ''}" onclick="supPick('${id}',${i})">${esc(n)}</button>`
+  ).join('');
+  return `<span class="rw-sup-lbl">🏪 القطعة دي جبتها منين؟</span>${chips}`
+       + `<button type="button" class="rw-chip add" onclick="supAdd('${id}')">➕ إضافة مورد</button>`;
+}
+
+function supPaint(id){
+  const box = document.getElementById('rwsup_' + id);
+  if(box) box.innerHTML = supChipsInner(id);
+}
+// كل الكروت المفتوحة — بعد ما مورد جديد يتضاف أو القايمة توصل من السيرفر
+function supPaintAll(){
+  document.querySelectorAll('#rwOv .rw-sup').forEach(el => {
+    const id = el.id.replace('rwsup_', '');
+    if(id) el.innerHTML = supChipsInner(id);
+  });
+}
+
+// دوسة على الخانة = اختيار · دوسة تانية على نفس الخانة = إلغاء الاختيار
+function supPick(id, i){
+  const n = SUPPLIERS[i];
+  if(!n) return;
+  SUP_PICK[id] = (SUP_PICK[id] && supNorm(SUP_PICK[id]) === supNorm(n)) ? '' : n;
+  supPaint(id);
+  rwToggle(id);
+}
+
+// ➕ مورد جديد — بيتسجّل على السيرفر فيظهر لكل الفنيين
+async function supAdd(id){
+  const name = (prompt('اسم المورد الجديد — هيظهر لكل الفنيين 🏪', '') || '').trim();
+  if(!name) return;
+  if(name.length > 40){ toast('الاسم طويل شوية — خليه أقصر'); return; }
+
+  // موجود بالفعل؟ منضيفوش تاني — بنختاره وخلاص
+  const dup = SUPPLIERS.find(n => supNorm(n) === supNorm(name));
+  if(dup){
+    SUP_PICK[id] = dup;
+    supPaintAll(); rwToggle(id);
+    toast('المورد ده موجود بالفعل — اتختار ✅');
+    return;
+  }
+  if(!navigator.onLine){ toast('مفيش نت — إضافة مورد محتاجة اتصال'); return; }
+
+  try{
+    // ⚠️ Supabase مبيرميش خطأ — بيرجّعه في .error
+    const { data, error } = await sb.rpc('parts_suppliers_add', { p_name: name });
+    if(error) throw error;
+    const list = supClean(data);
+    if(list.length){
+      SUPPLIERS = list;
+      try{ localStorage.setItem(SUP_CACHE_KEY, JSON.stringify(list)); }catch(e){}
+    } else if(!SUPPLIERS.some(n => supNorm(n) === supNorm(name))){
+      SUPPLIERS.push(name);
+    }
+    SUP_PICK[id] = name;
+    supPaintAll(); rwToggle(id);
+    toast('اتضاف ✅ «' + name + '» بقى متاح لكل الفنيين');
+  }catch(e){
+    console.error('إضافة مورد فشلت:', e);
+    toast('مقدرناش نضيف المورد: ' + ((e && e.message) || ''));
+  }
+}
+
 // تبسيط النص قبل المقارنة: بنشيل المسافات وعلامات الترقيم عشان
 // «مفيش.» و«مفيش » و«ما فيش» يبقوا حاجة واحدة.
 function rwNorm(txt){
@@ -1214,8 +1404,10 @@ function rwNorm(txt){
 //    على قطع مش موجودة أصلاً.
 // ⚠️ بنقارن جملة الزرار بنسختها المبسّطة (مش مكتوبة بإيدينا مرتين) —
 //    فلو غيّرت صياغة RW_NONE_TXT بكرا، المقارنة بتفضل شغّالة لوحدها.
+// ⚠️ وبنشيل اسم المورد الأول (supSplit) — عشان «مفيش · 🏪 المورد: …»
+//    تفضل تتحسب «مفيش» زي ما هي.
 function rwNoParts(txt){
-  const t = rwNorm(txt);
+  const t = rwNorm(supSplit(txt).text);
   if(t === rwNorm(RW_NONE_TXT)) return true;
   return ['', 'مفيش', 'مافيش', 'مفيشحاجة', 'مافيشحاجة', 'لايوجد', 'لاشيء', 'لاشئ', 'لا', '0', 'ولاحاجة'].includes(t);
 }
@@ -1295,6 +1487,9 @@ function rwDayLabel(key){
 
 async function openRecentWork(opts){
   RW.open = true;
+  // 🏪 الموردين — من غير await عشان النافذة تفتح على طول. أول ما
+  // القايمة توصل، supLoad بتعيد رسم الخانات لوحدها.
+  supLoad();
   // بنحدّث حالة الحضور الأول عشان «النهاردة» يبقى يوم الوردية الصح.
   // لو فشلت، rwToday بترجع ليوم القاهرة — مش هنوقف النافذة عشانها.
   if(typeof attLoadState === 'function'){
@@ -1337,6 +1532,7 @@ function rwInfoHtml(){
   if(n.parts) lines.push(`<b>${rwCount(n.parts)}</b> محتاجين تكتب جبت ليهم إيه أو تدوس «لسه مجبتش ليه حاجة».`);
   if(n.ret)   lines.push(`<b>${rwCount(n.ret)}</b> اترفضوا — قول القطع اللي عليهم رجعت ولا لا.`);
   lines.push(`لازم ترد عليهم قبل الانصراف. لو الجهاز اتصلح من غير أي قطعة، دوس «✅ الجهاز خلص ومحتاجش قطع غيار».`);
+  lines.push(`🏪 ولمّا تكتب قطعة، اختار المورد اللي جبتها منه قبل الحفظ — الزرار الأحمر مش هيحفظ من غيره.`);
   return lines.join('<br>');
 }
 
@@ -1383,22 +1579,32 @@ function rwPaint(){
 
     // ٣ أزرار في نفس السطر، بس مش بيبانوا كلهم مع بعض:
     //   الخانة فاضية        → «لسه مجبتش» + «خلص ومحتاجش قطع غيار»
-    //   الفني كتب أي كلام   → «حفظ» لوحده
+    //   الفني كتب أي كلام   → «حفظ» لوحده (+ صف الموردين فوقه)
     //   داس «محتاجش قطع»    → الزرار الأخضر بعلامة ✓ لوحده
-    const txt  = (d.partsComment || '').trim();
-    const has  = !!txt;
-    const pend = rwStateOf(d) === 'pend';
-    const none = rwIsNoneBtn(txt);               // داس الزرار الأخضر قبل كده
+    //
+    // 🏪 بنفصل المورد عن نص القطع: المربع بيتعرض فيه القطع بس،
+    //    والمورد بيرجع خانة متعلّمة. لو الجهاز اتحفظ قبل كده بمورد،
+    //    بيفضل متعلّم من غير ما الفني يختاره تاني.
+    const sp    = supSplit(d.partsComment);
+    const txt   = sp.text;
+    const has   = !!txt;
+    const pend  = rwStateOf(d) === 'pend';
+    const none  = rwIsNoneBtn(txt);              // داس الزرار الأخضر قبل كده
+    SUP_PICK[d.id] = sp.sup || '';               // الاختيار بيتظبط من المحفوظ
+    const supOk = !!sp.sup;
+    const showSup = has && !none;                // الموردين بيبانوا مع كلام القطع بس
     return sep + `
         <div class="${rwCardClass(d)}" id="rwk_${d.id}">${head}
           <div class="rw-cm">
-            <textarea id="rwc_${d.id}" maxlength="600" oninput="rwToggle('${d.id}')" placeholder="اكتب قطع الغيار اللي جبتها للجهاز ده…">${esc(d.partsComment || '')}</textarea>
+            <textarea id="rwc_${d.id}" maxlength="600" oninput="rwToggle('${d.id}')" placeholder="اكتب قطع الغيار اللي جبتها للجهاز ده…">${esc(txt)}</textarea>
+            <!-- 🏪 صف الموردين — بيبان بس لما يكون فيه قطع مكتوبة -->
+            <div class="rw-sup${showSup?'':' rw-off'}" id="rwsup_${d.id}">${supChipsInner(d.id)}</div>
             <div class="row">
               <!-- الأزرار في نفس المكان — واحد بس اللي بيبان في أي لحظة -->
-              <button type="button" class="rw-save${(has && !none)?'':' rw-off'}" id="rws_${d.id}" onclick="rwSave('${d.id}')">💾 حفظ</button>
+              <button type="button" class="rw-save${showSup?'':' rw-off'}${supOk?' ready':' lock'}" id="rws_${d.id}" onclick="rwSave('${d.id}')">💾 حفظ</button>
               <button type="button" class="rw-none${has?' rw-off':''}${pend?' done':''}" id="rwn_${d.id}" onclick="rwNone('${d.id}')" ${pend?'disabled':''}>${pend?'✓ لسه مجبتش ليه حاجة':'⏳ لسه مجبتش ليه حاجة'}</button>
-              <button type="button" class="rw-ok0${(has && !none)?' rw-off':''}${none?' done':''}" id="rwd_${d.id}" onclick="rwNoNeed('${d.id}')" ${none?'disabled':''}>${none?'✓ محتاجش قطع غيار':'✅ الجهاز خلص ومحتاجش قطع غيار'}</button>
-              <span class="rw-hint" id="rwh_${d.id}">${has ? 'متسجّل ✅' : ''}</span>
+              <button type="button" class="rw-ok0${showSup?' rw-off':''}${none?' done':''}" id="rwd_${d.id}" onclick="rwNoNeed('${d.id}')" ${none?'disabled':''}>${none?'✓ محتاجش قطع غيار':'✅ الجهاز خلص ومحتاجش قطع غيار'}</button>
+              <span class="rw-hint" id="rwh_${d.id}">${has ? (supOk ? 'متسجّل ✅' : '🏪 اختار المورد') : ''}</span>
             </div>
           </div>
         </div>`;
@@ -1432,13 +1638,14 @@ function rwRefreshCard(id){
 }
 
 // بتشتغل مع كل حرف بيتكتب أو بيتمسح في المربع.
-// زي لمبة بوشّين: فاضي ← «لسه مجبتش» ، فيه كلام ← «حفظ».
+// زي لمبة بوشّين: فاضي ← «لسه مجبتش» ، فيه كلام ← «حفظ» + صف الموردين.
 function rwToggle(id){
   const ta   = document.getElementById('rwc_' + id);
   const save = document.getElementById('rws_' + id);
   const none = document.getElementById('rwn_' + id);
   const nod  = document.getElementById('rwd_' + id);
   const hint = document.getElementById('rwh_' + id);
+  const sbox = document.getElementById('rwsup_' + id);
   if(!ta) return;
   const val = ta.value.trim();     // مسافات بس = فاضي
   const has = !!val;
@@ -1446,7 +1653,16 @@ function rwToggle(id){
   // ساعتها الزرار الأخضر هو اللي بيبان (بعلامة ✓) — مش «حفظ»،
   // لأن مفيش حاجة جديدة تتحفظ.
   const isNone = rwIsNoneBtn(val);
-  if(save) save.classList.toggle('rw-off', !has || isNone);
+  const showSup = has && !isNone;
+  const sup = SUP_PICK[id] || '';
+  // 🏪 صف الموردين بيظهر ويختفي مع زرار الحفظ بالظبط
+  if(sbox) sbox.classList.toggle('rw-off', !showSup);
+  if(save){
+    save.classList.toggle('rw-off', !showSup);
+    // 🔴 أحمر = لسه مفيش مورد · 🟢 أخضر هادي = جاهز للحفظ
+    save.classList.toggle('lock',  !sup);
+    save.classList.toggle('ready', !!sup);
+  }
   if(none){
     none.classList.toggle('rw-off', has);
     // شكل «اتداس خلاص» بس لو الجهاز فعلاً في حالة pend
@@ -1459,17 +1675,19 @@ function rwToggle(id){
   if(nod){
     // بيختفي بس لما الفني يكتب قطع غيار حقيقية.
     // فاضي → بيبان عادي · جملة الزرار → بيبان بعلامة ✓ ومقفول
-    nod.classList.toggle('rw-off', has && !isNone);
+    nod.classList.toggle('rw-off', showSup);
     nod.classList.toggle('done', isNone);
     nod.disabled = isNone;
     nod.textContent = isNone ? '✓ محتاجش قطع غيار' : '✅ الجهاز خلص ومحتاجش قطع غيار';
   }
   // علامة «متسجّل» تفضل بس لو الكلام لسه زي المحفوظ بالظبط
   const d = devices.find(x => x.id === id);
-  const saved = d ? (d.partsComment || '').trim() : '';
+  const svd = d ? supSplit(d.partsComment) : { text:'', sup:'' };
+  const saved = svd.text;
   if(hint){
     hint.classList.remove('err');   // أي خطأ قديم بيتشال أول ما الفني يعمل حاجة جديدة
-    hint.textContent = (saved && val === saved) ? 'متسجّل ✅' : '';
+    hint.textContent = (showSup && !sup) ? '🏪 اختار المورد'
+                     : ((saved && val === saved && sup === svd.sup) ? 'متسجّل ✅' : '');
   }
 }
 
@@ -1506,7 +1724,9 @@ async function rwNone(id){
   if(d._raw) Object.assign(d._raw, patch);
   if(saved){
     d.partsComment = '';
+    SUP_PICK[id] = '';                 // 🏪 المورد اتمسح مع القطع
     const ta = document.getElementById('rwc_' + id); if(ta) ta.value = '';
+    supPaint(id);
   }
   // التوست الأول، وبعدين rwRefreshCard — عشان لو ده آخر جهاز،
   // بشارة «تقدر تنصرف» تبقى هي اللي باينة في الآخر مش تتغطى.
@@ -1522,6 +1742,8 @@ async function rwNone(id){
 //                   بيرجع يسأل تاني. (ختم يومي)
 //   ✅ محتاجش قطع = قرار نهائي. الجهاز اتصلح من غير أي قطعة،
 //                   فالسؤال بيقفل خالص ومبيتكررش.
+//
+// 🏪 الزرار ده **مش** محتاج مورد — منطقياً مفيش قطعة اتجابت أصلاً.
 //
 // بيعمل حاجتين مع بعض:
 //   ١) بيكتب الجملة في نفس خانة قطع الغيار (partsComment) — عشان
@@ -1565,6 +1787,8 @@ async function rwNoNeed(id){
   d.notes = (patch.activityNotes || []).map(n => ({ by:n.by||'', role:n.role||'', at:n.at||'', text:n.text||'' }));
   const ta = document.getElementById('rwc_' + id);
   if(ta) ta.value = RW_NONE_TXT;
+  SUP_PICK[id] = '';                   // 🏪 مفيش مورد — مفيش قطعة أصلاً
+  supPaint(id);
   rwErr(id, '');
   // التوست الأول وبعدين الكارت — عشان لو ده آخر جهاز ناقص،
   // بشارة «تقدر تنصرف» تبقى هي الأخيرة اللي الفني يشوفها.
@@ -1579,6 +1803,16 @@ function rwErr(id, msg){
   if(!h) return;
   h.textContent = msg || '';
   h.classList.toggle('err', !!msg);
+}
+
+// رجّة صغيرة على أي عنصر — بنستعملها لما الفني يدوس حفظ من غير مورد.
+// ⚠️ لازم نشيل الكلاس ونجبر المتصفح يعيد الحساب (offsetWidth)، وإلا
+//    الرجّة بتحصل مرة واحدة بس والدوسة التانية مبيحصلش فيها حاجة.
+function rwShake(el){
+  if(!el) return;
+  el.classList.remove('rw-shake');
+  void el.offsetWidth;
+  el.classList.add('rw-shake');
 }
 
 // ⚠️ Supabase مبيرميش خطأ لو السيرفر تجاهل حقل. فبعد الحفظ بنقرا
@@ -1644,6 +1878,17 @@ async function rwReturn(id, ans){
   rwRefreshCard(id);   // بعد التوست — عشان بشارة «تقدر تنصرف» تبان في الآخر
 }
 
+// ============================================================
+// 💾 حفظ قطع الغيار
+// ------------------------------------------------------------
+// 🏪 لازم يكون فيه مورد متختار. من غيره الحفظ بيقف هنا بالظبط،
+//    والفني بيشوف الإنذار في ٣ حتت مع بعض عشان مستحيل يفوته:
+//    توست فوق · سطر أحمر جوه الكارت · ورجّة على صف الموردين.
+//    ولا حاجة بتروح للسيرفر — فمفيش قطعة بتتسجّل من غير مصدر.
+//
+// اللي بيتحفظ في partsComment هو الاتنين مع بعض:
+//    «شاشة ايفون 11 · 🏪 المورد: اكرامي»
+// ============================================================
 async function rwSave(id){
   const ta  = document.getElementById('rwc_' + id);
   const btn = document.getElementById('rws_' + id);
@@ -1651,17 +1896,31 @@ async function rwSave(id){
   if(!ta) return;
   const val = ta.value.trim();
   if(!val) return;   // الفاضي بيتمسح من زرار «لسه مجبتش» بس
+
+  // 🔴 الحارس: مفيش مورد = مفيش حفظ
+  const sup = SUP_PICK[id] || '';
+  if(!sup){
+    toast('🏪 لازم تختار المورد اللي جبت منه الأول');
+    rwErr(id, '🏪 اختار المورد الأول');
+    const sbox = document.getElementById('rwsup_' + id);
+    rwShake(sbox); rwShake(btn);
+    if(sbox) sbox.scrollIntoView({ behavior:'smooth', block:'center' });
+    return;
+  }
+
+  const full = supJoin(val, sup);
   if(btn) btn.disabled = true;
   const ok = await save(id, {
-    partsComment: val,
+    partsComment: full,
     lastModifiedAt: new Date().toISOString(),
     lastModifiedBy: ME
   });
   if(btn) btn.disabled = false;
   if(ok){
     const d = devices.find(x => x.id === id);
-    if(d){ d.partsComment = val; if(d._raw) d._raw.partsComment = val; }
-    toast('تم حفظ قطع الغيار ✅');
+    if(d){ d.partsComment = full; if(d._raw) d._raw.partsComment = full; }
+    rwErr(id, '');
+    toast('تم حفظ قطع الغيار ✅ — من عند ' + sup);
     rwRefreshCard(id);   // بعد التوست — نفس السبب اللي فوق
     if(hint) hint.textContent = 'اتحفظ ✅';
   }
@@ -2470,7 +2729,7 @@ async function refresh(){
     // لو شاشة الترتيب مفتوحة دلوقتي، تتحدّث في مكانها
     try{
       const sh = $('sheet');
-      if(sh && sh.classList.contains('on') && sh.innerHTML.indexOf('\u062a\u0631\u062a\u064a\u0628 \u0627\u0644\u0641\u0646\u064a\u064a\u0646') >= 0) renderTechBoard();
+      if(sh && sh.classList.contains('on') && sh.innerHTML.indexOf('ترتيب الفنيين') >= 0) renderTechBoard();
     }catch(e){}
   }).catch(() => {});
   render();
@@ -2591,29 +2850,29 @@ function tbT(k){
   let en = false;
   try{ en = (typeof I18N !== 'undefined' && I18N.getLang() === 'en'); }catch(e){}
   const M = {
-    title:   ['\u062a\u0631\u062a\u064a\u0628 \u0627\u0644\u0641\u0646\u064a\u064a\u0646', 'Technician ranking'],
-    today:   ['\u0627\u0644\u0646\u0647\u0627\u0631\u062f\u0647', 'Today'],
-    d30:     ['\u0622\u062e\u0631 \u0663\u0660 \u064a\u0648\u0645', 'Last 30 days'],
-    tech:    ['\u0627\u0644\u0641\u0646\u064a', 'Technician'],
-    points:  ['\u0627\u0644\u0646\u0642\u0627\u0637', 'Points'],
-    done:    ['\u0623\u062c\u0647\u0632\u0629', 'Devices'],
-    avg:     ['\u0645\u062a\u0648\u0633\u0637 \u0627\u0644\u0645\u062f\u0629', 'Avg time'],
-    returns: ['\u0645\u0631\u062a\u062c\u0639', 'Returns'],
-    day:     ['\u064a\u0648\u0645', 'd'],
-    lessDay: ['\u0623\u0642\u0644 \u0645\u0646 \u064a\u0648\u0645', '< 1d'],
-    you:     ['(\u0625\u0646\u062a)', '(you)'],
-    updated: ['\u0622\u062e\u0631 \u062a\u062d\u062f\u064a\u062b:', 'Updated:'],
-    r1:      ['\ud83e\udd47 \u0627\u0644\u0645\u062a\u0635\u062f\u0631', '\ud83e\udd47 1st'],
-    r2:      ['\ud83e\udd48 \u0627\u0644\u062a\u0627\u0646\u064a', '\ud83e\udd48 2nd'],
-    r3:      ['\ud83e\udd49 \u0627\u0644\u062a\u0627\u0644\u062a', '\ud83e\udd49 3rd'],
-    rLast:   ['\u0627\u0644\u0623\u062e\u064a\u0631', 'Last'],
-    rLast2:  ['\u0642\u0628\u0644 \u0627\u0644\u0623\u062e\u064a\u0631', 'Second to last'],
-    rN:      ['\u0627\u0644\u062a\u0631\u062a\u064a\u0628 {n}', 'Rank {n}'],
-    paused:  ['\u0627\u0644\u062a\u062d\u062f\u064a\u062b\u0627\u062a \u0645\u0648\u0642\u0648\u0641\u0629 \u0644\u062d\u064a\u0646 \u062d\u0636\u0648\u0631 \u0627\u0644\u0645\u062d\u0627\u0633\u0628\u064a\u0646',
+    title:   ['ترتيب الفنيين', 'Technician ranking'],
+    today:   ['النهارده', 'Today'],
+    d30:     ['آخر ٣٠ يوم', 'Last 30 days'],
+    tech:    ['الفني', 'Technician'],
+    points:  ['النقاط', 'Points'],
+    done:    ['أجهزة', 'Devices'],
+    avg:     ['متوسط المدة', 'Avg time'],
+    returns: ['مرتجع', 'Returns'],
+    day:     ['يوم', 'd'],
+    lessDay: ['أقل من يوم', '< 1d'],
+    you:     ['(إنت)', '(you)'],
+    updated: ['آخر تحديث:', 'Updated:'],
+    r1:      ['🥇 المتصدر', '🥇 1st'],
+    r2:      ['🥈 التاني', '🥈 2nd'],
+    r3:      ['🥉 التالت', '🥉 3rd'],
+    rLast:   ['الأخير', 'Last'],
+    rLast2:  ['قبل الأخير', 'Second to last'],
+    rN:      ['الترتيب {n}', 'Rank {n}'],
+    paused:  ['التحديثات موقوفة لحين حضور المحاسبين',
               'Updates paused until an accountant is online'],
-    resume:  ['\u0634\u063a\u0644\u0643 \u0645\u062a\u0633\u062c\u0651\u0644 \u0648\u0645\u062d\u0641\u0648\u0638 \u2014 \u0627\u0644\u062a\u0631\u062a\u064a\u0628 \u0647\u064a\u062a\u062d\u062f\u0651\u062b \u0623\u0648\u0644 \u0645\u0627 \u064a\u0641\u062a\u062d\u0648\u0627 \u0627\u0644\u0646\u0638\u0627\u0645',
+    resume:  ['شغلك متسجّل ومحفوظ — الترتيب هيتحدّث أول ما يفتحوا النظام',
               'Your work is saved — the ranking updates once they open the system'],
-    empty:   ['\u0644\u0633\u0647 \u0645\u0641\u064a\u0634 \u062a\u0631\u062a\u064a\u0628 \u2014 \u0647\u064a\u0638\u0647\u0631 \u0623\u0648\u0644 \u0645\u0627 \u0627\u0644\u0645\u062d\u0627\u0633\u0628 \u064a\u0641\u062a\u062d \u0627\u0644\u0646\u0638\u0627\u0645',
+    empty:   ['لسه مفيش ترتيب — هيظهر أول ما المحاسب يفتح النظام',
               'No ranking yet — it appears once the accountant opens the system'],
   };
   return (M[k] || ['',''])[en ? 1 : 0];
