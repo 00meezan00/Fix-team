@@ -443,16 +443,129 @@ function shopStatementRows(shop){
 // ============================================================
 // الطباعة — من جوه الصفحة، مش في تاب جديد
 // ------------------------------------------------------------
-// ⚠️ الطريقة القديمة كانت window.open('','_blank') وبعدين
+// ⚠️ الطريقة الأقدم كانت window.open('','_blank') وبعدين
 //    document.write. ودي بتفتح **صفحة جديدة**، ولما التطبيق
 //    مثبّت على الأيفون (standalone) مفيش زرار رجوع أصلاً —
 //    فالمستخدم بيتحبس ومضطر يقفل التطبيق ويفتحه تاني.
 //
-//    دلوقتي بنرسم الكشف في إطار مخفي (iframe) جوه نفس الصفحة
-//    وبنطبع منه. الصفحة **ما بتتحركش من مكانها خالص** — فحتى
-//    لو نافذة الطباعة اتقفلت أو فشلت، المستخدم لسه في مكانه.
+//    بعدها بقينا نرسم الكشف في إطار مخفي (iframe) جوه نفس الصفحة
+//    ونطبع منه. الصفحة ما بتتحركش من مكانها — وده شغّال تمام على
+//    الكمبيوتر وأندرويد.
+//
+// 🔴 لكن على الأيفون والآيباد الإطار المخفي **مش بيطبع خالص**:
+//    سفاري (WebKit) بيدعم الطباعة للصفحة الرئيسية بس، وأي
+//    iframe.contentWindow.print() بيتجاهله في صمت — من غير خطأ
+//    ومن غير رسالة. وده كان بالظبط اللي بيحصل: الزرار يتدعس
+//    ومفيش أي حاجة تحصل، والكمبيوتر شغّال عادي.
+//
+//    تشبيه: كإنك بتقول للورقة اللي جوه الدرج «اطبعي نفسك».
+//    على الويندوز الدرج بينفّذ، وعلى الأيفون الدرج مش سامع
+//    أصلاً — لازم تطلّع الورقة برّه على المكتب الأول.
+//
+//    فعلى الأيفون بنعمل كده بالظبط: بنعرض الكشف **في الصفحة
+//    نفسها** ملء الشاشة، وبنندهه window.print() بتاع الصفحة
+//    الرئيسية — ودي WebKit بيدعمها.
+//
+// 🔧 الكمبيوتر وأندرويد سايبينهم على الـ iframe زي ما هم. شغّال،
+//    فمش هنلمسه — وده مقصود مش كسل.
 // ============================================================
+
+// الأيفون والآيباد.
+// ⚠️ الآيباد الحديث بيقول عن نفسه "Macintosh" في الـ user agent،
+//    فبنكشفه باللمس كمان وإلا هيتعامل كأنه كمبيوتر ويفضل مكسور.
+var ACC_IS_IOS = (function(){
+  try{
+    var ua = navigator.userAgent || '';
+    if(/iPad|iPhone|iPod/.test(ua)) return true;
+    return /Macintosh/.test(ua) && (navigator.maxTouchPoints || 0) > 1;
+  }catch(e){ return false; }
+})();
+
+// ============================================================
+// مسار الأيفون: الكشف بيتعرض في الصفحة نفسها وبيتطبع منها
+// ------------------------------------------------------------
+// الكشف جاي كصفحة HTML كاملة (فيها <style> و<body>). بنفصلهم:
+//   • الجسم  → بيتحط في صندوق ملء الشاشة جوه الصفحة
+//   • الاستايل → بيتحقن في الصفحة، وقواعد body بتاعته بتتحوّل
+//     للصندوق بتاعنا عشان ما تقعش على صفحة النظام كلها
+//
+// وفي وضع الطباعة بنخفي كل حاجة في الصفحة ما عدا الصندوق —
+// فاللي بيتطبع هو الكشف لوحده.
+// ============================================================
+function accPrintSheet(html, title){
+  accClosePrintSheet();          // أي كشف قديم لسه مفتوح
+
+  var css = '', body = html;
+  try{
+    var doc = new DOMParser().parseFromString(html, 'text/html');
+    css = Array.prototype.map.call(doc.querySelectorAll('style'),
+            function(s){ return s.textContent; }).join('\n');
+    body = doc.body ? doc.body.innerHTML : html;
+  }catch(e){ console.error('قراءة الكشف فشلت:', e); }
+
+  // ⚠️ استايل الكشف متكتب وهو فاكر إنه لوحده في صفحة. قواعد body
+  //    بتاعته (padding / خط / لون) لو سبناها هتقع على صفحة النظام
+  //    كلها. بنحوّلها للصندوق بتاعنا بس.
+  css = String(css).replace(/(^|[}\n,]\s*)body(\s*[,{])/g, '$1.aps-doc$2');
+
+  var st = document.createElement('style');
+  st.id = 'accPrintSheetCss';
+  st.textContent =
+    '#accPrintSheet{position:fixed;inset:0;z-index:2147483647;background:#fff;'
+      + 'color:#1A2332;overflow:auto;-webkit-overflow-scrolling:touch;}'
+    + '#accPrintSheet .aps-bar{position:sticky;top:0;z-index:2;display:flex;align-items:center;'
+      + 'gap:8px;padding:calc(10px + env(safe-area-inset-top)) 12px 10px;background:#101014;color:#fff;}'
+    + '#accPrintSheet .aps-t{flex:1;font-weight:800;font-size:14px;overflow:hidden;'
+      + 'text-overflow:ellipsis;white-space:nowrap;}'
+    + '#accPrintSheet .aps-btn{border:0;border-radius:10px;padding:11px 14px;'
+      + 'font:800 13px/1 inherit;cursor:pointer;white-space:nowrap;}'
+    + '#accPrintSheet .aps-x{background:rgba(255,255,255,.16);color:#fff;}'
+    + '#accPrintSheet .aps-p{background:#16A34A;color:#fff;}'
+    + '\n' + css + '\n'
+    // ⚠️ لازم تفضل آخر حاجة في الاستايل — عشان تكسب على أي
+    //    @media print مكتوب جوه الكشف نفسه.
+    + '@media print{'
+      + 'body > *:not(#accPrintSheet){display:none !important;}'
+      + '#accPrintSheet{position:static !important;overflow:visible !important;background:#fff !important;}'
+      + '#accPrintSheet .aps-bar{display:none !important;}'
+    + '}';
+  document.head.appendChild(st);
+
+  var host = document.createElement('div');
+  host.id = 'accPrintSheet';
+  host.setAttribute('dir', 'rtl');
+  host.innerHTML =
+    '<div class="aps-bar">'
+      + '<button type="button" class="aps-btn aps-x" onclick="accClosePrintSheet()">\u2715 إغلاق</button>'
+      + '<span class="aps-t">' + esc(title || 'كشف') + '</span>'
+      + '<button type="button" class="aps-btn aps-p" onclick="accPrintNow()">\ud83d\udda8\ufe0f اطبع / احفظ PDF</button>'
+    + '</div>'
+    + '<div class="aps-doc">' + body + '</div>';
+  document.body.appendChild(host);
+
+  // ⚠️ من غير أي تأخير — لازم تبقى في نفس لحظة الضغطة، وإلا سفاري
+  //    بيعتبرها "طباعة تلقائية" ويطلب إذن كل مرة.
+  accPrintNow();
+}
+
+// الطباعة نفسها. زرار «اطبع» جوه الكشف بيندهها كمان — فلو النداء
+// التلقائي اتمنع لأي سبب، المستخدم عنده ضغطة مباشرة تشتغل أكيد.
+function accPrintNow(){
+  try{ window.print(); }
+  catch(e){ console.error('الطباعة فشلت:', e); }
+}
+
+// بنشيل الصندوق **والاستايل** مع بعض. لو سبنا الاستايل، قواعد
+// الجدول والألوان بتاعة الكشف هتفضل واقعة على صفحة النظام.
+function accClosePrintSheet(){
+  var h = document.getElementById('accPrintSheet');    if(h) h.remove();
+  var s = document.getElementById('accPrintSheetCss'); if(s) s.remove();
+}
+
 function accPrint(html, title){
+  // 🍎 الأيفون والآيباد: مسار مختلف تماماً (شوف الشرح فوق)
+  if(ACC_IS_IOS) return accPrintSheet(html, title);
+
   // إطار قديم من طباعة سابقة؟ نشيله عشان ما يتكدّسوش
   const old = document.getElementById('accPrintFrame');
   if(old) old.remove();
