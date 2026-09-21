@@ -492,6 +492,56 @@ var ACC_IS_IOS = (function(){
 // وفي وضع الطباعة بنخفي كل حاجة في الصفحة ما عدا الصندوق —
 // فاللي بيتطبع هو الكشف لوحده.
 // ============================================================
+// ============================================================
+// 🎨 ألوان الطباعة — الكشف لازم يطلع فاتح دايماً
+// ------------------------------------------------------------
+// ⚠️ التقارير بتستعمل متغيرات ثيم الداشبورد جوه الأسطر، مثلاً:
+//        background:var(--surface)   ·   color:var(--warn)
+//
+//    ده مكانش بيبان في الإطار المخفي لأن المتغيرات دي مش معرّفة
+//    جواه أصلاً — فكانت بتقع على الافتراضي والخلفية تطلع بيضا.
+//    يعني كان شغّال بالصدفة مش بالتصميم.
+//
+//    لكن الكشف دلوقتي بيتعرض **جوه الصفحة نفسها**، يعني ورث ثيم
+//    الداشبورد. ولو المحاسب شغّال بالوضع الداكن، --surface بتبقى
+//    كحلي غامق والكلام غامق فوقه = سطور مش مقروءة خالص.
+//
+//    الحل: بنعيد تعريف ألوان الثيم كلها **جوه الكشف بس** بقيم
+//    الوضع الفاتح. فأي تقرير بيطلع بألوان الورق الصح مهما كان
+//    ثيم الشاشة، وصفحة النظام ورا الكشف ما بتتأثرش.
+//
+// 🔧 القيم دي منقولة من :root في dashboard.html. لو غيّرت لون
+//    هناك وعايزه يتغيّر في الطباعة كمان، غيّره هنا برضه.
+// ============================================================
+var ACC_PRINT_VARS =
+    'color-scheme:light;'
+  + '--bg:#F3F5F7;--surface:#FFFFFF;--ink:#1A2332;--muted:#64748B;'
+  + '--accent:#0891A8;--accent-dark:#077A8F;'
+  + '--surface-2:#F8FAFC;--surface-3:#F1F5F9;--surface-alt:#EEF0F3;'
+  + '--border:#E2E8F0;--border-strong:#CBD5E1;'
+  + '--ink-2:#475569;--ink-3:#334155;--muted-2:#64748B;'
+  + '--on-accent:#FFFFFF;'
+  + '--shadow:rgba(16,24,40,.10);--shadow-lg:rgba(16,24,40,.20);'
+  + '--chrome:#1A2332;--chrome-ink:#FFFFFF;'
+  + '--danger:#DC2626;--danger-bg:#FEF2F2;--danger-border:#FCA5A5;--danger-strong:#B91C1C;--danger-tint:#FEE2E2;'
+  + '--warn:#B45309;--warn-bg:#FEF3C7;--warn-border:#FDE68A;--warn-strong:#92400E;--warn-tint:#FFFBEB;'
+  + '--success:#16A34A;--success-bg:#F0FDF4;--success-border:#BBF7D0;'
+  + '--info:#2563EB;--info-bg:#EFF6FF;--info-border:#BFDBFE;'
+  + '--violet:#7C3AED;'
+  + '--waiting:#96521A;--waiting-bg:#FBF2E9;'
+  + '--diagnosing:#6E56CF;--diagnosing-bg:#F1EEFB;'
+  + '--repairing:#2B6CB0;--repairing-bg:#EAF1F8;'
+  + '--done:#15803D;--done-bg:#EAF6EE;'
+  + '--delivered:#64748B;--delivered-bg:#EEF1F3;'
+  + '--delivered_paid:#15803D;--delivered_paid-bg:#DCFCE7;'
+  + '--delivered_unpaid:#B45309;--delivered_unpaid-bg:#FEF3C7;'
+  + '--paid:#15803D;--paid-bg:#EAF6EE;'
+  + '--unpaid:#B45309;--unpaid-bg:#FEF3E2;'
+  + '--rejected_shop:#C2185B;--rejected_shop-bg:#FCE7F1;'
+  + '--rejected:#BE1D1D;--rejected-bg:#FEF2F2;'
+  + '--returned:#9333EA;--returned-bg:#F5EEFC;'
+  + '--trashed:#64748B;--trashed-bg:#EEF1F3;';
+
 function accPrintSheet(html, title){
   accClosePrintSheet();          // أي كشف قديم لسه مفتوح
 
@@ -511,7 +561,10 @@ function accPrintSheet(html, title){
   var st = document.createElement('style');
   st.id = 'accPrintSheetCss';
   st.textContent =
-    '#accPrintSheet{position:fixed;inset:0;z-index:2147483647;background:#fff;'
+    // ⚠️ ACC_PRINT_VARS لازم تفضل أول حاجة جوه القاعدة — هي اللي
+    //    بتقطع ثيم الداشبورد عن الكشف.
+    '#accPrintSheet{' + ACC_PRINT_VARS
+      + 'position:fixed;inset:0;z-index:2147483647;background:#fff;'
       + 'color:#1A2332;overflow:auto;-webkit-overflow-scrolling:touch;}'
     + '#accPrintSheet .aps-bar{position:sticky;top:0;z-index:2;display:flex;align-items:center;'
       + 'gap:8px;padding:calc(10px + env(safe-area-inset-top)) 12px 10px;background:#101014;color:#fff;}'
