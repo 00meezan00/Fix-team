@@ -679,12 +679,12 @@
   /* ⚠️ الشريطين "جهاز جديد" (z-index:30) والتبويبات (29) sticky —
      يعني بيفضلوا راكبين على الشاشة. الشاشة دي لازم تبقى فوقهم،
      وإلا هيفضلوا ظاهرين فوق الجرد. */
-  #accountsOverlay, #inventoryOverlay, #prOverlay{z-index:69;}
+  #accountsOverlay, #inventoryOverlay, #prOverlay, #pzOverlay{z-index:69;}
   /* ⚠️ .overlay هي flex container، و.acc-page جواها عنصر flex —
      يعني بيتقلّص لعرض محتواه بدل ما ياخد الشاشة كلها. لازم
      width:100% صريحة، وإلا الصفحة بتطلع في ثلثين الشاشة والكروت
      بتنزل واحد تحت التاني. */
-  #inventoryOverlay .acc-page, #prOverlay .acc-page{width:100%;}
+  #inventoryOverlay .acc-page, #prOverlay .acc-page, #pzOverlay .acc-page{width:100%;}
   /* ⚠️ شيت التفاصيل (.sheet = 61) أقل من شاشة الجرد (69)، فلما
      تتفتح من جوه الجرد بتتفتح **ورا** الشاشة — يعني الشاشة بتبان
      كأنها مابتعملش حاجة. بنرفعها فوق الجرد وقت ما يكون مفتوح بس،
@@ -943,13 +943,18 @@
      💰 شاشة التسعير — الأجهزة اللي السوبر أدمن شاركها معاك
      الجسم بيتبني كله من p9_price.js
      ============================================================ -->
-<div class="sheet-bg" id="pzBg" onclick="closePricing()"></div>
-<div class="sheet" id="pzSheet">
-  <div class="sheet-head">
-    <div class="grab"></div>
-    <div class="sh-row"><div class="sh-title">💰 تسعير أجهزة</div><button class="sh-x" onclick="closePricing()">×</button></div>
+<!-- صفحة كاملة — نفس هيكل الجرد ومراجعة قطع الغيار بالحرف
+     (overlay + acc-page + acc-head). ⚠️ acc-head مش sheet-head:
+     فيها env(safe-area-inset-top) اللي بينزّل الرأس تحت نتش
+     الأيفون — من غيرها زرار × بيستخبى تحت الساعة. -->
+<div id="pzOverlay" class="overlay hidden" style="align-items:stretch; justify-content:stretch; padding:0; overflow-y:auto;">
+  <div class="acc-page">
+    <div class="acc-head">
+      <h2>💰 تسعير أجهزة</h2>
+      <button class="acc-close" onclick="closePricing()">×</button>
+    </div>
+    <div id="pzBody" style="padding:14px 20px 40px;"></div>
   </div>
-  <div class="sh-body" id="pzBody"></div>
 </div>
 
 
@@ -993,6 +998,37 @@
       <button class="acc-close" onclick="closePartsReview()">×</button>
     </div>
     <div id="prBody" style="padding:14px 20px 40px;"></div>
+  </div>
+</div>
+
+<!-- ══ منقول بالحرف من dispatch.html: شاشة الحسابات ══
+     ⚠️ accounts.js بيدوّر على العناصر دي بالاسم: accountsOverlay ·
+        accountsBody · accSearch. من غيرها openAccounts بترمي خطأ
+        والخانة مبتفتحش خالص — وده اللي كان حاصل. -->
+<div id="accountsOverlay" class="overlay hidden" style="align-items:stretch; justify-content:stretch; padding:0; overflow-y:auto;">
+  <div class="acc-page">
+    <div class="acc-head">
+      <h2>🧾 الحسابات</h2>
+      <button class="acc-close" onclick="closeAccounts()">×</button>
+    </div>
+    <div style="padding:12px 20px 8px;">
+      <div class="modal-search"><input id="accSearch" oninput="renderAccounts()" placeholder="ابحث باسم المحل..." /></div>
+      <div id="accViewBar" class="acc-viewbar">
+        <span class="acc-viewbar-label">طريقة العرض</span>
+        <div class="acc-viewbtns">
+          <button type="button" class="acc-viewbtn" data-mode="list" onclick="setAccViewMode('list')">
+            <span class="acc-viewbtn-ic">📜</span><span>قائمة تفصيلية</span>
+          </button>
+          <button type="button" class="acc-viewbtn" data-mode="grid-small" onclick="setAccViewMode('grid-small')">
+            <span class="acc-viewbtn-ic">🔲</span><span>مربعات صغيرة</span>
+          </button>
+          <button type="button" class="acc-viewbtn" data-mode="grid-large" onclick="setAccViewMode('grid-large')">
+            <span class="acc-viewbtn-ic">🔳</span><span>مربعات كبيرة</span>
+          </button>
+        </div>
+      </div>
+    </div>
+    <div id="accountsBody" style="padding:12px 20px 40px;"></div>
   </div>
 </div>
 
@@ -3313,16 +3349,14 @@ async function pzRefreshBadge(){
 async function openPricing(){
   closeKebab();
   pzOpen = true;
-  $('pzSheet').classList.add('on');
-  $('pzBg').classList.add('on');
+  $('pzOverlay').classList.remove('hidden');
   $('pzBody').innerHTML = '<div class="empty">⏳ بيحمّل...</div>';
   await pzLoad();
 }
 
 function closePricing(){
   pzOpen = false;
-  $('pzSheet').classList.remove('on');
-  $('pzBg').classList.remove('on');
+  $('pzOverlay').classList.add('hidden');
 }
 
 async function pzLoad(){
