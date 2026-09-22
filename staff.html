@@ -11,14 +11,18 @@
     var h = new Date().getHours();
     var d = m === 'dark' || (m === 'auto' && (h >= 19 || h < 7));
     document.documentElement.setAttribute('data-theme', d ? 'dark' : 'light');
+    // 🎨 لون شريط الحالة على الموبايل لازم يطابق الهيدر،
+    //    وإلا بيبان شريط بلون مختلف فوق الشاشة.
+    var mt = document.querySelector('meta[name="theme-color"]');
+    if(mt) mt.setAttribute('content', d ? '#0F1823' : '#16233A');
   }catch(e){}
 })();
 </script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>المواعيد — I Fix Team</title>
-<meta name="theme-color" content="#1B2A3A">
+<meta name="theme-color" content="#16233A">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="المواعيد">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="common.js"></script>

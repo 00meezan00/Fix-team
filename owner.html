@@ -18,11 +18,17 @@
 </script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>المالك — I Fix Team</title>
-<link rel="icon" href="icon-192.png">
-<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="owner-icon-192.png">
+<link rel="apple-touch-icon" href="owner-icon-192.png">
 <meta name="theme-color" content="#1B2A3A">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<!-- 🍎 «default» مقصودة، متغيّرهاش لـ black-translucent تاني.
+     من iOS 26، لما الصفحة بتطلب ترسم تحت شريط الحالة، النظام
+     بيحط فوقها طبقة زجاج ضبابية (Liquid Glass) بتمتد لجوه
+     الهيدر وبتغبّشه. مفيش أي CSS بيوقّفها — الحل الوحيد إننا
+     منطلبش الرسم تحت الشريط أصلاً. ساعتها الشريط بياخد لونه
+     من theme-color فوق، فخليه دايماً بلون الهيدر (--steel). -->
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="المالك">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="common.js"></script>
@@ -67,11 +73,11 @@
     --paper:#EBEEF2; --card:#FFFFFF; --line:#E4E9EF;
     --ink:#17222E; --muted:#6B7A8C; --faint:#94A3B4;
     --red:#E8321E; --red-dark:#C22513; --blue:#2B1DE8; --gold:#BE8A1C;
-    /* 👑 لون المالك — ذهبي غامق. بيستخدم في شارة التبويب، عشان
+    /* 🔑 لون المالك — ذهبي غامق. بيستخدم في شارة التبويب، عشان
        المالك يفرّق بين شغله كفني وشغله كديسباتشر.
        ⚠️ غامق كده عن قصد: الذهبي الفاتح (#B08419) تباينه مع
        الأبيض ٣.٤ بس — والمطلوب ٤.٥ عشان النص يتقرا. ده ٥.١. */
-    --crown:#8A6410; --crown-bg:#FBF4E4;
+    --owner:#8A6410; --owner-bg:#FBF4E4;
     --waiting:#B5651D; --waiting-bg:#FBF2E9;
     --diagnosing:#6E56CF; --diagnosing-bg:#F1EEFB;
     --repairing:#2B6CB0; --repairing-bg:#EAF1F8;
@@ -93,7 +99,7 @@
     --paper:#131E29; --card:#1B2A3A; --line:#2F4356;
     --ink:#E9EFF5; --muted:#92A6B8; --faint:#71879B;
     --red:#F0554A; --red-dark:#D13B2E; --blue:#7C8FFF; --gold:#E3B85C;
-    --crown:#E3B85C; --crown-bg:rgba(227,184,92,.15);
+    --owner:#E3B85C; --owner-bg:rgba(227,184,92,.15);
     --waiting:#E0A15C;    --waiting-bg:rgba(224,161,92,.15);
     --diagnosing:#A78BFA; --diagnosing-bg:rgba(167,139,250,.15);
     --repairing:#7BA9DC;  --repairing-bg:rgba(123,169,220,.15);
@@ -215,10 +221,10 @@
   .tab .cnt{font-family:var(--mono); font-weight:800; font-size:15px; color:var(--ink);}
   .tab.on{background:var(--steel); border-color:var(--steel); color:#C7D6E4;}
   .tab.on .cnt{color:var(--on-color);}
-  /* 👑 تبويب «أجهزتي» بلون المالك عشان يبان إنه شغل مختلف */
-  .tab.mine{border-color:var(--crown); color:var(--crown);}
-  .tab.mine .cnt{color:var(--crown);}
-  .tab.mine.on{background:var(--crown); border-color:var(--crown); color:#fff;}
+  /* 🔑 تبويب «أجهزتي» بلون المالك عشان يبان إنه شغل مختلف */
+  .tab.mine{border-color:var(--owner); color:var(--owner);}
+  .tab.mine .cnt{color:var(--owner);}
+  .tab.mine.on{background:var(--owner); border-color:var(--owner); color:#fff;}
   html[data-theme="dark"] .tab.mine.on{color:#1B1206;}
   .tab.mine.on .cnt{color:inherit;}
 
@@ -273,8 +279,8 @@
   .act-prob{background:var(--waiting-bg); color:var(--waiting); flex:0 0 auto;}
   .act:hover{filter:brightness(.97);}
   /* شارة «إنت الفني» على كارت أجهزتي */
-  .tk-crown{display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:800;
-    color:var(--crown); background:var(--crown-bg); border-radius:7px; padding:3px 8px;}
+  .tk-own{display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:800;
+    color:var(--owner); background:var(--owner-bg); border-radius:7px; padding:3px 8px;}
   /* شارة الطلب المعلّق */
   .pend{margin-top:9px; background:#FEF3C7; border:1px solid #FDE68A; color:#92400E;
     border-radius:9px; padding:7px 10px; font-size:12px; font-weight:800; line-height:1.6;}
@@ -469,7 +475,7 @@
   .hb-h{font-size:13px; font-weight:700; color:var(--ink); margin-bottom:8px;}
   /* ===== 💰 شاشة التسعير ===== */
   .pr-badge{display:inline-flex; align-items:center; justify-content:center; min-width:19px; height:19px;
-    margin-inline-start:7px; padding:0 5px; border-radius:10px; background:var(--crown); color:#fff;
+    margin-inline-start:7px; padding:0 5px; border-radius:10px; background:var(--owner); color:#fff;
     font-family:var(--mono); font-size:11px; font-weight:800; line-height:1;}
   .pr-h{font-family:'Cairo',sans-serif; font-weight:800; font-size:14px; color:var(--ink); margin:4px 0 11px;}
   .pr-ok{text-align:center; color:var(--done); background:var(--done-bg); border-radius:12px;
@@ -481,7 +487,7 @@
   .pr-top{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px;}
   .pr-no{font-family:var(--mono); font-size:11.5px; color:var(--faint); font-weight:600; flex:0 0 auto;}
   .pr-b{font-size:11px; font-weight:800; padding:3px 9px; border-radius:20px; line-height:1.6;}
-  .pr-b-new{background:var(--crown-bg); color:var(--crown);}
+  .pr-b-new{background:var(--owner-bg); color:var(--owner);}
   .pr-b-cash{background:var(--waiting-bg); color:var(--waiting);}
   .pr-b-wait{background:var(--paper); color:var(--muted);}
   .pr-b-ok{background:var(--done-bg); color:var(--done);}
@@ -493,7 +499,7 @@
   .pr-in{flex:1; min-width:0; border:1.5px solid var(--line); background:var(--card); color:var(--ink);
     border-radius:11px; padding:12px 13px; font-family:var(--mono); font-size:16px; font-weight:700;
     direction:ltr; text-align:right;}
-  .pr-in:focus{outline:none; border-color:var(--crown);}
+  .pr-in:focus{outline:none; border-color:var(--owner);}
   .pr-eg{font-size:13px; font-weight:800; color:var(--muted); flex:0 0 auto;}
   .pr-btns{display:flex; gap:7px; margin-top:10px;}
   /* ⚠️ لون النص هنا مش var(--muted) عن قصد. --muted لون نص جانبي
@@ -506,7 +512,7 @@
   .pr-btn:disabled{opacity:.5; cursor:not-allowed;}
   .pr-cash{border-color:var(--waiting); color:var(--waiting);}
   .pr-cash.on{background:var(--waiting); border-color:var(--waiting); color:#fff;}
-  .pr-def{border-color:var(--crown); color:var(--crown);}
+  .pr-def{border-color:var(--owner); color:var(--owner);}
   .pr-none{border-color:var(--line);}
   .pr-none.on{background:var(--paper);}
   .pr-warn{font-size:11.5px; color:var(--rejected_shop); background:var(--rejected_shop-bg);
@@ -533,7 +539,9 @@
 
 <div class="topbar">
   <div class="who">
-    <div class="mark">👑</div>
+    <!-- 🔑 علامة المالك — نفس عيلة أيقونات النظام (شريحة + تروس)،
+         والرمز جواها مفك ومفتاح محل: «فني… ومعاه مفتاح المحل». -->
+    <div class="mark"><img src="owner-icon.png" alt="" style="width:100%;height:100%;object-fit:contain;border-radius:inherit;background:var(--card);"></div>
     <div class="txt">
       <div class="hi">المالك</div>
       <div class="nm" id="ownName">—</div>
@@ -652,7 +660,7 @@
 </div>
 
 <div id="veil">
-  <div class="mk">👑</div>
+  <div class="mk"><img src="owner-icon.png" alt="المالك" style="width:68%;height:68%;object-fit:contain;"></div>
   <div class="sp"></div>
   <div class="ms" id="veilMsg">جاري التحميل...</div>
 </div>
@@ -1354,9 +1362,9 @@ function dispTicket(d){
          <button class="act act-rej" onclick="event.stopPropagation();requestReject('${d.id}')">🚫 رفض</button>
          <button class="act act-view" onclick="event.stopPropagation();showInfo('${d.id}')">تفاصيل</button>
        </div>`;
-  // 👑 لو الجهاز ده عليه اسمه هو كفني، بنعلّمه — عشان يعرف إنه
+  // 🔑 لو الجهاز ده عليه اسمه هو كفني، بنعلّمه — عشان يعرف إنه
   //    موجود في تبويب «أجهزتي» كمان ومايتلغبطش
-  const crown = d.isMine ? `<span class="tk-crown">👑 إنت الفني</span>` : '';
+  const crown = d.isMine ? `<span class="tk-own">🔑 إنت الفني</span>` : '';
   return `<div class="ticket" style="--sp:var(${s.c});" onclick="showInfo('${d.id}')">
     <div class="tk-top"><span class="tk-no">${ticketNo(d.id)}</span>${statusPill(d.status)}</div>
     <div class="tk-title">${esc(d.type)} ${esc(d.model)}</div>
@@ -1438,7 +1446,7 @@ function render(){
     const n = devices.filter(tb.filter).length;
     return `<div class="tab ${tb.crown?'mine':''} ${activeTab===tb.key?'on':''}"
                  onclick="activeTab='${tb.key}';render()">
-      <span class="cnt">${n}</span><span>${tb.crown?'👑 ':''}${tb.label}</span>
+      <span class="cnt">${n}</span><span>${tb.crown?'🔑 ':''}${tb.label}</span>
     </div>`;
   }).join('');
 
@@ -1511,11 +1519,11 @@ function renderTechSelect(){
   const sel = $('f_tech'); if(!sel) return;
   const cur = sel.value;
   const list = allTechNames();
-  // 👑 اسمي الأول في القايمة — أغلب الوقت المالك بيسجّل على نفسه
+  // 🔑 اسمي الأول في القايمة — أغلب الوقت المالك بيسجّل على نفسه
   const mine = list.filter(x => x.name === MY_TECH);
   const rest = list.filter(x => x.name !== MY_TECH);
   sel.innerHTML = '<option value="">— اختار الفني —</option>'
-    + mine.map(x => `<option value="${esc(x.name)}">👑 ${esc(x.name)} (إنت)</option>`).join('')
+    + mine.map(x => `<option value="${esc(x.name)}">🔑 ${esc(x.name)} (إنت)</option>`).join('')
     + rest.map(x => `<option value="${esc(x.name)}">${esc(x.name)}${x.pending?' ⏳':''}</option>`).join('');
   if(cur) sel.value = cur;
 
@@ -1935,7 +1943,7 @@ function editTech(id){
     <div class="de-cur">الفني دلوقتي: <b>${esc(cur || 'لسه من غير فني')}</b></div>
     <select id="deTech" class="tech-select" style="margin-bottom:14px;">
       <option value="">— اختار الفني الجديد —</option>
-      ${list.map(x => `<option value="${esc(x.name)}">${x.name === MY_TECH ? '👑 ' : ''}${esc(x.name)}${x.name === MY_TECH ? ' (إنت)' : ''}${x.pending ? ' ⏳' : ''}</option>`).join('')}
+      ${list.map(x => `<option value="${esc(x.name)}">${x.name === MY_TECH ? '🔑 ' : ''}${esc(x.name)}${x.name === MY_TECH ? ' (إنت)' : ''}${x.pending ? ' ⏳' : ''}</option>`).join('')}
     </select>
     <div class="de-hint">الجهاز هيختفي من عند «${esc(cur || '—')}» ويظهر عند الفني الجديد.</div>
     <button class="act-btn act-primary" id="deGo" onclick="doEditTech('${d.id}')">🔄 انقل الجهاز</button>
@@ -1974,7 +1982,7 @@ function applyLocal(d, raw){
   Object.assign(d._raw, raw);
   if('technician'    in raw){
     d.tech = (raw.technician || '').trim();
-    // 👑 الجهاز اتحوّل لي أو مني؟ علامة «أجهزتي» لازم تتحدّث فوراً
+    // 🔑 الجهاز اتحوّل لي أو مني؟ علامة «أجهزتي» لازم تتحدّث فوراً
     d.isMine = (d.tech === MY_TECH) || (d.assist === MY_TECH);
   }
   if('assistTechnician' in raw){
@@ -2769,7 +2777,7 @@ async function saveIntake(){
   if($('f_tech')) $('f_tech').value = '';
   closeIntake();
   await loadDevices();
-  // 👑 لو سجّلته على نفسي، أوديه على «أجهزتي» — وإلا على «اللي سجّلتها»
+  // 🔑 لو سجّلته على نفسي، أوديه على «أجهزتي» — وإلا على «اللي سجّلتها»
   activeTab = 'reg';
   render();
 

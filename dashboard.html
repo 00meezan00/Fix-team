@@ -4,9 +4,9 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="I Fix Team">
-<meta name="theme-color" content="#101014">
+<meta name="theme-color" content="#1A2332">
 <link rel="manifest" href="manifest.json">
 <title>I Fix Team — نظام إدارة الصيانة</title>
 <!-- ⚠️ سكريبت الإقلاع لازم يفضل فوق وسوم الأيقونات. لو نزل تحتها،
@@ -5644,7 +5644,7 @@ function applyTheme(){
   const dark = isDarkNow(themeMode());
   document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
   const meta = document.querySelector('meta[name="theme-color"]');
-  if(meta) meta.setAttribute('content', dark ? '#131E29' : '#101014');
+  if(meta) meta.setAttribute('content', dark ? '#0E1721' : '#1A2332');
 }
 function pickTheme(mode){
   try{ localStorage.setItem(THEME_KEY, mode); }catch(e){}
