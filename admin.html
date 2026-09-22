@@ -694,7 +694,13 @@ async function toggleFlag(key){
 //    ٤) قايمة IN جوه دالة my_app_role في قاعدة البيانات
 //    ٥) roleLabel في hr.html و staff.html
 //    نسيان أي واحدة = الدور بيتحوّل لمحاسب في صمت.
-const ROLES = ['super_admin', 'accountant', 'dispatcher', 'technician', 'hr', 'staff'];
+//
+// 👑 owner = المالك — صاحب الشركة المشتركة في السيستم.
+//    مش السوبر أدمن (ده صاحب المنصة). المالك = ديسباتشر
+//    + فني في صفحة واحدة (owner.html)، وبيسعّر الأجهزة
+//    اللي السوبر أدمن بيشاركها معاه. مايقدرش يأكد دفع.
+//    ⚠️ الاسم الظاهر عنده **إجباري** — هو اللي بيربط أجهزته.
+const ROLES = ['super_admin', 'accountant', 'dispatcher', 'technician', 'hr', 'staff', 'owner'];
 const ROLE_LABEL_KEYS = {
   super_admin: 'adm.roleSuper',
   accountant:  'adm.roleAcc',
@@ -705,7 +711,7 @@ const ROLE_LABEL_KEYS = {
 };
 // الأدوار اللي لسه مالهاش مفتاح ترجمة — من غير ده بيظهر الاسم
 // الإنجليزي الخام (staff) قدّام الأدمن.
-const ROLE_LABEL_FALLBACK = { staff: 'موظف' };
+const ROLE_LABEL_FALLBACK = { staff: 'موظف', owner: 'المالك' };
 function roleLabel(r){
   const k = ROLE_LABEL_KEYS[r];
   try{ return k ? t(k) : (ROLE_LABEL_FALLBACK[r] || r); }
@@ -735,23 +741,23 @@ function normRole(v){
 const CAPS = [
   { key:'purchases', icon:'🧾', label:'فواتير المشتريات ومخزن قطع الغيار',
     hint:'قراءة الفواتير بالذكاء الاصطناعي + المخزن + ربط القطع بالأجهزة',
-    forRoles:['dispatcher'] },  // الديسباتشر بس — صفحة الفني مش موصّلة بالموديول
+    forRoles:['dispatcher','owner'] },  // الديسباتشر بس — صفحة الفني مش موصّلة بالموديول
   { key:'parts_review', icon:'🔩', label:'مراجعة قطع الغيار',
     hint:'يشوف كومنت قطع الغيار اللي الفني كتبه على كل جهاز، ويربط القطع بالأجهزة',
-    forRoles:['dispatcher'] },
+    forRoles:['dispatcher','owner'] },
   // ⚠️ قراءة فقط — عن قصد. تسجيل الدفعات والخصومات والرصيد الافتتاحي
   //    شغل المحاسب وحده. الديسباتشر بيشوف ويدوّر ويطبع PDF وبس.
   //    القفل ده مش في الواجهة بس: مفتاح accounts-ledger **الكتابة**
   //    فيه محصورة على الأدمن والمحاسب في قاعدة البيانات أصلاً.
   { key:'accounts_view', icon:'🧾', label:'عرض الحسابات (قراءة فقط)',
     hint:'يشوف آجل المحلات ويدوّر فيه ويصدّر كشف PDF — من غير تسجيل دفعة ولا خصم ولا حذف',
-    forRoles:['dispatcher'] },
+    forRoles:['dispatcher','owner'] },
   // ⚠️ قراءة فقط — بدون فلوس. devices_dispatch أصلاً بتشيل الأسعار
   //    قبل ما توصل لصفحة الديسباتشر، فمفيش عمود سعر ولا كارت
   //    "مدفوع/غير مدفوع" في الجرد بتاعه — الاتنين محتاجين بيانات فلوس مش موجودة أصلاً.
   { key:'inventory_view', icon:'📋', label:'الجرد (قراءة فقط)',
     hint:'كروت أعداد (استلام/قيد التنفيذ/تسليم/واقفة) + أداء الفنيين — من غير أسعار',
-    forRoles:['dispatcher'] }
+    forRoles:['dispatcher','owner'] }
 ];
 function hasCap(en, cap){ return (en.caps || []).includes(cap); }
 
@@ -790,11 +796,14 @@ async function addRole(){
   //    الفني بس هو اللي الاسم عنده **إجباري**، لأنه بيربط الحساب
   //    بالأجهزة المكتوب عليها اسمه.
   const prevName = normRole(userRoles[e]).techName;
-  const nm = prompt(role === 'technician' ? t('adm.techNamePrompt') : t('adm.namePrompt'),
+  // 👑 المالك بيشتغل كفني كمان، فالاسم الظاهر إجباري عنده
+  //    زي الفني — هو اللي بيربط الأجهزة بحسابه.
+  const needsName = (role === 'technician' || role === 'owner');
+  const nm = prompt(needsName ? t('adm.techNamePrompt') : t('adm.namePrompt'),
                     prevName || '');
   if(nm === null) return;
   const techName = (nm || '').trim();
-  if(role === 'technician' && !techName){ toast(t('adm.needTechName'), false); return; }
+  if(needsName && !techName){ toast(t('adm.needTechName'), false); return; }
 
   try{
     // بنحافظ على الصلاحيات الموجودة — تعديل الدور مش المفروض يمسحها

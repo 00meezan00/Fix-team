@@ -2481,7 +2481,7 @@ async function loadTechNames(){
 function accountTechNames(){
   return Object.values(userRoles)
     .map(v => (typeof v === 'string') ? null : v)
-    .filter(v => v && v.role === 'technician' && v.techName)
+    .filter(v => v && (v.role === 'technician' || v.role === 'owner') && v.techName)
     .map(v => String(v.techName).trim()).filter(Boolean);
 }
 function allTechNames(){

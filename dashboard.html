@@ -57,11 +57,12 @@
       }
     }
 
-    if(!bounced && sameUser && (last === 'dispatcher' || last === 'technician' || last === 'hr' || last === 'staff')){
+    if(!bounced && sameUser && (last === 'dispatcher' || last === 'technician' || last === 'hr' || last === 'staff' || last === 'owner')){
       sessionStorage.setItem('ifix-bounced', '1');
       location.replace(last === 'dispatcher' ? 'dispatch.html'
                      : last === 'hr'         ? 'hr.html'
                      : last === 'staff'      ? 'staff.html'
+                     : last === 'owner'      ? 'owner.html'
                      : 'my-devices.html');
       return;
     }
@@ -1786,7 +1787,7 @@ function isAdmin(){ return isSuperAdmin(); }
 // لو إيميل الأدمن لسه ماتحطش، بنسيب الصلاحيات مفتوحة عشان محدش يتقفل بره النظام
 const ADMIN_EMAIL_SET = ADMIN_EMAILS.length > 0;
 const ROLES_KEY = 'user-roles';
-const ROLES = ['super_admin', 'accountant', 'dispatcher', 'technician', 'hr', 'staff'];
+const ROLES = ['super_admin', 'accountant', 'dispatcher', 'technician', 'hr', 'staff', 'owner'];
 let userRoles = {};   // { "email": "super_admin" }  أو  { "email": {role, techName} }
 
 async function loadUserRoles(){
@@ -1866,7 +1867,7 @@ const ROLE_LABEL_KEYS = {
 };
 // دور HR اتضاف بعد ما الخريطة دي اتكتبت ومالوش مفتاح ترجمة،
 // فبيرجّع 'hr' خام. الخريطة دي بتغطّي أي دور مالوش مفتاح.
-const ROLE_LABEL_FALLBACK = { hr: 'موارد بشرية', staff: 'موظف' };
+const ROLE_LABEL_FALLBACK = { hr: 'موارد بشرية', staff: 'موظف', owner: 'المالك' };
 function roleLabel(r){
   const k = ROLE_LABEL_KEYS[r];
   try{ return k ? t(k) : (ROLE_LABEL_FALLBACK[r] || r); }
@@ -1907,6 +1908,8 @@ function applyRoleVisibility(){
   if(myRole() === 'hr'){ location.replace('hr.html');       return; }
   // ⚠️ الموظف العادي مالوش أي علاقة بالأجهزة ولا الفلوس.
   if(myRole() === 'staff'){ location.replace('staff.html'); return; }
+  // 👑 المالك: صفحته owner.html — بتقرا من devices_owner
+  if(myRole() === 'owner'){ location.replace('owner.html'); return; }
 
   // الدور اتحدد → نحفظه ونحدّث الكلاسات
   try{
@@ -4096,7 +4099,7 @@ async function savePendingTechs(){
 function accountTechNames(){
   return Object.keys(userRoles)
     .map(e => roleEntry(e))
-    .filter(x => x && x.role === 'technician' && x.techName)
+    .filter(x => x && (x.role === 'technician' || x.role === 'owner') && x.techName)
     .map(x => x.techName.trim())
     .filter(Boolean);
 }
@@ -6025,7 +6028,7 @@ function tvTechChoices(exclude){
   const ex = (exclude || '').trim();
   const fromRoles = Object.keys(userRoles)
     .map(e => roleEntry(e))
-    .filter(x => x && x.role === 'technician' && x.techName)
+    .filter(x => x && (x.role === 'technician' || x.role === 'owner') && x.techName)
     .map(x => x.techName.trim());
   const fromDevices = devices.map(d => (d.technician || '').trim()).filter(Boolean);
   return [...new Set([...fromRoles, ...fromDevices])]

@@ -467,7 +467,8 @@ const KIND = {
 
 function roleLabel(r){
   return { super_admin:'أدمن', accountant:'محاسب', dispatcher:'مسؤول حركة',
-           technician:'فني', hr:'شؤون العاملين', staff:'موظف' }[r] || r;
+           technician:'فني', hr:'شؤون العاملين', staff:'موظف',
+           owner:'المالك' }[r] || r;
 }
 function nameOf(email){
   const v = ROLES_MAP[email];
