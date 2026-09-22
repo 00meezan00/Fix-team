@@ -4130,12 +4130,14 @@ let OWNER_NOTES = {};
 async function loadOwnerNote(id){
   if(!isSuperAdmin()) return;
   try{
-    const { data, error } = await sb.from('owner_admin_notes')
-      .select('note,by_name,updated_at,read_at').eq('device_id', id).maybeSingle();
+    // ⚠️ من الدالة مش من الجدول: الجدول لو رفض بيرجّع فاضي في صمت،
+    //    الدالة لو رفضت بتقول السبب.
+    const { data, error } = await sb.rpc('owner_notes_read', { p_ids: [id] });
     if(error) throw error;
-    OWNER_NOTES[id] = data || null;
+    OWNER_NOTES[id] = (Array.isArray(data) && data[0]) || null;
   }catch(e){
     console.warn('ملاحظة المالك:', e && e.message ? e.message : e);
+    showError('⚠️ ملاحظة المالك مش بتتحمّل: ' + ((e && e.message) || e));
     return;
   }
   if(selectedId === id && OWNER_NOTES[id]) renderDetail();
@@ -4151,16 +4153,15 @@ async function loadOwnerNote(id){
 async function loadAllOwnerNotes(){
   if(!isSuperAdmin()) return;
   try{
-    const { data, error } = await sb.from('owner_admin_notes')
-      .select('device_id,note,by_name,updated_at,read_at')
-      .order('updated_at', { ascending:false }).limit(2000);
+    const { data, error } = await sb.rpc('owner_notes_read', { p_ids: null });
     if(error) throw error;
     OWNER_NOTES = {};
-    (data || []).forEach(n => { OWNER_NOTES[n.device_id] = n; });
+    (Array.isArray(data) ? data : []).forEach(n => { OWNER_NOTES[n.device_id] = n; });
+    console.log('ملاحظات المالك:', Object.keys(OWNER_NOTES).length);
   }catch(e){
     console.error('ملاحظات المالك:', e);
     showError('⚠️ ملاحظات المالك مش بتتحمّل: ' + ((e && e.message) || e)
-      + ' — اتأكد إن ملفات SQL رقم 60 و 61 اتشغّلوا');
+      + ' — اتأكد إن ملفات SQL رقم 60 و 61 و 62 اتشغّلوا');
     return;
   }
   if(currentColumn === 'delivered_unpaid') renderColumn(true);

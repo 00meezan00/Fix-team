@@ -3685,10 +3685,9 @@ async function pzLoadNotes(){
   try{
     const map = {};
     for(let i = 0; i < ids.length; i += 100){
-      const { data, error } = await sb.from('owner_admin_notes')
-        .select('device_id,note').in('device_id', ids.slice(i, i + 100));
+      const { data, error } = await sb.rpc('owner_notes_read', { p_ids: ids.slice(i, i + 100) });
       if(error) throw error;
-      (data || []).forEach(n => { map[n.device_id] = n.note || ''; });
+      (Array.isArray(data) ? data : []).forEach(n => { map[n.device_id] = n.note || ''; });
     }
     pzRows.forEach(r => { r.note = map[r.id] || ''; r.noteFail = false; });
   }catch(e){
