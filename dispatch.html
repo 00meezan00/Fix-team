@@ -3163,6 +3163,47 @@ let invView = null;      // {kind:'card'|'tech', key} أو null للقائمة
 let invLists = {};
 let invTechLists = {};
 
+// ============================================================
+// 🗂️ الأجهزة اللي مش مكتوب عليها فني
+// ------------------------------------------------------------
+// قبل كده كانت بتختفي من الجرد خالص. دلوقتي بتتلم في كارتين:
+//   🗂️ النظام القديم → جهاز مستورد من النظام القديم
+//   ❓ من غير فني     → جهاز من النظام الحالي ولسه ملوش فني
+//
+// نفس منطق شاشة المحاسب بالحرف — عشان العدّ يطلع واحد في
+// الشاشتين، مايبقاش كل واحد بيقول رقم.
+//
+// ⚠️ البادئة ivx مقصودة: الصفحة بتحمّل كذا ملف في نفس المساحة،
+//    وأي اسم متكرر بيوقّع السكريبت كله.
+// ============================================================
+const IVX_LEGACY_BY = 'النظام القديم';   // الاسم المتخزّن في الأجهزة وقت الاستيراد
+function ivxLegacyName(){ return 'النظام القديم'; }
+function ivxNoTechName(){ return 'من غير فني'; }
+
+// الجهاز ده جاي من النظام القديم؟ أي علامة من التلاتة تكفي.
+function ivxIsLegacy(d){
+  if(!d) return false;
+  if(String(d.id || '').indexOf('old_') === 0) return true;
+  if(String(d.by || '').trim() === IVX_LEGACY_BY) return true;
+  const h = (d._raw && d._raw.statusHistory) || [];
+  if(h.length && String(h[0].by || '').trim() === IVX_LEGACY_BY) return true;
+  return false;
+}
+
+// اسم الكارت اللي الجهاز ده المفروض يقف فيه
+function ivxKey(d){
+  const tech = (d.tech || '').trim();
+  if(tech) return tech;                 // عليه فني → كارت الفني، مبنلمسوش
+  return ivxIsLegacy(d) ? ivxLegacyName() : ivxNoTechName();
+}
+
+// الأيقونة اللي قدّام اسم الكارت
+function ivxIcon(name){
+  if(name === ivxLegacyName()) return '🗂️';
+  if(name === ivxNoTechName()) return '❓';
+  return '🔧';
+}
+
 function setInvPeriod(mode){ invPeriod.mode = mode; renderInventory(); }
 
 function invRange(){
@@ -3242,7 +3283,7 @@ function invStatusTag(status){
 
 function invViewData(){
   if(!invView) return null;
-  if(invView.kind === 'tech') return { title: '🔧 ' + invView.key, list: invTechLists[invView.key] || [] };
+  if(invView.kind === 'tech') return { title: ivxIcon(invView.key) + ' ' + invView.key, list: invTechLists[invView.key] || [] };
   const labels = { received:'📥 استلمت الفترة دي', progress:'⏳ قيد التنفيذ', delivered:'✅ اتسلّمت', stuck:`⚠️ واقفة ${INV_STUCK_DAYS} أيام فأكتر` };
   return { title: labels[invView.key] || invView.key, list: invLists[invView.key] || [] };
 }
@@ -3322,11 +3363,20 @@ function renderInventory(){
   // ===== أداء الفنيين: الأجهزة اللي معاهم ولسه ما اتسلمتش =====
   const withTech = {};
   devices.forEach(d => {
-    if(!d.tech || !INV_TECH_STATUSES.includes(d.status)) return;
-    (withTech[d.tech] = withTech[d.tech] || []).push(d);
+    if(!INV_TECH_STATUSES.includes(d.status)) return;
+    // ⚠️ مفيش return للجهاز اللي من غير فني. ivxKey بترجّع اسم كارت
+    //    مناسب ليه (النظام القديم / من غير فني) بدل ما يختفي.
+    const key = ivxKey(d);
+    (withTech[key] = withTech[key] || []).push(d);
   });
   invTechLists = withTech;
-  const techNames = Object.keys(withTech).sort((a,b) => withTech[b].length - withTech[a].length);
+  // الفنيين الأول (الأكتر أجهزة فوق)، والكارتين الخاصين آخر القايمة دايماً
+  const _ivxExtra = [ivxLegacyName(), ivxNoTechName()];
+  const techNames = Object.keys(withTech).sort((a,b) => {
+    const ea = _ivxExtra.indexOf(a) !== -1, eb = _ivxExtra.indexOf(b) !== -1;
+    if(ea !== eb) return ea ? 1 : -1;
+    return withTech[b].length - withTech[a].length;
+  });
   const techCards = techNames.length === 0
     ? `<div class="empty-col">مفيش أجهزة موزّعة على فنيين دلوقتي</div>`
     : `<div class="inv-cards">${techNames.map(tn => {
@@ -3334,7 +3384,7 @@ function renderInventory(){
         const safe = esc(tn).replace(/'/g, "\\'");
         return `<div class="inv-card" onclick="openInvView('tech','${safe}')">
           <div class="inv-card-num" style="color:var(--repairing);">${withTech[tn].length}</div>
-          <div class="inv-card-label">🔧 ${esc(tn)}</div>
+          <div class="inv-card-label">${ivxIcon(tn)} ${esc(tn)}</div>
           ${late ? `<div style="font-size:11px;color:var(--danger);font-weight:800;margin-top:4px;">${late} متأخرة</div>` : ''}
           <div class="inv-card-more">عرض الأجهزة ←</div>
         </div>`;
