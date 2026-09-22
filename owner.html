@@ -1031,7 +1031,12 @@ let CAN_PURCHASES = false, CAN_PARTS_REVIEW = false;
 let CAN_ACCOUNTS  = false;
 // ⚠️ CAN_INVENTORY مش هنا — الكود المنقول من dispatch.html بيعرّفه
 //    بنفسه في p10_tools.js. تعريفه مرتين = الصفحة كلها بتقع.
-let ACC_CAN_EDIT  = false;   // ثابتة — المالك بيشوف الحسابات مش بيكتب فيها
+// ⚠️⚠️ ACC_CAN_EDIT **مش** بتتعرّف هنا، وعمرها ما تتعرّف.
+//    accounts.js بيعرّفها بنفسه في أوله: var ACC_CAN_EDIT = true;
+//    ولو عرّفناها هنا كمان بـ let، المتصفح بيرفض سكريبت الصفحة
+//    **كله** (Identifier already declared) — يعني boot ما بتشتغلش
+//    أصلاً والصفحة بتفضل على «جاري التحميل» للأبد.
+//    إحنا بنغيّر قيمتها بس في applyCaps، زي صفحة الديسباتشر بالظبط.
 
 // شريط أحمر بيوري الخطأ الحقيقي بدل ما نقول «مفيش نت» غلط
 function showLoadError(msg){
@@ -1417,7 +1422,9 @@ async function applyCaps(){
   //    والسبب مش الشكل: accounts.js نفسه مفيهوش كود الكتابة،
   //    وسياسات قاعدة البيانات بترفض الكتابة على دفتر الحسابات
   //    من أي حد غير الأدمن والمحاسب. تلات طبقات مستقلة.
-  ACC_CAN_EDIT = false;
+  // window. عشان لو accounts.js مانزلش لأي سبب، السطر ده
+  // يفضل شغّال بدل ما يرمي خطأ.
+  window.ACC_CAN_EDIT = false;
   if(acc){
     show('.cap-accounts');
     // ⚠️ لو accounts.js مارفعش على السيرفر، loadLedger مش هتبقى
