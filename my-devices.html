@@ -3,6 +3,17 @@
 <head>
 <meta charset="UTF-8">
 <script>
+/* ============================================================
+   🔒 اللغة متثبّتة على العربي
+   ------------------------------------------------------------
+   بنكتبها كل مرة الصفحة تفتح، مش مرة واحدة — عن قصد.
+   ليه؟ لأن أي حد كان مبدّل على الإنجليزي قبل ما المبدّل يتشال،
+   اختياره القديم متخزّن على جهازه هو. لو مكتبناهاش بالقوة،
+   هيفضل شايف إنجليزي للأبد ومفيش أي طريقة يرجع بيها.
+   ============================================================ */
+try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
+</script>
+<script>
 /* المظهر قبل أي رسم — نفس مفتاح الداشبورد (ifix-theme) عشان
    الاختيار يسري على كل شاشات النظام. من غير ده فيه ومضة بيضا. */
 (function(){
@@ -2812,8 +2823,6 @@ function kebabLogout(){
     <div class="set-lbl" data-i18n="rp.theme">🎨 المظهر</div>
     <div class="set-row" id="setRow"></div>
     <p class="set-note" id="setNote"></p>
-    <div class="set-lbl" style="margin-top:16px;" data-i18n="rp.lang">🌐 اللغة</div>
-    <div class="set-row2" id="setLang"></div>
 
   </div>
 </div>
@@ -3025,7 +3034,8 @@ function renderSettings(){
          + '<span class="i">'+x.i+'</span><span>'+x.n+'</span></button>';
   }).join('');
   var lg = curLang();
-  document.getElementById('setLang').innerHTML = LANGS.map(function(x){
+  var _lg = document.getElementById('setLang');   // 🔒 اتشال — اللغة عربي
+  if(_lg) _lg.innerHTML = LANGS.map(function(x){
     return '<button class="set-o'+(x.k===lg?' on':'')+'" onclick="pickLang(\''+x.k+'\')">'
          + '<span class="i">'+x.i+'</span><span>'+x.n+'</span>'
          + '<span style="font-size:10.5px;font-weight:400;opacity:.7">'+x.s+'</span></button>';

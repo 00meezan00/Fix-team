@@ -3,6 +3,17 @@
 <head>
 <meta charset="UTF-8">
 <script>
+/* ============================================================
+   🔒 اللغة متثبّتة على العربي
+   ------------------------------------------------------------
+   بنكتبها كل مرة الصفحة تفتح، مش مرة واحدة — عن قصد.
+   ليه؟ لأن أي حد كان مبدّل على الإنجليزي قبل ما المبدّل يتشال،
+   اختياره القديم متخزّن على جهازه هو. لو مكتبناهاش بالقوة،
+   هيفضل شايف إنجليزي للأبد ومفيش أي طريقة يرجع بيها.
+   ============================================================ */
+try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
+</script>
+<script>
 /* المظهر قبل أي رسم — نفس مفتاح باقي الشاشات (ifix-theme) عشان
    الاختيار يسري على كل النظام. من غير ده فيه ومضة بيضا. */
 (function(){
@@ -934,8 +945,6 @@
     <div class="hb-h">🎨 المظهر</div>
     <div class="modes" id="setRow" style="margin-top:0;"></div>
     <p class="fld-hint" id="setNote"></p>
-    <div class="hb-h" style="margin-top:18px;">🌐 اللغة</div>
-    <div class="modes" id="setLang" style="margin-top:0;"></div>
   </div>
 </div>
 
@@ -3267,7 +3276,8 @@ function renderSettings(){
     `<div class="mode ${x.k===cur?'sel':''}" onclick="pickTheme('${x.k}')">
        <div class="mi">${x.i}</div><div class="mt">${x.n}</div></div>`).join('');
   const lg = curLang();
-  $('setLang').innerHTML = LANGS.map(x =>
+  var _lg = $('setLang');   // 🔒 اتشال — اللغة متثبّتة عربي
+  if(_lg) _lg.innerHTML = LANGS.map(x =>
     `<div class="mode ${x.k===lg?'sel':''}" onclick="pickLang('${x.k}')">
        <div class="mi">${x.i}</div><div class="mt">${x.n}</div></div>`).join('');
   $('setNote').textContent = cur === 'auto'

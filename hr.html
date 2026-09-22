@@ -3,6 +3,17 @@
 <head>
 <meta charset="UTF-8">
 <script>
+/* ============================================================
+   🔒 اللغة متثبّتة على العربي
+   ------------------------------------------------------------
+   بنكتبها كل مرة الصفحة تفتح، مش مرة واحدة — عن قصد.
+   ليه؟ لأن أي حد كان مبدّل على الإنجليزي قبل ما المبدّل يتشال،
+   اختياره القديم متخزّن على جهازه هو. لو مكتبناهاش بالقوة،
+   هيفضل شايف إنجليزي للأبد ومفيش أي طريقة يرجع بيها.
+   ============================================================ */
+try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
+</script>
+<script>
 /* المظهر قبل أي رسم — نفس مفتاح باقي الصفحات (ifix-theme).
    من غير ده فيه ومضة بيضا قبل ما الغامق يشتغل. */
 (function(){
@@ -423,11 +434,6 @@
         <option value="dark">غامق</option>
       </select>
     </label>
-    <label class="fld"><span>🌐 اللغة</span>
-      <select id="lgSel" onchange="setLang(this.value)">
-        <option value="ar">العربية</option>
-        <option value="en">English</option>
-      </select>
     </label>
   </div>
 </div>
@@ -978,7 +984,7 @@ function closeSheet(id){ document.getElementById(id).classList.remove('open'); }
 function openGeneral(){
   try{
     document.getElementById('thSel').value = localStorage.getItem('ifix-theme') || 'auto';
-    document.getElementById('lgSel').value = localStorage.getItem('ifix-lang') || 'ar';
+    // 🔒 قايمة اللغة اتشالت — اللغة متثبّتة عربي
   }catch(e){}
   openSheet('genSet');
 }

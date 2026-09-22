@@ -2,6 +2,17 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8" />
+<script>
+/* ============================================================
+   🔒 اللغة متثبّتة على العربي
+   ------------------------------------------------------------
+   بنكتبها كل مرة الصفحة تفتح، مش مرة واحدة — عن قصد.
+   ليه؟ لأن أي حد كان مبدّل على الإنجليزي قبل ما المبدّل يتشال،
+   اختياره القديم متخزّن على جهازه هو. لو مكتبناهاش بالقوة،
+   هيفضل شايف إنجليزي للأبد ومفيش أي طريقة يرجع بيها.
+   ============================================================ */
+try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -1595,11 +1606,6 @@
     </div>
     <div style="padding:4px 20px 24px;">
 
-      <div class="set-group">
-        <div class="set-label" data-i18n="set.langSection">🌐 اللغة والاتجاه</div>
-        <div class="set-choices" id="setLangChoices"></div>
-        <p class="set-hint" data-i18n="set.langHint">تغيير اللغة بيعيد تحميل الصفحة عشان كل الشاشات تتبني باللغة الجديدة.</p>
-      </div>
 
       <div class="set-group">
         <div class="set-label" data-i18n="set.themeSection">🎨 المظهر</div>
@@ -1947,7 +1953,7 @@ function applyRoleVisibility(){
   try{
     const lh = document.getElementById('tpLangHost');
     if(lh && !lh.dataset.mounted && window.I18N && I18N.mountLangToggle){
-      I18N.mountLangToggle(lh);
+      // 🔒 زرار اللغة اتشال — اللغة متثبّتة عربي
       lh.dataset.mounted = '1';
     }
   }catch(e){}
@@ -5708,6 +5714,7 @@ function renderSettings(){
       : '';
   }
   const host = document.getElementById('setLangChoices');
+  if(!host) return;   // 🔒 المبدّل اتشال — اللغة متثبّتة عربي
   if(!host) return;
   let cur = 'ar';
   try{ cur = I18N.getLang(); }catch(e){}
