@@ -3,6 +3,17 @@
 <head>
 <meta charset="UTF-8">
 <script>
+/* ============================================================
+   🔒 اللغة متثبّتة على العربي
+   ------------------------------------------------------------
+   بنكتبها كل مرة الصفحة تفتح، مش مرة واحدة — عن قصد.
+   ليه؟ لأن أي حد كان مبدّل على الإنجليزي قبل ما المبدّل يتشال،
+   اختياره القديم متخزّن على جهازه هو. لو مكتبناهاش بالقوة،
+   هيفضل شايف إنجليزي للأبد ومفيش أي طريقة يرجع بيها.
+   ============================================================ */
+try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
+</script>
+<script>
 /* المظهر قبل أي رسم — نفس مفتاح باقي الشاشات */
 (function(){
   try{
@@ -46,7 +57,7 @@
   .topbar{ background:#0F172A; color:var(--on-chrome); padding:calc(14px + env(safe-area-inset-top)) 18px 14px; }
   .topbar h1{ font-family:'Cairo',sans-serif; font-size:19px; margin:0; }
   .topbar .sub{ font-size:12px; opacity:.7; margin-top:2px; }
-  .topbar .who{ font-size:12px; opacity:.85; margin-top:8px; }
+  .topbar .who{ font-family:'Cairo',sans-serif; font-size:13px; font-weight:700; opacity:.92; margin-top:8px; }
   .wrap{ max-width:640px; margin:0 auto; padding:16px; }
   .sec{ background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; margin-bottom:14px;
     box-shadow:0 2px 10px rgba(16,16,20,.04); }
@@ -89,6 +100,25 @@
     border-radius:9px; min-height:36px; padding:0 12px; font-size:13px; font-weight:700; font-family:inherit; cursor:pointer; }
   .toast{ position:fixed; left:0; right:0; bottom:0; z-index:9999; color:var(--on-color); text-align:center;
     font-weight:800; font-size:14px; padding:13px; }
+
+  /* ============================================================
+     📱 قاعدة الآيفون — متشيلهاش
+     ------------------------------------------------------------
+     🧠 المشكلة: لو خانة الكتابة خطها **أقل من ١٦ بكسل**، iOS
+        بيكبّر الصفحة كلها أول ما تلمسها عشان يقرّب لك الخانة.
+        في متصفح عادي بيرجع يصغّرها لما تسيبها — لكن في تطبيق
+        مثبّت على الشاشة الرئيسية (PWA) **مبيرجعش**. فالصفحة
+        بتفضل مكبّرة ومقصوصة من الجنب لحد ما تقفل التطبيق.
+
+     ✅ الحل: كل خانات الكتابة على الموبايل ١٦ بكسل بالظبط.
+        الفرق عن ١٥ مش باين للعين، بس بيمنع التكبير تماماً.
+
+     ⚠️ !important مقصودة هنا. دي مش ذوق تصميم — ده شرط من
+        نظام التشغيل. أي قاعدة تانية تتحط بعدين لازم تحترمه.
+     ============================================================ */
+  @media (max-width:820px){
+    input, textarea, select, .tech-select{ font-size:16px !important; }
+  }
 </style>
 </head>
 <body>
@@ -694,7 +724,13 @@ async function toggleFlag(key){
 //    ٤) قايمة IN جوه دالة my_app_role في قاعدة البيانات
 //    ٥) roleLabel في hr.html و staff.html
 //    نسيان أي واحدة = الدور بيتحوّل لمحاسب في صمت.
-const ROLES = ['super_admin', 'accountant', 'dispatcher', 'technician', 'hr', 'staff'];
+//
+// 👑 owner = المالك — صاحب الشركة المشتركة في السيستم.
+//    مش السوبر أدمن (ده صاحب المنصة). المالك = ديسباتشر
+//    + فني في صفحة واحدة (owner.html)، وبيسعّر الأجهزة
+//    اللي السوبر أدمن بيشاركها معاه. مايقدرش يأكد دفع.
+//    ⚠️ الاسم الظاهر عنده **إجباري** — هو اللي بيربط أجهزته.
+const ROLES = ['super_admin', 'accountant', 'dispatcher', 'technician', 'hr', 'staff', 'owner'];
 const ROLE_LABEL_KEYS = {
   super_admin: 'adm.roleSuper',
   accountant:  'adm.roleAcc',
@@ -705,7 +741,7 @@ const ROLE_LABEL_KEYS = {
 };
 // الأدوار اللي لسه مالهاش مفتاح ترجمة — من غير ده بيظهر الاسم
 // الإنجليزي الخام (staff) قدّام الأدمن.
-const ROLE_LABEL_FALLBACK = { staff: 'موظف' };
+const ROLE_LABEL_FALLBACK = { staff: 'موظف', owner: 'المالك' };
 function roleLabel(r){
   const k = ROLE_LABEL_KEYS[r];
   try{ return k ? t(k) : (ROLE_LABEL_FALLBACK[r] || r); }
@@ -735,23 +771,23 @@ function normRole(v){
 const CAPS = [
   { key:'purchases', icon:'🧾', label:'فواتير المشتريات ومخزن قطع الغيار',
     hint:'قراءة الفواتير بالذكاء الاصطناعي + المخزن + ربط القطع بالأجهزة',
-    forRoles:['dispatcher'] },  // الديسباتشر بس — صفحة الفني مش موصّلة بالموديول
+    forRoles:['dispatcher','owner'] },  // الديسباتشر بس — صفحة الفني مش موصّلة بالموديول
   { key:'parts_review', icon:'🔩', label:'مراجعة قطع الغيار',
     hint:'يشوف كومنت قطع الغيار اللي الفني كتبه على كل جهاز، ويربط القطع بالأجهزة',
-    forRoles:['dispatcher'] },
+    forRoles:['dispatcher','owner'] },
   // ⚠️ قراءة فقط — عن قصد. تسجيل الدفعات والخصومات والرصيد الافتتاحي
   //    شغل المحاسب وحده. الديسباتشر بيشوف ويدوّر ويطبع PDF وبس.
   //    القفل ده مش في الواجهة بس: مفتاح accounts-ledger **الكتابة**
   //    فيه محصورة على الأدمن والمحاسب في قاعدة البيانات أصلاً.
   { key:'accounts_view', icon:'🧾', label:'عرض الحسابات (قراءة فقط)',
     hint:'يشوف آجل المحلات ويدوّر فيه ويصدّر كشف PDF — من غير تسجيل دفعة ولا خصم ولا حذف',
-    forRoles:['dispatcher'] },
+    forRoles:['dispatcher','owner'] },
   // ⚠️ قراءة فقط — بدون فلوس. devices_dispatch أصلاً بتشيل الأسعار
   //    قبل ما توصل لصفحة الديسباتشر، فمفيش عمود سعر ولا كارت
   //    "مدفوع/غير مدفوع" في الجرد بتاعه — الاتنين محتاجين بيانات فلوس مش موجودة أصلاً.
   { key:'inventory_view', icon:'📋', label:'الجرد (قراءة فقط)',
     hint:'كروت أعداد (استلام/قيد التنفيذ/تسليم/واقفة) + أداء الفنيين — من غير أسعار',
-    forRoles:['dispatcher'] }
+    forRoles:['dispatcher','owner'] }
 ];
 function hasCap(en, cap){ return (en.caps || []).includes(cap); }
 
@@ -790,11 +826,14 @@ async function addRole(){
   //    الفني بس هو اللي الاسم عنده **إجباري**، لأنه بيربط الحساب
   //    بالأجهزة المكتوب عليها اسمه.
   const prevName = normRole(userRoles[e]).techName;
-  const nm = prompt(role === 'technician' ? t('adm.techNamePrompt') : t('adm.namePrompt'),
+  // 👑 المالك بيشتغل كفني كمان، فالاسم الظاهر إجباري عنده
+  //    زي الفني — هو اللي بيربط الأجهزة بحسابه.
+  const needsName = (role === 'technician' || role === 'owner');
+  const nm = prompt(needsName ? t('adm.techNamePrompt') : t('adm.namePrompt'),
                     prevName || '');
   if(nm === null) return;
   const techName = (nm || '').trim();
-  if(role === 'technician' && !techName){ toast(t('adm.needTechName'), false); return; }
+  if(needsName && !techName){ toast(t('adm.needTechName'), false); return; }
 
   try{
     // بنحافظ على الصلاحيات الموجودة — تعديل الدور مش المفروض يمسحها

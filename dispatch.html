@@ -3,6 +3,17 @@
 <head>
 <meta charset="UTF-8">
 <script>
+/* ============================================================
+   🔒 اللغة متثبّتة على العربي
+   ------------------------------------------------------------
+   بنكتبها كل مرة الصفحة تفتح، مش مرة واحدة — عن قصد.
+   ليه؟ لأن أي حد كان مبدّل على الإنجليزي قبل ما المبدّل يتشال،
+   اختياره القديم متخزّن على جهازه هو. لو مكتبناهاش بالقوة،
+   هيفضل شايف إنجليزي للأبد ومفيش أي طريقة يرجع بيها.
+   ============================================================ */
+try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
+</script>
+<script>
 /* المظهر قبل أي رسم — نفس مفتاح الداشبورد (ifix-theme) عشان
    الاختيار يسري على كل شاشات النظام. من غير ده فيه ومضة بيضا. */
 (function(){
@@ -22,7 +33,7 @@
 <link rel="apple-touch-icon" href="dispatch-icon-192.png">
 <meta name="theme-color" content="#1B2A3A">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="الحركة">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="common.js"></script>
@@ -148,7 +159,7 @@
   .who .mark{width:40px; height:40px; border-radius:11px; flex:none;
     background:linear-gradient(135deg,#22344a,#33506b); display:grid; place-items:center; font-size:19px;
     box-shadow:inset 0 0 0 1px rgba(255,255,255,.08);}
-  .who .hi{font-size:12px; color:#9DB0C4; line-height:1.2;}
+  .who .hi{font-family:'Cairo',sans-serif; font-size:13px; font-weight:700; line-height:1.45; color:#C6D6E7;}   /* سطر الوظيفة: نفس خط الاسم + لون أنصع */
   .who .nm{font-family:'Cairo',sans-serif; font-weight:800; font-size:16.5px; line-height:1.25; white-space:nowrap;}
   .logout{flex:none; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.14); color:#DCE6F0;
     font-family:inherit; font-weight:700; font-size:13px; padding:9px 13px; border-radius:10px; cursor:pointer;}
@@ -681,6 +692,52 @@
   .btn-secondary:hover{background:var(--surface-2);}
   .modal-search input{width:100%; border:1px solid var(--border); background:var(--surface);
     color:var(--ink); border-radius:10px; padding:11px 13px; font-size:14.5px; font-family:inherit;}
+
+  /* ============================================================
+     📱 قاعدة الآيفون — متشيلهاش
+     ------------------------------------------------------------
+     🧠 المشكلة: لو خانة الكتابة خطها **أقل من ١٦ بكسل**، iOS
+        بيكبّر الصفحة كلها أول ما تلمسها عشان يقرّب لك الخانة.
+        في متصفح عادي بيرجع يصغّرها لما تسيبها — لكن في تطبيق
+        مثبّت على الشاشة الرئيسية (PWA) **مبيرجعش**. فالصفحة
+        بتفضل مكبّرة ومقصوصة من الجنب لحد ما تقفل التطبيق.
+
+     ✅ الحل: كل خانات الكتابة على الموبايل ١٦ بكسل بالظبط.
+        الفرق عن ١٥ مش باين للعين، بس بيمنع التكبير تماماً.
+
+     ⚠️ !important مقصودة هنا. دي مش ذوق تصميم — ده شرط من
+        نظام التشغيل. أي قاعدة تانية تتحط بعدين لازم تحترمه.
+     ============================================================ */
+  @media (max-width:820px){
+    input, textarea, select, .tech-select{ font-size:16px !important; }
+  }
+</style>
+<style id="ios-safe-head-fix">
+/* ============================================================
+   📱 عناوين الشاشات الكاملة تحت نتش الآيفون
+   ------------------------------------------------------------
+   viewport-fit=cover بيفرد الصفحة تحت شريط الساعة، فأي رأس لازق
+   فوق (position:sticky; top:0) بيقع تحته ويتقصّ.
+
+   env(safe-area-inset-top) = طول النتش/شريط الساعة بالظبط.
+   على الكمبيوتر وأي جهاز من غير نتش بيساوي صفر، يعني مفيش أي فرق.
+
+   !important عشان البادينج مكتوب style="padding:16px 20px" جوه
+   الوسم نفسه في ٣٠ شاشة، والمكتوب جوه الوسم بيغلب الـ CSS العادي.
+
+   الشرط .summaries-page مقصود: يعني الشاشات الكاملة بس. النوافذ
+   اللي بتطلع من تحت (.modal) مش لازقة فوق فمحتاجاش حاجة.
+   ============================================================ */
+.summaries-page > .modal-head{
+  padding-top: calc(16px + env(safe-area-inset-top)) !important;
+}
+/* نفس الحكاية للشاشتين اللي بيرسمهم ai-invoice.js من الجافاسكريبت:
+   «مخزن قطع الغيار» و«فواتير المشتريات وقطع الغيار». مكتوبين
+   بالاسم كمان تحسّباً لو شكل الماركب بتاعهم اتغيّر يوم. */
+#invOverlay .modal-head,
+#purOverlay .modal-head{
+  padding-top: calc(16px + env(safe-area-inset-top)) !important;
+}
 </style>
 </head>
 <body>
@@ -2481,7 +2538,7 @@ async function loadTechNames(){
 function accountTechNames(){
   return Object.values(userRoles)
     .map(v => (typeof v === 'string') ? null : v)
-    .filter(v => v && v.role === 'technician' && v.techName)
+    .filter(v => v && (v.role === 'technician' || v.role === 'owner') && v.techName)
     .map(v => String(v.techName).trim()).filter(Boolean);
 }
 function allTechNames(){
@@ -2691,8 +2748,6 @@ function kebabLogout(){
     <div class="set-lbl" data-i18n="rp.theme">🎨 المظهر</div>
     <div class="set-row" id="setRow"></div>
     <p class="set-note" id="setNote"></p>
-    <div class="set-lbl" style="margin-top:16px;" data-i18n="rp.lang">🌐 اللغة</div>
-    <div class="set-row2" id="setLang"></div>
 
   </div>
 </div>
@@ -2738,7 +2793,8 @@ function renderSettings(){
          + '<span class="i">'+x.i+'</span><span>'+x.n+'</span></button>';
   }).join('');
   var lg = curLang();
-  document.getElementById('setLang').innerHTML = LANGS.map(function(x){
+  var _lg = document.getElementById('setLang');   // 🔒 اتشال — اللغة عربي
+  if(_lg) _lg.innerHTML = LANGS.map(function(x){
     return '<button class="set-o'+(x.k===lg?' on':'')+'" onclick="pickLang(\''+x.k+'\')">'
          + '<span class="i">'+x.i+'</span><span>'+x.n+'</span>'
          + '<span style="font-size:10.5px;font-weight:400;opacity:.7">'+x.s+'</span></button>';
@@ -3107,6 +3163,47 @@ let invView = null;      // {kind:'card'|'tech', key} أو null للقائمة
 let invLists = {};
 let invTechLists = {};
 
+// ============================================================
+// 🗂️ الأجهزة اللي مش مكتوب عليها فني
+// ------------------------------------------------------------
+// قبل كده كانت بتختفي من الجرد خالص. دلوقتي بتتلم في كارتين:
+//   🗂️ النظام القديم → جهاز مستورد من النظام القديم
+//   ❓ من غير فني     → جهاز من النظام الحالي ولسه ملوش فني
+//
+// نفس منطق شاشة المحاسب بالحرف — عشان العدّ يطلع واحد في
+// الشاشتين، مايبقاش كل واحد بيقول رقم.
+//
+// ⚠️ البادئة ivx مقصودة: الصفحة بتحمّل كذا ملف في نفس المساحة،
+//    وأي اسم متكرر بيوقّع السكريبت كله.
+// ============================================================
+const IVX_LEGACY_BY = 'النظام القديم';   // الاسم المتخزّن في الأجهزة وقت الاستيراد
+function ivxLegacyName(){ return 'النظام القديم'; }
+function ivxNoTechName(){ return 'من غير فني'; }
+
+// الجهاز ده جاي من النظام القديم؟ أي علامة من التلاتة تكفي.
+function ivxIsLegacy(d){
+  if(!d) return false;
+  if(String(d.id || '').indexOf('old_') === 0) return true;
+  if(String(d.by || '').trim() === IVX_LEGACY_BY) return true;
+  const h = (d._raw && d._raw.statusHistory) || [];
+  if(h.length && String(h[0].by || '').trim() === IVX_LEGACY_BY) return true;
+  return false;
+}
+
+// اسم الكارت اللي الجهاز ده المفروض يقف فيه
+function ivxKey(d){
+  const tech = (d.tech || '').trim();
+  if(tech) return tech;                 // عليه فني → كارت الفني، مبنلمسوش
+  return ivxIsLegacy(d) ? ivxLegacyName() : ivxNoTechName();
+}
+
+// الأيقونة اللي قدّام اسم الكارت
+function ivxIcon(name){
+  if(name === ivxLegacyName()) return '🗂️';
+  if(name === ivxNoTechName()) return '❓';
+  return '🔧';
+}
+
 function setInvPeriod(mode){ invPeriod.mode = mode; renderInventory(); }
 
 function invRange(){
@@ -3186,7 +3283,7 @@ function invStatusTag(status){
 
 function invViewData(){
   if(!invView) return null;
-  if(invView.kind === 'tech') return { title: '🔧 ' + invView.key, list: invTechLists[invView.key] || [] };
+  if(invView.kind === 'tech') return { title: ivxIcon(invView.key) + ' ' + invView.key, list: invTechLists[invView.key] || [] };
   const labels = { received:'📥 استلمت الفترة دي', progress:'⏳ قيد التنفيذ', delivered:'✅ اتسلّمت', stuck:`⚠️ واقفة ${INV_STUCK_DAYS} أيام فأكتر` };
   return { title: labels[invView.key] || invView.key, list: invLists[invView.key] || [] };
 }
@@ -3266,11 +3363,20 @@ function renderInventory(){
   // ===== أداء الفنيين: الأجهزة اللي معاهم ولسه ما اتسلمتش =====
   const withTech = {};
   devices.forEach(d => {
-    if(!d.tech || !INV_TECH_STATUSES.includes(d.status)) return;
-    (withTech[d.tech] = withTech[d.tech] || []).push(d);
+    if(!INV_TECH_STATUSES.includes(d.status)) return;
+    // ⚠️ مفيش return للجهاز اللي من غير فني. ivxKey بترجّع اسم كارت
+    //    مناسب ليه (النظام القديم / من غير فني) بدل ما يختفي.
+    const key = ivxKey(d);
+    (withTech[key] = withTech[key] || []).push(d);
   });
   invTechLists = withTech;
-  const techNames = Object.keys(withTech).sort((a,b) => withTech[b].length - withTech[a].length);
+  // الفنيين الأول (الأكتر أجهزة فوق)، والكارتين الخاصين آخر القايمة دايماً
+  const _ivxExtra = [ivxLegacyName(), ivxNoTechName()];
+  const techNames = Object.keys(withTech).sort((a,b) => {
+    const ea = _ivxExtra.indexOf(a) !== -1, eb = _ivxExtra.indexOf(b) !== -1;
+    if(ea !== eb) return ea ? 1 : -1;
+    return withTech[b].length - withTech[a].length;
+  });
   const techCards = techNames.length === 0
     ? `<div class="empty-col">مفيش أجهزة موزّعة على فنيين دلوقتي</div>`
     : `<div class="inv-cards">${techNames.map(tn => {
@@ -3278,7 +3384,7 @@ function renderInventory(){
         const safe = esc(tn).replace(/'/g, "\\'");
         return `<div class="inv-card" onclick="openInvView('tech','${safe}')">
           <div class="inv-card-num" style="color:var(--repairing);">${withTech[tn].length}</div>
-          <div class="inv-card-label">🔧 ${esc(tn)}</div>
+          <div class="inv-card-label">${ivxIcon(tn)} ${esc(tn)}</div>
           ${late ? `<div style="font-size:11px;color:var(--danger);font-weight:800;margin-top:4px;">${late} متأخرة</div>` : ''}
           <div class="inv-card-more">عرض الأجهزة ←</div>
         </div>`;
