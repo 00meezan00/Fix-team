@@ -1373,6 +1373,60 @@ async function loadNotices(){
 /* ============================================================
    الإقلاع
    ============================================================ */
+/* ============================================================
+   🔐 صلاحيات المالك الإضافية
+   ------------------------------------------------------------
+   🧠 الخمس خانات (المشتريات · المخزن · مراجعة القطع · الحسابات ·
+      الجرد) مش بتظهر لمجرد إن الحساب «مالك». بتظهر بس لو الأدمن
+      فعّلها للحساب ده من لوحة الأدمن.
+
+   ⚡ الأربع أسئلة بتتبعت **مع بعض** مش واحد ورا التاني.
+      واحد ورا التاني = ٤ رحلات للسيرفر ورا بعض؛ على الموبايل دي
+      ثانية أو اتنين على الفاضي. مع بعض = رحلة واحدة.
+
+   🔒 والإخفاء ده شكل بس. القفل الحقيقي في قاعدة البيانات:
+      has_cap بتسأل السيرفر، والسياسات بترفض أي قراءة أو كتابة
+      مالهاش صلاحية — حتى لو حد عدّل الصفحة بإيده.
+
+   ⚠️ لو الشبكة وقعت، الافتراضي **مقفول** مش مفتوح.
+   ============================================================ */
+async function applyCaps(){
+  const show = sel => document.querySelectorAll(sel).forEach(el => el.style.display = '');
+  const ask  = cap => sb.rpc('has_cap', { p_cap: cap })
+                        .then(r => !!(r && r.data === true))
+                        .catch(() => false);
+  let pur = false, rev = false, acc = false, inv = false;
+  try{
+    [pur, rev, acc, inv] = await Promise.all([
+      ask('purchases'), ask('parts_review'), ask('accounts_view'), ask('inventory_view')
+    ]);
+  }catch(e){ console.warn('الصلاحيات:', e); return; }
+
+  CAN_PURCHASES = pur; CAN_PARTS_REVIEW = rev;
+  CAN_ACCOUNTS  = acc; CAN_INVENTORY    = inv;
+
+  if(pur){ loadPurchasesModule(); show('.cap-purchases'); }
+  if(rev){
+    // مراجعة القطع بتحتاج موديول المشتريات عشان الربط يشتغل
+    if(!pur) loadPurchasesModule();
+    show('.cap-partsreview');
+  }
+
+  // 🔴 ACC_CAN_EDIT = false **ثابتة** — زي صفحة الديسباتشر بالظبط.
+  //    المالك بيشوف الحسابات ومش بيسجّل فيها دفعة ولا خصم.
+  //    والسبب مش الشكل: accounts.js نفسه مفيهوش كود الكتابة،
+  //    وسياسات قاعدة البيانات بترفض الكتابة على دفتر الحسابات
+  //    من أي حد غير الأدمن والمحاسب. تلات طبقات مستقلة.
+  ACC_CAN_EDIT = false;
+  if(acc){
+    show('.cap-accounts');
+    // ⚠️ لو accounts.js مارفعش على السيرفر، loadLedger مش هتبقى
+    //    موجودة — والنداء عليها من غير الفحص ده كان هيوقّع الصفحة.
+    if(typeof loadLedger === 'function') loadLedger().catch(() => {});
+  }
+  if(inv) show('.cap-inventory');
+}
+
 async function boot(){
   if(!navigator.onLine){
     const c = localStorage.getItem(CACHE_KEY), u = localStorage.getItem('ifix_owner_me');
@@ -1442,60 +1496,12 @@ async function boot(){
   // 👤 خانة «حسابي» — بتظهر بس لو وصله منشور خطط الاشتراك
   try{ syncAccountShared(MY_EMAIL, ME, 'المالك'); }catch(e){}
 
-  // ============================================================
-  // 🔐 صلاحيات المالك الإضافية
-  // ------------------------------------------------------------
-  // 🧠 الخمس خانات دي (المشتريات · المخزن · مراجعة القطع ·
-  //    الحسابات · الجرد) مش بتظهر لمجرد إن الحساب «مالك».
-  //    بتظهر بس لو إنت (الأدمن) فعّلتها للحساب ده من لوحة الأدمن.
-  //
-  // 🔒 والإخفاء ده شكل بس. القفل الحقيقي في قاعدة البيانات:
-  //    has_cap() بتسأل السيرفر، والسياسات بترفض أي قراءة أو
-  //    كتابة مالهاش صلاحية — حتى لو حد عدّل الصفحة بإيده.
-  //
-  // ⚠️ لو الشبكة وقعت، الافتراضي **مقفول** مش مفتوح.
-  // ============================================================
-  try{
-    const { data } = await sb.rpc('has_cap', { p_cap: 'purchases' });
-    CAN_PURCHASES = (data === true);
-  }catch(e){ CAN_PURCHASES = false; }
-  if(CAN_PURCHASES){
-    loadPurchasesModule();
-    document.querySelectorAll('.cap-purchases').forEach(el => el.style.display = '');
-  }
-
-  try{
-    const { data } = await sb.rpc('has_cap', { p_cap: 'parts_review' });
-    CAN_PARTS_REVIEW = (data === true);
-  }catch(e){ CAN_PARTS_REVIEW = false; }
-  if(CAN_PARTS_REVIEW){
-    // مراجعة القطع بتحتاج موديول المشتريات عشان الربط يشتغل
-    if(!CAN_PURCHASES) loadPurchasesModule();
-    document.querySelectorAll('.cap-partsreview').forEach(el => el.style.display = '');
-  }
-
-  // 🔴 ACC_CAN_EDIT = false **ثابتة** — زي صفحة الديسباتشر بالظبط.
-  //    المالك بيشوف الحسابات ومش بيسجّل فيها دفعة ولا خصم.
-  //    والسبب مش الشكل: accounts.js نفسه مفيهوش كود الكتابة،
-  //    وسياسات قاعدة البيانات بترفض الكتابة على دفتر الحسابات
-  //    من أي حد غير الأدمن والمحاسب. تلات طبقات مستقلة.
-  ACC_CAN_EDIT = false;
-  try{
-    const { data } = await sb.rpc('has_cap', { p_cap: 'accounts_view' });
-    CAN_ACCOUNTS = (data === true);
-  }catch(e){ CAN_ACCOUNTS = false; }
-  if(CAN_ACCOUNTS){
-    document.querySelectorAll('.cap-accounts').forEach(el => el.style.display = '');
-    loadLedger().catch(() => {});
-  }
-
-  try{
-    const { data } = await sb.rpc('has_cap', { p_cap: 'inventory_view' });
-    CAN_INVENTORY = (data === true);
-  }catch(e){ CAN_INVENTORY = false; }
-  if(CAN_INVENTORY){
-    document.querySelectorAll('.cap-inventory').forEach(el => el.style.display = '');
-  }
+  // 🔐 الصلاحيات الإضافية — **من غير await** عن قصد.
+  //    كانت بتستنّى ٤ ردود من السيرفر ورا بعض قبل ما الصفحة ترسم،
+  //    فشاشة «جاري التحميل» كانت بتفضل واقفة ثواني زيادة على الفاضي.
+  //    الخانات دي مخبّية جوه قايمة التلت نقط أصلاً — محدش محتاجها
+  //    في أول لحظة. فالصفحة بترسم، وهي بتظهر لوحدها لما الرد يوصل.
+  applyCaps();
 
   localStorage.setItem('ifix_owner_me', JSON.stringify({ name:ME, email:MY_EMAIL }));
   loadNotices();   // من غير await — ما توقفش عرض الصفحة
