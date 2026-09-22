@@ -3712,12 +3712,11 @@ function pzEditHtml(r, locked){
       +  '<textarea class="pz-ta" id="pzI_' + id + '" rows="2" maxlength="300" '
       +  'placeholder="اكتب العطل…" ' + on + '>' + esc(r.issue) + '</textarea>';
   }
-  h += '<label class="pz-lbl" for="pzN_' + id + '">🔒 ملاحظة للأدمن بس</label>'
-    +  '<textarea class="pz-ta pz-note" id="pzN_' + id + '" rows="2" maxlength="1000" '
+  h += '<label class="pz-lbl" for="pzN_' + id + '">ملاحظة</label>'
+    +  '<textarea class="pz-ta" id="pzN_' + id + '" rows="2" maxlength="1000" '
     +  (r.noteFail ? 'disabled placeholder="⚠️ مقدرناش نجيب الملاحظة — اقفل الشاشة وافتحها تاني"'
-                   : 'placeholder="اكتب أي حاجة عايز الأدمن يعرفها عن الجهاز ده…"')
+                   : 'placeholder="اكتب أي حاجة عايز المحاسب يعرفها عن الجهاز ده…"')
     +  ' ' + on + '>' + esc(r.note) + '</textarea>'
-    +  '<div class="pz-hint">محدش هيشوفها غير الأدمن — لا المحاسب ولا الفنيين ولا الديسباتشر.</div>'
     +  '<button class="pz-save-info" id="pzG_' + id + '" disabled '
     +  'onclick="pzSaveInfo(\'' + id + '\')">💾 حفظ التعديلات</button>'
     +  '</div>';
