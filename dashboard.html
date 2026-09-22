@@ -3574,6 +3574,8 @@ function openColumn(statusKey){
   renderColumn();
   document.getElementById('columnOverlay').classList.remove('hidden');
   attachColScrollOnce();
+  // 👑 ملاحظات المالك — بتظهر جنب الأجهزة في «بانتظار الدفع» (للأدمن بس)
+  if(statusKey === 'delivered_unpaid') loadAllOwnerNotes();
 }
 function closeColumn(){
   document.getElementById('columnOverlay').classList.add('hidden');
@@ -3601,12 +3603,13 @@ function renderColumn(keepPos){
 
   const toolbar = document.getElementById('columnToolbar');
   if(toolbar){
-    toolbar.innerHTML = (currentColumn === 'delivered_unpaid' && colFullList.length > 0) ? `
+    toolbar.innerHTML = (currentColumn === 'delivered_unpaid' ? ownerDeferredNotesHtml() : '')
+    + ((currentColumn === 'delivered_unpaid' && colFullList.length > 0) ? `
       <div class="acc-toolbar" style="margin:0 0 12px;">
         <button class="btn-secondary" style="color:#166534;border-color:var(--success-border);" onclick="exportDeliveredUnpaidExcel(colFullList)">📊 Excel</button>
         <button class="btn-secondary" style="color:var(--danger-strong);border-color:var(--danger-border);" onclick="exportDeliveredUnpaidPdf(colFullList)">📄 PDF</button>
         ${isSuperAdmin() ? `<button class="btn-secondary" style="color:#8A6410;border-color:#C9A227;" onclick="openShareOwner()">👑 شارك مع المالك${ownerSharedCount(colFullList) ? ` (${ownerSharedCount(colFullList)})` : ''}</button>` : ''}
-      </div>` : '';
+      </div>` : '');
   }
 
   const scroller = document.querySelector('#columnOverlay .modal');
@@ -3692,6 +3695,7 @@ function cardHtml(d, s){
     ${isPriced(d) ? `<div class="card-price">${esc(d.agreedPrice)} ج.م</div>` : ''}
     ${d.status === 'delivered' ? paymentBadge(d) : ''}
     ${pendingApprovalText(d) ? `<div class="pending-appr-chip">⏳ ${pendingApprovalText(d)}</div>` : ''}
+    ${ownerNoteCardHtml(d)}
   </div>`;
 }
 
@@ -4110,8 +4114,131 @@ function openDetail(id){
   if(d && d.trackToken){
     loadTrackResponses(d.trackToken).then(() => { if(selectedId === id) renderDetail(); });
   }
+  try{ loadOwnerNote(id); }catch(e){}   // 👑🔒 ملاحظة المالك — للأدمن بس
   runAiIfNeeded(id);   // شغّل الذكاء الاصطناعي لو العطل صعب (يغطّي المكتوب وقت الاستلام)
 }
+// ============================================================
+// 👑🔒 ملاحظة المالك للأدمن
+// ------------------------------------------------------------
+// المالك بيكتبها من شاشة التسعير. متخزّنة في جدول لوحده
+// (owner_admin_notes) مقفول من قاعدة البيانات على الأدمن والمالك —
+// يعني حتى لو المحاسب فتح الكونسول مش هيقدر يقراها.
+// بتتجاب لجهاز واحد لما تفتح تفاصيله.
+// ============================================================
+let OWNER_NOTES = {};
+
+async function loadOwnerNote(id){
+  if(!isSuperAdmin()) return;
+  try{
+    // ⚠️ من الدالة مش من الجدول: الجدول لو رفض بيرجّع فاضي في صمت،
+    //    الدالة لو رفضت بتقول السبب.
+    const { data, error } = await sb.rpc('owner_notes_read', { p_ids: [id] });
+    if(error) throw error;
+    OWNER_NOTES[id] = (Array.isArray(data) && data[0]) || null;
+  }catch(e){
+    console.warn('ملاحظة المالك:', e && e.message ? e.message : e);
+    showError('⚠️ ملاحظة المالك مش بتتحمّل: ' + ((e && e.message) || e));
+    return;
+  }
+  if(selectedId === id && OWNER_NOTES[id]) renderDetail();
+}
+
+// ------------------------------------------------------------
+// 👑 كل ملاحظات المالك مرة واحدة — لما «بانتظار الدفع» تتفتح
+// ⚠️ الجدول صغير (ملاحظة لكل جهاز اتشارك بس)، فسحبه كله أرخص
+//    من سؤال لكل كارت.
+// ⚠️ لو فشل، بنقول السبب في شريط الأخطاء بدل ما نسكت —
+//    عشان «الملاحظة مش ظاهرة» يبان سببها على طول.
+// ------------------------------------------------------------
+async function loadAllOwnerNotes(){
+  if(!isSuperAdmin()) return;
+  try{
+    const { data, error } = await sb.rpc('owner_notes_read', { p_ids: null });
+    if(error) throw error;
+    OWNER_NOTES = {};
+    (Array.isArray(data) ? data : []).forEach(n => { OWNER_NOTES[n.device_id] = n; });
+    console.log('ملاحظات المالك:', Object.keys(OWNER_NOTES).length);
+  }catch(e){
+    console.error('ملاحظات المالك:', e);
+    showError('⚠️ ملاحظات المالك مش بتتحمّل: ' + ((e && e.message) || e)
+      + ' — اتأكد إن ملفات SQL رقم 60 و 61 و 62 اتشغّلوا');
+    return;
+  }
+  if(currentColumn === 'delivered_unpaid') renderColumn(true);
+}
+
+// الملاحظة على كارت الجهاز نفسه
+function ownerNoteCardHtml(d){
+  if(!d || !isSuperAdmin()) return '';
+  const n = OWNER_NOTES[d.id];
+  if(!n || !n.note) return '';
+  return `<div style="margin-top:7px;background:var(--warn-tint);border:1px dashed var(--warn);border-radius:8px;padding:7px 9px;font-size:12.5px;line-height:1.65;color:var(--ink);white-space:pre-wrap;">
+    <b style="color:var(--warn);">👑 ملاحظة المالك:</b> ${esc(n.note)}</div>`;
+}
+
+// ------------------------------------------------------------
+// 📒 أجهزة اتحوّلت آجل وعليها ملاحظة من المالك
+// ------------------------------------------------------------
+// الجهاز الآجل بيتحصّل فوراً، فبيخرج من «بانتظار الدفع» — والملاحظة
+// كانت هتضيع معاه. فبنثبّتها فوق الخانة لحد ما تدوس «✓ قرأت».
+// «قرأت» متسجّلة على السيرفر (read_at) — مش على الموبايل —
+// فلو قريتها من الكمبيوتر مش هتظهرلك تاني على الموبايل.
+// ولو المالك عدّل الملاحظة بعد كده، بترجع تظهر تاني.
+// ------------------------------------------------------------
+function ownerDeferredNotesHtml(){
+  if(!isSuperAdmin()) return '';
+  const list = devices.filter(d => {
+    const n = OWNER_NOTES[d.id];
+    return n && n.note && !n.read_at
+        && d.status === 'delivered' && d.paymentStatus === 'paid' && d.paymentType === 'deferred';
+  });
+  if(!list.length) return '';
+  return `<div style="background:var(--warn-tint);border:1.5px solid var(--warn);border-radius:12px;padding:12px;margin:0 0 12px;">
+    <div style="font-weight:900;font-size:14px;color:var(--warn);margin-bottom:8px;">📒 اتحوّلت آجل وعليها ملاحظة من المالك (${list.length})</div>
+    ${list.map(d => {
+      const n = OWNER_NOTES[d.id];
+      const shop = (d.billedShop || d.shopName || '').trim();
+      return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:8px;">
+        <div style="cursor:pointer;" onclick="openDetail('${d.id}')">
+          <div style="font-weight:800;font-size:13.5px;">${esc(d.deviceType || '')} ${esc(d.model || '')} — ${esc(d.customerName || '')}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px;">${shop ? '🏬 ' + esc(shop) + ' · ' : ''}${isPriced(d) ? esc(d.agreedPrice) + ' ج.م' : ''}</div>
+          <div style="font-size:13px;line-height:1.7;margin-top:6px;white-space:pre-wrap;">👑 ${esc(n.note)}</div>
+        </div>
+        <button class="btn-secondary" style="margin-top:8px;width:100%;color:var(--success);border-color:var(--success-border);"
+                onclick="ownerNoteMarkRead('${d.id}', this)">✓ قرأت</button>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+async function ownerNoteMarkRead(id, btn){
+  if(btn){ btn.disabled = true; btn.textContent = '⏳...'; }
+  try{
+    const { data, error } = await sb.rpc('owner_note_mark_read', { p_id: id });
+    if(error) throw error;
+    if(!data) throw new Error('السيرفر ما سجّلش إنك قريتها');
+    if(OWNER_NOTES[id]) OWNER_NOTES[id].read_at = data;
+    renderColumn(true);
+  }catch(e){
+    console.error('ownerNoteMarkRead:', e);
+    showError('⚠️ مقدرناش نعلّم الملاحظة إنها اتقرت: ' + ((e && e.message) || e));
+    if(btn){ btn.disabled = false; btn.textContent = '✓ قرأت'; }
+  }
+}
+
+function ownerNoteHtml(d){
+  if(!d || !isSuperAdmin()) return '';
+  const n = OWNER_NOTES[d.id];
+  if(!n || !n.note) return '';
+  let when = '';
+  try{ when = n.updated_at ? new Date(n.updated_at).toLocaleString('ar-EG') : ''; }catch(e){}
+  return `<div style="background:var(--warn-tint);border:1.5px dashed var(--warn);border-radius:10px;padding:10px 12px;margin:8px 0;">
+    <div style="font-size:12px;font-weight:800;color:var(--warn);margin-bottom:5px;">👑🔒 ملاحظة المالك — ليك إنت بس</div>
+    <div style="font-size:13.5px;line-height:1.7;white-space:pre-wrap;color:var(--ink);">${esc(n.note)}</div>
+    <div style="font-size:11px;color:var(--muted-2);margin-top:4px;">${esc(n.by_name || '')}${when ? ' — ' + esc(when) : ''}</div>
+  </div>`;
+}
+
 function closeDetail(){
   document.getElementById('detailOverlay').classList.add('hidden');
   _detailRenderPending = false;   // مفيش رسم مؤجّل بعد ما الشاشة تتقفل
@@ -4370,6 +4497,7 @@ function renderDetailNow(){
     ${d.billedShop ? `<div class="detail-row"><span>${t('det.billedTo')}</span><span style="font-weight:800;color:var(--accent);">${esc(d.billedShop)}</span></div>` : ''}
     </div><!-- /money-only -->
     ${d.accountNote ? `<div style="background:#FFF8EC;border:1px solid #EACB84;border-radius:8px;padding:9px 12px;font-size:13px;margin:8px 0;color:#7A5A10;">${esc(d.accountNote)}</div>` : ''}
+    ${ownerNoteHtml(d)}
     <label class="field"><span>${t('det.issue')}</span><textarea rows="2"${roI} onblur="editField('reportedIssue', this.value)">${esc(d.reportedIssue||'')}</textarea></label>
     ${hasRet ? `
     <label class="field"><span style="color:var(--violet);font-weight:800;">${t('det.returnComplaint')}</span><textarea rows="2"${roR} placeholder="${t('det.returnComplaintPh')}" onblur="editField('returnComplaint', this.value)">${esc(d.returnComplaint||'')}</textarea></label>

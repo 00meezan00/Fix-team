@@ -531,6 +531,26 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
     border-radius:9px; padding:8px 10px; margin-top:9px; line-height:1.65;}
   .pz-final{font-family:'Cairo',sans-serif; font-weight:900; font-size:17px; color:var(--done);
     text-align:center; background:var(--done-bg); border-radius:11px; padding:11px; margin-top:11px;}
+  /* ✏️ تعديل العطل والمحل + ملاحظة الأدمن جوه كارت التسعير */
+  .pz-ed{margin-top:11px;}
+  .pz-lbl{display:block; font-size:12px; font-weight:800; color:var(--muted); margin:9px 2px 5px;}
+  .pz-ta, .pz-tx{width:100%; box-sizing:border-box; border:1.5px solid var(--line); background:var(--card);
+    color:var(--ink); border-radius:11px; padding:10px 12px; font-family:inherit; font-size:14px; line-height:1.6;}
+  .pz-ta{resize:vertical; min-height:46px;}
+  .pz-ta:focus, .pz-tx:focus{outline:none; border-color:var(--owner);}
+  /* ملاحظة الأدمن بلون مختلف عشان محدش يفتكرها ملاحظة عادية */
+  .pz-ta.pz-note{background:var(--owner-bg); border-style:dashed; border-color:var(--owner);}
+  .pz-ta:disabled{opacity:.6;}
+  .pz-hint{font-size:11.5px; color:var(--muted); margin:4px 2px 0; line-height:1.6;}
+  .pz-save-info{width:100%; margin-top:10px; border:1.5px solid var(--owner); background:var(--owner); color:#fff;
+    border-radius:11px; padding:11px; font-family:'Tajawal',sans-serif; font-weight:800; font-size:13.5px; cursor:pointer;}
+  html[data-theme="dark"] .pz-save-info:not(:disabled){color:#1B1206;}
+  /* ⚠️ الموقوف لازم يغيّر لون النص كمان — وإلا في الداكن غامق على غامق */
+  /* الموقوف (قبل ما تغيّر حاجة): خلفية ذهبي خفيف + كلام بلون المالك.
+     --owner متظبّط إنه يتقرا في الثيمين (٥.١ على الفاتح، وذهبي فاتح على
+     الداكن)، فالزرار بيبان واضح إنه موجود — بس باين إنه مش مفعّل لسه. */
+  .pz-save-info:disabled{background:var(--owner-bg); border:1.5px dashed var(--owner);
+    color:var(--owner); cursor:default;}
 
   .modes{display:flex; gap:9px; margin-top:14px;}
   .mode{flex:1; border:1.5px solid var(--line); background:var(--card); border-radius:12px; padding:13px 10px; cursor:pointer; text-align:center; transition:border-color .15s, background .15s;}
@@ -3386,6 +3406,8 @@ async function pzRefreshBadge(){
 async function openPricing(){
   closeKebab();
   pzOpen = true;
+  // 🏬 بيملى قايمة اقتراحات أسماء المحلات (ownShopList) — نفس اللي في «جهاز جديد»
+  try{ buildSuggest(); }catch(e){}
   $('pzOverlay').classList.remove('hidden');
   $('pzBody').innerHTML = '<div class="empty">⏳ بيحمّل...</div>';
   await pzLoad();
@@ -3421,15 +3443,48 @@ async function pzLoad(){
         payState: r.payment_status || d.paymentStatus || '',
         answered: d.ownerPriced || null,
         sharedAt: (d.ownerShare && d.ownerShare.at) || '',
-        out:      r.delivered_at || ''
+        out:      r.delivered_at || '',
+        paidAt:   pzPaidAt(d, r),
+        note:     '',          // 🔒 ملاحظة الأدمن — بتتجاب من جدولها تحت
+        noteFail: false
       };
     });
+    await pzLoadNotes();
     pzRender();
   }catch(e){
     console.error('pzLoad failed:', e);
     $('pzBody').innerHTML = '<div class="empty">📴 مقدرناش نحمّل الصندوق.<br>'
       + '<span style="font-size:12.5px;">' + esc(e.message || String(e)) + '</span></div>';
   }
+}
+
+/* ============================================================
+   ⏳ الجهاز المتحصّل بيختفي بعد ٢٤ ساعة
+   ------------------------------------------------------------
+   🧠 إمتى اتحصّل؟ بندوّر بالترتيب:
+      ١) سطر «اتحصّل» في سجل الحالة (زرار «تأكيد الدفع» بيكتبه)
+      ٢) وقت رد المالك لو كان آجل (الآجل بيتحصّل في نفس اللحظة)
+      ٣) آخر تعديل على الجهاز — أي حد بيعلّم «اتحصّل» بيحدّثه
+      ٤) وقت التسليم — آخر حل
+   ⚠️ ده إخفاء من الصندوق بس. الجهاز نفسه مبيتلمسش، وبيفضل
+      موجود في الداشبورد والحسابات زي ما هو.
+   ============================================================ */
+const PZ_KEEP_PAID_MS = 24 * 3600000;
+
+function pzPaidAt(d, row){
+  const hist = Array.isArray(d.statusHistory) ? d.statusHistory : [];
+  const paidH = hist.filter(h => h && String(h.labelKey || '').indexOf('hist.paid') === 0 && h.date);
+  if(paidH.length) return paidH[paidH.length - 1].date;
+  const op = d.ownerPriced;
+  if(op && op.pay === 'deferred' && op.at) return op.at;
+  return d.lastModifiedAt || (row && row.delivered_at) || '';
+}
+
+function pzExpired(r){
+  if(r.payState !== 'paid') return false;
+  const t = new Date(r.paidAt || 0).getTime();
+  if(!t) return false;                     // مش عارفين إمتى؟ نسيبه ظاهر أحسن من ما يختفي غلط
+  return (Date.now() - t) > PZ_KEEP_PAID_MS;
 }
 
 /* ===== الرسم ===== */
@@ -3444,8 +3499,15 @@ function pzRender(){
     return;
   }
 
-  const todo = pzRows.filter(r => !r.answered);
-  const done = pzRows.filter(r => r.answered);
+  // ⏳ الجهاز اللي اتحصّل بيفضل ظاهر ٢٤ ساعة بس عشان تشوف إنه خلص،
+  //    وبعدين بيختفي من الصندوق خالص (حتى من «اللي جاوبت عليه»).
+  const live = pzRows.filter(r => !pzExpired(r));
+  if(!live.length){
+    box.innerHTML = '<div class="pz-ok">✅ مفيش أجهزة مستنياك دلوقتي.</div>';
+    return;
+  }
+  const todo = live.filter(r => !r.answered);
+  const done = live.filter(r => r.answered);
 
   let html = '';
 
@@ -3465,7 +3527,7 @@ function pzRender(){
   box.innerHTML = html;
 }
 
-function pzToggleDone(){ pzShowDone = !pzShowDone; pzRender(); }
+function pzToggleDone(){ pzShowDone = !pzShowDone; pzRenderKeep(); }
 
 function pzCard(r){
   // 🔒 اتحصّل خلاص → للعرض بس، مفيش أي تعديل
@@ -3495,12 +3557,14 @@ function pzCard(r){
       + (r.tech ? '🔧 ' + esc(r.tech) + ' · ' : '')
       + '📤 ' + (r.out ? fmtDate(r.out) : '—')
     + '</div>'
-    + (r.issue ? '<div class="pz-i">🩺 ' + esc(r.issue) + '</div>' : '');
+    + ((locked && r.issue) ? '<div class="pz-i">🩺 ' + esc(r.issue) + '</div>' : '');
 
   if(locked){
     body += '<div class="pz-final">💰 ' + esc(r.price || '—') + ' ج.م</div>';
+    body += pzEditHtml(r, true);      // اتحصّل → ملاحظة الأدمن بس
   } else {
     const idJs = esc(r.id);
+    body += pzEditHtml(r, false);     // العطل + المحل + ملاحظة الأدمن
     body += '<div class="pz-row">'
       + '<input class="pz-in" id="pz_' + idJs + '" inputmode="numeric" autocomplete="off" '
       + 'value="' + esc(r.price) + '" placeholder="السعر بالجنيه" '
@@ -3517,7 +3581,7 @@ function pzCard(r){
 
     if(!r.shop){
       body += '<div class="pz-warn">⚠️ الجهاز ده مش مكتوب عليه اسم محل، '
-            + 'فالآجل مش هينفع عليه — الآجل لازم يتقيّد على حساب محل.</div>';
+            + 'فالآجل مش هينفع عليه — اكتب اسم المحل في الخانة فوق واحفظ.</div>';
     }
   }
 
@@ -3539,6 +3603,14 @@ async function pzSave(id, pay){
   if(pzBusy) return;
   const r = pzRows.find(x => x.id === id);
   if(!r) return;
+
+  // ✏️ غيّرت العطل أو المحل ولسه ما حفظتش؟ نحفظ الأول.
+  //    ⚠️ ده مهم للآجل بالذات: من غيره الفلوس كانت هتتقيّد
+  //       على اسم المحل القديم مش اللي إنت لسه كاتبه.
+  if(pzInfoChanges(r)){
+    const okInfo = await pzSaveInfo(id, true);
+    if(!okInfo) return;
+  }
 
   const inp = $('pz_' + id);
   const price = inp ? String(inp.value || '').trim() : '';
@@ -3589,6 +3661,151 @@ async function pzSave(id, pay){
     pzBusy = false;
     document.querySelectorAll('.pz-btn').forEach(b => b.disabled = false);
   }
+}
+
+/* ============================================================
+   ✏️ تعديل العطل واسم المحل + 🔒 ملاحظة للأدمن
+   ------------------------------------------------------------
+   🧠 بالبلدي:
+      كل كارت فيه ٣ خانات. لما تغيّر أي واحدة، زرار «حفظ» بيولّع.
+      الحفظ بيروح لدالة على السيرفر (owner_pricing_edit) — هي اللي
+      بتتأكد إن الجهاز متشارك معاك ولسه ما اتحصّلش.
+
+   🔒 الملاحظة بتتحفظ في جدول لوحده (owner_admin_notes) مقفول
+      على الأدمن وإنت بس. المحاسب والفنيين مبيوصلهمش أصلاً —
+      مش مخفية بالشاشة، مقفولة من قاعدة البيانات.
+   ============================================================ */
+const pzClean = s => String(s == null ? '' : s).trim();
+const pzShopClean = s => String(s == null ? '' : s).replace(/[ \t\r\n]+/g, ' ').trim();
+
+// ملاحظات الأدمن للأجهزة اللي في الصندوق — على دفعات صغيرة
+async function pzLoadNotes(){
+  const ids = pzRows.map(r => r.id);
+  if(!ids.length) return;
+  try{
+    const map = {};
+    for(let i = 0; i < ids.length; i += 100){
+      const { data, error } = await sb.rpc('owner_notes_read', { p_ids: ids.slice(i, i + 100) });
+      if(error) throw error;
+      (Array.isArray(data) ? data : []).forEach(n => { map[n.device_id] = n.note || ''; });
+    }
+    pzRows.forEach(r => { r.note = map[r.id] || ''; r.noteFail = false; });
+  }catch(e){
+    // ⚠️ لو مقدرناش نقرا الملاحظة، نقفل خانتها — وإلا لو كتب فيها
+    //    واتحفظت، كانت هتمسح ملاحظة قديمة ماشافهاش.
+    console.warn('owner_admin_notes:', e && e.message ? e.message : e);
+    pzRows.forEach(r => { r.noteFail = true; });
+  }
+}
+
+function pzEditHtml(r, locked){
+  const id = esc(r.id);
+  const on = 'oninput="pzDirty(\'' + id + '\')"';
+  let h = '<div class="pz-ed">';
+  if(!locked){
+    // 🏬 المحل فوق و🩺 العطل تحته
+    h += '<label class="pz-lbl" for="pzS_' + id + '">🏬 اسم المحل</label>'
+      +  '<input class="pz-tx" id="pzS_' + id + '" list="ownShopList" autocomplete="off" '
+      +  'maxlength="80" placeholder="اكتب اسم المحل…" value="' + esc(r.shop) + '" ' + on + ' />'
+      +  '<label class="pz-lbl" for="pzI_' + id + '">🩺 العطل</label>'
+      +  '<textarea class="pz-ta" id="pzI_' + id + '" rows="2" maxlength="300" '
+      +  'placeholder="اكتب العطل…" ' + on + '>' + esc(r.issue) + '</textarea>';
+  }
+  h += '<label class="pz-lbl" for="pzN_' + id + '">ملاحظة</label>'
+    +  '<textarea class="pz-ta" id="pzN_' + id + '" rows="2" maxlength="1000" '
+    +  (r.noteFail ? 'disabled placeholder="⚠️ مقدرناش نجيب الملاحظة — اقفل الشاشة وافتحها تاني"'
+                   : 'placeholder="اكتب أي حاجة عايز المحاسب يعرفها عن الجهاز ده…"')
+    +  ' ' + on + '>' + esc(r.note) + '</textarea>'
+    +  '<button class="pz-save-info" id="pzG_' + id + '" disabled '
+    +  'onclick="pzSaveInfo(\'' + id + '\')">💾 حفظ التعديلات</button>'
+    +  '</div>';
+  return h;
+}
+
+// إيه اللي اتغيّر فعلاً؟ بيرجّع null لو مفيش حاجة
+function pzInfoChanges(r){
+  if(!r) return null;
+  const ch = {};
+  const iEl = $('pzI_' + r.id), sEl = $('pzS_' + r.id), nEl = $('pzN_' + r.id);
+  if(iEl){ const v = pzClean(iEl.value);     if(v !== pzClean(r.issue)) ch.issue = v; }
+  if(sEl){ const v = pzShopClean(sEl.value); if(v !== pzShopClean(r.shop)) ch.shop = v; }
+  if(nEl && !nEl.disabled){ const v = pzClean(nEl.value); if(v !== pzClean(r.note)) ch.note = v; }
+  return Object.keys(ch).length ? ch : null;
+}
+
+// زرار الحفظ بيولّع لما يكون فيه تغيير بس
+function pzDirty(id){
+  const r = pzRows.find(x => x.id === id);
+  const b = $('pzG_' + id);
+  if(b) b.disabled = !pzInfoChanges(r);
+}
+
+// إعادة رسم الصندوق من غير ما اللي مكتوب في الخانات يضيع
+function pzRenderKeep(){
+  const keep = {};
+  document.querySelectorAll('#pzBody input, #pzBody textarea').forEach(el => {
+    if(el.id) keep[el.id] = el.value;
+  });
+  pzRender();
+  Object.keys(keep).forEach(k => { const el = $(k); if(el) el.value = keep[k]; });
+  pzRows.forEach(r => pzDirty(r.id));
+}
+
+async function pzSaveInfo(id, quiet){
+  const r = pzRows.find(x => x.id === id);
+  if(!r) return false;
+  const ch = pzInfoChanges(r);
+  if(!ch) return true;
+  if('issue' in ch && !ch.issue){
+    toast('⚠️ العطل مينفعش يبقى فاضي');
+    const el = $('pzI_' + id); if(el) el.focus();
+    return false;
+  }
+  if(!navigator.onLine){ toast('مفيش نت — التعديل مش هيتحفظ 📴'); return false; }
+
+  const btn = $('pzG_' + id);
+  if(btn){ btn.disabled = true; btn.textContent = '⏳ بيحفظ...'; }
+  let ok = false;
+  try{
+    const { data, error } = await sb.rpc('owner_pricing_edit', {
+      p_id:    id,
+      p_issue: ('issue' in ch) ? ch.issue : null,
+      p_shop:  ('shop'  in ch) ? ch.shop  : null,
+      p_note:  ('note'  in ch) ? ch.note  : null,
+      p_by:    ME
+    });
+    if(error) throw error;
+
+    // ✅ Supabase مبترميش أخطاء لوحدها — بنقارن باللي السيرفر رجّعه
+    const res = data || {};
+    if('issue' in ch && (res.reportedIssue || '') !== ch.issue) throw new Error('السيرفر مسجّلش العطل — بلّغ الإدارة');
+    if('shop'  in ch && (res.shop || '')          !== ch.shop)  throw new Error('السيرفر مسجّلش اسم المحل — بلّغ الإدارة');
+    if('note'  in ch && (res.note || '')          !== ch.note)  throw new Error('السيرفر مسجّلش الملاحظة — بلّغ الإدارة');
+
+    r.issue = res.reportedIssue || r.issue;
+    r.shop  = res.shop || '';
+    r.note  = res.note || '';
+
+    // الجهاز ممكن يكون ظاهر في «المُسلَّمة» كمان — نحدّثه هناك
+    const dv = devices.find(x => x.id === id);
+    if(dv){
+      if('issue' in ch){ dv.issue = r.issue; if(dv._raw) dv._raw.reportedIssue = r.issue; }
+      if('shop'  in ch){ dv.shop  = r.shop;  if(dv._raw) dv._raw.shopName = r.shop; }
+      try{ if(window.IFixSearch) IFixSearch.invalidate(dv); }catch(e){}
+      reindexSearch(); render();
+    }
+
+    ok = true;
+    if(!quiet) toast('✅ التعديلات اتحفظت');
+  }catch(e){
+    console.error('pzSaveInfo failed:', e);
+    const perm = e && (e.code === '42501' || /permission|security/i.test(e.message || ''));
+    toast('⚠️ ' + (perm ? 'السيرفر رفض — ' : '') + (e.message || String(e)));
+  }finally{
+    if(btn) btn.textContent = '💾 حفظ التعديلات';
+  }
+  if(ok) pzRenderKeep(); else pzDirty(id);
+  return ok;
 }
 
 /* نفس تنضيف السعر اللي في السيرفر — عشان المقارنة تطلع صح */
