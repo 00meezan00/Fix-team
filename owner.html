@@ -795,6 +795,33 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
     input, textarea, select, .tech-select{ font-size:16px !important; }
   }
 </style>
+<style id="ios-safe-head-fix">
+/* ============================================================
+   📱 عناوين الشاشات الكاملة تحت نتش الآيفون
+   ------------------------------------------------------------
+   viewport-fit=cover بيفرد الصفحة تحت شريط الساعة، فأي رأس لازق
+   فوق (position:sticky; top:0) بيقع تحته ويتقصّ.
+
+   env(safe-area-inset-top) = طول النتش/شريط الساعة بالظبط.
+   على الكمبيوتر وأي جهاز من غير نتش بيساوي صفر، يعني مفيش أي فرق.
+
+   !important عشان البادينج مكتوب style="padding:16px 20px" جوه
+   الوسم نفسه في ٣٠ شاشة، والمكتوب جوه الوسم بيغلب الـ CSS العادي.
+
+   الشرط .summaries-page مقصود: يعني الشاشات الكاملة بس. النوافذ
+   اللي بتطلع من تحت (.modal) مش لازقة فوق فمحتاجاش حاجة.
+   ============================================================ */
+.summaries-page > .modal-head{
+  padding-top: calc(16px + env(safe-area-inset-top)) !important;
+}
+/* نفس الحكاية للشاشتين اللي بيرسمهم ai-invoice.js من الجافاسكريبت:
+   «مخزن قطع الغيار» و«فواتير المشتريات وقطع الغيار». مكتوبين
+   بالاسم كمان تحسّباً لو شكل الماركب بتاعهم اتغيّر يوم. */
+#invOverlay .modal-head,
+#purOverlay .modal-head{
+  padding-top: calc(16px + env(safe-area-inset-top)) !important;
+}
+</style>
 </head>
 <body>
 
