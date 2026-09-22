@@ -544,9 +544,13 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
   .pz-hint{font-size:11.5px; color:var(--muted); margin:4px 2px 0; line-height:1.6;}
   .pz-save-info{width:100%; margin-top:10px; border:1.5px solid var(--owner); background:var(--owner); color:#fff;
     border-radius:11px; padding:11px; font-family:'Tajawal',sans-serif; font-weight:800; font-size:13.5px; cursor:pointer;}
-  html[data-theme="dark"] .pz-save-info{color:#1B1206;}
+  html[data-theme="dark"] .pz-save-info:not(:disabled){color:#1B1206;}
   /* ⚠️ الموقوف لازم يغيّر لون النص كمان — وإلا في الداكن غامق على غامق */
-  .pz-save-info:disabled{background:var(--paper); border-color:var(--line); color:var(--faint); cursor:default;}
+  /* الموقوف (قبل ما تغيّر حاجة): خلفية ذهبي خفيف + كلام بلون المالك.
+     --owner متظبّط إنه يتقرا في الثيمين (٥.١ على الفاتح، وذهبي فاتح على
+     الداكن)، فالزرار بيبان واضح إنه موجود — بس باين إنه مش مفعّل لسه. */
+  .pz-save-info:disabled{background:var(--owner-bg); border:1.5px dashed var(--owner);
+    color:var(--owner); cursor:default;}
 
   .modes{display:flex; gap:9px; margin-top:14px;}
   .mode{flex:1; border:1.5px solid var(--line); background:var(--card); border-radius:12px; padding:13px 10px; cursor:pointer; text-align:center; transition:border-color .15s, background .15s;}
@@ -3700,12 +3704,13 @@ function pzEditHtml(r, locked){
   const on = 'oninput="pzDirty(\'' + id + '\')"';
   let h = '<div class="pz-ed">';
   if(!locked){
-    h += '<label class="pz-lbl" for="pzI_' + id + '">🩺 العطل</label>'
-      +  '<textarea class="pz-ta" id="pzI_' + id + '" rows="2" maxlength="300" '
-      +  'placeholder="اكتب العطل…" ' + on + '>' + esc(r.issue) + '</textarea>'
-      +  '<label class="pz-lbl" for="pzS_' + id + '">🏬 اسم المحل</label>'
+    // 🏬 المحل فوق و🩺 العطل تحته
+    h += '<label class="pz-lbl" for="pzS_' + id + '">🏬 اسم المحل</label>'
       +  '<input class="pz-tx" id="pzS_' + id + '" list="ownShopList" autocomplete="off" '
-      +  'maxlength="80" placeholder="اكتب اسم المحل…" value="' + esc(r.shop) + '" ' + on + ' />';
+      +  'maxlength="80" placeholder="اكتب اسم المحل…" value="' + esc(r.shop) + '" ' + on + ' />'
+      +  '<label class="pz-lbl" for="pzI_' + id + '">🩺 العطل</label>'
+      +  '<textarea class="pz-ta" id="pzI_' + id + '" rows="2" maxlength="300" '
+      +  'placeholder="اكتب العطل…" ' + on + '>' + esc(r.issue) + '</textarea>';
   }
   h += '<label class="pz-lbl" for="pzN_' + id + '">🔒 ملاحظة للأدمن بس</label>'
     +  '<textarea class="pz-ta pz-note" id="pzN_' + id + '" rows="2" maxlength="1000" '
