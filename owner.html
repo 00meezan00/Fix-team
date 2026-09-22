@@ -467,6 +467,53 @@
   .hand-body{margin-top:14px; display:none;}
   .hand-body.on{display:block; animation:tkin .25s ease both;}
   .hb-h{font-size:13px; font-weight:700; color:var(--ink); margin-bottom:8px;}
+  /* ===== 💰 شاشة التسعير ===== */
+  .pr-badge{display:inline-flex; align-items:center; justify-content:center; min-width:19px; height:19px;
+    margin-inline-start:7px; padding:0 5px; border-radius:10px; background:var(--crown); color:#fff;
+    font-family:var(--mono); font-size:11px; font-weight:800; line-height:1;}
+  .pr-h{font-family:'Cairo',sans-serif; font-weight:800; font-size:14px; color:var(--ink); margin:4px 0 11px;}
+  .pr-ok{text-align:center; color:var(--done); background:var(--done-bg); border-radius:12px;
+    padding:15px; font-weight:700; font-size:13.5px; margin-bottom:12px;}
+  .pr-toggle{width:100%; margin:14px 0 10px; background:var(--paper); color:var(--muted); border:1px solid var(--line);
+    border-radius:11px; padding:11px; font-family:'Tajawal',sans-serif; font-weight:700; font-size:13px; cursor:pointer;}
+  .pr-card{background:var(--card); border:1px solid var(--line); border-radius:15px;
+    padding:14px 15px; margin-bottom:12px; box-shadow:0 2px 8px rgba(16,22,32,.05);}
+  .pr-top{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px;}
+  .pr-no{font-family:var(--mono); font-size:11.5px; color:var(--faint); font-weight:600; flex:0 0 auto;}
+  .pr-b{font-size:11px; font-weight:800; padding:3px 9px; border-radius:20px; line-height:1.6;}
+  .pr-b-new{background:var(--crown-bg); color:var(--crown);}
+  .pr-b-cash{background:var(--waiting-bg); color:var(--waiting);}
+  .pr-b-wait{background:var(--paper); color:var(--muted);}
+  .pr-b-ok{background:var(--done-bg); color:var(--done);}
+  .pr-t{font-family:'Cairo',sans-serif; font-weight:800; font-size:15.5px; line-height:1.35; color:var(--ink);}
+  .pr-s{font-size:12px; color:var(--muted); margin-top:3px; line-height:1.7;}
+  .pr-i{font-size:12.5px; color:var(--ink); background:var(--paper); border-radius:9px;
+    padding:8px 10px; margin-top:9px; line-height:1.65;}
+  .pr-row{display:flex; align-items:center; gap:8px; margin-top:12px;}
+  .pr-in{flex:1; min-width:0; border:1.5px solid var(--line); background:var(--card); color:var(--ink);
+    border-radius:11px; padding:12px 13px; font-family:var(--mono); font-size:16px; font-weight:700;
+    direction:ltr; text-align:right;}
+  .pr-in:focus{outline:none; border-color:var(--crown);}
+  .pr-eg{font-size:13px; font-weight:800; color:var(--muted); flex:0 0 auto;}
+  .pr-btns{display:flex; gap:7px; margin-top:10px;}
+  /* ⚠️ لون النص هنا مش var(--muted) عن قصد. --muted لون نص جانبي
+     (تحت العنوان وكده)، ونسبة وضوحه على الأبيض 4.39 — أقل من
+     المعيار (4.5). ده مقبول لسطر جانبي، بس مش مقبول لزرار
+     المستخدم لازم يقراه ويدوس عليه. فاللون هنا أغمق شوية (6.19). */
+  .pr-btn{flex:1; border:1.5px solid var(--line); background:var(--card); border-radius:11px; padding:11px 6px;
+    font-family:'Tajawal',sans-serif; font-weight:800; font-size:12.5px; cursor:pointer; color:#54636F;}
+  html[data-theme="dark"] .pr-btn{color:var(--muted);}
+  .pr-btn:disabled{opacity:.5; cursor:not-allowed;}
+  .pr-cash{border-color:var(--waiting); color:var(--waiting);}
+  .pr-cash.on{background:var(--waiting); border-color:var(--waiting); color:#fff;}
+  .pr-def{border-color:var(--crown); color:var(--crown);}
+  .pr-none{border-color:var(--line);}
+  .pr-none.on{background:var(--paper);}
+  .pr-warn{font-size:11.5px; color:var(--rejected_shop); background:var(--rejected_shop-bg);
+    border-radius:9px; padding:8px 10px; margin-top:9px; line-height:1.65;}
+  .pr-final{font-family:'Cairo',sans-serif; font-weight:900; font-size:17px; color:var(--done);
+    text-align:center; background:var(--done-bg); border-radius:11px; padding:11px; margin-top:11px;}
+
   .modes{display:flex; gap:9px; margin-top:14px;}
   .mode{flex:1; border:1.5px solid var(--line); background:var(--card); border-radius:12px; padding:13px 10px; cursor:pointer; text-align:center; transition:border-color .15s, background .15s;}
   .mode .mi{font-size:19px;}
@@ -505,7 +552,10 @@
       <button class="pay-menu-btn" style="display:none;" onclick="closeKebab(); openPayroll()">💰 مرتبك</button>
       <div class="sep"></div>
       <button onclick="openSettings()">⚙️ الإعدادات</button>
-      <!-- 💰 خانة التسعير — بتتحط هنا في مرحلة ٣ (تحت خالص زي ما اتفقنا) -->
+      <!-- 💰 خانة التسعير — تحت خالص زي ما اتفقنا.
+           العدّاد الأصفر جنبها بيقول كام جهاز مستني تسعير. -->
+      <div class="sep"></div>
+      <button onclick="openPricing()">💰 تسعير أجهزة<span id="prBadge" class="pr-badge" style="display:none;"></span></button>
       <div class="sep"></div>
       <button class="danger" onclick="kebabLogout()">تسجيل الخروج ⏻</button>
     </div>
@@ -621,6 +671,19 @@
     <div class="hb-h" style="margin-top:18px;">🌐 اللغة</div>
     <div class="modes" id="setLang" style="margin-top:0;"></div>
   </div>
+</div>
+
+<!-- ============================================================
+     💰 شاشة التسعير — الأجهزة اللي السوبر أدمن شاركها معاك
+     الجسم بيتبني كله من p9_price.js
+     ============================================================ -->
+<div class="sheet-bg" id="prBg" onclick="closePricing()"></div>
+<div class="sheet" id="prSheet">
+  <div class="sheet-head">
+    <div class="grab"></div>
+    <div class="sh-row"><div class="sh-title">💰 تسعير أجهزة</div><button class="sh-x" onclick="closePricing()">×</button></div>
+  </div>
+  <div class="sh-body" id="prBody"></div>
 </div>
 
 <!-- شاشة المواعيد — بتتبني بالكامل من attendance.js -->
@@ -1083,6 +1146,9 @@ function finish(){
   if(nm) nm.textContent = ME;
   render();
   $('veil').classList.add('gone');
+  // 💰 العدّاد اللي جنب «تسعير أجهزة» في قايمة التلت نقط.
+  //    بيتنده من غير await عن قصد — لو فشل، الصفحة تكمّل عادي.
+  try{ prRefreshBadge(); }catch(e){}
   // شريط STAGING في common.js (موحّد في كل الصفحات)
 }
 
@@ -1097,6 +1163,7 @@ async function refresh(){
   if(!booted || !navigator.onLine) return;
   await loadDevices();
   render();
+  try{ prRefreshBadge(); }catch(e){}
 }
 
 // ⚠️ كبح ضروري. المالك شغال على موبايل: بيقفل الشاشة، بيرد على
@@ -2815,6 +2882,269 @@ document.addEventListener('DOMContentLoaded', function(){
   try{ I18N.applyI18n(document); }catch(e){}
   try{ mountScanBtn(); }catch(e){}
 });
+
+/* ============================================================
+   💰 شاشة التسعير — الصندوق اللي السوبر أدمن بيشارك فيه أجهزة
+   ------------------------------------------------------------
+   🧠 الحكاية بالبلدي:
+      السوبر أدمن عنده قايمة «تم التسليم وبانتظار الدفع».
+      بيختار منها أجهزة ويبعتها هنا. إنت بتفتح الخانة دي،
+      بتكتب سعر كل جهاز، وبتقول:
+
+        💵 فوري  → الجهاز بيفضل مكانه عند المحاسب لحد ما
+                    يستلم الفلوس ويدوس «تأكيد الدفع».
+                    ⚠️ إنت مش بتأكد إن الفلوس اتحصّلت.
+
+        📒 آجل   → الفلوس بتتحوّل لدَين على حساب المحل فوراً،
+                    والجهاز بيختفي من «بانتظار الدفع».
+
+        ⏸️ لسه   → بتكتب السعر وبس، من غير ما تحدد حاجة.
+
+   🔒 وكل ده محروس من قاعدة البيانات مش من الصفحة:
+      • الصندوق ده شباك (devices_owner_pricing) مبيفتحش غير
+        على الأجهزة اللي اتشاركت معاك إنت بالذات.
+      • الكتابة بتمر على دالة (owner_set_price) بترفض أي حاجة
+        برة القواعد دي، حتى لو حد عدّل في الصفحة بإيده.
+   ============================================================ */
+
+let prRows  = [];        // الأجهزة اللي في الصندوق
+let prBusy  = false;     // بيحفظ دلوقتي؟ (عشان مايدوسش مرتين)
+let prOpen  = false;     // الشاشة مفتوحة؟
+let prShowDone = false;  // نعرض اللي اتسعّر خلاص؟
+
+/* عدّاد الخانة في قايمة التلت نقط — بيتحدّث لوحده */
+async function prRefreshBadge(){
+  try{
+    const { count, error } = await sb.from('devices_owner_pricing')
+      .select('id', { count:'exact', head:true })
+      .is('data->ownerPriced', null);
+    if(error) throw error;
+    const b = $('prBadge');
+    if(b){ b.textContent = count ? String(count) : ''; b.style.display = count ? '' : 'none'; }
+  }catch(e){ /* مش مشكلة — العدّاد كمالة */ }
+}
+
+async function openPricing(){
+  closeKebab();
+  prOpen = true;
+  $('prSheet').classList.add('on');
+  $('prBg').classList.add('on');
+  $('prBody').innerHTML = '<div class="empty">⏳ بيحمّل...</div>';
+  await prLoad();
+}
+
+function closePricing(){
+  prOpen = false;
+  $('prSheet').classList.remove('on');
+  $('prBg').classList.remove('on');
+}
+
+async function prLoad(){
+  try{
+    // 🧠 الصندوق صغير بطبعه (أجهزة معدودة بيشاركها السوبر أدمن)،
+    //    بس بنستخدم نفس التقسيم بتاع باقي الصفحة عشان لو يوم
+    //    شارك ٥٠٠ جهاز الصفحة ما تقعش ولا نتعدى حصة المشروع.
+    const rows = await fetchPaged(() => sb.from('devices_owner_pricing')
+      .select('id,status,payment_status,delivered_at,data')
+      .order('delivered_at', { ascending:false }));
+
+    prRows = (rows || []).map(r => {
+      const d = r.data || {};
+      return {
+        id:       d.id || r.id,
+        type:     d.deviceType || '',
+        model:    d.model || '',
+        customer: d.customerName || '',
+        phone:    d.customerPhone || '',
+        shop:     (d.billedShop || d.shopName || '').trim(),
+        issue:    d.reportedIssue || '',
+        tech:     (d.technician || '').trim(),
+        price:    (d.agreedPrice === 0 || d.agreedPrice) ? String(d.agreedPrice) : '',
+        payType:  d.paymentType || '',
+        payState: r.payment_status || d.paymentStatus || '',
+        answered: d.ownerPriced || null,
+        sharedAt: (d.ownerShare && d.ownerShare.at) || '',
+        out:      r.delivered_at || ''
+      };
+    });
+    prRender();
+  }catch(e){
+    console.error('prLoad failed:', e);
+    $('prBody').innerHTML = '<div class="empty">📴 مقدرناش نحمّل الصندوق.<br>'
+      + '<span style="font-size:12.5px;">' + esc(e.message || String(e)) + '</span></div>';
+  }
+}
+
+/* ===== الرسم ===== */
+function prRender(){
+  const box = $('prBody');
+  if(!box) return;
+
+  if(!prRows.length){
+    box.innerHTML = '<div class="empty">📭 مفيش أجهزة في صندوقك لسه.<br>'
+      + '<span style="font-size:12.5px;">السوبر أدمن هو اللي بيشارك الأجهزة هنا '
+      + 'من قايمة «تم التسليم وبانتظار الدفع».</span></div>';
+    return;
+  }
+
+  const todo = prRows.filter(r => !r.answered);
+  const done = prRows.filter(r => r.answered);
+
+  let html = '';
+
+  if(todo.length){
+    html += '<div class="pr-h">📥 مستنية منك (' + todo.length + ')</div>'
+          + todo.map(prCard).join('');
+  } else {
+    html += '<div class="pr-ok">✅ خلصت كل اللي عندك. تسلم إيدك.</div>';
+  }
+
+  if(done.length){
+    html += '<button class="pr-toggle" onclick="prToggleDone()">'
+          + (prShowDone ? '▲ إخفاء' : '▼ عرض') + ' اللي جاوبت عليه (' + done.length + ')</button>';
+    if(prShowDone) html += done.map(prCard).join('');
+  }
+
+  box.innerHTML = html;
+}
+
+function prToggleDone(){ prShowDone = !prShowDone; prRender(); }
+
+function prCard(r){
+  // 🔒 اتحصّل خلاص → للعرض بس، مفيش أي تعديل
+  const locked = (r.payState === 'paid');
+
+  // الشريط العلوي: الحالة الحالية بكلمتين
+  let badge = '';
+  if(locked && r.payType === 'deferred'){
+    badge = '<span class="pr-b pr-b-ok">📒 راح على حساب «' + esc(r.shop || '—') + '»</span>';
+  } else if(locked){
+    badge = '<span class="pr-b pr-b-ok">✅ اتحصّل</span>';
+  } else if(r.answered && r.answered.pay === 'cash'){
+    badge = '<span class="pr-b pr-b-cash">💵 فوري — مستني تحصيل المحاسب</span>';
+  } else if(r.answered){
+    badge = '<span class="pr-b pr-b-wait">⏸️ سعر متسجّل، من غير تحديد</span>';
+  } else {
+    badge = '<span class="pr-b pr-b-new">🆕 محتاج تسعير</span>';
+  }
+
+  const title = (esc(r.type + ' ' + r.model).trim() || 'جهاز') + ' — ' + esc(r.customer || 'عميل');
+
+  let body = '<div class="pr-card">'
+    + '<div class="pr-top">' + badge + '<span class="pr-no">' + ticketNo(r.id) + '</span></div>'
+    + '<div class="pr-t">' + title + '</div>'
+    + '<div class="pr-s">'
+      + (r.shop ? '🏬 ' + esc(r.shop) + ' · ' : '')
+      + (r.tech ? '🔧 ' + esc(r.tech) + ' · ' : '')
+      + '📤 ' + (r.out ? fmtDate(r.out) : '—')
+    + '</div>'
+    + (r.issue ? '<div class="pr-i">🩺 ' + esc(r.issue) + '</div>' : '');
+
+  if(locked){
+    body += '<div class="pr-final">💰 ' + esc(r.price || '—') + ' ج.م</div>';
+  } else {
+    const idJs = esc(r.id);
+    body += '<div class="pr-row">'
+      + '<input class="pr-in" id="pr_' + idJs + '" inputmode="numeric" autocomplete="off" '
+      + 'value="' + esc(r.price) + '" placeholder="السعر بالجنيه" '
+      + 'oninput="prFixDigits(this)" />'
+      + '<span class="pr-eg">ج.م</span>'
+      + '</div>'
+      + '<div class="pr-btns">'
+      + '<button class="pr-btn pr-cash' + (r.answered && r.answered.pay === 'cash' ? ' on' : '') + '" '
+        + 'onclick="prSave(\'' + idJs + '\',\'cash\')">💵 فوري</button>'
+      + '<button class="pr-btn pr-def" onclick="prSave(\'' + idJs + '\',\'deferred\')">📒 آجل</button>'
+      + '<button class="pr-btn pr-none' + (r.answered && r.answered.pay === 'none' ? ' on' : '') + '" '
+        + 'onclick="prSave(\'' + idJs + '\',\'none\')">⏸️ لسه</button>'
+      + '</div>';
+
+    if(!r.shop){
+      body += '<div class="pr-warn">⚠️ الجهاز ده مش مكتوب عليه اسم محل، '
+            + 'فالآجل مش هينفع عليه — الآجل لازم يتقيّد على حساب محل.</div>';
+    }
+  }
+
+  body += '</div>';
+  return body;
+}
+
+/* أرقام إنجليزية بس — نفس تنضيف الداشبورد */
+function prFixDigits(el){
+  const en = String(el.value)
+    .replace(/[٠-٩]/g, c => String(c.charCodeAt(0) - 0x0660))
+    .replace(/[۰-۹]/g, c => String(c.charCodeAt(0) - 0x06F0))
+    .replace(/[^0-9]/g, '');
+  if(el.value !== en) el.value = en;
+}
+
+/* ===== الحفظ ===== */
+async function prSave(id, pay){
+  if(prBusy) return;
+  const r = prRows.find(x => x.id === id);
+  if(!r) return;
+
+  const inp = $('pr_' + id);
+  const price = inp ? String(inp.value || '').trim() : '';
+
+  // ── تحذيرات قبل ما نبعت — عشان ميستناش رد السيرفر ──
+  if(pay !== 'none' && price === ''){ toast('⚠️ اكتب السعر الأول'); if(inp) inp.focus(); return; }
+  if(pay === 'deferred'){
+    if(!r.shop){ toast('⚠️ مفيش اسم محل — الآجل لازم يتقيّد على حساب محل'); return; }
+    if(Number(price) <= 0){ toast('⚠️ الآجل لازم له سعر أكبر من صفر'); return; }
+    const ok = confirm('هتحط ' + price + ' ج.م على حساب «' + r.shop + '».\n\n'
+      + 'الجهاز هيختفي من قايمة «بانتظار الدفع» ويروح على الحساب علطول، '
+      + 'ومش هتقدر تعدّله بعد كده.\n\nأكمل؟');
+    if(!ok) return;
+  }
+
+  prBusy = true;
+  const btns = document.querySelectorAll('.pr-btn');
+  btns.forEach(b => b.disabled = true);
+
+  try{
+    const { data, error } = await sb.rpc('owner_set_price',
+      { p_id: id, p_price: price, p_pay: pay });
+    if(error) throw error;
+
+    // ✅ Supabase مبترميش أخطاء لوحدها — بنتأكد بعينينا من اللي رجع
+    const res = data || {};
+    if(String(res.agreedPrice === undefined ? '' : res.agreedPrice) !== String(prNorm(price))){
+      throw new Error('السيرفر سجّل سعر مختلف (' + res.agreedPrice + ') — بلّغ الإدارة');
+    }
+
+    if(pay === 'deferred'){
+      if(res.paymentStatus !== 'paid') throw new Error('القيد ما اتعملش — بلّغ الإدارة');
+      toast('📒 اتقيّد ' + price + ' ج.م على حساب «' + esc(r.shop) + '»');
+    } else if(pay === 'cash'){
+      // 🔒 الحارس الأهم — لو السيرفر كتب paid في الفوري يبقى فيه غلط كبير
+      if(res.paymentStatus !== 'unpaid') throw new Error('حالة الدفع اتكتبت غلط — بلّغ الإدارة فوراً');
+      toast('💵 اتسجّل ' + price + ' ج.م — فوري، والمحاسب هو اللي يأكد التحصيل');
+    } else {
+      toast(price === '' ? '🧹 السعر اتمسح' : '⏸️ اتسجّل ' + price + ' ج.م من غير تحديد');
+    }
+
+    await prLoad();
+    prRefreshBadge();
+  }catch(e){
+    console.error('prSave failed:', e);
+    toast('⚠️ ' + (e.message || String(e)));
+  }finally{
+    prBusy = false;
+    document.querySelectorAll('.pr-btn').forEach(b => b.disabled = false);
+  }
+}
+
+/* نفس تنضيف السعر اللي في السيرفر — عشان المقارنة تطلع صح */
+function prNorm(v){
+  const raw = String(v == null ? '' : v)
+    .replace(/[٠-٩]/g, c => String(c.charCodeAt(0) - 0x0660))
+    .replace(/[۰-۹]/g, c => String(c.charCodeAt(0) - 0x06F0))
+    .replace(/[^0-9.]/g, '');
+  if(raw === '' || raw === '.') return '';
+  const n = Math.round(Number(raw));
+  return (isFinite(n) && n >= 0) ? String(n) : '';
+}
+
 
 boot().catch(e => veilFail('خطأ: ' + esc(e && e.message ? e.message : e) +
   '<br><br><a href="index.html">تسجيل الدخول تاني</a>'));

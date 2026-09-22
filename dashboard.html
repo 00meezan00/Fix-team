@@ -3553,6 +3553,7 @@ function renderColumn(keepPos){
       <div class="acc-toolbar" style="margin:0 0 12px;">
         <button class="btn-secondary" style="color:#166534;border-color:var(--success-border);" onclick="exportDeliveredUnpaidExcel(colFullList)">📊 Excel</button>
         <button class="btn-secondary" style="color:var(--danger-strong);border-color:var(--danger-border);" onclick="exportDeliveredUnpaidPdf(colFullList)">📄 PDF</button>
+        ${isSuperAdmin() ? `<button class="btn-secondary" style="color:#8A6410;border-color:#C9A227;" onclick="openShareOwner()">👑 شارك مع المالك${ownerSharedCount(colFullList) ? ` (${ownerSharedCount(colFullList)})` : ''}</button>` : ''}
       </div>` : '';
   }
 
@@ -6857,6 +6858,157 @@ async function cancelDeepInspection(){
 // دفتر الحسابات (القراءة) اتنقل لـ accounts.js (الملف المشترك مع صفحة الديسباتشر). متعرّفهوش هنا تاني وإلا الصفحة هتقع.
 async function persistLedger(){
   try{ await window.storage.set(LEDGER_KEY, JSON.stringify(ledger)); }catch(e){}
+}
+
+// ============================================================
+// 👑 مشاركة أجهزة «تم التسليم وبانتظار الدفع» مع المالك
+// ------------------------------------------------------------
+// 🧠 الحكاية: إنت (السوبر أدمن) بتختار أجهزة من العمود ده
+//    وتبعتها لصندوق المالك، عشان يكتب أسعارها ويقول فوري
+//    ولا آجل. المالك مش بيشوف أي جهاز تاني في المحل.
+//
+// 🔒 مهم تفهم: الصفحة هنا بتخبّي الزرار عن غير السوبر أدمن،
+//    بس ده مجرد شكل. القفل الحقيقي تحت في قاعدة البيانات:
+//    دالة owner_share_device بترفض أي حد مش سوبر أدمن، حتى لو
+//    حد فتح الصفحة وعدّل فيها بإيده.
+//
+// 🧠 وكمان: Supabase مبترميش أخطاء لوحدها، بترجّع الخطأ جوه
+//    النتيجة. فإحنا بعد كل حفظ بنرجع نقرا من السيرفر ونتأكد
+//    بعينينا إن اللي طلبناه اتكتب فعلاً.
+// ============================================================
+function ownerSharedCount(list){
+  return (list || []).filter(d => d && d.ownerShare).length;
+}
+
+// اللي اتغيّر في الشاشة بس: { رقم الجهاز: true=شارك / false=اشيل }
+let _shSel = {};
+
+function openShareOwner(){
+  if(!isSuperAdmin()){ showError('المشاركة مع المالك للسوبر أدمن بس'); return; }
+  _shSel = {};
+  let ov = document.getElementById('shareOwnerOverlay');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.id = 'shareOwnerOverlay';
+    ov.className = 'overlay hidden';
+    ov.innerHTML =
+      '<div class="modal" style="max-width:520px;">'
+      + '<div class="modal-head"><h2>👑 شارك مع المالك</h2>'
+      + '<button class="close-btn" onclick="closeShareOwner()">&times;</button></div>'
+      + '<div style="font-size:12.5px;color:var(--muted);line-height:1.75;margin-bottom:12px;">'
+      + 'الأجهزة اللي هتعلّم عليها هتظهر عند المالك عشان يكتب سعرها '
+      + 'ويحدد <b>فوري</b> ولا <b>آجل</b>. لو قال آجل، الجهاز هيروح على حساب '
+      + 'المحل فوراً ويختفي من العمود ده. ولو قال فوري، هيفضل مكانه '
+      + 'لحد ما تدوس «تأكيد الدفع».'
+      + '</div>'
+      + '<div id="shOwList"></div>'
+      + '<button id="shOwSave" onclick="saveShareOwner()" '
+      + 'style="width:100%;margin-top:14px;padding:13px;border:none;border-radius:12px;'
+      + 'background:#0891A8;color:#fff;font:800 14px/1 inherit;cursor:pointer;">💾 حفظ</button>'
+      + '</div>';
+    ov.addEventListener('click', e => { if(e.target === ov) closeShareOwner(); });
+    document.body.appendChild(ov);
+  }
+  renderShareOwner();
+  ov.classList.remove('hidden');
+}
+
+function closeShareOwner(){
+  const ov = document.getElementById('shareOwnerOverlay');
+  if(ov) ov.classList.add('hidden');
+  _shSel = {};
+}
+
+function renderShareOwner(){
+  const box = document.getElementById('shOwList');
+  if(!box) return;
+  const list = (colFullList || []).slice();
+  if(!list.length){ box.innerHTML = '<div class="empty-col">مفيش أجهزة في العمود ده</div>'; return; }
+
+  box.innerHTML = list.map(d => {
+    const on    = (_shSel[d.id] !== undefined) ? _shSel[d.id] : !!d.ownerShare;
+    const price = isPriced(d) ? (esc(d.agreedPrice) + ' ج.م') : 'من غير سعر';
+    const shop  = (d.billedShop || d.shopName || '').trim();
+    // رد المالك لو كان جاوب قبل كده
+    let answer = '';
+    if(d.ownerPriced){
+      const p = d.ownerPriced;
+      const w = p.pay === 'deferred' ? 'آجل' : (p.pay === 'cash' ? 'فوري' : 'لسه ما حددش');
+      answer = '<div style="font-size:11.5px;color:#8A6410;font-weight:700;margin-top:3px;">'
+             + '👑 المالك قال: ' + esc(String(p.price || '')) + ' ج.م — ' + w + '</div>';
+    }
+    return '<label style="display:flex;gap:10px;align-items:flex-start;padding:10px 4px;'
+      + 'border-bottom:1px solid var(--border);cursor:pointer;">'
+      + '<input type="checkbox" ' + (on ? 'checked' : '') + ' '
+      + 'onchange="shOwToggle(\'' + esc(d.id) + '\', this.checked)" '
+      + 'style="width:20px;height:20px;margin-top:2px;flex:none;" />'
+      + '<span style="flex:1;min-width:0;">'
+      + '<span style="font-weight:800;font-size:13.5px;">'
+      + esc((d.deviceType || '') + ' ' + (d.model || '')) + ' — ' + esc(d.customerName || '') + '</span>'
+      + '<span style="display:block;font-size:12px;color:var(--muted);margin-top:2px;">'
+      + (shop ? esc(shop) + ' · ' : '') + price + '</span>'
+      + answer
+      + '</span></label>';
+  }).join('');
+}
+
+function shOwToggle(id, on){
+  const d = (colFullList || []).find(x => x.id === id);
+  const was = !!(d && d.ownerShare);
+  if(on === was) delete _shSel[id];   // رجع زي ما كان → مفيش تغيير
+  else _shSel[id] = on;
+}
+
+async function saveShareOwner(){
+  const btn = document.getElementById('shOwSave');
+  const addIds = [], delIds = [];
+  Object.keys(_shSel).forEach(id => { (_shSel[id] ? addIds : delIds).push(id); });
+
+  if(!addIds.length && !delIds.length){ closeShareOwner(); return; }
+
+  if(btn){ btn.disabled = true; btn.textContent = '⏳ بيحفظ...'; }
+  showError('');
+  try{
+    if(addIds.length){
+      const { data, error } = await sb.rpc('owner_share_device', { p_ids: addIds, p_on: true });
+      if(error) throw error;
+      if(Number(data) !== addIds.length){
+        throw new Error('اتشارك ' + Number(data) + ' من ' + addIds.length
+          + ' — يمكن جهاز منهم اتحصّل أو اترجّع للورشة في نفس اللحظة');
+      }
+    }
+    if(delIds.length){
+      const { error } = await sb.rpc('owner_share_device', { p_ids: delIds, p_on: false });
+      if(error) throw error;
+    }
+
+    // ✅ نتأكد بالقراية — ما نصدّقش إن الحفظ نجح غير لما نشوفه
+    const ids = addIds.concat(delIds);
+    const { data: rows, error: e2 } = await sb.from('devices_data').select('id,data').in('id', ids);
+    if(e2) throw e2;
+
+    let bad = 0;
+    (rows || []).forEach(r => {
+      if(!r || !r.data) return;
+      const want = (_shSel[r.id] === true);
+      const has  = !!r.data.ownerShare;
+      if(want !== has) bad++;
+      devices = devices.map(x => x.id === r.id ? r.data : x);
+    });
+    if(bad) throw new Error('فيه ' + bad + ' جهاز ما اتسجّلش صح — جرّب تاني');
+
+    writeCache();
+    renderColumn(true);
+    closeShareOwner();
+    showError('');
+  }catch(e){
+    console.error('saveShareOwner failed:', e);
+    const perm = e && (e.code === '42501' || /row-level security|permission/i.test(e.message || ''));
+    showError(perm ? 'الصلاحيات رفضت — المشاركة للسوبر أدمن بس'
+                   : 'فشلت المشاركة: ' + (e.message || e));
+  }finally{
+    if(btn){ btn.disabled = false; btn.textContent = '💾 حفظ'; }
+  }
 }
 
 function addLedgerDebit(d, price, opts){
