@@ -771,10 +771,10 @@ function normRole(v){
 const CAPS = [
   { key:'purchases', icon:'🧾', label:'فواتير المشتريات ومخزن قطع الغيار',
     hint:'قراءة الفواتير بالذكاء الاصطناعي + المخزن + ربط القطع بالأجهزة',
-    forRoles:['dispatcher','owner'] },  // الديسباتشر بس — صفحة الفني مش موصّلة بالموديول
+    forRoles:['dispatcher','owner','hr'] },  // الديسباتشر بس — صفحة الفني مش موصّلة بالموديول
   { key:'parts_review', icon:'🔩', label:'مراجعة قطع الغيار',
     hint:'يشوف كومنت قطع الغيار اللي الفني كتبه على كل جهاز، ويربط القطع بالأجهزة',
-    forRoles:['dispatcher','owner'] },
+    forRoles:['dispatcher','owner','hr'] },
   // ⚠️ قراءة فقط — عن قصد. تسجيل الدفعات والخصومات والرصيد الافتتاحي
   //    شغل المحاسب وحده. الديسباتشر بيشوف ويدوّر ويطبع PDF وبس.
   //    القفل ده مش في الواجهة بس: مفتاح accounts-ledger **الكتابة**
@@ -787,7 +787,7 @@ const CAPS = [
   //    "مدفوع/غير مدفوع" في الجرد بتاعه — الاتنين محتاجين بيانات فلوس مش موجودة أصلاً.
   { key:'inventory_view', icon:'📋', label:'الجرد (قراءة فقط)',
     hint:'كروت أعداد (استلام/قيد التنفيذ/تسليم/واقفة) + أداء الفنيين — من غير أسعار',
-    forRoles:['dispatcher','owner'] }
+    forRoles:['dispatcher','owner','hr'] }
 ];
 function hasCap(en, cap){ return (en.caps || []).includes(cap); }
 
