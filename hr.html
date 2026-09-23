@@ -446,6 +446,21 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
   /* سطر المحل والفني جوه كارت الجهاز */
   .pr-dev-m{font-size:12px;color:var(--muted);margin-top:4px;display:flex;flex-wrap:wrap;gap:4px 12px;}
   .pr-dev-m b{color:var(--ink);font-weight:700;}
+  /* 📁 فولدرات المراجعة — نفس شكل الداشبورد */
+  .pr-folders{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));
+    gap:10px;margin-bottom:14px;}
+  .pr-folder{text-align:start;border:1px solid var(--line);background:var(--paper);color:var(--ink);
+    border-radius:14px;padding:14px;cursor:pointer;font:inherit;}
+  .pr-folder:active{transform:scale(.99);}
+  .pr-folder.warn{border-inline-start:4px solid var(--waiting);}
+  .pr-folder.ok{border-inline-start:4px solid var(--done);}
+  .pr-folder-n{font-weight:800;font-size:13.5px;margin-bottom:5px;line-height:1.6;}
+  .pr-folder-s{font-size:12px;color:var(--muted);}
+  .pr-folder-s b{font-size:15px;color:var(--ink);}
+  .pr-fact{display:flex;gap:8px;align-items:center;flex-wrap:wrap;
+    margin-top:10px;padding-top:10px;border-top:1px dashed var(--line);}
+  .pr-fnote{font-size:12px;color:var(--muted);}
+  .pr-cm.ok0{background:var(--done-bg);border:1px solid var(--done);color:var(--done);}
 
 
   /* الشاشتين فوق كل حاجة في الصفحة (أعلى sheet عندنا 65) */
@@ -493,6 +508,18 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
     box-shadow:0 12px 30px rgba(0,0,0,.3); opacity:0; pointer-events:none;
     transition:opacity .25s, transform .25s; z-index:100000; text-align:center;}
   .hr-toast.on{opacity:1; transform:translateX(-50%) translateY(0);}
+</style>
+<style id="ios-safe-head-fix">
+/* 📱 «فواتير المشتريات» و«مخزن قطع الغيار» بيترسموا من ai-invoice.js
+   برأس لازق فوق (modal-head). الصفحة مفرودة تحت شريط الساعة
+   (viewport-fit=cover)، فالرأس كان بيقع تحته ويبان باهت/مستخبي.
+   env(safe-area-inset-top) = طول الشريط بالظبط — على الكمبيوتر صفر.
+   !important لأن البادينج مكتوب جوه الوسم نفسه في ai-invoice.js. */
+.summaries-page > .modal-head,
+#invOverlay .modal-head,
+#purOverlay .modal-head{
+  padding-top: calc(16px + env(safe-area-inset-top)) !important;
+}
 </style>
 </head>
 <body>
@@ -3704,7 +3731,7 @@ function openCap(api){
 // كارت لكل فني → أجهزته في الفترة → الكومنت ظاهر على الكارت من برا.
 // تدوس على الجهاز → بتفتح شاشة قطع الغيار (INV) عشان تربط القطع.
 // ============================================================
-const PR = { from:'', to:'', tech:null, quick:'today', q:'' };   // q = كلمة البحث
+const PR = { from:'', to:'', tech:null, quick:'today', q:'', folder:null };   // q = كلمة البحث
 
 function prDayKey(iso){
   if(!iso) return '';
@@ -3748,6 +3775,8 @@ function prInRange(d){
 
 function openPartsReview(){
   if(!CAN_PARTS_REVIEW){ toast('الميزة دي مقفولة عندك'); return; }
+  PR.folder = null;
+  PR_HAS.set = null;   // نعيد كشف المربوط — ممكن المحاسب ربط قطع من آخر مرة
   // الشاشة من ورا: الدرع الشفاف بتاع قايمة ⋮ لازم يتشال — وإلا بيفضل
   // فوق الصفحة وياكل أول ضغطة (نفس اللي الجرد بيعمله)
   const _shield = document.getElementById('kebabShield'); if(_shield) _shield.classList.add('hidden');
@@ -3766,6 +3795,7 @@ function closePartsReview(){
   const inv = document.getElementById('inventoryOverlay');
   if(!inv || inv.classList.contains('hidden')) document.body.classList.remove('inv-open');
   PR.tech = null;
+  PR.folder = null;
   PR.q = '';   // البحث بيتصفّر مع القفل — عشان المرة الجاية ميفتحش على نتايج قديمة
 }
 
@@ -3857,6 +3887,130 @@ function prDevHtml(d, showTech){
         </div>`;
 }
 
+// ============================================================
+// 📁 الفولدرين (نفس اللي عند المحاسب في الداشبورد)
+// ------------------------------------------------------------
+//   📭 مش مربوط بيها قطع غيار = الفني اشتغل عليه، ومفيش ولا قطعة
+//       من المخزن مربوطة بيه، ومحدش قال إنه مش محتاج.
+//   ✅ مش محتاجة قطع غيار      = الفني قال «مفيش» أو المحاسب علّمه.
+// ⚠️ هنا للعرض بس — زرار «مش محتاج قطعة» من عند المحاسب.
+// ⚠️ الصفحة دي شايفة أجهزة المحل + المسلَّم آخر ٣٠ يوم بس، فالرقم
+//    ممكن يطلع أقل من المحاسب في المدد الطويلة.
+// «مين مربوط بيه قطع؟» = طلب واحد بعمود device_id بس من المخزن،
+// بدل طلب لكل جهاز.
+// ============================================================
+var PR_FLOOR = '2026-09-01';   // أول يوم النظام اشتغل فيه (زي الداشبورد)
+var PR_HAS = { set: null, loading: false };
+
+async function prLoadHasParts(){
+  if(PR_HAS.loading || PR_HAS.set) return false;
+  PR_HAS.loading = true;
+  try{
+    const ids = new Set();
+    const PAGE = 1000;
+    for(let from = 0, guard = 0; guard < 50; guard++, from += PAGE){
+      const { data, error } = await sb.from('spare_parts')
+        .select('device_id').not('device_id', 'is', null)
+        .range(from, from + PAGE - 1);
+      if(error) throw error;
+      if(!data || !data.length) break;
+      data.forEach(r => { if(r.device_id) ids.add(r.device_id); });
+      if(data.length < PAGE) break;
+    }
+    PR_HAS.set = ids;
+    return true;
+  }catch(e){
+    console.error('[المراجعة] فشل جلب الأجهزة المربوطة:', e);
+    PR_HAS.set = PR_HAS.set || new Set();
+    return false;
+  }finally{
+    PR_HAS.loading = false;
+  }
+}
+
+function prNoNeed(d){
+  const r = d._raw || {};
+  if(r.noPartsNeeded === true) return true;
+  return dpPartsIsNone(r.partsComment);
+}
+
+// آخر تعديل بس — من غير الرجوع لتاريخ الدخول (زي الداشبورد).
+// جهاز محدش لمسه من ساعة ما دخل مالوش مكان في الفولدرات.
+function prTouchedEdit(d){
+  const r = d._raw || {};
+  let best = '';
+  for(const v of [r.lastModifiedAt, r.partsReturnAt]){
+    if(v && (!best || new Date(v) > new Date(best))) best = v;
+  }
+  return best;
+}
+
+function prFolderBase(){
+  return devices
+    .filter(d => d.status !== 'rejected')
+    .filter(d => (d.tech || '').trim())
+    .filter(d => {
+      const k = prDayKey(prTouchedEdit(d));
+      if(!k || k < PR_FLOOR) return false;
+      return (!PR.from || k >= PR.from) && (!PR.to || k <= PR.to);
+    });
+}
+
+function prFolderLists(){
+  const base = prFolderBase();
+  const noNeed  = base.filter(prNoNeed);
+  const noParts = PR_HAS.set
+    ? base.filter(d => !prNoNeed(d) && !PR_HAS.set.has(d.id))
+    : null;                       // null = لسه بنحسب
+  return { noNeed, noParts };
+}
+
+function prFolderCardsHtml(){
+  const { noNeed, noParts } = prFolderLists();
+  return `<div class="pr-folders">
+    <button class="pr-folder warn" onclick="PR.folder='noparts';PR.tech=null;prRender()">
+      <div class="pr-folder-n">📭 مش مربوط بيها قطع غيار</div>
+      <div class="pr-folder-s">${noParts ? `<b>${noParts.length}</b> جهاز` : '⏳ بنحسب…'}</div>
+    </button>
+    <button class="pr-folder ok" onclick="PR.folder='noneed';PR.tech=null;prRender()">
+      <div class="pr-folder-n">✅ مش محتاجة قطع غيار</div>
+      <div class="pr-folder-s"><b>${noNeed.length}</b> جهاز</div>
+    </button>
+  </div>`;
+}
+
+// كارت الجهاز جوه الفولدر = الكارت العادي + سطر صغير «مين قال»
+function prFolderDevHtml(d, mode){
+  const r = d._raw || {};
+  let note;
+  if(mode === 'noparts')                         note = '📭 مفيش قطع مربوطة — المحاسب بيراجعه';
+  else if(dpPartsIsNone(r.partsComment))         note = '🔧 الفني هو اللي قال إنه مش محتاج قطع غيار';
+  else note = '✅ اتعلّم إنه مش محتاج قطع غيار' + (r.noPartsBy ? ' — ' + esc(r.noPartsBy) : '');
+  return prDevHtml(d, true).replace(/<\/div>\s*$/, `<div class="pr-fact"><span class="pr-fnote">${note}</span></div></div>`);
+}
+
+function prRenderFolder(){
+  const host = $('prList');
+  if(!host) return;
+  const mode = PR.folder;
+  const { noNeed, noParts } = prFolderLists();
+  let list = mode === 'noparts' ? (noParts || []) : noNeed;
+  const q = (PR.q || '').trim();
+  if(q) list = list.filter(d => prMatch(d, q));
+  list = list.slice().sort((a, b) =>
+    new Date(prTouchedEdit(b) || 0) - new Date(prTouchedEdit(a) || 0));
+  const title = mode === 'noparts' ? '📭 مش مربوط بيها قطع غيار' : '✅ مش محتاجة قطع غيار';
+  const loading = mode === 'noparts' && !noParts;
+  host.innerHTML = `
+    <button class="pr-back" onclick="PR.folder=null;prRender()">‹ رجوع للمراجعة</button>
+    <div class="pr-th">${title} <span class="pr-n">${loading ? '…' : list.length}</span></div>
+    ${loading
+      ? `<div class="pr-empty">⏳ بنراجع المخزن…</div>`
+      : (list.length
+          ? list.map(d => prFolderDevHtml(d, mode)).join('')
+          : `<div class="pr-empty">${q ? 'مفيش نتايج لـ «' + esc(q) + '» في الفولدر ده' : 'الفولدر فاضي في الفترة دي'}</div>`)}`;
+}
+
 function prByTouchedDesc(a, b){ return new Date(prTouched(b) || 0) - new Date(prTouched(a) || 0); }
 
 // الرسم على جزئين (نفس الداشبورد):
@@ -3896,6 +4050,12 @@ function prRenderList(){
   // القطع المربوطة بتتجاب بعد الرسم، وأول ما توصل بنعيد الرسم مرة واحدة
   // prRenderList بتخرج لوحدها لو الشاشة اتقفلت (مفيش prList)
   prLoadLinked(rows.map(d => d.id)).then(got => { if(got) prRenderList(); });
+  // «مين مربوط بيه أصلاً» — مرة واحدة لكل فتح للشاشة
+  if(!PR_HAS.set && !PR_HAS.loading){
+    prLoadHasParts().then(got => { if(got) prRenderList(); });
+  }
+  // فولدر مفتوح → نعرضه لوحده
+  if(PR.folder){ prRenderFolder(); return; }
 
   // (٠) فيه بحث → قايمة واحدة بكل النتايج، من كل الفنيين
   const q = (PR.q || '').trim();
@@ -3922,7 +4082,7 @@ function prRenderList(){
     return;
   }
 
-  host.innerHTML = techs.length ? `
+  host.innerHTML = prFolderCardsHtml() + (techs.length ? `
     <div class="pr-grid">
       ${techs.map(tn => {
         const l = byTech[tn];
@@ -3932,7 +4092,7 @@ function prRenderList(){
           <div class="pr-tech-s"><b>${l.length}</b> جهاز · <span class="${withCm?'ok':''}">${withCm} فيهم قطع غيار</span></div>
         </button>`;
       }).join('')}
-    </div>` : `<div class="pr-empty">مفيش شغل في الفترة دي</div>`;
+    </div>` : `<div class="pr-empty">مفيش شغل في الفترة دي</div>`);
 }
 
 // فتح شاشة ربط قطع الغيار للجهاز — نفس آلية الربط الموجودة
