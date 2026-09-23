@@ -576,6 +576,21 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
   /* سطر المحل والفني جوه كارت الجهاز */
   .pr-dev-m{font-size:12px;color:var(--muted);margin-top:4px;display:flex;flex-wrap:wrap;gap:4px 12px;}
   .pr-dev-m b{color:var(--ink);font-weight:700;}
+  /* 📁 فولدرات المراجعة — نفس شكل الداشبورد */
+  .pr-folders{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));
+    gap:10px;margin-bottom:14px;}
+  .pr-folder{text-align:start;border:1px solid var(--line);background:var(--paper);color:var(--ink);
+    border-radius:14px;padding:14px;cursor:pointer;font:inherit;}
+  .pr-folder:active{transform:scale(.99);}
+  .pr-folder.warn{border-inline-start:4px solid var(--waiting);}
+  .pr-folder.ok{border-inline-start:4px solid var(--done);}
+  .pr-folder-n{font-weight:800;font-size:13.5px;margin-bottom:5px;line-height:1.6;}
+  .pr-folder-s{font-size:12px;color:var(--muted);}
+  .pr-folder-s b{font-size:15px;color:var(--ink);}
+  .pr-fact{display:flex;gap:8px;align-items:center;flex-wrap:wrap;
+    margin-top:10px;padding-top:10px;border-top:1px dashed var(--line);}
+  .pr-fnote{font-size:12px;color:var(--muted);}
+  .pr-cm.ok0{background:var(--done-bg);border:1px solid var(--done);color:var(--done);}
 
   /* ============================================================
      شاشة الحسابات (قراءة فقط) — نفس شكل الداشبورد
@@ -984,6 +999,50 @@ const IN_SHOP = ['waiting','diagnosing','repairing','done','returned'];
 // فالتحديث يومي تلقائي من غير أي شغل إضافي.
 const DELIVERED_DAYS = 30;
 
+// ============================================================
+// 📦 شنطة تانية: المسلَّم من ٣٠ يوم لحد ٦ شهور
+// ------------------------------------------------------------
+// الصفحة الرئيسية وتبويب «المسلّمة» فاضلين ٣٠ يوم زي ما هما.
+// الأجهزة الأقدم دي بتتجاب **بس** لما تفتح مراجعة قطع الغيار أو
+// الجرد — ومرة واحدة لحد ما تقفل التطبيق (مش مع كل تحديث).
+// بتتحط جوه devices بعلامة _old عشان المراجعة والجرد والبحث
+// والتفاصيل يلاقوها، وتبويب «المسلّمة» بيتجاهلها.
+// ============================================================
+const WIDE_DAYS = 180;
+let DP_OLD = [];
+let DP_OLD_PROMISE = null;
+
+function dpMergeOld(){
+  if(!DP_OLD.length) return;
+  const have = new Set(devices.map(d => d.id));
+  devices = devices.concat(DP_OLD.filter(d => !have.has(d.id)));
+  reindexSearch();
+}
+
+function dpEnsureOld(){
+  if(DP_OLD_PROMISE) return DP_OLD_PROMISE;
+  if(!navigator.onLine) return Promise.resolve();
+  DP_OLD_PROMISE = (async () => {
+    const to   = new Date(Date.now() - DELIVERED_DAYS * 86400000).toISOString();
+    const from = new Date(Date.now() - WIDE_DAYS * 86400000).toISOString();
+    const rows = await fetchPaged(() => sb.from('devices_dispatch')
+      .select('id,data')
+      .eq('status', 'delivered')
+      .gte('delivered_at', from)
+      .lt('delivered_at', to)
+      .order('delivered_at', { ascending:false }));
+    DP_OLD = rows.filter(r => r && r.data).map(r => { const d = adapt(r.data); d._old = true; return d; });
+    dpMergeOld();
+  })();
+  // فشل؟ نسيب المرة الجاية تحاول تاني، ونقول بدل ما الأرقام تطلع ناقصة في صمت
+  DP_OLD_PROMISE.catch(e => {
+    DP_OLD_PROMISE = null;
+    console.error('أجهزة الـ٦ شهور:', e);
+    toast('⚠️ مقدرناش نجيب أجهزة الـ٦ شهور — الظاهر آخر ٣٠ يوم بس');
+  });
+  return DP_OLD_PROMISE;
+}
+
 let ME = '';   // بيتظبط بعد تسجيل الدخول
 
 let devices = [];
@@ -1002,7 +1061,7 @@ const _demo = [
 const TABS = [
   {key:'mine',  label:t('dp.mine'),  filter:d => d.by===ME && IN_SHOP.includes(d.status)},
   {key:'shop',  label:t('dp.all'), filter:d => IN_SHOP.includes(d.status)},
-  {key:'out',   label:t('dp.delivered'),      filter:d => d.status==='delivered'},
+  {key:'out',   label:t('dp.delivered'),      filter:d => d.status==='delivered' && !d._old},   // _old = من شنطة الـ٦ شهور
 ];
 let activeTab = 'mine';
 
@@ -1258,6 +1317,7 @@ async function loadDevices(){
       if(r && r.data && !byId.has(r.id)) byId.set(r.id, r.data);
     const rows = [...byId.values()];
     devices = rows.map(adapt); reindexSearch();
+    dpMergeOld();   // أجهزة الـ٦ شهور لو اتجابت قبل كده — من الذاكرة، من غير طلب جديد
     lastLoadAt = Date.now();
     offline = false;
     document.querySelectorAll('.offbar').forEach(e => e.remove());
@@ -2838,7 +2898,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeSett
 // كارت لكل فني → أجهزته في الفترة → الكومنت ظاهر على الكارت من برا.
 // تدوس على الجهاز → بتفتح شاشة قطع الغيار (INV) عشان تربط القطع.
 // ============================================================
-const PR = { from:'', to:'', tech:null, quick:'today', q:'' };   // q = كلمة البحث
+const PR = { from:'', to:'', tech:null, quick:'today', q:'', folder:null };   // q = كلمة البحث
 
 function prDayKey(iso){
   if(!iso) return '';
@@ -2854,6 +2914,7 @@ function prSetQuick(q){
   let start = end;
   if(q==='week')  start = prDayKey(new Date(now.getTime() - 6*86400000).toISOString());
   if(q==='month') start = prDayKey(new Date(now.getTime() - 29*86400000).toISOString());
+  if(q==='half')  start = prDayKey(new Date(now.getTime() - (WIDE_DAYS-1)*86400000).toISOString());
   PR.from = start; PR.to = end; PR.tech = null;
   prRender();
 }
@@ -2863,8 +2924,8 @@ function prSetQuick(q){
 //   partsReturnAt  = الفني جاوب «القطع رجعت؟» بعد الرفض (migration 42)
 // ⚠️ «لسه مجبتش» (partsPendingAt) **مش** محسوب — ده الفني بيقول «مفيش
 //    جديد»، ولو حسبناه كل جهاز مستني قطعة هيظهر في «النهاردة» كل يوم.
-// ⚠️ ملحوظة: الديسباتشر بيحمّل كل أجهزة المحل + المسلَّمة في آخر ٣٠ يوم
-//    بس (DELIVERED_DAYS). جهاز اتسلّم من ٣ شهور ما هيظهرش هنا حتى لو
+// ⚠️ ملحوظة: المراجعة شايفة أجهزة المحل + المسلَّمة في آخر ٦ شهور
+//    بس (WIDE_DAYS). جهاز اتسلّم من ٨ شهور ما هيظهرش هنا حتى لو
 //    اتعدل النهاردة — بيظهر عند المحاسب في الداشبورد (عنده كل الأجهزة).
 function prTouched(d){
   const r = d._raw || {};
@@ -2882,6 +2943,8 @@ function prInRange(d){
 
 function openPartsReview(){
   if(!CAN_PARTS_REVIEW){ toast('الميزة دي مقفولة عندك'); return; }
+  PR.folder = null;
+  PR_HAS.set = null;   // نعيد كشف المربوط — ممكن المحاسب ربط قطع من آخر مرة
   // الشاشة من ورا: الدرع الشفاف بتاع قايمة ⋮ لازم يتشال — وإلا بيفضل
   // فوق الصفحة وياكل أول ضغطة (نفس اللي الجرد بيعمله)
   const _shield = document.getElementById('kebabShield'); if(_shield) _shield.classList.add('hidden');
@@ -2893,6 +2956,7 @@ function openPartsReview(){
   document.body.classList.add('inv-open');
   // نبدأ من فوق كل مرة — مش من مكان ما سبناها المرة اللي فاتت
   $('prOverlay').scrollTop = 0;
+  dpEnsureOld().then(() => { if(!$('prOverlay').classList.contains('hidden')) prRender(); }).catch(() => {});
 }
 function closePartsReview(){
   $('prOverlay').classList.add('hidden');
@@ -2900,6 +2964,7 @@ function closePartsReview(){
   const inv = document.getElementById('inventoryOverlay');
   if(!inv || inv.classList.contains('hidden')) document.body.classList.remove('inv-open');
   PR.tech = null;
+  PR.folder = null;
   PR.q = '';   // البحث بيتصفّر مع القفل — عشان المرة الجاية ميفتحش على نتايج قديمة
 }
 
@@ -2981,7 +3046,7 @@ function prDevHtml(d, showTech){
   if(showTech && d.tech) meta.push(`🔧 <b>${esc(d.tech)}</b>`);
   return `
         <div class="pr-dev" onclick="prOpenDevice('${d.id}')">
-          <div class="pr-dev-t"><span>${esc(d.model || d.type || 'جهاز')} · ${esc(d.customer||'')}</span>
+          <div class="pr-dev-t"><span>${esc([d.type, d.model].filter(Boolean).join(' ') || 'جهاز')} · ${esc(d.customer||'')}</span>
             <span class="pr-dev-s">${(ST[d.status]&&ST[d.status].label)||''}</span></div>
           ${meta.length ? `<div class="pr-dev-m">${meta.join('<span>·</span>')}</div>` : ''}
           <div class="pr-dev-i">⚠️ ${esc(d.issue||'—')}</div>
@@ -2989,6 +3054,130 @@ function prDevHtml(d, showTech){
                : `<div class="pr-cm none">— الفني ما كتبش قطع غيار</div>`}
           ${prLinkHtml(d.id)}
         </div>`;
+}
+
+// ============================================================
+// 📁 الفولدرين (نفس اللي عند المحاسب في الداشبورد)
+// ------------------------------------------------------------
+//   📭 مش مربوط بيها قطع غيار = الفني اشتغل عليه، ومفيش ولا قطعة
+//       من المخزن مربوطة بيه، ومحدش قال إنه مش محتاج.
+//   ✅ مش محتاجة قطع غيار      = الفني قال «مفيش» أو المحاسب علّمه.
+// ⚠️ هنا للعرض بس — زرار «مش محتاج قطعة» من عند المحاسب.
+// ⚠️ الصفحة دي شايفة أجهزة المحل + المسلَّم آخر ٦ شهور بس، فالرقم
+//    ممكن يطلع أقل من المحاسب في المدد الطويلة.
+// «مين مربوط بيه قطع؟» = طلب واحد بعمود device_id بس من المخزن،
+// بدل طلب لكل جهاز.
+// ============================================================
+var PR_FLOOR = '2026-09-01';   // أول يوم النظام اشتغل فيه (زي الداشبورد)
+var PR_HAS = { set: null, loading: false };
+
+async function prLoadHasParts(){
+  if(PR_HAS.loading || PR_HAS.set) return false;
+  PR_HAS.loading = true;
+  try{
+    const ids = new Set();
+    const PAGE = 1000;
+    for(let from = 0, guard = 0; guard < 50; guard++, from += PAGE){
+      const { data, error } = await sb.from('spare_parts')
+        .select('device_id').not('device_id', 'is', null)
+        .range(from, from + PAGE - 1);
+      if(error) throw error;
+      if(!data || !data.length) break;
+      data.forEach(r => { if(r.device_id) ids.add(r.device_id); });
+      if(data.length < PAGE) break;
+    }
+    PR_HAS.set = ids;
+    return true;
+  }catch(e){
+    console.error('[المراجعة] فشل جلب الأجهزة المربوطة:', e);
+    PR_HAS.set = PR_HAS.set || new Set();
+    return false;
+  }finally{
+    PR_HAS.loading = false;
+  }
+}
+
+function prNoNeed(d){
+  const r = d._raw || {};
+  if(r.noPartsNeeded === true) return true;
+  return dpPartsIsNone(r.partsComment);
+}
+
+// آخر تعديل بس — من غير الرجوع لتاريخ الدخول (زي الداشبورد).
+// جهاز محدش لمسه من ساعة ما دخل مالوش مكان في الفولدرات.
+function prTouchedEdit(d){
+  const r = d._raw || {};
+  let best = '';
+  for(const v of [r.lastModifiedAt, r.partsReturnAt]){
+    if(v && (!best || new Date(v) > new Date(best))) best = v;
+  }
+  return best;
+}
+
+function prFolderBase(){
+  return devices
+    .filter(d => d.status !== 'rejected')
+    .filter(d => (d.tech || '').trim())
+    .filter(d => {
+      const k = prDayKey(prTouchedEdit(d));
+      if(!k || k < PR_FLOOR) return false;
+      return (!PR.from || k >= PR.from) && (!PR.to || k <= PR.to);
+    });
+}
+
+function prFolderLists(){
+  const base = prFolderBase();
+  const noNeed  = base.filter(prNoNeed);
+  const noParts = PR_HAS.set
+    ? base.filter(d => !prNoNeed(d) && !PR_HAS.set.has(d.id))
+    : null;                       // null = لسه بنحسب
+  return { noNeed, noParts };
+}
+
+function prFolderCardsHtml(){
+  const { noNeed, noParts } = prFolderLists();
+  return `<div class="pr-folders">
+    <button class="pr-folder warn" onclick="PR.folder='noparts';PR.tech=null;prRender()">
+      <div class="pr-folder-n">📭 مش مربوط بيها قطع غيار</div>
+      <div class="pr-folder-s">${noParts ? `<b>${noParts.length}</b> جهاز` : '⏳ بنحسب…'}</div>
+    </button>
+    <button class="pr-folder ok" onclick="PR.folder='noneed';PR.tech=null;prRender()">
+      <div class="pr-folder-n">✅ مش محتاجة قطع غيار</div>
+      <div class="pr-folder-s"><b>${noNeed.length}</b> جهاز</div>
+    </button>
+  </div>`;
+}
+
+// كارت الجهاز جوه الفولدر = الكارت العادي + سطر صغير «مين قال»
+function prFolderDevHtml(d, mode){
+  const r = d._raw || {};
+  let note;
+  if(mode === 'noparts')                         note = '📭 مفيش قطع مربوطة — المحاسب بيراجعه';
+  else if(dpPartsIsNone(r.partsComment))         note = '🔧 الفني هو اللي قال إنه مش محتاج قطع غيار';
+  else note = '✅ اتعلّم إنه مش محتاج قطع غيار' + (r.noPartsBy ? ' — ' + esc(r.noPartsBy) : '');
+  return prDevHtml(d, true).replace(/<\/div>\s*$/, `<div class="pr-fact"><span class="pr-fnote">${note}</span></div></div>`);
+}
+
+function prRenderFolder(){
+  const host = $('prList');
+  if(!host) return;
+  const mode = PR.folder;
+  const { noNeed, noParts } = prFolderLists();
+  let list = mode === 'noparts' ? (noParts || []) : noNeed;
+  const q = (PR.q || '').trim();
+  if(q) list = list.filter(d => prMatch(d, q));
+  list = list.slice().sort((a, b) =>
+    new Date(prTouchedEdit(b) || 0) - new Date(prTouchedEdit(a) || 0));
+  const title = mode === 'noparts' ? '📭 مش مربوط بيها قطع غيار' : '✅ مش محتاجة قطع غيار';
+  const loading = mode === 'noparts' && !noParts;
+  host.innerHTML = `
+    <button class="pr-back" onclick="PR.folder=null;prRender()">‹ رجوع للمراجعة</button>
+    <div class="pr-th">${title} <span class="pr-n">${loading ? '…' : list.length}</span></div>
+    ${loading
+      ? `<div class="pr-empty">⏳ بنراجع المخزن…</div>`
+      : (list.length
+          ? list.map(d => prFolderDevHtml(d, mode)).join('')
+          : `<div class="pr-empty">${q ? 'مفيش نتايج لـ «' + esc(q) + '» في الفولدر ده' : 'الفولدر فاضي في الفترة دي'}</div>`)}`;
 }
 
 function prByTouchedDesc(a, b){ return new Date(prTouched(b) || 0) - new Date(prTouched(a) || 0); }
@@ -3010,6 +3199,7 @@ function prRender(){
         <button class="pr-q${PR.quick==='today'?' on':''}" onclick="prSetQuick('today')">النهاردة</button>
         <button class="pr-q${PR.quick==='week'?' on':''}"  onclick="prSetQuick('week')">أسبوع</button>
         <button class="pr-q${PR.quick==='month'?' on':''}" onclick="prSetQuick('month')">شهر</button>
+        <button class="pr-q${PR.quick==='half'?' on':''}"  onclick="prSetQuick('half')">٦ شهور</button>
       </div>
       <div class="pr-dates">
         <label>من <input type="date" value="${PR.from}" onchange="PR.from=this.value;PR.quick='';PR.tech=null;prRender()"></label>
@@ -3030,6 +3220,12 @@ function prRenderList(){
   // القطع المربوطة بتتجاب بعد الرسم، وأول ما توصل بنعيد الرسم مرة واحدة
   // prRenderList بتخرج لوحدها لو الشاشة اتقفلت (مفيش prList)
   prLoadLinked(rows.map(d => d.id)).then(got => { if(got) prRenderList(); });
+  // «مين مربوط بيه أصلاً» — مرة واحدة لكل فتح للشاشة
+  if(!PR_HAS.set && !PR_HAS.loading){
+    prLoadHasParts().then(got => { if(got) prRenderList(); });
+  }
+  // فولدر مفتوح → نعرضه لوحده
+  if(PR.folder){ prRenderFolder(); return; }
 
   // (٠) فيه بحث → قايمة واحدة بكل النتايج، من كل الفنيين
   const q = (PR.q || '').trim();
@@ -3056,7 +3252,7 @@ function prRenderList(){
     return;
   }
 
-  host.innerHTML = techs.length ? `
+  host.innerHTML = prFolderCardsHtml() + (techs.length ? `
     <div class="pr-grid">
       ${techs.map(tn => {
         const l = byTech[tn];
@@ -3066,7 +3262,7 @@ function prRenderList(){
           <div class="pr-tech-s"><b>${l.length}</b> جهاز · <span class="${withCm?'ok':''}">${withCm} فيهم قطع غيار</span></div>
         </button>`;
       }).join('')}
-    </div>` : `<div class="pr-empty">مفيش شغل في الفترة دي</div>`;
+    </div>` : `<div class="pr-empty">مفيش شغل في الفترة دي</div>`);
 }
 
 // فتح شاشة ربط قطع الغيار للجهاز — نفس آلية الربط الموجودة
@@ -3091,7 +3287,7 @@ async function prShowDeviceParts(id){
   if(!host || !d) return;
   host.innerHTML = `
     <button class="pr-back" onclick="prPickingId=null;prRender()">‹ ${PR.q ? 'رجوع لنتايج البحث' : (PR.tech ? 'رجوع لأجهزة الفني' : 'رجوع')}</button>
-    <div class="pr-th">📱 ${esc(d.model || d.type || 'جهاز')} · ${esc(d.customer||'')}</div>
+    <div class="pr-th">📱 ${esc([d.type, d.model].filter(Boolean).join(' ') || 'جهاز')} · ${esc(d.customer||'')}</div>
     ${((d._raw&&d._raw.partsComment)||'').trim()
       ? (dpPartsIsNone(d._raw.partsComment)
           ? `<div class="pr-cm ok0">✅ الفني قال: الجهاز محتاجش قطع غيار</div>`
@@ -3152,10 +3348,10 @@ window.prOnPartsChanged = function(){
 //   ١) مفيش عمود سعر ولا كارت "مدفوع/غير مدفوع" — devices_dispatch
 //      بتشيل الأسعار قبل ما توصل للمتصفح، فمفيش بيانات فلوس أصلاً
 //      نبني عليها الكارت ده.
-//   ٢) فلتر الفترة هنا "اليوم/الأسبوع/الشهر" بس، من غير "الكل" أو
-//      مدى مخصص — لأن loadDevices() بتحمّل الأجهزة المسلَّمة لآخر
-//      ٣٠ يوم بس (مش الأرشيف كله زي الداشبورد)، فأي فلتر أوسع من
-//      شهر هيدّي عدد ناقص من غير ما يبان إنه ناقص.
+//   ٢) فلتر الفترة هنا لحد "٦ شهور" بس، من غير "الكل" أو
+//      مدى مخصص — لأن dpEnsureOld() بتحمّل الأجهزة المسلَّمة لآخر
+//      ٦ شهور بس (WIDE_DAYS — مش الأرشيف كله)، فأي فلتر أوسع من
+//      كده هيدّي عدد ناقص من غير ما يبان إنه ناقص.
 // ============================================================
 const INV_STUCK_DAYS = 3;
 let invPeriod = { mode: 'today' };
@@ -3212,6 +3408,7 @@ function invRange(){
   if(invPeriod.mode === 'today') return [startOfDay(now), null];
   if(invPeriod.mode === 'week'){ const s = startOfDay(now); s.setDate(s.getDate() - 6); return [s, null]; }
   if(invPeriod.mode === 'month'){ const s = startOfDay(now); s.setDate(s.getDate() - 29); return [s, null]; }
+  if(invPeriod.mode === 'half'){ const s = startOfDay(now); s.setDate(s.getDate() - (WIDE_DAYS-1)); return [s, null]; }
   return [null, null];
 }
 function invInRange(iso){
@@ -3262,6 +3459,7 @@ function openInventory(){
   document.getElementById('inventoryOverlay').classList.remove('hidden');
   document.body.classList.add('inv-open');
   renderInventory();
+  dpEnsureOld().then(() => { if(!$('inventoryOverlay').classList.contains('hidden')) renderInventory(); }).catch(() => {});
 }
 function closeInventory(){
   document.getElementById('inventoryOverlay').classList.add('hidden');
@@ -3316,7 +3514,7 @@ function invViewHtml(){
 
 function renderInventory(){
   const chip = (mode, label) => `<button class="inv-chip ${invPeriod.mode===mode?'active':''}" onclick="setInvPeriod('${mode}')">${label}</button>`;
-  const filterBar = `<div class="inv-filter">${chip('today','اليوم')}${chip('week','الأسبوع')}${chip('month','الشهر')}</div>`;
+  const filterBar = `<div class="inv-filter">${chip('today','اليوم')}${chip('week','الأسبوع')}${chip('month','الشهر')}${chip('half','٦ شهور')}</div>`;
 
   const received  = devices.filter(d => invInRange(d.intake));
   const delivered = devices.filter(d => { const dd = invDeliveredDate(d); return dd && invInRange(dd); });
