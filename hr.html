@@ -3881,7 +3881,7 @@ function prDevHtml(d, showTech){
   if(showTech && d.tech) meta.push(`🔧 <b>${esc(d.tech)}</b>`);
   return `
         <div class="pr-dev" onclick="prOpenDevice('${d.id}')">
-          <div class="pr-dev-t"><span>${esc(d.model || d.type || 'جهاز')} · ${esc(d.customer||'')}</span>
+          <div class="pr-dev-t"><span>${esc([d.type, d.model].filter(Boolean).join(' ') || 'جهاز')} · ${esc(d.customer||'')}</span>
             <span class="pr-dev-s">${(ST[d.status]&&ST[d.status].label)||''}</span></div>
           ${meta.length ? `<div class="pr-dev-m">${meta.join('<span>·</span>')}</div>` : ''}
           <div class="pr-dev-i">⚠️ ${esc(d.issue||'—')}</div>
@@ -4122,7 +4122,7 @@ async function prShowDeviceParts(id){
   if(!host || !d) return;
   host.innerHTML = `
     <button class="pr-back" onclick="prPickingId=null;prRender()">‹ ${PR.q ? 'رجوع لنتايج البحث' : (PR.tech ? 'رجوع لأجهزة الفني' : 'رجوع')}</button>
-    <div class="pr-th">📱 ${esc(d.model || d.type || 'جهاز')} · ${esc(d.customer||'')}</div>
+    <div class="pr-th">📱 ${esc([d.type, d.model].filter(Boolean).join(' ') || 'جهاز')} · ${esc(d.customer||'')}</div>
     ${((d._raw&&d._raw.partsComment)||'').trim()
       ? (dpPartsIsNone(d._raw.partsComment)
           ? `<div class="pr-cm ok0">✅ الفني قال: الجهاز محتاجش قطع غيار</div>`
