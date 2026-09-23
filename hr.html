@@ -3595,7 +3595,10 @@ async function hrFetchPaged(makeQuery){
   return rows;
 }
 
-// الأجهزة اللي في المحل + المسلَّمة آخر ٣٠ يوم — نفس نطاق الديسباتشر
+// الأجهزة اللي في المحل + المسلَّمة آخر ٦ شهور (١٨٠ يوم)
+// ⚠️ ليه مش أكتر؟ كل جهاز مسلَّم بيتنزّل على الموبايل. ٦ شهور بتتحمّل
+//    مرة واحدة بس لما تفتح أول أداة (مش مع كل ضغطة)، فالتكلفة معقولة.
+const HR_DELIVERED_DAYS = 180;
 const HR_IN_SHOP = ['waiting','diagnosing','repairing','done','returned'];
 function hrEnsureDevices(){
   if(HR_DEV_PROMISE) return HR_DEV_PROMISE;
@@ -3603,7 +3606,7 @@ function hrEnsureDevices(){
     const sel = 'id,status,intake_date,delivered_at,data';
     const inShop = await hrFetchPaged(() => sb.from('devices_hr').select(sel)
       .in('status', HR_IN_SHOP).order('intake_date', { ascending:false }));
-    const cutoff = new Date(Date.now() - 30 * 86400000).toISOString();
+    const cutoff = new Date(Date.now() - HR_DELIVERED_DAYS * 86400000).toISOString();
     const out = await hrFetchPaged(() => sb.from('devices_hr').select(sel)
       .eq('status', 'delivered').gte('delivered_at', cutoff)
       .order('delivered_at', { ascending:false }));
@@ -3747,6 +3750,7 @@ function prSetQuick(q){
   let start = end;
   if(q==='week')  start = prDayKey(new Date(now.getTime() - 6*86400000).toISOString());
   if(q==='month') start = prDayKey(new Date(now.getTime() - 29*86400000).toISOString());
+  if(q==='half')  start = prDayKey(new Date(now.getTime() - (HR_DELIVERED_DAYS-1)*86400000).toISOString());
   PR.from = start; PR.to = end; PR.tech = null;
   prRender();
 }
@@ -3756,8 +3760,8 @@ function prSetQuick(q){
 //   partsReturnAt  = الفني جاوب «القطع رجعت؟» بعد الرفض (migration 42)
 // ⚠️ «لسه مجبتش» (partsPendingAt) **مش** محسوب — ده الفني بيقول «مفيش
 //    جديد»، ولو حسبناه كل جهاز مستني قطعة هيظهر في «النهاردة» كل يوم.
-// ⚠️ ملحوظة: الديسباتشر بيحمّل كل أجهزة المحل + المسلَّمة في آخر ٣٠ يوم
-//    بس (DELIVERED_DAYS). جهاز اتسلّم من ٣ شهور ما هيظهرش هنا حتى لو
+// ⚠️ ملحوظة: الصفحة دي بتحمّل كل أجهزة المحل + المسلَّمة في آخر ٦ شهور
+//    بس (HR_DELIVERED_DAYS). جهاز اتسلّم من ٨ شهور ما هيظهرش هنا حتى لو
 //    اتعدل النهاردة — بيظهر عند المحاسب في الداشبورد (عنده كل الأجهزة).
 function prTouched(d){
   const r = d._raw || {};
@@ -3894,7 +3898,7 @@ function prDevHtml(d, showTech){
 //       من المخزن مربوطة بيه، ومحدش قال إنه مش محتاج.
 //   ✅ مش محتاجة قطع غيار      = الفني قال «مفيش» أو المحاسب علّمه.
 // ⚠️ هنا للعرض بس — زرار «مش محتاج قطعة» من عند المحاسب.
-// ⚠️ الصفحة دي شايفة أجهزة المحل + المسلَّم آخر ٣٠ يوم بس، فالرقم
+// ⚠️ الصفحة دي شايفة أجهزة المحل + المسلَّم آخر ٦ شهور بس، فالرقم
 //    ممكن يطلع أقل من المحاسب في المدد الطويلة.
 // «مين مربوط بيه قطع؟» = طلب واحد بعمود device_id بس من المخزن،
 // بدل طلب لكل جهاز.
@@ -4030,6 +4034,7 @@ function prRender(){
         <button class="pr-q${PR.quick==='today'?' on':''}" onclick="prSetQuick('today')">النهاردة</button>
         <button class="pr-q${PR.quick==='week'?' on':''}"  onclick="prSetQuick('week')">أسبوع</button>
         <button class="pr-q${PR.quick==='month'?' on':''}" onclick="prSetQuick('month')">شهر</button>
+        <button class="pr-q${PR.quick==='half'?' on':''}"  onclick="prSetQuick('half')">٦ شهور</button>
       </div>
       <div class="pr-dates">
         <label>من <input type="date" value="${PR.from}" onchange="PR.from=this.value;PR.quick='';PR.tech=null;prRender()"></label>
@@ -4180,9 +4185,9 @@ window.prOnPartsChanged = function(){
 //   ١) مفيش عمود سعر ولا كارت "مدفوع/غير مدفوع" — devices_dispatch
 //      بتشيل الأسعار قبل ما توصل للمتصفح، فمفيش بيانات فلوس أصلاً
 //      نبني عليها الكارت ده.
-//   ٢) فلتر الفترة هنا "اليوم/الأسبوع/الشهر" بس، من غير "الكل" أو
+//   ٢) فلتر الفترة هنا لحد "٦ شهور" بس، من غير "الكل" أو
 //      مدى مخصص — لأن loadDevices() بتحمّل الأجهزة المسلَّمة لآخر
-//      ٣٠ يوم بس (مش الأرشيف كله زي الداشبورد)، فأي فلتر أوسع من
+//      ٦ شهور بس (HR_DELIVERED_DAYS — مش الأرشيف كله)، فأي فلتر أوسع من
 //      شهر هيدّي عدد ناقص من غير ما يبان إنه ناقص.
 // ============================================================
 const INV_STUCK_DAYS = 3;
@@ -4240,6 +4245,7 @@ function invRange(){
   if(invPeriod.mode === 'today') return [startOfDay(now), null];
   if(invPeriod.mode === 'week'){ const s = startOfDay(now); s.setDate(s.getDate() - 6); return [s, null]; }
   if(invPeriod.mode === 'month'){ const s = startOfDay(now); s.setDate(s.getDate() - 29); return [s, null]; }
+  if(invPeriod.mode === 'half'){ const s = startOfDay(now); s.setDate(s.getDate() - (HR_DELIVERED_DAYS-1)); return [s, null]; }
   return [null, null];
 }
 function invInRange(iso){
@@ -4344,7 +4350,7 @@ function invViewHtml(){
 
 function renderInventory(){
   const chip = (mode, label) => `<button class="inv-chip ${invPeriod.mode===mode?'active':''}" onclick="setInvPeriod('${mode}')">${label}</button>`;
-  const filterBar = `<div class="inv-filter">${chip('today','اليوم')}${chip('week','الأسبوع')}${chip('month','الشهر')}</div>`;
+  const filterBar = `<div class="inv-filter">${chip('today','اليوم')}${chip('week','الأسبوع')}${chip('month','الشهر')}${chip('half','٦ شهور')}</div>`;
 
   const received  = devices.filter(d => invInRange(d.intake));
   const delivered = devices.filter(d => { const dd = invDeliveredDate(d); return dd && invInRange(dd); });
