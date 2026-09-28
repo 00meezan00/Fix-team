@@ -465,6 +465,7 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
   html.app-booting .topbar,
   html.app-booting #board,
   html.app-booting #approvalsHost,
+  html.app-booting #ownerHoldHost,
   html.app-booting #partsLogHost{visibility:hidden !important;}
   html.app-booting #bootVeil{display:flex !important;}
   /* آخر دور معروف = فني → نخفي أدوات المحاسب من قبل ما الأدوار تتحمّل */
@@ -496,6 +497,7 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
   body.role-technician > .topbar,
   body.role-technician > #board,
   body.role-technician > #approvalsHost,
+  body.role-technician > #ownerHoldHost,
   body.role-technician > #partsLogHost,
   body.role-technician > #detailOverlay,
   body.role-technician > #addOverlay,
@@ -601,6 +603,16 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
   .appr-btn-yes:hover{background:#15803D;}
   .appr-btn-no{background:var(--surface); color:var(--danger); border:1px solid var(--danger-border);}
   .appr-btn-no:hover{background:var(--danger-bg);}
+
+  /* ===== ⏸️ لوحة «المالك قال لسه في الصيانة» =====
+     نفس شكل لوحة الاعتمادات (appr-panel) عشان تبان من نفس العيلة. */
+  #ownerHoldHost:empty{display:none;}
+  .oh-picks{display:flex; gap:7px; flex-wrap:wrap; flex:none;}
+  .oh-btn{border:none; border-radius:9px; padding:9px 13px; font-family:'Tajawal',sans-serif; font-weight:800;
+          font-size:13px; cursor:pointer; color:#fff;}
+  .oh-btn:disabled{opacity:.55; cursor:default;}
+  .oh-back{background:var(--accent);}
+  .oh-cancel{background:var(--surface); color:var(--ink-2); border:1px solid var(--border);}
 
   /* ===== 🧰 لوحة حركة الفنيين على المخزن ===== */
   /* نفس قياسات لوحة الاعتمادات بالظبط عشان الاتنين يقفوا تحت بعض
@@ -1386,6 +1398,8 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
 <div id="sysBanner" class="sys-banner hidden"></div>
 <div id="errorBar" class="error-bar hidden"></div>
 <div id="approvalsHost"></div>
+<!-- ⏸️ أجهزة المالك قال إنها لسه في الصيانة — للسوبر أدمن بس -->
+<div id="ownerHoldHost"></div>
 <div id="partsLogHost"></div>
 <!-- البحث الرئيسي: بيشوف كل الأجهزة، حتى اللي خرجت من اللوحة -->
 <div class="gs-wrap" id="gsWrap">
@@ -3239,6 +3253,7 @@ function hideImportProgress(){
 function render(){
   renderBoard();
   renderApprovalsPanel();
+  renderOwnerHoldPanel();
   renderPartsLogPanel();
   if(currentColumn) renderColumn(true);
   refreshOpenOverlays();
@@ -3696,6 +3711,7 @@ function cardHtml(d, s){
     ${d.status === 'delivered' ? paymentBadge(d) : ''}
     ${pendingApprovalText(d) ? `<div class="pending-appr-chip">⏳ ${pendingApprovalText(d)}</div>` : ''}
     ${ownerNoteCardHtml(d)}
+    ${(isSuperAdmin() && isOwnerHold(d)) ? `<div class="pending-appr-chip">⏸️ المالك قال: لسه في الصيانة ومتسلّمش</div>` : ''}
   </div>`;
 }
 
@@ -4226,6 +4242,143 @@ async function ownerNoteMarkRead(id, btn){
   }
 }
 
+// ============================================================
+// ⏸️ «المالك قال: الجهاز لسه في الصيانة ومتسلّمش»
+// ------------------------------------------------------------
+// 🧠 الحكاية بالبلدي:
+//    المالك بيفتح صندوق التسعير ويلاقي جهاز إنت بعتهوله على إنه
+//    اتسلّم — وهو عارف إنه لسه في الورشة. فبيدوس «⏸️ لسه».
+//
+//    السيرفر (owner_set_price) بيحط على الجهاز علامة:
+//        ownerPriced.pay = 'hold'
+//    والجهاز **مبيتحرّكش لوحده** — بيفضل في «تم التسليم».
+//
+//    هنا بنطلّعلك لوحة فوق الأعمدة بكل الأجهزة دي، وجنب كل واحد
+//    زرار «↩️ رجّعه». بتدوسه → بتختار الخانة → الجهاز بيتحرّك،
+//    والعلامة والمشاركة بيتشالوا (الشغل ده جوه changeStatus).
+//
+// 🔒 للسوبر أدمن بس — المحاسب العادي مبيشوفش اللوحة.
+// ⚠️ أي كلام بيتكتب في سجل الجهاز من هنا ممنوع يقول «سوبر أدمن» —
+//    المالك بيقرا السجل ده من صفحته. اسمنا عنده «المحاسب العام».
+// ============================================================
+const OWNER_HOLD_TARGETS = ['diagnosing', 'repairing', 'done'];
+let ownerHoldPickId = null;     // الجهاز اللي فاتحله قايمة الاختيار دلوقتي
+let ownerHoldBusy = false;
+
+function isOwnerHold(d){
+  return !!(d && d.status === 'delivered' && d.paymentStatus !== 'paid'
+            && d.ownerPriced && d.ownerPriced.pay === 'hold');
+}
+
+function ownerHoldList(){
+  if(!isSuperAdmin()) return [];
+  return devices.filter(isOwnerHold)
+    .sort((a,b) => new Date(b.ownerPriced.at || 0) - new Date(a.ownerPriced.at || 0));
+}
+
+// الأزرار: «↩️ رجّعه» — ولو اتداس، بيتحوّل لتلات خانات + إلغاء
+function ownerHoldActionsHtml(d){
+  if(ownerHoldPickId !== d.id){
+    return `<button class="oh-btn oh-back" onclick="event.stopPropagation();ownerHoldPick('${d.id}')">↩️ رجّعه</button>`;
+  }
+  return `<div class="oh-picks">
+    ${OWNER_HOLD_TARGETS.map(k => {
+      const s = statusInfo(k);
+      return `<button class="oh-btn" style="background:${accent(s.varname)};" ${ownerHoldBusy ? 'disabled' : ''}
+                onclick="event.stopPropagation();ownerHoldReturn('${d.id}','${k}')">${esc(stLabel(s))}</button>`;
+    }).join('')}
+    <button class="oh-btn oh-cancel" ${ownerHoldBusy ? 'disabled' : ''}
+            onclick="event.stopPropagation();ownerHoldPick(null)">إلغاء</button>
+  </div>`;
+}
+
+function ownerHoldPanelHtml(){
+  const list = ownerHoldList();
+  if(!list.length) return '';
+  return `<div class="appr-panel">
+    <div class="appr-panel-head">⏸️ المالك قال إنها لسه في الصيانة ومتسلّمتش <span class="appr-count">${list.length}</span></div>
+    ${list.map(d => {
+      const p = d.ownerPriced || {};
+      let when = '';
+      try{ when = p.at ? new Date(p.at).toLocaleString(getLocale()) : ''; }catch(e){}
+      return `<div class="appr-row">
+        <div class="appr-row-info" style="cursor:pointer;" onclick="openDetail('${d.id}')">
+          <div class="appr-row-dev">📱 ${esc(d.deviceType || '')} ${esc(d.model || '')}${d.customerName ? ' — ' + esc(d.customerName) : ''}</div>
+          <div class="appr-row-meta">${d.shopName ? '🏬 ' + esc(d.shopName) + ' · ' : ''}${d.technician ? '🔧 ' + esc(d.technician) + ' · ' : ''}${esc(p.by || 'المالك')}${when ? ' · ' + esc(when) : ''}</div>
+          ${ownerHoldPickId === d.id ? `<div class="appr-row-meta" style="font-weight:800;color:var(--ink);">يرجع لأنهي خانة؟</div>` : ''}
+        </div>
+        <div class="appr-row-actions">${ownerHoldActionsHtml(d)}</div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+function renderOwnerHoldPanel(){
+  const host = document.getElementById('ownerHoldHost');
+  if(host) host.innerHTML = ownerHoldPanelHtml();
+}
+
+// نفس التنبيه جوه تفاصيل الجهاز — عشان لو فتحته من أي حتة تلاقي الزرار
+function ownerHoldDetailHtml(d){
+  if(!isSuperAdmin() || !isOwnerHold(d)) return '';
+  return `<div style="background:var(--warn-tint);border:1.5px solid var(--warn);border-radius:10px;padding:10px 12px;margin:8px 0;">
+    <div style="font-size:13.5px;font-weight:800;color:var(--warn);margin-bottom:8px;">⏸️ المالك قال: الجهاز ده لسه في الصيانة ومتسلّمش</div>
+    ${ownerHoldActionsHtml(d)}
+  </div>`;
+}
+
+function ownerHoldPick(id){
+  if(ownerHoldBusy) return;
+  ownerHoldPickId = id;
+  renderOwnerHoldPanel();
+  if(selectedId) renderDetail();
+}
+
+async function ownerHoldReturn(id, st){
+  if(!isSuperAdmin()){ showError('الرجوع ده للسوبر أدمن بس'); return; }
+  if(ownerHoldBusy) return;
+  if(!OWNER_HOLD_TARGETS.includes(st)) return;
+  const d = devices.find(x => x.id === id);
+  // الحالة ممكن تكون اتغيّرت وإنت فاتح القايمة (حد أكّد الدفع مثلاً)
+  if(!isOwnerHold(d)){
+    ownerHoldPickId = null; render();
+    showError('الجهاز ده مبقاش عليه تنبيه «لسه» — يمكن حد حرّكه أو أكّد دفعه');
+    return;
+  }
+  ownerHoldBusy = true;
+  renderOwnerHoldPanel();
+
+  // 📝 سطر في سجل الجهاز — المالك ممكن يقراه من صفحته،
+  //    فالكلام والدور مكتوبين بالاسم اللي هو يعرفه.
+  const lbl = stLabel(statusInfo(st));
+  devices = devices.map(x => x.id === id
+    ? { ...x, lastModifiedAt: new Date().toISOString(), lastModifiedBy: currentUser.name,
+        activityNotes: [ ...(x.activityNotes || []), {
+          text: '↩️ الجهاز رجع لـ «' + lbl + '» — المالك كان قال إنه لسه في الصيانة ومتسلّمش',
+          at: new Date().toISOString(), by: currentUser.name, role: 'المحاسب العام' } ] }
+    : x);
+
+  // الحركة نفسها بنفس منطق changeStatus — المصدر الوحيد للانتقالات.
+  // هو اللي بيشيل العلامة والمشاركة، وبيحفظ، وبيحدّث صفحة متابعة العميل.
+  const prevSel = selectedId;
+  selectedId = id;
+  try{
+    await changeStatus(st);
+  }finally{
+    selectedId = prevSel;
+    ownerHoldBusy = false;
+    ownerHoldPickId = null;
+  }
+
+  // ✅ نتأكد بعينينا: الحالة اتغيّرت والعلامة اتشالت
+  const after = devices.find(x => x.id === id);
+  if(!after || after.status !== st || after.ownerPriced || after.ownerShare){
+    showError('⚠️ الجهاز ما رجعش صح — افتح تفاصيله واتأكد');
+  }
+  render();
+  if(selectedId) renderDetail();
+}
+
 function ownerNoteHtml(d){
   if(!d || !isSuperAdmin()) return '';
   const n = OWNER_NOTES[d.id];
@@ -4498,6 +4651,7 @@ function renderDetailNow(){
     </div><!-- /money-only -->
     ${d.accountNote ? `<div style="background:#FFF8EC;border:1px solid #EACB84;border-radius:8px;padding:9px 12px;font-size:13px;margin:8px 0;color:#7A5A10;">${esc(d.accountNote)}</div>` : ''}
     ${ownerNoteHtml(d)}
+    ${ownerHoldDetailHtml(d)}
     <label class="field"><span>${t('det.issue')}</span><textarea rows="2"${roI} onblur="editField('reportedIssue', this.value)">${esc(d.reportedIssue||'')}</textarea></label>
     ${hasRet ? `
     <label class="field"><span style="color:var(--violet);font-weight:800;">${t('det.returnComplaint')}</span><textarea rows="2"${roR} placeholder="${t('det.returnComplaintPh')}" onblur="editField('returnComplaint', this.value)">${esc(d.returnComplaint||'')}</textarea></label>
@@ -5520,16 +5674,31 @@ async function changeStatus(newStatus, paymentChoice, rejectedInShopChoice){
     extra.returnPriceConfirmation = null;
   }
 
+  // ⏸️ المالك كان قال «لسه في الصيانة» والجهاز خارج من «تم التسليم»؟
+  //    يبقى نشيل العلامة والمشاركة مع بعض. ليه؟
+  //      • العلامة خلاص اتنفّذت — مالهاش لازمة تفضل.
+  //      • ولو المشاركة فضلت، الجهاز هيفضل ظاهر في صندوق المالك
+  //        وهو في الورشة (شباك التسعير بيفلتر على المشاركة بس).
+  //      • ولما يتسلّم تاني وتبعته، يوصل للمالك «محتاج تسعير» من الأول.
+  //    ⚠️ بيشتغل كمان لو حد حرّك الجهاز بالطريقة العادية من غير
+  //       زرار «↩️ رجّعه» — عشان العلامة متفضلش معلّقة للأبد.
+  const dropOwnerHold = d.status === 'delivered' && newStatus !== 'delivered' && isOwnerHold(d);
+
   showError('');
   if(newStatus === 'rejected' && d.status !== 'rejected') extra.rejectedInShop = (rejectedInShopChoice !== undefined) ? !!rejectedInShopChoice : true;   // رفض جديد → درج الرفض افتراضياً (أو حسب اختيار الديسباتشر)
-  devices = devices.map(x => x.id === selectedId
-    ? {
+  devices = devices.map(x => {
+    if(x.id !== selectedId) return x;
+    const nx = {
         ...x, ...extra,
         status:newStatus,
         paymentStatus: newStatus === 'delivered' ? newPaymentStatus : null,
         statusHistory:[...(x.statusHistory||[]), {status:newStatus, label:historyLabel, labelKey:historyKey, labelVars:historyVars, date:new Date().toISOString(), by: currentUser.name}]
-      }
-    : x);
+      };
+    // ⚠️ delete مش «= null»: الحفظ بيبعت الجهاز كله، والمفتاح اللي
+    //    قيمته null لسه موجود — وشباك المالك بيشوف أي مفتاح موجود.
+    if(dropOwnerHold){ delete nx.ownerShare; delete nx.ownerPriced; }
+    return nx;
+  });
   renderDetail();
   render();
   await persist();
@@ -7116,7 +7285,10 @@ function renderShareOwner(){
       const p = d.ownerPriced;
       const w = p.pay === 'deferred' ? 'آجل' : (p.pay === 'cash' ? 'فوري' : 'لسه ما حددش');
       answer = '<div style="font-size:11.5px;color:#8A6410;font-weight:700;margin-top:3px;">'
-             + '👑 المالك قال: ' + esc(String(p.price || '')) + ' ج.م — ' + w + '</div>';
+             + (p.pay === 'hold'
+                 ? '⏸️ المالك قال: الجهاز لسه في الصيانة ومتسلّمش'
+                 : '👑 المالك قال: ' + esc(String(p.price || '')) + ' ج.م — ' + w)
+             + '</div>';
     }
     return '<label style="display:flex;gap:10px;align-items:flex-start;padding:10px 4px;'
       + 'border-bottom:1px solid var(--border);cursor:pointer;">'

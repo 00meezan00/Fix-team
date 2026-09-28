@@ -3377,7 +3377,12 @@ document.addEventListener('DOMContentLoaded', function(){
         📒 آجل   → الفلوس بتتحوّل لدَين على حساب المحل فوراً،
                     والجهاز بيختفي من «بانتظار الدفع».
 
-        ⏸️ لسه   → بتكتب السعر وبس، من غير ما تحدد حاجة.
+        ⏸️ لسه   → الجهاز لسه في الصيانة ومتسلّمش أصلاً.
+                    مفيش سعر مطلوب، والجهاز مبيتحرّكش لوحده —
+                    بيطلع تنبيه عند المحاسب العام وهو اللي يرجّعه.
+                    لما يتسلّم تاني ويتبعتلك، بيرجع «محتاج تسعير».
+                    ⚠️ ممنوع أي كلمة «سوبر أدمن» تظهر للمالك —
+                       اللي بيبعتله اسمه «المحاسب العام».
 
    🔒 وكل ده محروس من قاعدة البيانات مش من الصفحة:
       • الصندوق ده شباك (devices_owner_pricing) مبيفتحش غير
@@ -3494,8 +3499,8 @@ function pzRender(){
 
   if(!pzRows.length){
     box.innerHTML = '<div class="empty">📭 مفيش أجهزة في صندوقك لسه.<br>'
-      + '<span style="font-size:12.5px;">السوبر أدمن هو اللي بيشارك الأجهزة هنا '
-      + 'من قايمة «تم التسليم وبانتظار الدفع».</span></div>';
+      + '<span style="font-size:12.5px;">المحاسب العام هو اللي بيبعت الأجهزة هنا '
+      + 'بعد ما تتسلّم.</span></div>';
     return;
   }
 
@@ -3539,6 +3544,9 @@ function pzCard(r){
     badge = '<span class="pz-b pz-b-ok">📒 راح على حساب «' + esc(r.shop || '—') + '»</span>';
   } else if(locked){
     badge = '<span class="pz-b pz-b-ok">✅ اتحصّل</span>';
+  } else if(r.answered && r.answered.pay === 'hold'){
+    // ⏸️ المالك قال الجهاز لسه في الصيانة — مستني المحاسب العام يرجّعه
+    badge = '<span class="pz-b pz-b-wait">⏸️ لسه في الصيانة — مستني المحاسب العام يرجّعه</span>';
   } else if(r.answered && r.answered.pay === 'cash'){
     badge = '<span class="pz-b pz-b-cash">💵 فوري — مستني تحصيل المحاسب</span>';
   } else if(r.answered){
@@ -3575,8 +3583,8 @@ function pzCard(r){
       + '<button class="pz-btn pz-cash' + (r.answered && r.answered.pay === 'cash' ? ' on' : '') + '" '
         + 'onclick="pzSave(\'' + idJs + '\',\'cash\')">💵 فوري</button>'
       + '<button class="pz-btn pz-def" onclick="pzSave(\'' + idJs + '\',\'deferred\')">📒 آجل</button>'
-      + '<button class="pz-btn pz-none' + (r.answered && r.answered.pay === 'none' ? ' on' : '') + '" '
-        + 'onclick="pzSave(\'' + idJs + '\',\'none\')">⏸️ لسه</button>'
+      + '<button class="pz-btn pz-none' + (r.answered && r.answered.pay === 'hold' ? ' on' : '') + '" '
+        + 'onclick="pzSave(\'' + idJs + '\',\'hold\')">⏸️ لسه</button>'
       + '</div>';
 
     if(!r.shop){
@@ -3616,7 +3624,14 @@ async function pzSave(id, pay){
   const price = inp ? String(inp.value || '').trim() : '';
 
   // ── تحذيرات قبل ما نبعت — عشان ميستناش رد السيرفر ──
-  if(pay !== 'none' && price === ''){ toast('⚠️ اكتب السعر الأول'); if(inp) inp.focus(); return; }
+  // ⏸️ «لسه» = الجهاز لسه في الصيانة → مش محتاج سعر خالص
+  if(pay === 'hold'){
+    const ok = confirm('الجهاز ده لسه في الصيانة ومتسلّمش؟\n\n'
+      + 'هيطلع تنبيه عند المحاسب العام وهو اللي هيرجّعه للصيانة. '
+      + 'ولما يتسلّم تاني ويتبعتلك، هيظهرلك «محتاج تسعير» من الأول.\n\nأكمل؟');
+    if(!ok) return;
+  }
+  if(pay !== 'none' && pay !== 'hold' && price === ''){ toast('⚠️ اكتب السعر الأول'); if(inp) inp.focus(); return; }
   if(pay === 'deferred'){
     if(!r.shop){ toast('⚠️ مفيش اسم محل — الآجل لازم يتقيّد على حساب محل'); return; }
     if(Number(price) <= 0){ toast('⚠️ الآجل لازم له سعر أكبر من صفر'); return; }
@@ -3632,11 +3647,21 @@ async function pzSave(id, pay){
 
   try{
     const { data, error } = await sb.rpc('owner_set_price',
-      { p_id: id, p_price: price, p_pay: pay });
+      { p_id: id, p_price: (pay === 'hold' ? '' : price), p_pay: pay });
     if(error) throw error;
 
     // ✅ Supabase مبترميش أخطاء لوحدها — بنتأكد بعينينا من اللي رجع
     const res = data || {};
+    // ⏸️ «لسه» مبيلمسش السعر — فبنتأكد من القرار نفسه بس.
+    //    لو السيرفر لسه على النسخة القديمة (ملف 63 ما اتشغّلش)،
+    //    هيرفض 'hold' برسالة واضحة قبل ما نوصل هنا أصلاً.
+    if(pay === 'hold'){
+      if(res.pay !== 'hold') throw new Error('السيرفر ما سجّلش «لسه» — بلّغ الإدارة');
+      toast('⏸️ اتسجّل إن الجهاز لسه في الصيانة — المحاسب العام هيرجّعه');
+      await pzLoad();
+      pzRefreshBadge();
+      return;
+    }
     if(String(res.agreedPrice === undefined ? '' : res.agreedPrice) !== String(pzNorm(price))){
       throw new Error('السيرفر سجّل سعر مختلف (' + res.agreedPrice + ') — بلّغ الإدارة');
     }
