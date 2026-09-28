@@ -1264,6 +1264,12 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
   .pr-link b{font-weight:800;}
   .pr-link-t{font-weight:800;color:var(--done);white-space:nowrap;}
   .pr-link.none,.pr-link.wait{background:none;border:1px dashed var(--border);color:var(--muted);font-style:italic;}
+  /* 🗓️ رحلة الجهاز على كارت المراجعة (دخل · اتنقل · اتسلّم) */
+  .pr-tl{margin-top:8px;border:1px solid var(--border);border-radius:9px;padding:5px 9px;background:var(--surface);}
+  .pr-tl-r{display:flex;justify-content:space-between;align-items:baseline;gap:10px;
+    font-size:11.5px;line-height:1.95;color:var(--muted);}
+  .pr-tl-r b{font-weight:700;color:var(--ink);white-space:nowrap;}
+  .pr-tl-r.soft b{font-weight:500;color:var(--muted);}
 
   /* سطر المحل والفني جوه كارت الجهاز */
   .pr-dev-m{font-size:12px;color:var(--muted);margin-top:4px;display:flex;flex-wrap:wrap;gap:4px 12px;}
@@ -9537,52 +9543,142 @@ function closePartsReview(){
 // الأجهزة هنا قليلة (المدة بس)، فالمطابقة المباشرة سريعة كفاية.
 
 // ------------------------------------------------------------
-// 🔩 القطع المربوطة من المخزن
+// 🔩 القطع المربوطة من المخزن — نسخة ٢
 // ------------------------------------------------------------
 // فرق مهم: `partsComment` هو اللي **الفني كتبه بإيده**، والقطع دي
 // هي اللي **اتربطت فعلاً من المخزن** (جدول spare_parts) وليها تكلفة.
-// الاتنين بيظهروا مع بعض عشان المحاسب يقارن: الفني قال «شاشة»
-// وهل اتربطت شاشة فعلاً ولا لأ.
 //
-// ⚠️ بنجيبها للأجهزة الظاهرة في الفترة بس — مش كل المخزن.
-//    وعلى دفعات صغيرة لأن الرابط بيتبعت في العنوان وليه حد أقصى.
-var PR_LINK = {};          // رقم الجهاز → [قطع]
-var PR_LINK_DONE = {};     // اللي اتجاب قبل كده (حتى لو فاضي)
+// 🐞 الباج اللي اتصلّح: «القطعة مربوطة وباينة من جوه، ومن برا
+//    مكتوب مفيش قطع مربوطة».
+//    🧠 بالبلدي: الصفحة كانت بتصوّر قطع كل جهاز **مرة واحدة** وتحط
+//    الصورة في درج، ومبتفتحش الدرج تاني أبداً طول ما الصفحة مفتوحة.
+//    فلو القطعة اتربطت بعد الصورة (من جوه الجهاز، أو من المخزن، أو
+//    حد تاني من موبايله) — الكارت يفضل يوري الصورة القديمة «مفيش».
+//    وجوه الجهاز كان صح لأنه بيسأل السيرفر من جديد كل مرة.
+//    وكمان لو النت فصل لحظة، الصفحة كانت بتكتب «مفيش قطع» بدل
+//    «مقدرناش نجيب» — كدبة صغيرة شكلها سليم.
+//
+// ✅ دلوقتي:
+//    • كل جهاز ليه وقت اتجابت فيه قطعه، وبعد دقيقة بيتجاب تاني.
+//    • فتح الشاشة، والرجوع من الجهاز، وربط/فك قطعة → بيمسحوا
+//      الصورة القديمة فوراً.
+//    • الفشل بيتقال «فشل» وبيتعاد لوحده بعد ١٥ ثانية.
+//    • النتيجة بتـ«تستبدل» اللي قبلها مش بتـ«تتزوّد» عليه — قبل كده
+//      طلبين في نفس اللحظة كانوا بيكرروا القطع (٢ بدل ١).
+// ------------------------------------------------------------
+var PR_LINK = {};          // رقم الجهاز → [قطع] (آخر نسخة من السيرفر)
+var PR_LINK_AT = {};       // رقم الجهاز → إمتى اتجابت
+var PR_LINK_ERR = {};      // رقم الجهاز → 1 لو آخر محاولة فشلت
+var PR_LINK_BUSY = {};     // رقم الجهاز → 1 وهي بتتجاب دلوقتي
+var PR_LINK_TTL = 60000;   // دقيقة وبعدها نسأل تاني
+var PR_LINK_RETRY = 15000; // لو فشلت: نحاول تاني بعد ١٥ ثانية
+
+// ننسى صورة جهاز واحد (أو كله لو من غير رقم) — عشان تتجاب طازة
+function prLinkForget(id){
+  if(id){ delete PR_LINK_AT[id]; return; }
+  PR_LINK = {}; PR_LINK_AT = {}; PR_LINK_ERR = {};
+}
 
 async function prLoadLinked(ids){
-  const need = (ids || []).filter(id => id && !PR_LINK_DONE[id]);
+  const now = Date.now();
+  const need = [...new Set(ids || [])].filter(id => id && !PR_LINK_BUSY[id]
+    && (!PR_LINK_AT[id] || now - PR_LINK_AT[id] > PR_LINK_TTL));
   if(!need.length) return false;
-  const CH = 60;
+  need.forEach(id => { PR_LINK_BUSY[id] = 1; });
+  const CH = 60;   // على دفعات — الرابط بيتبعت في العنوان وليه حد أقصى
   try{
     for(let i = 0; i < need.length; i += CH){
       const chunk = need.slice(i, i + CH);
       const { data, error } = await sb.from('spare_parts')
         .select('device_id,name,total_cost').in('device_id', chunk);
+      // ⚠️ Supabase مبيرميش خطأ — بيرجّعه في .error
       if(error) throw error;
-      (data || []).forEach(p => {
-        (PR_LINK[p.device_id] = PR_LINK[p.device_id] || []).push(p);
+      const fresh = {};
+      chunk.forEach(id => { fresh[id] = []; });
+      (data || []).forEach(p => { if(fresh[p.device_id]) fresh[p.device_id].push(p); });
+      const at = Date.now();
+      chunk.forEach(id => {
+        PR_LINK[id] = fresh[id];          // استبدال، مش إضافة
+        PR_LINK_AT[id] = at;
+        delete PR_LINK_ERR[id];
+        delete PR_LINK_BUSY[id];
       });
-      chunk.forEach(id => { PR_LINK_DONE[id] = 1; });
+      // فولدر «مش مربوط بيها قطع» (عند المحاسب بس) — نحدّثه بنفس الحقيقة
+      if(typeof PR_HAS !== 'undefined' && PR_HAS && PR_HAS.set){
+        chunk.forEach(id => { fresh[id].length ? PR_HAS.set.add(id) : PR_HAS.set.delete(id); });
+      }
     }
-    return true;
   }catch(e){
-    // بنعلّم الدفعة كأنها اتجابت عشان مندخلش في لفة تحميل لا تنتهي
-    need.forEach(id => { PR_LINK_DONE[id] = 1; });
     console.error('prLoadLinked failed:', e);
-    return false;
+    // مش بنقول «مفيش قطع» — بنقول «فشل»، ونحاول تاني بعد شوية
+    const retryAt = Date.now() - PR_LINK_TTL + PR_LINK_RETRY;
+    need.forEach(id => { if(PR_LINK_BUSY[id]){ PR_LINK_ERR[id] = 1; PR_LINK_AT[id] = retryAt; } });
+  }finally{
+    need.forEach(id => { delete PR_LINK_BUSY[id]; });
   }
+  return true;   // اتغيّر حاجة (نتيجة أو فشل) → الكارت يترسم تاني مرة واحدة
 }
 
 // سطر القطع المربوطة جوه كارت الجهاز
 function prLinkHtml(id){
-  if(!PR_LINK_DONE[id]) return `<div class="pr-link wait">⏳ بنجيب القطع المربوطة…</div>`;
-  const list = PR_LINK[id] || [];
+  const list = PR_LINK[id];
+  if(!list){
+    return PR_LINK_ERR[id]
+      ? `<div class="pr-link none">⚠️ مقدرناش نجيب القطع المربوطة — هنحاول تاني لوحدنا</div>`
+      : `<div class="pr-link wait">⏳ بنجيب القطع المربوطة…</div>`;
+  }
   if(!list.length) return `<div class="pr-link none">🧰 مفيش قطع مربوطة من المخزن</div>`;
   const tot = list.reduce((a, p) => a + Number(p.total_cost || 0), 0);
   return `<div class="pr-link">🧰 <b>مربوط من المخزن (${list.length}):</b> ` +
     list.map(p => esc(p.name)).join('، ') +
     ` <span class="pr-link-t">${tot.toLocaleString()} ج.م</span></div>`;
 }
+
+// ------------------------------------------------------------
+// 🗓️ رحلة الجهاز على الكارت — دخل إمتى، اتنقل لأنهي خانة إمتى،
+//    اتسلّم إمتى، وآخر تعديل.
+// ------------------------------------------------------------
+// 🧠 المصدر: statusHistory — الكشكول اللي النظام بيكتب فيه سطر مع
+//    كل تغيير حالة. بناخد منه **النقلات بس**: السطر اللي حالته زي
+//    اللي قبله (زي «اتحصّل» أو «المالك سعّر») مش نقلة لخانة تانية،
+//    فمبنكرّروش.
+// ⚠️ كل التواريخ بتوقيت القاهرة — مش توقيت الموبايل اللي بيتفرّج.
+// ------------------------------------------------------------
+var PR_TL_ICON = { waiting:'⏳', diagnosing:'🔍', repairing:'🔧', done:'✅',
+                   delivered:'📦', rejected:'🚫', returned:'↩️', trashed:'🗑' };
+
+function prTlDate(iso){
+  const d = new Date(iso);
+  if(isNaN(d)) return '';
+  try{
+    return d.toLocaleString('ar-EG', { day:'numeric', month:'short',
+      hour:'numeric', minute:'2-digit', timeZone:'Africa/Cairo' });
+  }catch(e){ return d.toLocaleString(); }
+}
+
+function prTimelineHtml(raw){
+  raw = raw || {};
+  const steps = [];
+  if(raw.intakeDate) steps.push({ ic:'📥', t:'دخل المحل', at:raw.intakeDate, by:raw.registeredBy });
+  let prev = 'waiting';   // كل جهاز بيبدأ «قيد الانتظار» — فمش بنكرّرها بعد الدخول
+  (Array.isArray(raw.statusHistory) ? raw.statusHistory : []).forEach(h => {
+    if(!h || !h.status || !h.date || h.status === prev) return;
+    prev = h.status;
+    steps.push({ ic: PR_TL_ICON[h.status] || '•', t: prStName(h.status), at: h.date, by: h.by });
+  });
+  // آخر تعديل — بس لو بعد آخر نقلة بأكتر من دقيقة (وإلا هو نفسه)
+  const lastAt = steps.length ? steps[steps.length - 1].at : '';
+  if(raw.lastModifiedAt && (!lastAt || new Date(raw.lastModifiedAt) - new Date(lastAt) > 60000)){
+    steps.push({ ic:'✏️', t:'آخر تعديل', at:raw.lastModifiedAt, by:raw.lastModifiedBy, soft:true });
+  }
+  if(!steps.length) return '';
+  return `<div class="pr-tl">${steps.map(s =>
+    `<div class="pr-tl-r${s.soft ? ' soft' : ''}"${s.by ? ` title="${esc(s.by)}"` : ''}>
+       <span>${s.ic} ${esc(s.t)}</span><b>${esc(prTlDate(s.at))}</b></div>`).join('')}</div>`;
+}
+
+// اسم الحالة بالعربي للرحلة
+function prStName(k){ const s = statusInfo(k); return s ? stLabel(s) : k; }
 
 function prFields(d){
   return [d.model, d.deviceType, d.customerName, d.shopName,
@@ -9620,6 +9716,7 @@ function prDevHtml(d, showTech, extra){
                    : `<div class="pr-cm">🔩 ${esc(cm)}</div>`)
                : `<div class="pr-cm none">— الفني ما كتبش قطع غيار</div>`}
           ${prLinkHtml(d.id)}
+          ${prTimelineHtml(d)}
           ${extra || ''}
         </div>`;
 }
