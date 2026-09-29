@@ -3718,6 +3718,7 @@ function cardHtml(d, s){
     ${pendingApprovalText(d) ? `<div class="pending-appr-chip">⏳ ${pendingApprovalText(d)}</div>` : ''}
     ${ownerNoteCardHtml(d)}
     ${(isSuperAdmin() && isOwnerHold(d)) ? `<div class="pending-appr-chip">⏸️ المالك قال: لسه في الصيانة ومتسلّمش</div>` : ''}
+    ${(isSuperAdmin() && isOwnerRej(d)) ? `<div class="pending-appr-chip">🚫 المالك قال: الجهاز ده اترفض</div>` : ''}
   </div>`;
 }
 
@@ -4321,7 +4322,8 @@ function ownerHoldPanelHtml(){
 
 function renderOwnerHoldPanel(){
   const host = document.getElementById('ownerHoldHost');
-  if(host) host.innerHTML = ownerHoldPanelHtml();
+  // ⏸️ «لسه» و🚫 «اترفض» — لوحتين في نفس المكان فوق الأعمدة
+  if(host) host.innerHTML = ownerHoldPanelHtml() + ownerRejPanelHtml();
 }
 
 // نفس التنبيه جوه تفاصيل الجهاز — عشان لو فتحته من أي حتة تلاقي الزرار
@@ -4381,6 +4383,153 @@ async function ownerHoldReturn(id, st){
   if(!after || after.status !== st || after.ownerPriced || after.ownerShare){
     showError('⚠️ الجهاز ما رجعش صح — افتح تفاصيله واتأكد');
   }
+  render();
+  if(selectedId) renderDetail();
+}
+
+// ============================================================
+// 🚫 «المالك قال: الجهاز ده اترفض»
+// ------------------------------------------------------------
+// 🧠 نفس فكرة «لسه» بالظبط، بس الإجابة المحتملة مختلفة:
+//    المالك دوس «🚫 اترفض» في صندوق التسعير → السيرفر حط على الجهاز
+//        ownerPriced.pay = 'rejected'
+//    والجهاز مبيتحرّكش لوحده. إنت بتراجع، وعندك ٣ اختيارات:
+//      🗄️ درج الرفض        → اترفض والجهاز لسه عندنا في المحل
+//      📤 العميل خده        → اترفض والعميل استلمه
+//      ↩️ مش مرفوض         → المالك غلط — العلامة بتتشال، والجهاز
+//                             بيرجع للمالك «محتاج تسعير» من الأول
+//
+// ⚠️ النقل للرفض بيعدّي على changeStatus — نفس زرار «تم الرفض» اللي
+//    في التفاصيل. هو اللي بيشيل العلامة والمشاركة (dropOwnerHold)،
+//    وبيحفظ، وبيحدّث صفحة متابعة العميل.
+// 🔒 للسوبر أدمن بس. والكلام اللي بيتكتب في السجل مفيهوش «سوبر أدمن» —
+//    المالك بيقرا السجل ده.
+// ============================================================
+let ownerRejBusy = false;
+
+function isOwnerRej(d){
+  return !!(d && d.status === 'delivered' && d.paymentStatus !== 'paid'
+            && d.ownerPriced && d.ownerPriced.pay === 'rejected');
+}
+
+function ownerRejList(){
+  if(!isSuperAdmin()) return [];
+  return devices.filter(isOwnerRej)
+    .sort((a,b) => new Date(b.ownerPriced.at || 0) - new Date(a.ownerPriced.at || 0));
+}
+
+function ownerRejActionsHtml(d){
+  const dis = ownerRejBusy ? 'disabled' : '';
+  return `<div class="oh-picks">
+    <button class="oh-btn" style="background:var(--rejected_shop);" ${dis}
+            onclick="event.stopPropagation();ownerRejApply('${d.id}',true)">🗄️ درج الرفض</button>
+    <button class="oh-btn" style="background:var(--rejected);" ${dis}
+            onclick="event.stopPropagation();ownerRejApply('${d.id}',false)">📤 العميل خده</button>
+    <button class="oh-btn oh-cancel" ${dis}
+            onclick="event.stopPropagation();ownerRejDismiss('${d.id}')">↩️ مش مرفوض</button>
+  </div>`;
+}
+
+function ownerRejPanelHtml(){
+  const list = ownerRejList();
+  if(!list.length) return '';
+  return `<div class="appr-panel" style="border-color:var(--rejected_shop);">
+    <div class="appr-panel-head" style="color:var(--rejected_shop);">🚫 المالك قال إنها اترفضت — راجعها <span class="appr-count">${list.length}</span></div>
+    ${list.map(d => {
+      const p = d.ownerPriced || {};
+      let when = '';
+      try{ when = p.at ? new Date(p.at).toLocaleString(getLocale()) : ''; }catch(e){}
+      return `<div class="appr-row">
+        <div class="appr-row-info" style="cursor:pointer;" onclick="openDetail('${d.id}')">
+          <div class="appr-row-dev">📱 ${esc(d.deviceType || '')} ${esc(d.model || '')}${d.customerName ? ' — ' + esc(d.customerName) : ''}</div>
+          <div class="appr-row-meta">${d.shopName ? '🏬 ' + esc(d.shopName) + ' · ' : ''}${d.technician ? '🔧 ' + esc(d.technician) + ' · ' : ''}${esc(p.by || 'المالك')}${when ? ' · ' + esc(when) : ''}</div>
+        </div>
+        <div class="appr-row-actions">${ownerRejActionsHtml(d)}</div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+function ownerRejDetailHtml(d){
+  if(!isSuperAdmin() || !isOwnerRej(d)) return '';
+  return `<div style="background:var(--rejected_shop-bg);border:1.5px solid var(--rejected_shop);border-radius:10px;padding:10px 12px;margin:8px 0;">
+    <div style="font-size:13.5px;font-weight:800;color:var(--rejected_shop);margin-bottom:8px;">🚫 المالك قال: الجهاز ده اترفض — راجعه</div>
+    ${ownerRejActionsHtml(d)}
+  </div>`;
+}
+
+// سطر في سجل الجهاز باسم «المحاسب العام»
+function ownerRejNote(x, text){
+  const now = new Date().toISOString();
+  return { ...x, lastModifiedAt: now, lastModifiedBy: currentUser.name,
+    activityNotes: [ ...(x.activityNotes || []),
+      { text, at: now, by: currentUser.name, role: 'المحاسب العام' } ] };
+}
+
+// ✅ اترفض فعلاً → ينتقل للرفض
+async function ownerRejApply(id, inShop){
+  if(!isSuperAdmin()){ showError('المراجعة دي للسوبر أدمن بس'); return; }
+  if(ownerRejBusy) return;
+  const d = devices.find(x => x.id === id);
+  if(!isOwnerRej(d)){
+    render();
+    showError('الجهاز ده مبقاش عليه تنبيه «اترفض» — يمكن حد حرّكه أو أكّد دفعه');
+    return;
+  }
+  const where = inShop ? 'درج الرفض (لسه في المحل)' : 'تم الرفض (العميل خده)';
+  if(!confirm('تنقل «' + [d.deviceType, d.model].filter(Boolean).join(' ') + ' — ' + (d.customerName || '') + '»\nلـ ' + where + '؟')) return;
+
+  ownerRejBusy = true;
+  renderOwnerHoldPanel();
+  devices = devices.map(x => x.id === id
+    ? ownerRejNote(x, '🚫 اتنقل لـ «' + where + '» — المالك كان قال إن الجهاز اترفض')
+    : x);
+
+  const prevSel = selectedId;
+  selectedId = id;
+  try{
+    await changeStatus('rejected', undefined, !!inShop);
+  }finally{
+    selectedId = prevSel;
+    ownerRejBusy = false;
+  }
+
+  // ✅ نتأكد بعينينا: اترفض والعلامة اتشالت
+  const after = devices.find(x => x.id === id);
+  if(!after || after.status !== 'rejected' || after.ownerPriced || after.ownerShare){
+    showError('⚠️ الجهاز ما اتنقلش للرفض صح — افتح تفاصيله واتأكد');
+  }
+  render();
+  if(selectedId) renderDetail();
+}
+
+// ↩️ المالك غلط — الجهاز مش مرفوض
+// بنشيل العلامة بس، والمشاركة **بتفضل** — فالجهاز بيرجع لصندوق
+// المالك «🆕 محتاج تسعير» كأنه أول مرة.
+async function ownerRejDismiss(id){
+  if(!isSuperAdmin()){ showError('المراجعة دي للسوبر أدمن بس'); return; }
+  if(ownerRejBusy) return;
+  const d = devices.find(x => x.id === id);
+  if(!isOwnerRej(d)){ render(); return; }
+  if(!confirm('الجهاز ده مش مرفوض؟\n\nهيرجع للمالك «محتاج تسعير» من الأول.')) return;
+
+  ownerRejBusy = true;
+  renderOwnerHoldPanel();
+  try{
+    devices = devices.map(x => {
+      if(x.id !== id) return x;
+      const nx = ownerRejNote(x, '↩️ الجهاز مش مرفوض — رجع للمالك يسعّره من الأول');
+      // ⚠️ delete مش «= null»: الحفظ بيبعت الجهاز كله، والعدّاد عند
+      //    المالك بيعدّ الأجهزة اللي ownerPriced بتاعها مش موجود أصلاً.
+      delete nx.ownerPriced;
+      return nx;
+    });
+    await persist();
+  }finally{
+    ownerRejBusy = false;
+  }
+  const after = devices.find(x => x.id === id);
+  if(!after || after.ownerPriced) showError('⚠️ العلامة ما اتشالتش — جرّب تاني');
   render();
   if(selectedId) renderDetail();
 }
@@ -4658,6 +4807,7 @@ function renderDetailNow(){
     ${d.accountNote ? `<div style="background:#FFF8EC;border:1px solid #EACB84;border-radius:8px;padding:9px 12px;font-size:13px;margin:8px 0;color:#7A5A10;">${esc(d.accountNote)}</div>` : ''}
     ${ownerNoteHtml(d)}
     ${ownerHoldDetailHtml(d)}
+    ${ownerRejDetailHtml(d)}
     <label class="field"><span>${t('det.issue')}</span><textarea rows="2"${roI} onblur="editField('reportedIssue', this.value)">${esc(d.reportedIssue||'')}</textarea></label>
     ${hasRet ? `
     <label class="field"><span style="color:var(--violet);font-weight:800;">${t('det.returnComplaint')}</span><textarea rows="2"${roR} placeholder="${t('det.returnComplaintPh')}" onblur="editField('returnComplaint', this.value)">${esc(d.returnComplaint||'')}</textarea></label>
@@ -5688,7 +5838,8 @@ async function changeStatus(newStatus, paymentChoice, rejectedInShopChoice){
   //      • ولما يتسلّم تاني وتبعته، يوصل للمالك «محتاج تسعير» من الأول.
   //    ⚠️ بيشتغل كمان لو حد حرّك الجهاز بالطريقة العادية من غير
   //       زرار «↩️ رجّعه» — عشان العلامة متفضلش معلّقة للأبد.
-  const dropOwnerHold = d.status === 'delivered' && newStatus !== 'delivered' && isOwnerHold(d);
+  // 🚫 ونفس الكلام لعلامة «اترفض» — لو الجهاز خرج من التسليم، العلامة خلصت
+  const dropOwnerHold = d.status === 'delivered' && newStatus !== 'delivered' && (isOwnerHold(d) || isOwnerRej(d));
 
   showError('');
   if(newStatus === 'rejected' && d.status !== 'rejected') extra.rejectedInShop = (rejectedInShopChoice !== undefined) ? !!rejectedInShopChoice : true;   // رفض جديد → درج الرفض افتراضياً (أو حسب اختيار الديسباتشر)
@@ -7293,6 +7444,8 @@ function renderShareOwner(){
       answer = '<div style="font-size:11.5px;color:#8A6410;font-weight:700;margin-top:3px;">'
              + (p.pay === 'hold'
                  ? '⏸️ المالك قال: الجهاز لسه في الصيانة ومتسلّمش'
+                 : p.pay === 'rejected'
+                 ? '🚫 المالك قال: الجهاز ده اترفض'
                  : '👑 المالك قال: ' + esc(String(p.price || '')) + ' ج.م — ' + w)
              + '</div>';
     }

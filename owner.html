@@ -527,6 +527,13 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
   .pz-def{border-color:var(--owner); color:var(--owner);}
   .pz-none{border-color:var(--line);}
   .pz-none.on{background:var(--paper);}
+  /* 🚫 «اترفض» — بالعرض تحت التلات زراير، بلون الرفض */
+  .pz-rej{display:block; width:100%; margin-top:7px; flex:none;
+    border-color:var(--rejected_shop); color:var(--rejected_shop);}
+  .pz-rej.on{background:var(--rejected_shop); border-color:var(--rejected_shop); color:#fff;}
+  /* ⚠️ القاعدة الداكنة بتاعة .pz-btn أقوى من .pz-rej — فبنعيد اللون هنا */
+  html[data-theme="dark"] .pz-rej{color:var(--rejected_shop);}
+  html[data-theme="dark"] .pz-rej.on{color:#1B1206;}
   .pz-warn{font-size:11.5px; color:var(--rejected_shop); background:var(--rejected_shop-bg);
     border-radius:9px; padding:8px 10px; margin-top:9px; line-height:1.65;}
   .pz-final{font-family:'Cairo',sans-serif; font-weight:900; font-size:17px; color:var(--done);
@@ -3386,6 +3393,8 @@ document.addEventListener('DOMContentLoaded', function(){
         ⏸️ لسه   → الجهاز لسه في الصيانة ومتسلّمش أصلاً.
                     مفيش سعر مطلوب، والجهاز مبيتحرّكش لوحده —
                     بيطلع تنبيه عند المحاسب العام وهو اللي يرجّعه.
+        🚫 اترفض → الجهاز اترفض. برضه من غير سعر، ومبيتحرّكش لوحده —
+                    المحاسب العام بيراجع وينقله للرفض لو صح.
                     لما يتسلّم تاني ويتبعتلك، بيرجع «محتاج تسعير».
                     ⚠️ ممنوع أي كلمة «سوبر أدمن» تظهر للمالك —
                        اللي بيبعتله اسمه «المحاسب العام».
@@ -3550,6 +3559,9 @@ function pzCard(r){
     badge = '<span class="pz-b pz-b-ok">📒 راح على حساب «' + esc(r.shop || '—') + '»</span>';
   } else if(locked){
     badge = '<span class="pz-b pz-b-ok">✅ اتحصّل</span>';
+  } else if(r.answered && r.answered.pay === 'rejected'){
+    // 🚫 المالك قال الجهاز اترفض — مستني المحاسب العام يراجع
+    badge = '<span class="pz-b pz-b-wait">🚫 اترفض — مستني المحاسب العام يراجع</span>';
   } else if(r.answered && r.answered.pay === 'hold'){
     // ⏸️ المالك قال الجهاز لسه في الصيانة — مستني المحاسب العام يرجّعه
     badge = '<span class="pz-b pz-b-wait">⏸️ لسه في الصيانة — مستني المحاسب العام يرجّعه</span>';
@@ -3591,7 +3603,10 @@ function pzCard(r){
       + '<button class="pz-btn pz-def" onclick="pzSave(\'' + idJs + '\',\'deferred\')">📒 آجل</button>'
       + '<button class="pz-btn pz-none' + (r.answered && r.answered.pay === 'hold' ? ' on' : '') + '" '
         + 'onclick="pzSave(\'' + idJs + '\',\'hold\')">⏸️ لسه</button>'
-      + '</div>';
+      + '</div>'
+      // 🚫 زرار «اترفض» بالعرض تحت التلاتة
+      + '<button class="pz-btn pz-rej' + (r.answered && r.answered.pay === 'rejected' ? ' on' : '') + '" '
+        + 'onclick="pzSave(\'' + idJs + '\',\'rejected\')">🚫 اترفض</button>';
 
     if(!r.shop){
       body += '<div class="pz-warn">⚠️ الجهاز ده مش مكتوب عليه اسم محل، '
@@ -3637,7 +3652,14 @@ async function pzSave(id, pay){
       + 'ولما يتسلّم تاني ويتبعتلك، هيظهرلك «محتاج تسعير» من الأول.\n\nأكمل؟');
     if(!ok) return;
   }
-  if(pay !== 'none' && pay !== 'hold' && price === ''){ toast('⚠️ اكتب السعر الأول'); if(inp) inp.focus(); return; }
+  // 🚫 «اترفض» = الجهاز ده اترفض → برضه مش محتاج سعر
+  if(pay === 'rejected'){
+    const ok = confirm('الجهاز ده اترفض؟\n\n'
+      + 'هيطلع تنبيه عند المحاسب العام يراجعه، ولو اترفض فعلاً هو اللي هينقله للرفض.\n\nأكمل؟');
+    if(!ok) return;
+  }
+  const noPrice = (pay === 'hold' || pay === 'rejected');
+  if(pay !== 'none' && !noPrice && price === ''){ toast('⚠️ اكتب السعر الأول'); if(inp) inp.focus(); return; }
   if(pay === 'deferred'){
     if(!r.shop){ toast('⚠️ مفيش اسم محل — الآجل لازم يتقيّد على حساب محل'); return; }
     if(Number(price) <= 0){ toast('⚠️ الآجل لازم له سعر أكبر من صفر'); return; }
@@ -3653,7 +3675,7 @@ async function pzSave(id, pay){
 
   try{
     const { data, error } = await sb.rpc('owner_set_price',
-      { p_id: id, p_price: (pay === 'hold' ? '' : price), p_pay: pay });
+      { p_id: id, p_price: (noPrice ? '' : price), p_pay: pay });
     if(error) throw error;
 
     // ✅ Supabase مبترميش أخطاء لوحدها — بنتأكد بعينينا من اللي رجع
@@ -3661,9 +3683,12 @@ async function pzSave(id, pay){
     // ⏸️ «لسه» مبيلمسش السعر — فبنتأكد من القرار نفسه بس.
     //    لو السيرفر لسه على النسخة القديمة (ملف 63 ما اتشغّلش)،
     //    هيرفض 'hold' برسالة واضحة قبل ما نوصل هنا أصلاً.
-    if(pay === 'hold'){
-      if(res.pay !== 'hold') throw new Error('السيرفر ما سجّلش «لسه» — بلّغ الإدارة');
-      toast('⏸️ اتسجّل إن الجهاز لسه في الصيانة — المحاسب العام هيرجّعه');
+    // 🚫 ونفس الكلام لـ«اترفض» (ملف 64)
+    if(noPrice){
+      if(res.pay !== pay) throw new Error('السيرفر ما سجّلش «' + (pay === 'hold' ? 'لسه' : 'اترفض') + '» — بلّغ الإدارة');
+      toast(pay === 'hold'
+        ? '⏸️ اتسجّل إن الجهاز لسه في الصيانة — المحاسب العام هيرجّعه'
+        : '🚫 اتسجّل إن الجهاز اترفض — المحاسب العام هيراجعه');
       await pzLoad();
       pzRefreshBadge();
       return;
