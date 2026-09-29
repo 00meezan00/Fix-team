@@ -9520,6 +9520,7 @@ function openPartsReview(){
   const dd = document.getElementById('menuDropdown'); if(dd) dd.classList.add('hidden');
   PR.folder = null;
   PR_HAS.set = null;   // نعيد كشف المربوط — ممكن حد ربط قطع من آخر مرة
+  prLinkForget();      // 🐞 وننسى صور القطع القديمة — تتجاب طازة
   if(!PR.from) prSetQuick('today'); else prRender();
   document.getElementById('partsReviewOverlay').classList.remove('hidden');
 }
@@ -9917,7 +9918,7 @@ async function prUnmarkNoNeed(id){
 var PR_RETURN = null;
 
 function prOpenDevice(id){
-  PR_RETURN = { tech: PR.tech, folder: PR.folder, q: PR.q,
+  PR_RETURN = { id: id, tech: PR.tech, folder: PR.folder, q: PR.q,
                 from: PR.from, to: PR.to, quick: PR.quick };
   const o = document.getElementById('partsReviewOverlay');
   if(o) o.classList.add('hidden');      // نخبّيها بس — مفيش تصفير
@@ -9927,6 +9928,9 @@ function prOpenDevice(id){
 function prRestoreAfterDetail(){
   if(!PR_RETURN) return;
   const snap = PR_RETURN; PR_RETURN = null;
+  // 🐞 ممكن تكون ربطت/فكّيت قطعة جوه الجهاز — ننسى صورته القديمة
+  if(snap.id) prLinkForget(snap.id);
+  delete snap.id;
   if(!prCanUse()) return;
   Object.assign(PR, snap);
   const o = document.getElementById('partsReviewOverlay');

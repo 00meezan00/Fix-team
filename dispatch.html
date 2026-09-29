@@ -2891,6 +2891,7 @@ function openPartsReview(){
   // الشاشة من ورا: الدرع الشفاف بتاع قايمة ⋮ لازم يتشال — وإلا بيفضل
   // فوق الصفحة وياكل أول ضغطة (نفس اللي الجرد بيعمله)
   const _shield = document.getElementById('kebabShield'); if(_shield) _shield.classList.add('hidden');
+  prLinkForget();   // 🐞 صور القطع القديمة تتنسي — تتجاب طازة
   if(!PR.from) prSetQuick('today'); else prRender();
   $('prOverlay').classList.remove('hidden');
   // ⚠️ inv-open بيرفع الشيتات (61 → 79) فوق الصفحات الكاملة (69).
@@ -3229,12 +3230,14 @@ async function prUnlink(partId){
       .update({ category:'unallocated', device_id:null, device_label:null }).eq('id', partId);
     if(error) throw error;
     toast('اتفك الربط ✅');
+    prLinkForget(prPickingId);   // الكارت من برا يتحدّث هو كمان
     if(prPickingId) prShowDeviceParts(prPickingId);
   }catch(e){ toast('فشل فك الربط: ' + (e.message||e)); }
 }
 
 // ai-invoice بينده دي بعد أي ربط عشان الشاشة تتحدّث
 window.prOnPartsChanged = function(){
+  if(prPickingId) prLinkForget(prPickingId);   // 🐞 الكارت من برا يشوف القطعة الجديدة
   if(prPickingId) prShowDeviceParts(prPickingId);
 };
 
