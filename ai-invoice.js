@@ -794,7 +794,7 @@
       view: 'home', file: null, mime: '', url: '', b64: '',
       header: {}, conf: {}, seen: {}, items: [],
       model: '', raw: null, warnings: [], dup: null, dupOk: false, saving: false,
-      manual: false, aiFailed: false
+      manual: false, aiFailed: false, failMsg: ''
     });
   }
 
@@ -1108,7 +1108,8 @@
         ${hasFile ? `<button class="pur-mini" style="color:var(--muted,#64748B);" onclick="PUR.detach()">${esc(T('pur.attachRemove'))}</button>` : ''}
       </div>`;
     const manualNote = !S.manual ? '' : S.aiFailed
-      ? `<div class="pur-alert">${esc(T('pur.aiFailedManual'))}</div>`
+      ? `<div class="pur-alert">${esc(T('pur.aiFailedManual'))}
+           ${S.failMsg ? `<div style="margin-top:6px;font-size:12px;opacity:.85;direction:ltr;text-align:left;word-break:break-word;">${esc(S.failMsg)}</div>` : ''}</div>`
       : `<div class="pur-note" style="margin:0 0 12px;">${esc(T('pur.manualHint'))}</div>`;
 
     // ⚠️ من غير صورة مفيش عمود معاينة — لو سبنا الشبكة بعمودين،
@@ -1375,6 +1376,8 @@
       S.aborted = false;
       S.view = 'busy'; render();
 
+      // 🔎 بنعرف الوقعة حصلت فين: قبل ما الرد يوصل (نت/سيرفر)، ولا بعده (عرض الشاشة)
+      let gotRes = false;
       try {
         const { blob, mime } = await shrink(file);
         if (S.aborted) return;
@@ -1387,6 +1390,7 @@
 
         const res = await parseInvoice(mime, b64);
         if (S.aborted) return;
+        gotRes = true;
 
         const d = (res && res.data) || {};
         S.model = (res && res.model) || '';
@@ -1423,10 +1427,32 @@
         S.view = 'verify'; render();
       } catch (e) {
         if (S.aborted) return;
-        const m = (e && (e.message || e.error_description)) || 'خطأ غير معروف';
+        const m = (e && (e.message || e.error_description)) || String(e || 'خطأ غير معروف');
+        // السبب الحقيقي في الـ Console كامل (مع مكان السطر) عشان نعرف نصلّحه
+        console.error('parse-invoice client error (' + (gotRes ? 'after response' : 'before response') + '):', e);
         toast(T('pur.errRead', { m: m }), false);
         // الصورة وصلت خلاص؟ ما نضيّعهاش — نفتح الإدخال اليدوي وهي جنبك
-        if (S.url) { startManual(true); }
+        if (S.url) {
+          // ✅ لو القراءة وصلت ووقعنا بعدها، ما نرميش البنود اللي اتقرت
+          const keepItems = gotRes ? S.items : null;
+          const keepHeader = gotRes ? Object.assign({}, S.header) : null;
+          startManual(true);
+          // السبب بيتكتب ثابت في المربع الأحمر بدل رسالة بتختفي
+          S.failMsg = (gotRes ? '[بعد الاستلام] ' : '') + m;
+          if (keepItems && keepItems.length) {
+            S.items = keepItems;
+            Object.assign(S.header, keepHeader);
+            try { render(); }
+            catch (e2) {
+              // الأصناف نفسها هي اللي بتوقع الرسم — نرجع لخانة فاضية
+              console.error('parse-invoice render with items failed:', e2);
+              S.items = []; S.failMsg += ' | ' + (e2 && e2.message);
+              PUR.addI();
+            }
+          } else {
+            render();
+          }
+        }
         else { S.view = 'home'; render(); }
       } finally {
         S.busyParse = false;   // يتفتح دايماً — حتى لو حصل خطأ
