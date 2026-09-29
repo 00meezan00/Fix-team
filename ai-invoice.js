@@ -122,6 +122,15 @@
       'pur.itemDevice': 'الجهاز الموجهة له',
       'pur.itemDevicePick': 'اختر الجهاز',
       'pur.itemDeviceNone': 'من غير جهاز → هتتحط في المخزن العام',
+      // الإدخال اليدوي
+      'pur.manualBtn': '✍️ إدخال فاتورة يدوي (من غير ذكاء اصطناعي)',
+      'pur.manualTitle': '✍️ إدخال فاتورة يدوي',
+      'pur.manualHint': 'اكتب بيانات الفاتورة بنفسك. لو سبت الإجمالي فاضي هيتحسب من مجموع البنود.',
+      'pur.aiFailedManual': '⚠️ القراءة الآلية ما نجحتش — اكتب بيانات الفاتورة بنفسك وإنت شايف الصورة.',
+      'pur.attach': '📎 إرفاق صورة الفاتورة (اختياري)',
+      'pur.attachChange': '📎 تغيير الصورة',
+      'pur.attachRemove': '✕ شيل الصورة',
+      'pur.manualBadge': '✍️ يدوي',
 
       // مخزن قطع الغيار
       'inv.menu': 'مخزن قطع الغيار',
@@ -287,6 +296,14 @@
       'pur.itemDevice': 'Allocated to device',
       'pur.itemDevicePick': 'Choose device',
       'pur.itemDeviceNone': 'No device → goes to general stock',
+      'pur.manualBtn': '✍️ Enter invoice manually (no AI)',
+      'pur.manualTitle': '✍️ Manual invoice entry',
+      'pur.manualHint': 'Type the invoice details yourself. Leave the grand total empty to use the sum of items.',
+      'pur.aiFailedManual': '⚠️ Automatic reading failed — type the invoice details while looking at the photo.',
+      'pur.attach': '📎 Attach invoice photo (optional)',
+      'pur.attachChange': '📎 Change photo',
+      'pur.attachRemove': '✕ Remove photo',
+      'pur.manualBadge': '✍️ manual',
 
       'inv.menu': 'Spare-parts store',
       'parts.title': '🧰 Spare-parts store',
@@ -580,6 +597,13 @@
   .pur-note{font-size:12.5px; color:var(--muted,#64748B); margin-top:10px; line-height:1.7;}
   .pur-pick{display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-top:14px;}
   @media (max-width:560px){ .pur-pick{grid-template-columns:1fr;} }
+  /* زرار الإدخال اليدوي — أهدى من زرار الذكاء الاصطناعي */
+  .pur-cta.alt{background:var(--surface-2,#F8FAFC); color:var(--accent,#0891A8);
+    border:1.5px dashed var(--accent,#0891A8); margin-top:10px; padding:13px 18px; font-size:14.5px;}
+  .pur-cta.alt:hover{background:var(--surface,#fff);}
+  .pur-attach{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;}
+  .pur-badge-manual{font-size:11px; font-weight:800; padding:1px 8px; border-radius:999px;
+    background:var(--surface-3,#F1F5F9); color:var(--ink-2,#475569);}
   .pur-pick button{background:var(--surface-2,#F8FAFC); border:1.5px solid var(--border,#E2E8F0); border-radius:10px; padding:14px 10px;
     font-family:inherit; font-size:14px; font-weight:700; color:var(--ink,#1A2332); cursor:pointer;}
   .pur-pick button:hover{border-color:var(--accent,#0891A8); background:var(--surface,#fff);}
@@ -712,6 +736,16 @@
     mk('purCam', 'image/*', true);
     mk('purImg', 'image/*', false);
     mk('purPdf', 'application/pdf', false);
+
+    // إرفاق صورة للإدخال اليدوي — بتتحفظ مع الفاتورة بس، مش بتروح للذكاء الاصطناعي
+    const a = document.createElement('input');
+    a.type = 'file'; a.id = 'purAttach'; a.accept = 'image/*,application/pdf'; a.style.display = 'none';
+    a.onchange = () => {
+      const f = a.files && a.files[0];
+      a.value = '';
+      if (f) PUR.attach(f);
+    };
+    document.body.appendChild(a);
   }
 
   // أزرار القائمة — بتظهر بس لما المفتاح يكون مفتوح
@@ -745,6 +779,9 @@
     header: {}, conf: {}, seen: {}, items: [],
     model: '', raw: null, warnings: [],
     dup: null, dupOk: false,
+    // manual = الفاتورة بتتكتب باليد (من الزرار، أو بعد ما القراءة الآلية فشلت)
+    // aiFailed = اتفتح اليدوي لوحده لأن القراءة فشلت (بنوري رسالة توضيح)
+    manual: false, aiFailed: false,
     saving: false, list: [], listOpen: null, q: '',
     // حالة حذف فاتورة: { id, loading, parts:[], word, ok, busy }
     // null = مفيش حذف جاري
@@ -756,7 +793,8 @@
     Object.assign(S, {
       view: 'home', file: null, mime: '', url: '', b64: '',
       header: {}, conf: {}, seen: {}, items: [],
-      model: '', raw: null, warnings: [], dup: null, dupOk: false, saving: false
+      model: '', raw: null, warnings: [], dup: null, dupOk: false, saving: false,
+      manual: false, aiFailed: false
     });
   }
 
@@ -927,6 +965,7 @@
           <button onclick="PUR.choose('purImg')">${esc(T('pur.pickPhoto'))}</button>
           <button onclick="PUR.choose('purPdf')">${esc(T('pur.pickPdf'))}</button>
         </div>
+        <button class="pur-cta alt" onclick="PUR.manual()">${esc(T('pur.manualBtn'))}</button>
       </div>
       ${listHtml()}`;
   }
@@ -996,7 +1035,8 @@
 
   function sumsHtml() {
     const sum = sumItems();
-    const gt = num(S.header.grand_total);
+    // في اليدوي، الإجمالي الفاضي معناه "احسبه من البنود" — فبنعرضه = المجموع
+    const gt = (S.manual && !num(S.header.grand_total)) ? sum : num(S.header.grand_total);
     const diff = sum - gt;
     const mismatch = Math.abs(diff) > CFG.totalTolerance;
     return `
@@ -1038,7 +1078,8 @@
   }
 
   function viewVerify() {
-    const preview = /pdf/.test(S.mime)
+    const hasFile = !!S.url;
+    const preview = !hasFile ? '' : /pdf/.test(S.mime)
       ? `<iframe class="pur-pdf" src="${S.url}"></iframe>
          <div class="pur-note">${esc(T('pur.pdfNoPreview'))}
            <a href="${S.url}" target="_blank" rel="noopener">${esc(T('pur.openFile'))}</a></div>`
@@ -1061,19 +1102,35 @@
       ? `<div class="pur-alert" style="background:var(--warn-tint,#FFFBEB);border-color:var(--warn-border,#FDE047);color:var(--warn-strong,#854D0E);">
            ${S.warnings.map(w => '• ' + esc(w)).join('<br>')}</div>` : '';
 
-    return `
-      ${dup}
-      <div class="pur-split">
+    // في اليدوي: زرار إرفاق/تغيير/شيل الصورة
+    const attach = !S.manual ? '' : `<div class="pur-attach">
+        <button class="pur-mini" style="color:var(--accent,#0891A8);" onclick="PUR.choose('purAttach')">${esc(T(hasFile ? 'pur.attachChange' : 'pur.attach'))}</button>
+        ${hasFile ? `<button class="pur-mini" style="color:var(--muted,#64748B);" onclick="PUR.detach()">${esc(T('pur.attachRemove'))}</button>` : ''}
+      </div>`;
+    const manualNote = !S.manual ? '' : S.aiFailed
+      ? `<div class="pur-alert">${esc(T('pur.aiFailedManual'))}</div>`
+      : `<div class="pur-note" style="margin:0 0 12px;">${esc(T('pur.manualHint'))}</div>`;
+
+    // ⚠️ من غير صورة مفيش عمود معاينة — لو سبنا الشبكة بعمودين،
+    //    الفورم هيتحشر في نص الشاشة وجنبه فراغ.
+    const imgPane = !hasFile ? '' : `
         <div class="pur-pane pur-pane-img">
           <h3 class="pur-pane-title">${esc(T('pur.preview'))}</h3>
           ${preview}
-          <button class="pur-mini" style="margin-top:10px;color:var(--muted,#64748B);" onclick="PUR.reset()">↺ ${esc(T('pur.retake'))}</button>
-        </div>
+          ${S.manual ? '' : `<button class="pur-mini" style="margin-top:10px;color:var(--muted,#64748B);" onclick="PUR.reset()">↺ ${esc(T('pur.retake'))}</button>`}
+        </div>`;
+
+    return `
+      ${dup}
+      <div class="${hasFile ? 'pur-split' : ''}">
+        ${imgPane}
 
         <div class="pur-pane">
-          <h3 class="pur-pane-title">${esc(T('pur.verifyTitle'))}</h3>
+          <h3 class="pur-pane-title">${esc(T(S.manual ? 'pur.manualTitle' : 'pur.verifyTitle'))}</h3>
 
-          <div id="purReviewBar">${reviewBarHtml()}</div>
+          ${manualNote}
+          ${attach}
+          ${S.manual ? '' : `<div id="purReviewBar">${reviewBarHtml()}</div>`}
           ${warn}
 
           ${fieldHtml('supplier_name', T('pur.supplier'), 'text')}
@@ -1141,6 +1198,7 @@
                 ${r.invoice_number ? `<span>#${esc(r.invoice_number)}</span>` : ''}
                 <span>${items.length} ${esc(T('pur.itemsCount'))}</span>
                 ${r.created_by_name ? `<span>${esc(T('pur.by'))} ${esc(r.created_by_name)}</span>` : ''}
+                ${r.ai_model === 'manual' ? `<span class="pur-badge-manual">${esc(T('pur.manualBadge'))}</span>` : ''}
               </div>
             </div>
             <div class="pur-card-total">${money(r.grand_total)} ج.م</div>
@@ -1256,6 +1314,34 @@
   // ============================================================
   // الواجهة العامة
   // ============================================================
+  // ============================================================
+  // ✍️ الإدخال اليدوي
+  // ------------------------------------------------------------
+  // نفس شاشة المراجعة، بس فاضية. الفرق:
+  //   · مفيش أصفر ولا "راجع" — اللي بيكتب بإيده هو المراجع أصلاً
+  //   · التاريخ بيبدأ بتاريخ النهارده
+  //   · الإجمالي لو فاضي بيتحسب من مجموع البنود عند الحفظ
+  //   · بيتحفظ بـ ai_model = 'manual' عشان نفرّقه في القايمة
+  // fromFail = true لما القراءة الآلية تفشل: الصورة بتفضل، والبنود
+  //            اللي اتقرت (لو فيه) بتتمسح عشان نبدأ على نضيف.
+  // ============================================================
+  function todayLocal() {
+    const d = new Date();
+    const p = n => String(n).padStart(2, '0');
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+  }
+  function startManual(fromFail) {
+    const allSeen = { supplier_name: true, invoice_date: true, invoice_number: true, grand_total: true };
+    Object.assign(S, {
+      view: 'verify', manual: true, aiFailed: !!fromFail,
+      header: { supplier_name: '', invoice_date: todayLocal(), invoice_number: '', grand_total: '', currency: 'EGP' },
+      conf: { supplier_name: 1, invoice_date: 1, invoice_number: 1, grand_total: 1 },
+      seen: allSeen, items: [], model: 'manual', raw: null, warnings: [],
+      dup: null, dupOk: false, saving: false, b64: ''
+    });
+    PUR.addI();   // بند أول فاضي جاهز للكتابة — وهي بترسم الشاشة
+  }
+
   const PUR = window.PUR = {
     open() {
       const dd = $('menuDropdown'); if (dd) dd.classList.add('hidden');
@@ -1337,15 +1423,36 @@
         S.view = 'verify'; render();
       } catch (e) {
         if (S.aborted) return;
-        S.view = 'home'; render();
         const m = (e && (e.message || e.error_description)) || 'خطأ غير معروف';
         toast(T('pur.errRead', { m: m }), false);
+        // الصورة وصلت خلاص؟ ما نضيّعهاش — نفتح الإدخال اليدوي وهي جنبك
+        if (S.url) { startManual(true); }
+        else { S.view = 'home'; render(); }
       } finally {
         S.busyParse = false;   // يتفتح دايماً — حتى لو حصل خطأ
       }
     },
 
     abort() { S.aborted = true; resetEntry(); render(); },
+
+    // ✍️ إدخال فاتورة يدوي من الصفر
+    manual() { resetEntry(); startManual(false); },
+
+    // إرفاق صورة للفاتورة اليدوية (من غير ما تتبعت للذكاء الاصطناعي)
+    async attach(file) {
+      const ok = /^image\//.test(file.type) || file.type === 'application/pdf';
+      if (!ok) { toast(T('pur.errMime'), false); return; }
+      if (file.size > 20 * 1024 * 1024) { toast(T('pur.errBig'), false); return; }
+      const { blob, mime } = await shrink(file);
+      if (S.url) { try { URL.revokeObjectURL(S.url); } catch (e) {} }
+      S.file = blob; S.mime = mime; S.url = URL.createObjectURL(blob);
+      render();
+    },
+    detach() {
+      if (S.url) { try { URL.revokeObjectURL(S.url); } catch (e) {} }
+      S.file = null; S.mime = ''; S.url = ''; S.b64 = '';
+      render();
+    },
     zoom() {
       const z = document.createElement('div');
       z.className = 'pur-zoom';
@@ -1387,9 +1494,13 @@
       }
       it[f] = (f === 'item_name') ? v : num(v);
       it.seen[f] = true;
+      if (f === 'total_price') it.totalTyped = true;
       clearNeedI(id, f);
       // الوحدة والكمية بيحسبوا الإجمالي — إلا لو المحاسب كتب الإجمالي بإيده
-      if ((f === 'quantity' || f === 'unit_cost_price') && !it.seen.total_price) {
+      // ⚠️ كان الشرط !it.seen.total_price — بس البند اللي بيتضاف بإيدك
+      //    بيتولد "متراجع" (seen) فالحساب التلقائي كان مابيشتغلش خالص.
+      //    دلوقتي بيقف بس لو إنت كتبت الإجمالي بنفسك.
+      if ((f === 'quantity' || f === 'unit_cost_price') && !it.totalTyped) {
         it.total_price = +(num(it.quantity) * num(it.unit_cost_price)).toFixed(2);
         const tot = $('purI_' + id + '_total_price');
         // ما نلمسش الخانة لو المحاسب واقف فيها بيكتب
@@ -1437,11 +1548,18 @@
     async save() {
       if (S.saving) return;
       const h = S.header;
+      // يدوي: البنود الفاضية خالص (من غير اسم ولا سعر) بنشيلها بدل ما تتحفظ
+      if (S.manual) {
+        const kept = S.items.filter(it => String(it.item_name || '').trim() || num(it.total_price));
+        if (kept.length !== S.items.length) { S.items = kept; render(); }
+      }
       if (!String(h.supplier_name || '').trim()) { toast(T('pur.needSupplier'), false); return; }
       if (!h.invoice_date) { toast(T('pur.needDate'), false); return; }
       if (!S.items.length) { toast(T('pur.needItems'), false); return; }
       if (reviewCount()) { toast(T('pur.needReview'), false); return; }
       if (!online()) { toast(T('pur.errNet'), false); return; }
+      // يدوي والإجمالي فاضي؟ ناخد مجموع البنود
+      if (S.manual && !num(h.grand_total)) h.grand_total = +sumItems().toFixed(2);
 
       // فحص تكرار تاني: المحاسب ممكن يكون عدّل المورد أو الإجمالي بعد القراءة
       if (!S.dupOk) {
@@ -1489,8 +1607,8 @@
           total_unallocated: per('unallocated'),
           total_supplies: per('supplies'),
           image_path: path,
-          ai_raw: S.raw,
-          ai_model: S.model,
+          ai_raw: S.manual ? null : S.raw,
+          ai_model: S.manual ? 'manual' : S.model,
           edited_fields: edited,
           created_by: user ? user.id : null,
           created_by_name: meName()
