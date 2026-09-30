@@ -222,13 +222,24 @@ const PROD_HOSTS = ["fix-team.pages.dev"];
 const APP_ENV = PROD_HOSTS.includes(location.hostname) ? "production" : "staging";
 const _envCfg = SUPABASE_ENVS[APP_ENV];
 const sb = supabase.createClient(_envCfg.url, _envCfg.key);
-// إيميلات الأدمن — الدخول بيها بيروح لوحة الأدمن مباشرة
+// إيميلات الأدمن — الدخول بيها بيروح **شاشة المحاسب** (مش لوحة الأدمن).
+// لوحة الأدمن بقت خانة في قايمة التلت نقط على الفون بس.
 const ADMIN_EMAILS_BY_ENV = {
   production: ['belal0@fix.com'],
   staging:    ['belal0@fix.com']
 };
 const ADMIN_EMAILS = (ADMIN_EMAILS_BY_ENV[APP_ENV] || []).map(e => e.toLowerCase());
-const landingFor = (email) => ADMIN_EMAILS.includes((email||'').toLowerCase()) ? 'admin.html' : 'dashboard.html';
+const landingFor = (email) => 'dashboard.html';
+
+// 📱 فون ولا كمبيوتر؟ — نفس منطق commonIsPhone في common.js بالحرف.
+// ⚠️ متكرّرة هنا عن قصد: صفحة الدخول مش بتحمّل common.js (بتعرّف
+//    sb بنفسها)، ولو حمّلناه هيقول «Identifier already declared».
+function isPhoneDevice(){
+  try{
+    const ua = navigator.userAgent || '';
+    return /iPhone|iPad|iPod|Android|Mobile/i.test(ua) && (navigator.maxTouchPoints || 0) > 0;
+  }catch(e){ return false; }
+}
 
 // ============================================================
 // تحويل حسب الدور — من هنا مباشرة، من غير ما نعدّي على الداشبورد
@@ -246,7 +257,34 @@ const landingFor = (email) => ADMIN_EMAILS.includes((email||'').toLowerCase()) ?
 // ============================================================
 async function landingByRole(email){
   const e = (email || '').toLowerCase();
-  if(ADMIN_EMAILS.includes(e)) return 'admin.html';
+
+  // ============================================================
+  // 👑 الأدمن (السوبر أدمن)
+  // ------------------------------------------------------------
+  // 🧠 بالبلدي: الأدمن بقى بيفتح على **شاشة المحاسب** زي أي محاسب.
+  //    لوحة الأدمن بقت خانة في قايمة التلت نقط (على الفون بس).
+  //
+  // ⚠️ لو الاشتراك **خلصان** وهو على **الفون**، بيروح لوحة الأدمن —
+  //    عشان يوصل لزرار «تفعيل الاشتراك» (شاشة المحاسب بتقفل نفسها
+  //    وتطلّع «تم إيقاف الخدمة»). ونفس الكلام لو مقدرناش نعرف حالة
+  //    الاشتراك (النت فصل).
+  //
+  // 💻 على الكمبيوتر: شاشة المحاسب **دايماً**، حتى لو الاشتراك خلصان
+  //    (قرار المالك — سبتمبر ٢٠٢٦). لوحة الأدمن مقفولة على الكمبيوتر
+  //    في كل الحالات، يعني التفعيل بيتعمل من الفون بس.
+  // ============================================================
+  if(ADMIN_EMAILS.includes(e)){
+    const active = isPhoneDevice() ? await shopActive() : true;
+    if(active === true){
+      try{
+        localStorage.setItem('ifix-last-role', 'super_admin');
+        localStorage.setItem('ifix-last-email', e);
+        sessionStorage.removeItem('ifix-bounced');
+      }catch(err){}
+      return 'dashboard.html';
+    }
+    return 'admin.html';
+  }
   if(!ADMIN_EMAILS.length)     return 'dashboard.html';   // الإعداد لسه ماتعملش
 
   let role = 'accountant';

@@ -291,6 +291,12 @@ function trialDaysLeft(){
 }
 function isFeatureEnabled(key){ const f = featureFlags[key]; return !!(f && f.is_enabled); }
 
+// الخدمة شغّالة دلوقتي؟ (نفس الشروط التلاتة اللي شاشة المحاسب
+// بتفحصها قبل ما تفتح: مدفوع · فترة مجانية · وضع بيتا)
+function serviceOn(){
+  return paidActive() || trialActive() || systemConfig.mode === 'beta';
+}
+
 function toast(msg, ok){
   const t = document.createElement('div');
   t.className = 'toast'; t.style.background = ok===false ? 'var(--danger)' : 'var(--success)';
@@ -988,6 +994,22 @@ async function doLogout(){
   }
   document.getElementById('whoBox').textContent = `${currentUser.name} — ${t('adm.roleSuper')}`;
   try{ I18N.setUser(currentUser.email); I18N.mountLangToggle(document.getElementById('langHost')); }catch(e){}
+  // ============================================================
+  // 💻 لوحة الأدمن على الفون بس — **من غير أي استثناء**
+  // ------------------------------------------------------------
+  // 🧠 بالبلدي: لو فتحت اللوحة من كمبيوتر (من رابط محفوظ مثلاً)،
+  //    بنرجّعك على شاشة المحاسب على طول — قبل ما نحمّل أي حاجة.
+  //
+  // ⚠️ ده بيسري حتى لو الاشتراك خلصان (قرار المالك — سبتمبر ٢٠٢٦).
+  //    يعني لو الاشتراك خلص، التفعيل بيتعمل **من الفون بس**:
+  //    على الكمبيوتر شاشة المحاسب هتطلّع «تم إيقاف الخدمة».
+  //
+  // ⚠️ replace مش href — عشان زرار «رجوع» في المتصفح ميرجّعكش هنا.
+  // ============================================================
+  if(!commonIsPhone()){
+    location.replace('dashboard.html');
+    return;
+  }
   await loadAll();
   render();
 })();
