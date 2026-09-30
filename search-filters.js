@@ -213,6 +213,36 @@
     if (el) el.dispatchEvent(new Event('input', { bubbles: true }));
   }
 
+  // ============================================================
+  // تحديث الخانات في مكانها — من غير ما نمسح أي حاجة ونرسمها تاني
+  // ------------------------------------------------------------
+  // 🐞 الباج اللي اتصلّح: الأيفون أول ما النتيجة تتفتح على خانة
+  //    فاضية بيحط تاريخ النهاردة لوحده ويقول «التاريخ اتغيّر».
+  //    الكود كان بيرد على ده بإنه يرسم الصف كله من جديد — فخانة
+  //    التاريخ اللي النتيجة فاتحة عليها كانت بتتمسح، والنتيجة
+  //    تقفل بعد أقل من ثانية على تاريخ النهاردة.
+  //    المرة التانية كانت بتشتغل لأن الخانة مبقتش فاضية، فالأيفون
+  //    مبيغيّرش حاجة لوحده.
+  // ✅ دلوقتي وإنت بتختار: بنغيّر الكلام اللي على الخانة بس.
+  //    الخانة نفسها مبتتلمسش، فالنتيجة بتفضل مفتوحة لحد ما تختار.
+  // ============================================================
+  function sync(bar, s) {
+    var ins = bar.querySelectorAll('input.ifx-d');
+    var chip = bar.querySelector('.ifx-dt'), lbl = bar.querySelector('.ifx-dl');
+    var to = bar.querySelector('.ifx-to'), tl = bar.querySelector('.ifx-tl');
+    var x = bar.querySelector('.ifx-x');
+    if (lbl) lbl.textContent = dateLabel(s.date);
+    if (chip) chip.classList.toggle('on', !!s.date);
+    if (tl) tl.textContent = toLabel(s.to);
+    if (to) { to.classList.toggle('on', !!s.to); to.style.display = s.date ? '' : 'none'; }
+    if (x) x.style.display = s.date ? '' : 'none';
+    // القيم جوه الخانات — بنكتبها بس لو مختلفة (لو اتبدّلوا مثلاً)،
+    // عشان منلمسش الخانة اللي المستخدم لسه بيختار فيها
+    if (ins[0] && ins[0].value !== (s.date || '')) ins[0].value = s.date || '';
+    if (ins[1] && ins[1].value !== (s.to || ''))   ins[1].value = s.to || '';
+    bar.classList.toggle('dt', !!(s.date || s.picking));
+  }
+
   function wireDate(inp, bar) {
     var id = inp.id;
     var ins = bar.querySelectorAll('input.ifx-d');   // [0] = من · [1] = إلى
@@ -225,19 +255,26 @@
         // الكمبيوتر: الدوسة على الخانة مبتفتحش النتيجة لوحدها
         try { if (!(window.matchMedia && matchMedia('(pointer: coarse)').matches) && d.showPicker) d.showPicker(); } catch (e) {}
       });
-      d.addEventListener('change', function () {
+      // ⚠️ هنا **ممنوع** paint() — شوف الشرح فوق sync
+      var onPick = function () {
         var s = st(id);
-        s[key] = d.value || '';
-        if (key === 'date' && !s.date) s.to = '';       // مسحت «من» → الفترة كلها اتشالت
-        fixRange(s);
-        s.picking = false;
-        paint(inp);                                     // الترتيب ممكن يكون اتبدّل — نرسم من جديد
+        var v = d.value || '';
+        if (s[key] === v) return;
+        s[key] = v;
+        if (key === 'date' && !s.date) s.to = '';      // مسحت «من» → الفترة كلها اتشالت
+        sync(bar, s);
         fire(id);
-      });
+      };
+      d.addEventListener('change', onPick);
+      d.addEventListener('input', onPick);
+      // النتيجة اتقفلت → دلوقتي بس نظبّط الترتيب (لو «إلى» قبل «من»)
       d.addEventListener('blur', function () {
         var s = st(id);
         s.picking = false;
-        if (!s.date) bar.classList.remove('dt');
+        var a = s.date, b = s.to;
+        fixRange(s);
+        sync(bar, s);
+        if (a !== s.date || b !== s.to) fire(id);
       });
     });
   }
