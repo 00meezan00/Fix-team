@@ -204,14 +204,16 @@ function accShopBlockHtml(n, s){
   // ⚠️ في وضع القراءة-فقط الأزرار دي **مش بتترسم أصلاً** — مش
   //    مخفية بـ CSS. يعني حتى لو حد فتح أدوات المطوّر، مفيش زرار
   //    يدوس عليه. وفوق ده الكتابة نفسها مرفوضة من قاعدة البيانات.
+  // 📅 زرارين Excel و PDF بيفتحوا شاشة «اختار الفترة» الأول
+  //    (accRangeShop) — مش بيطبعوا على طول زي زمان.
   const toolbar = ACC_CAN_EDIT ? `
       <button class="btn-secondary" style="color:#0E7490;border-color:#A5F3FC;" onclick="waShop('${safe}')">💬 ${t('acc.wa')}</button>
       <button class="acc-mini-btn" style="margin-top:0;align-self:center;" onclick="setShopPhone('${safe}')">✎ ${t('acc.phone')}</button>
       <button class="acc-mini-btn" style="margin-top:0;align-self:center;color:var(--info);border-color:var(--info-border);" onclick="addDiscount('${safe}')">🏷️ ${t('acc.discount')}</button>
-      <button class="btn-secondary" style="color:#166534;border-color:var(--success-border);" onclick="exportShopExcel('${safe}')">📊 Excel</button>
-      <button class="btn-secondary" style="color:var(--danger-strong);border-color:var(--danger-border);" onclick="exportShopPdf('${safe}')">📄 PDF</button>
+      <button class="btn-secondary" style="color:#166534;border-color:var(--success-border);" onclick="accRangeShop('xlsx','${safe}')">📊 Excel</button>
+      <button class="btn-secondary" style="color:var(--danger-strong);border-color:var(--danger-border);" onclick="accRangeShop('pdf','${safe}')">📄 PDF</button>
       <button class="acc-mini-btn" style="margin-top:0;align-self:center;color:var(--danger);border-color:var(--danger-border);" onclick="deleteAccount('${safe}')">🗑 ${t('acc.deleteAccount')}</button>`
-    : `<button class="btn-secondary" style="color:var(--danger-strong);border-color:var(--danger-border);" onclick="exportShopPdf('${safe}')">📄 PDF</button>`;
+    : `<button class="btn-secondary" style="color:var(--danger-strong);border-color:var(--danger-border);" onclick="accRangeShop('pdf','${safe}')">📄 PDF</button>`;
 
   const entriesHtml = !open ? '' : `
     <div class="acc-toolbar">${toolbar}
@@ -348,7 +350,7 @@ function accShopCardLarge(n, s){
   return `<div class="acc-card acc-card-lg" data-accshop="${esc(n)}">
     <div class="acc-card-lg-head">
       <button type="button" class="acc-card-open" onclick="openShopFromCard('${safe}')"><span>🏪 ${esc(n)}</span></button>
-      <button type="button" class="acc-card-print" title="${t('acc.printPdf')}" onclick="event.stopPropagation(); exportShopPdf('${safe}')">🖨️</button>
+      <button type="button" class="acc-card-print" title="${t('acc.printPdf')}" onclick="event.stopPropagation(); accRangeShop('pdf','${safe}')">🖨️</button>
     </div>
     <div class="acc-card-lg-body" onclick="openShopFromCard('${safe}')">
       <div class="acc-card-row"><span>${t('acc.owed')}</span><b>${s.owed.toLocaleString('en-EG')}</b></div>
@@ -364,6 +366,7 @@ function accShopCardLarge(n, s){
 function isDebitLike(e){ return e.type === 'debit' || e.type === 'opening'; }
 // وصف الحركة نص عادي (للإكسيل)
 function stmtDesc(e){
+  if(e._carry) return accCarryText(e);
   if(e.type==='opening') return 'رصيد افتتاحي سابق';
   if(e.type==='discount') return 'خصم' + (e.note ? ' — ' + e.note : '');
   if(e.type==='credit') return 'دفعة' + (e.note ? ' — ' + e.note : '');
@@ -371,6 +374,7 @@ function stmtDesc(e){
 }
 // وصف الحركة بأيقونات (للـ PDF)
 function stmtDescHtml(e){
+  if(e._carry) return '📌 <b>' + esc(accCarryText(e)) + '</b>';
   if(e.type==='opening') return '🧾 رصيد افتتاحي سابق';
   if(e.type==='discount') return '🏷️ خصم' + (e.note ? ' — ' + esc(e.note) : '');
   if(e.type==='credit') return '💵 دفعة' + (e.note ? ' — ' + esc(e.note) : '');
@@ -429,11 +433,46 @@ function stmtIssue(e){
   return (d && d.reportedIssue) ? String(d.reportedIssue).trim() : '';
 }
 
+// ============================================================
+// سطور كشف المحل
+// ------------------------------------------------------------
+// 📅 لو فيه فترة متحددة (ACC_RANGE) — بنطلّع الحركات اللي جوه
+//    الفترة بس، وبنحط في أولها سطر واحد اسمه «رصيد سابق»:
+//    ده مجموع كل اللي قبل أول يوم في الفترة.
+//
+// 🧠 ليه السطر ده مهم؟ تخيّل كشكول حساب. لو قطعت منه صفحات
+//    الشهر ده بس وإديتها للمحل، هيقول «طب واللي قبل كده؟».
+//    السطر ده بيقوله: «قبل الشهر ده كان عليك كذا» — فالمتبقي
+//    في آخر الكشف بيطلع صح، مش بس فلوس الشهر ده.
+//
+// ⚠️ الحركات اللي **بعد** آخر يوم في الفترة مش داخلة خالص —
+//    فالمتبقي = الرصيد لحد آخر يوم في الفترة.
+// ============================================================
 function shopStatementRows(shop){
   // الترتيب بنفس التاريخ اللي بيتعرض — وإلا السطور تطلع مبعثرة
   // قدام المحل. مفيش عمود رصيد جاري، فالترتيب عرض بحت.
-  const entries = ledger.filter(e => (e.shop||'بدون محل') === shop)
+  const all = ledger.filter(e => (e.shop||'بدون محل') === shop)
     .slice().sort((a,b) => new Date(stmtDate(a)) - new Date(stmtDate(b)));
+  let entries = all;
+  const r = ACC_RANGE;
+  if(r){
+    entries = all.filter(e => accInRange(stmtDate(e), r));
+    if(r.from){
+      const fromT = r.from.getTime();
+      const prior = all.filter(e => {
+        const tt = new Date(stmtDate(e) || 0).getTime();
+        return tt && tt < fromT;
+      }).reduce((s,e) => s + (isDebitLike(e) ? (e.amount||0) : -(e.amount||0)), 0);
+      if(prior){
+        // سطر الرصيد السابق — مش حركة حقيقية في الدفتر، متولّد للكشف بس
+        entries = [{
+          id: '__carry', _carry: true, _carryFrom: r.from.toISOString(),
+          shop, type: prior > 0 ? 'opening' : 'credit', amount: Math.abs(prior),
+          date: new Date(fromT - 1000).toISOString(), by: '', note: ''
+        }].concat(entries);
+      }
+    }
+  }
   const debit = entries.filter(e=>e.type==='debit'||e.type==='opening').reduce((t,e)=>t+(e.amount||0),0);
   const credit = entries.filter(e=>e.type==='credit'||e.type==='discount').reduce((t,e)=>t+(e.amount||0),0);
   return { entries, debit, credit, balance: debit - credit };
@@ -601,10 +640,10 @@ function accPrintSheet(html, title){
   host.setAttribute('dir', 'rtl');
   host.innerHTML =
     '<div class="aps-bar">'
-      + '<button type="button" class="aps-btn aps-x" onclick="accClosePrintSheet()">\u2715 إغلاق</button>'
+      + '<button type="button" class="aps-btn aps-x" onclick="accClosePrintSheet()">✕ إغلاق</button>'
       + '<span class="aps-t">' + esc(title || 'كشف') + '</span>'
       + '<button type="button" class="aps-btn aps-p" id="apsPrintBtn" onclick="accPrintNow()">'
-        + (ACC_IOS_APP ? '\ud83d\udcc4 احفظ / ابعت PDF' : '\ud83d\udda8\ufe0f اطبع / احفظ PDF') + '</button>'
+        + (ACC_IOS_APP ? '📄 احفظ / ابعت PDF' : '🖨️ اطبع / احفظ PDF') + '</button>'
     + '</div>'
     + '<div class="aps-doc">' + body + '</div>';
   document.body.appendChild(host);
@@ -1040,6 +1079,10 @@ function accClosePrintSheet(){
 }
 
 function accPrint(html, title){
+  // 📅 لو فيه فترة مختارة، بنكتبها في رأس الورقة — عشان اللي
+  //    ماسك الورقة يعرف هي بتغطي من إمتى لإمتى.
+  if(ACC_PERIOD_LABEL) html = accStampPeriodHtml(html, ACC_PERIOD_LABEL);
+
   // 🍎 الأيفون والآيباد: مسار مختلف تماماً (شوف الشرح فوق)
   if(ACC_IS_IOS) return accPrintSheet(html, title);
 
@@ -1084,12 +1127,13 @@ function accPrint(html, title){
 
 function exportShopPdf(shop){
   const { entries, debit, credit, balance } = shopStatementRows(shop);
+  const realCount = entries.filter(e => !e._carry).length;
   const rowsHtml = entries.map((e,i) => {
     const issue = stmtIssue(e);
     const color = stmtColor(e);
     return `
-    <tr style="background:${i%2 ? '#F8FAFC' : '#FFFFFF'};">
-      <td>${new Date(stmtDate(e)).toLocaleString('ar-EG')}</td>
+    <tr style="background:${e._carry ? '#FFFBEB' : (i%2 ? '#F8FAFC' : '#FFFFFF')};">
+      <td>${e._carry ? '—' : new Date(stmtDate(e)).toLocaleString('ar-EG')}</td>
       <td style="text-align:right;">${stmtDescHtml(e)}</td>
       <td style="text-align:right; color:#475569;">${issue ? esc(issue) : '—'}</td>
       <td style="color:#475569;">${color ? esc(color) : '—'}</td>
@@ -1134,6 +1178,409 @@ function exportShopPdf(shop){
       <tr><th style="width:18%;">تاريخ التسليم</th><th style="width:28%;">البيان</th><th style="width:22%;">العطل</th><th style="width:10%;">اللون</th><th>عليه (آجل)</th><th>له (دفعات)</th></tr>
       ${rowsHtml || '<tr><td colspan="6">مفيش حركات متسجلة</td></tr>'}
     </table>
-    <div class="foot"><span>نظام I Fix Team لإدارة الصيانة</span><span>عدد الحركات: ${entries.length}</span></div>
+    <div class="foot"><span>نظام I Fix Team لإدارة الصيانة</span><span>عدد الحركات: ${realCount}</span></div>
   </body></html>`, 'كشف حساب — ' + shop);
 }
+
+
+// ============================================================
+// 📅 فترة الطباعة والتصدير (PDF و Excel)
+// ------------------------------------------------------------
+// 🧠 الفكرة بالبلدي:
+//    قبل كده زرار PDF أو Excel كان بيطبع **كل حاجة من أول يوم**.
+//    دلوقتي أول ما تدوس، بتطلع شاشة صغيرة بتسألك:
+//        «عايز تطبع من إمتى لإمتى؟»
+//    وفيها اختيارات سريعة (النهاردة · آخر ٧ أيام · الشهر ده ·
+//    الشهر اللي فات · كل الفترة) أو تكتب «من» و«إلى» بإيدك.
+//
+// 📍 بتشتغل في مكانين:
+//    ١) كشف المحل في «الحسابات» — PDF و Excel.
+//       عند المحاسب والأدمن والديسباتشر والمالك (الديسباتشر
+//       والمالك عندهم PDF بس — زي ما هو).
+//    ٢) «تم التسليم — بانتظار الدفع» — PDF و Excel (المحاسب).
+//       هنا الفترة بتتحسب على **تاريخ التسليم**.
+//
+// ⚠️ ليه كله هنا في accounts.js ومش في الداشبورد؟
+//    لأن الملف ده متحمّل في التلات صفحات (المحاسب · الديسباتشر ·
+//    المالك)، وكل طباعة PDF في النظام بتعدّي على accPrint اللي
+//    هنا. فتعديل واحد بيوصل للكل، ومفيش نسختين يختلفوا عن بعض.
+//
+// ⚠️ «تم التسليم بانتظار الدفع» زرايره مكتوبة في dashboard.html.
+//    بدل ما نلمس الداشبورد، بنركّب «مدخل» قدام دالتين التصدير
+//    بتوعه (accInstallUnpaidRange تحت): الزرار نفسه ما اتغيّرش،
+//    بس لما يتداس بيعدّي علينا الأول، نسألك عن الفترة، ونبعتله
+//    الأجهزة اللي جوه الفترة بس.
+//
+// 🍎 الأيفون: الطباعة لازم تحصل **في نفس لحظة الضغطة** (شوف
+//    الشرح عند accPrint). عشان كده زرار «اطبع» في شاشة الفترة
+//    بيندَه الطباعة على طول من غير أي انتظار — الضغطة دي نفسها
+//    هي «ضغطة المستخدم» اللي الأيفون عايزها.
+// ============================================================
+var ACC_RANGE = null;          // { from:Date|null, to:Date|null } — أو null = كل الفترة
+var ACC_PERIOD_LABEL = '';     // «الفترة: من … إلى …» — بيتكتب في رأس الـPDF
+var ACC_RD = null;             // الشاشة المفتوحة دلوقتي (إعداداتها)
+var ACC_RANGE_PREF_KEY = 'ifix_export_range';
+
+function accYmd(d){
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+function accDayStart(s){ if(!s) return null; const d = new Date(s + 'T00:00:00'); return isNaN(d) ? null : d; }
+function accDayEnd(s){   if(!s) return null; const d = new Date(s + 'T23:59:59.999'); return isNaN(d) ? null : d; }
+function accFmtDay(d){ try{ return d.toLocaleDateString('ar-EG'); }catch(e){ return accYmd(d); } }
+
+// التاريخ ده جوه الفترة؟ (من غير فترة = أي حاجة تعدّي)
+function accInRange(iso, r){
+  if(!r) return true;
+  const tt = new Date(iso || 0).getTime();
+  if(!tt) return false;
+  if(r.from && tt < r.from.getTime()) return false;
+  if(r.to && tt > r.to.getTime()) return false;
+  return true;
+}
+
+function accRangeLabel(r){
+  if(!r) return '';
+  if(r.from && r.to) return 'الفترة: من ' + accFmtDay(r.from) + ' إلى ' + accFmtDay(r.to);
+  if(r.from) return 'الفترة: من ' + accFmtDay(r.from) + ' لحد النهاردة';
+  if(r.to)   return 'الفترة: من الأول لحد ' + accFmtDay(r.to);
+  return '';
+}
+
+// نص سطر «الرصيد السابق» في الكشف
+function accCarryText(e){
+  let day = '';
+  try{ day = new Date(e._carryFrom).toLocaleDateString('ar-EG'); }catch(x){}
+  return 'رصيد سابق قبل ' + day + (e.type === 'credit' ? ' (لصالح المحل)' : '');
+}
+
+// بنكتب الفترة جوه سطر التاريخ اللي تحت العنوان (.sub).
+// لو التقرير مفيهوش السطر ده، بنحط سطر لوحده أول الصفحة.
+function accStampPeriodHtml(html, label){
+  const s = String(html || '');
+  const safe = esc(label);
+  if(s.indexOf('class="sub">') !== -1) return s.replace('class="sub">', 'class="sub">📅 ' + safe + ' — ');
+  return s.replace(/<body([^>]*)>/i, '<body$1><div style="font-weight:800;margin:0 0 12px;">📅 ' + safe + '</div>');
+}
+
+// بنشغّل حاجة والفترة «مفعّلة» — وبعدها بنرجّعها زي ما كانت، حتى لو حصل خطأ
+function accWithRange(r, fn){
+  const prevR = ACC_RANGE, prevL = ACC_PERIOD_LABEL;
+  ACC_RANGE = r || null;
+  ACC_PERIOD_LABEL = accRangeLabel(r);
+  try{ return fn(); }
+  finally{ ACC_RANGE = prevR; ACC_PERIOD_LABEL = prevL; }
+}
+
+// ============================================================
+// 📊 كتابة الفترة في ملف الإكسل
+// ------------------------------------------------------------
+// دوال الإكسل مكتوبة في الداشبورد، وكلها بتكتب في الخانة A2 سطر
+// «I Fix Team … تاريخ الكشف». عايزين نزوّد عليه «الفترة: …».
+//
+// 🧠 بالبلدي: بنقف على باب «اعمل ورقة جديدة» لحظة واحدة بس.
+//    أول ما الداشبورد يعمل الورقة، بنعلّم عليها: «قبل ما
+//    تتحفظ، زوّد الفترة في السطر التاني». وبعدين بنمشي من على
+//    الباب على طول — فأي إكسل تاني في النظام مش بيتأثر.
+//
+// ⚠️ لو أي حاجة هنا فشلت، الملف بيطلع عادي من غير سطر الفترة —
+//    مفيش حاجة بتقع.
+// ============================================================
+function accExcelStamped(label, fn){
+  if(!label || typeof ExcelJS === 'undefined' || !ExcelJS.Workbook) return fn();
+  const P = ExcelJS.Workbook.prototype;
+  const orig = P && P.addWorksheet;
+  if(typeof orig !== 'function') return fn();
+  P.addWorksheet = function(){
+    const ws = orig.apply(this, arguments);
+    try{
+      const x = this.xlsx;
+      if(x && !x.__accStamped && typeof x.writeBuffer === 'function'){
+        x.__accStamped = true;
+        const write0 = x.writeBuffer;
+        x.writeBuffer = function(){
+          try{
+            const c = ws.getCell('A2');
+            c.value = (c.value ? String(c.value) + ' — ' : '') + label;
+          }catch(e){ console.warn('سطر الفترة في الإكسل:', e); }
+          return write0.apply(x, arguments);
+        };
+      }
+    }catch(e){ console.warn('سطر الفترة في الإكسل:', e); }
+    return ws;
+  };
+  // الداشبورد بيعمل الورقة في أول سطر من دالته (قبل أي انتظار)،
+  // فبنرجّع الباب زي ما كان على طول بعد النداء
+  try{ return fn(); }
+  finally{ P.addWorksheet = orig; }
+}
+
+// ---------- آخر اختيار — بيتحفظ على الجهاز عشان المرة الجاية ----------
+function accRangePrefGet(){
+  try{ return JSON.parse(localStorage.getItem(ACC_RANGE_PREF_KEY) || 'null') || { mode:'all' }; }
+  catch(e){ return { mode:'all' }; }
+}
+function accRangePrefSet(p){
+  try{ localStorage.setItem(ACC_RANGE_PREF_KEY, JSON.stringify(p)); }catch(e){}
+}
+
+// الاختيارات السريعة → تاريخ «من» و«إلى» (كنص yyyy-mm-dd)
+var ACC_RANGE_PRESETS = [
+  { k:'all',   n:'كل الفترة' },
+  { k:'today', n:'النهاردة' },
+  { k:'week',  n:'آخر ٧ أيام' },
+  { k:'month', n:'الشهر ده' },
+  { k:'last',  n:'الشهر اللي فات' },
+];
+function accPresetDates(k){
+  const now = new Date();
+  const today = accYmd(now);
+  if(k === 'today') return { from: today, to: today };
+  if(k === 'week'){ const s = new Date(now); s.setDate(s.getDate() - 6); return { from: accYmd(s), to: today }; }
+  if(k === 'month') return { from: accYmd(new Date(now.getFullYear(), now.getMonth(), 1)), to: today };
+  if(k === 'last'){
+    return { from: accYmd(new Date(now.getFullYear(), now.getMonth() - 1, 1)),
+             to:   accYmd(new Date(now.getFullYear(), now.getMonth(), 0)) };
+  }
+  return { from: '', to: '' };
+}
+
+// الاستايل — بيتحقن مرة واحدة. ألوان الثيم مع قيم احتياطية،
+// عشان الشاشة تطلع مظبوطة في الصفحات التلاتة (كل صفحة بتسمّي
+// ألوانها بأسامي مختلفة شوية).
+function accRangeCss(){
+  if(document.getElementById('accRangeCss')) return;
+  const st = document.createElement('style');
+  st.id = 'accRangeCss';
+  st.textContent =
+    '#accRangeOv{position:fixed;inset:0;z-index:2147483000;background:rgba(10,16,24,.55);'
+    + 'display:flex;align-items:center;justify-content:center;padding:16px;}'
+    + '#accRangeOv .arg-card{background:var(--surface,#fff);color:var(--ink,#1A2332);border-radius:18px;'
+    + 'width:100%;max-width:420px;max-height:90vh;overflow-y:auto;padding:18px 18px 14px;'
+    + 'box-shadow:0 22px 60px rgba(0,0,0,.35);font-family:inherit;}'
+    + '#accRangeOv .arg-h{font-family:Cairo,inherit;font-weight:900;font-size:17px;line-height:1.5;}'
+    + '#accRangeOv .arg-s{font-size:12.5px;color:var(--muted,#64748B);margin:3px 0 14px;}'
+    + '#accRangeOv .arg-chips{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:14px;}'
+    + '#accRangeOv .arg-chip{border:1.5px solid var(--border,#E2E8F0);background:var(--surface-2,#F8FAFC);'
+    + 'color:var(--ink,#1A2332);border-radius:20px;padding:8px 13px;font:700 13px/1.2 inherit;cursor:pointer;}'
+    + '#accRangeOv .arg-chip.on{background:#E8321E;border-color:#E8321E;color:#fff;}'
+    + '#accRangeOv .arg-dates{display:grid;grid-template-columns:1fr 1fr;gap:10px;}'
+    + '#accRangeOv .arg-dates label{font-size:12px;font-weight:700;color:var(--muted,#64748B);display:block;}'
+    + '#accRangeOv .arg-dates input{display:block;width:100%;box-sizing:border-box;margin-top:5px;'
+    + 'border:1.5px solid var(--border,#E2E8F0);background:var(--surface-2,#F8FAFC);color:var(--ink,#1A2332);'
+    + 'border-radius:10px;padding:10px;font-family:inherit;font-size:16px;}'
+    + '#accRangeOv .arg-info{margin:14px 0 12px;padding:10px 12px;border-radius:10px;font-size:13px;'
+    + 'font-weight:700;line-height:1.7;background:var(--surface-2,#F1F5F9);color:var(--ink,#1A2332);}'
+    + '#accRangeOv .arg-info.bad{background:#FEF2F2;color:#B91C1C;}'
+    + '#accRangeOv .arg-go{width:100%;border:none;border-radius:12px;padding:14px;font:900 15px/1 inherit;'
+    + 'cursor:pointer;color:#fff;background:#16A34A;}'
+    + '#accRangeOv .arg-go.pdf{background:#DC2626;}'
+    + '#accRangeOv .arg-go:disabled{opacity:.45;cursor:not-allowed;}'
+    + '#accRangeOv .arg-x{width:100%;margin-top:8px;border:none;background:none;padding:11px;'
+    + 'font:700 14px/1 inherit;color:var(--muted,#64748B);cursor:pointer;}';
+  document.head.appendChild(st);
+}
+
+// ============================================================
+// فتح شاشة «اختار الفترة»
+// ------------------------------------------------------------
+// opts = {
+//   title : العنوان فوق
+//   fmt   : 'pdf' أو 'xlsx' — بيغيّر كلام ولون الزرار بس
+//   unit  : «حركة» أو «جهاز» — للعدّاد
+//   count : (فترة) => عدد اللي هيطلع — عشان نقولك قبل ما تطبع
+//   run   : (فترة) => بيطبع/بيصدّر فعلاً
+// }
+// ============================================================
+function accRangeOpen(opts){
+  accRangeCss();
+  accRangeClose();
+  ACC_RD = opts;
+  const pref = accRangePrefGet();
+  let mode = pref.mode || 'all';
+  let dates = mode === 'custom' ? { from: pref.from || '', to: pref.to || '' } : accPresetDates(mode);
+  if(!ACC_RANGE_PRESETS.some(p => p.k === mode) && mode !== 'custom'){ mode = 'all'; dates = { from:'', to:'' }; }
+  ACC_RD.mode = mode;
+
+  const isPdf = opts.fmt !== 'xlsx';
+  const goTxt = isPdf
+    ? (ACC_IOS_APP ? '📄 اعمل PDF' : '🖨️ اطبع / احفظ PDF')
+    : '📊 نزّل ملف Excel';
+
+  const ov = document.createElement('div');
+  ov.id = 'accRangeOv';
+  ov.setAttribute('dir', 'rtl');
+  ov.onclick = e => { if(e.target === ov) accRangeClose(); };
+  ov.innerHTML =
+    '<div class="arg-card">'
+    + '<div class="arg-h">📅 ' + esc(opts.title || 'اختار الفترة') + '</div>'
+    + '<div class="arg-s">عايز تطبع من إمتى لإمتى؟</div>'
+    + '<div class="arg-chips">'
+      + ACC_RANGE_PRESETS.map(p =>
+          '<button type="button" class="arg-chip" data-k="' + p.k + '" onclick="accRangePick(\'' + p.k + '\')">' + p.n + '</button>'
+        ).join('')
+    + '</div>'
+    + '<div class="arg-dates">'
+      + '<label>من<input type="date" id="argFrom" value="' + esc(dates.from) + '" onchange="accRangeCustom()"></label>'
+      + '<label>إلى<input type="date" id="argTo" value="' + esc(dates.to) + '" onchange="accRangeCustom()"></label>'
+    + '</div>'
+    + '<div class="arg-info" id="argInfo"></div>'
+    + '<button type="button" class="arg-go' + (isPdf ? ' pdf' : '') + '" id="argGo" onclick="accRangeGo()">' + goTxt + '</button>'
+    + '<button type="button" class="arg-x" onclick="accRangeClose()">إلغاء</button>'
+    + '</div>';
+  document.body.appendChild(ov);
+  accRangeSync();
+}
+
+function accRangeClose(){
+  const ov = document.getElementById('accRangeOv');
+  if(ov) ov.remove();
+}
+
+// دوست على اختيار سريع → بنملا «من» و«إلى» بتواريخه
+function accRangePick(k){
+  if(!ACC_RD) return;
+  ACC_RD.mode = k;
+  const d = accPresetDates(k);
+  const f = document.getElementById('argFrom'), t2 = document.getElementById('argTo');
+  if(f) f.value = d.from;
+  if(t2) t2.value = d.to;
+  accRangeSync();
+}
+
+// كتبت تاريخ بإيدك → بقى «فترة مخصوصة»
+function accRangeCustom(){
+  if(!ACC_RD) return;
+  ACC_RD.mode = 'custom';
+  accRangeSync();
+}
+
+// الفترة اللي على الشاشة دلوقتي → { from, to } أو null (كل الفترة)
+function accRangeRead(){
+  const fs = ((document.getElementById('argFrom') || {}).value || '').trim();
+  const ts = ((document.getElementById('argTo') || {}).value || '').trim();
+  if(!fs && !ts) return null;
+  let from = accDayStart(fs), to = accDayEnd(ts);
+  // كاتب «من» بعد «إلى» بالغلط؟ بنقلبهم بدل ما نطلّع ورقة فاضية
+  if(from && to && from > to){
+    const f2 = accDayStart(ts), t3 = accDayEnd(fs);
+    from = f2; to = t3;
+  }
+  return (from || to) ? { from, to } : null;
+}
+
+// بنحدّث الشاشة: الاختيار الملوّن + «هيطلع كام حاجة»
+function accRangeSync(){
+  if(!ACC_RD) return;
+  document.querySelectorAll('#accRangeOv .arg-chip').forEach(b => {
+    b.classList.toggle('on', b.getAttribute('data-k') === ACC_RD.mode);
+  });
+  const r = accRangeRead();
+  const info = document.getElementById('argInfo');
+  const go = document.getElementById('argGo');
+  let n = -1;
+  try{ n = ACC_RD.count ? ACC_RD.count(r) : -1; }catch(e){ console.warn('عدّ الفترة:', e); }
+  const unit = ACC_RD.unit || 'حركة';
+  const period = r ? accRangeLabel(r) : 'كل الفترة — من أول يوم';
+  if(info){
+    if(n === 0){
+      info.className = 'arg-info bad';
+      info.textContent = '⚠️ مفيش ولا ' + unit + ' في الفترة دي — اختار فترة تانية';
+    } else {
+      info.className = 'arg-info';
+      info.textContent = '📅 ' + period + (n > 0 ? ' · هيطلع ' + n + ' ' + unit : '');
+    }
+  }
+  if(go) go.disabled = (n === 0);
+}
+
+// «اطبع» / «نزّل»
+// ⚠️⚠️ متزامن بالكامل — مفيش await قبل الطباعة. الأيفون محتاج
+//    الطباعة تتنده في نفس لحظة الضغطة (شوف الشرح عند accPrint).
+function accRangeGo(){
+  if(!ACC_RD) return;
+  const r = accRangeRead();
+  const opts = ACC_RD;
+  accRangePrefSet(opts.mode === 'custom'
+    ? { mode:'custom',
+        from: (document.getElementById('argFrom') || {}).value || '',
+        to:   (document.getElementById('argTo') || {}).value || '' }
+    : { mode: opts.mode || 'all' });
+  // بنقفل الشاشة الأول — عشان متبانش فوق الكشف ولا تتطبع معاه
+  accRangeClose();
+  ACC_RD = null;
+  try{ opts.run(r); }
+  catch(e){
+    console.error('الطباعة بالفترة فشلت:', e);
+    alert('مقدرناش نطبع: ' + ((e && e.message) || e));
+  }
+}
+
+// Escape بيقفل الشاشة
+document.addEventListener('keydown', e => { if(e.key === 'Escape') accRangeClose(); });
+
+// ============================================================
+// ١) كشف المحل — زرار PDF و Excel في «الحسابات»
+// ============================================================
+function accRangeShop(fmt, shop){
+  const isX = fmt === 'xlsx';
+  if(isX && typeof exportShopExcel !== 'function'){ alert('تصدير Excel مش متاح في الصفحة دي'); return; }
+  accRangeOpen({
+    title: (isX ? 'Excel — ' : 'كشف PDF — ') + shop,
+    fmt: fmt,
+    unit: 'حركة',
+    count: r => accWithRange(r, () => shopStatementRows(shop).entries.filter(e => !e._carry).length),
+    run: r => accWithRange(r, () => isX
+      ? accExcelStamped(accRangeLabel(r), () => exportShopExcel(shop))
+      : exportShopPdf(shop))
+  });
+}
+
+// ============================================================
+// ٢) «تم التسليم — بانتظار الدفع» (في dashboard.html)
+// ------------------------------------------------------------
+// بنلفّ دالتين التصدير بتوع الداشبورد: الزرار بيندَه نفس الاسم،
+// فبيوصل لينا الأول، ولما تختار الفترة بنبعت للدالة الأصلية
+// الأجهزة اللي **اتسلّمت** جوه الفترة بس.
+//
+// ⚠️ بنتركّب بعد ما الصفحة تخلص تحميل (الداشبورد بيعرّف الدوال
+//    بعد الملف ده). في صفحة الديسباتشر والمالك الدوال مش موجودة
+//    أصلاً — فمفيش حاجة بتحصل.
+// ============================================================
+function accUnpaidDate(d){
+  try{
+    const dd = (typeof deliveredDateOf === 'function') ? deliveredDateOf(d) : null;
+    return dd || (d && d.intakeDate) || null;
+  }catch(e){ return d && d.intakeDate; }
+}
+function accUnpaidFilter(list, r){
+  if(!r) return list.slice();
+  return list.filter(d => accInRange(accUnpaidDate(d), r));
+}
+
+function accInstallUnpaidRange(){
+  [['exportDeliveredUnpaidExcel', 'xlsx'], ['exportDeliveredUnpaidPdf', 'pdf']].forEach(([name, fmt]) => {
+    const orig = window[name];
+    if(typeof orig !== 'function' || orig.__accRange) return;
+    const wrapped = function(list){
+      // من غير قايمة؟ (نداء قديم من مكان تاني) → زي ما كان بالظبط
+      if(!Array.isArray(list)) return orig.apply(this, arguments);
+      const src = list.slice();   // صورة من القايمة لحظة الضغط
+      accRangeOpen({
+        title: (fmt === 'xlsx' ? 'Excel' : 'PDF') + ' — تم التسليم بانتظار الدفع',
+        fmt: fmt,
+        unit: 'جهاز',
+        count: r => accUnpaidFilter(src, r).length,
+        run: r => {
+          const sub = accUnpaidFilter(src, r);
+          return accWithRange(r, () => fmt === 'xlsx'
+            ? accExcelStamped(accRangeLabel(r), () => orig.call(window, sub))
+            : orig.call(window, sub));
+        }
+      });
+    };
+    wrapped.__accRange = true;
+    window[name] = wrapped;
+  });
+}
+document.addEventListener('DOMContentLoaded', accInstallUnpaidRange);
+window.addEventListener('load', accInstallUnpaidRange);
