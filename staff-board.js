@@ -113,7 +113,10 @@
   + '.sb-hbtn{flex:none;border:none;background:var(--sb-bg);color:var(--sb-ink);width:38px;height:38px;'
   + 'border-radius:10px;font-size:19px;line-height:1;cursor:pointer;}'
   + '.sb-hbtn:disabled{opacity:.5;}'
-  + '.sb-body{padding:14px 16px 48px;max-width:760px;margin:0 auto;}'
+  + '.sb-body{padding:14px 16px 48px;}'
+  // الكروت جوه شبكة: عمود واحد على الموبايل، وعلى الكمبيوتر بتتصف جنب بعض
+  + '.sb-grid{display:grid;grid-template-columns:1fr;gap:9px;}'
+  + '.sb-grid .sb-row{margin-bottom:0;}'
   + '.sb-pills{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:12px;}'
   + '.sb-pill{border:1.5px solid var(--sb-line);background:var(--sb-card);border-radius:12px;padding:10px 4px;'
   + 'text-align:center;cursor:pointer;font-family:inherit;color:var(--sb-ink);min-width:0;}'
@@ -151,7 +154,27 @@
   + '.sb-p b{font-weight:800;}'
   + '.sb-empty{text-align:center;color:var(--sb-muted);padding:34px 10px;font-size:14px;line-height:2;}'
   + '.sb-err{background:var(--sb-abs-bg);color:var(--sb-abs);border-radius:12px;padding:14px;font-size:13.5px;line-height:1.9;}'
-  + '.sb-err code{font-size:11.5px;word-break:break-all;}';
+  + '.sb-err code{font-size:11.5px;word-break:break-all;}'
+  // ============================================================
+  // 🖥️ الكمبيوتر والتابلت العريض
+  // ------------------------------------------------------------
+  // ⚠️ كان فيه max-width:760px على الصفحة كلها، فعلى الكمبيوتر
+  //    اللوحة كانت عمود ضيق في النص بمقاس الموبايل. دلوقتي الصفحة
+  //    بتاخد العرض كله، والكروت بتتصف أعمدة على قد ما الشاشة تشيل.
+  //    تحت ٩٠٠px مفيش أي تغيير — الموبايل زي ما هو بالظبط.
+  // ============================================================
+  + '@media (min-width:900px){'
+  +   '.sb-head{padding-inline:28px;}'
+  +   '.sb-head h2{font-size:21px;}'
+  +   '.sb-body{padding:20px 28px 60px;}'
+  +   '.sb-pills{gap:12px;margin-bottom:16px;}'
+  +   '.sb-pill{padding:14px 8px;border-radius:14px;}'
+  +   '.sb-pill b{font-size:30px;}'
+  +   '.sb-pill span{font-size:13px;}'
+  +   '.sb-search{max-width:480px;}'
+  +   '.sb-grid{grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:12px;}'
+  +   '.sb-row{padding:14px 15px;}'
+  + '}';
 
   function injectCss(){
     if($('sbCss')) return;
@@ -291,7 +314,7 @@
       return;
     }
 
-    host.innerHTML = errBox + list.map(function(r){
+    host.innerHTML = errBox + '<div class="sb-grid">' + list.map(function(r){
       var s = ST[r.status] || ST.absent;
       return '<div class="sb-row ' + s.cls + '">'
         + '<span class="sb-dot"></span>'
@@ -301,7 +324,7 @@
         +   '<div class="sb-meta">' + esc(metaTxt(r)) + '</div>'
         +   timelineHtml(r)
         + '</div></div>';
-    }).join('');
+    }).join('') + '</div>';
   }
 
   // ---------- التحديث التلقائي ----------
