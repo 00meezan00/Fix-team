@@ -4,7 +4,7 @@
 // ⚠️ لو ضفت صفحة أو ملف جديد للنظام: زوّده في APP_SHELL تحت،
 //    وزوّد رقم الإصدار (v4 → v5). تعديل ملف موجود مش محتاج تزويد الرقم —
 //    ملفات الكود بتتقرا من النت الأول (شوف قسم fetch).
-const CACHE_NAME = 'ifixteam-v72';
+const CACHE_NAME = 'ifixteam-v73';
 
 const APP_SHELL = [
   './',
@@ -44,6 +44,7 @@ const APP_SHELL = [
   'label.js',
   'attendance.js',
   'payroll.js',
+  'staff-board.js',      // 👥 لوحة الموظفين الملوّنة (common.js بيحمّلها)
   'dock.js',
   'dock-tools.js',
   'assist.html',

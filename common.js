@@ -260,6 +260,33 @@ async function saveAccountShared(){
   }
 }
 
+// ============================================================
+// 👥 لوحة الموظفين الملوّنة — تحميل staff-board.js
+// ------------------------------------------------------------
+// 🧠 بالبلدي: common.js محمّل في كل الصفحات، فهو اللي بيجيب ملف
+//    اللوحة — بس في الصفحتين اللي محتاجينه:
+//      • الداشبورد → علامته #staffOverlay (اللوحة القديمة)
+//      • المالك    → علامته #kebabMenu + #ownName
+//    كده مفيش أي <script> جديد في الصفحتين الكبار.
+//
+// ⚠️ بعد DOMContentLoaded: العلامات دي عناصر في الصفحة — قبل كده
+//    مش هتبقى موجودة لسه.
+// ⚠️ لو staff-board.js مش مرفوع: الداشبورد بيفضل على اللوحة القديمة
+//    (أخضر/أحمر) والمالك مبيظهرلوش الزرار — ولا صفحة بتقع.
+// ============================================================
+addEventListener('DOMContentLoaded', function(){
+  try{
+    var need = document.getElementById('staffOverlay')
+            || (document.getElementById('kebabMenu') && document.getElementById('ownName'));
+    if(!need || window.StaffBoard || document.getElementById('sbScript')) return;
+    var s = document.createElement('script');
+    s.id = 'sbScript';
+    s.src = 'staff-board.js';
+    s.onerror = function(){ console.error('فشل تحميل staff-board.js — اللوحة الملوّنة مش هتظهر'); };
+    document.head.appendChild(s);
+  }catch(e){ console.error('staff-board loader:', e); }
+});
+
 // ===== تأمين النصوص قبل عرضها في الصفحة =====
 // النسخة الأأمن: بتأمّن ٥ رموز (بما فيها ' المفردة) — بتمنع أي حقن HTML.
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
