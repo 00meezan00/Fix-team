@@ -42,6 +42,8 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
 <script src="i18n.js"></script>
 <script src="qr-scan.js"></script>
 <script src="fuzzy-search.js"></script>
+<!-- 🔎 فلاتر البحث البيضاوية (تاريخ · موديل · اسم · محل · رقم · عطل · سريال) -->
+<script src="search-filters.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;800;900&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
@@ -2010,16 +2012,31 @@ function openLockImg(id){
   document.body.appendChild(ov);
 }
 
+
+// ============================================================
+// 🔎 فلاتر البحث البيضاوية (search-filters.js)
+// ------------------------------------------------------------
+// ifxMatch = «الجهاز ده يعدّي؟» — لو مفيش فلتر متختار بيرجع للبحث
+// العادي بتاع الصفحة بالظبط. ولو الملف مش مرفوع، الصفحة متقعش.
+// ============================================================
+function ifxMatch(id, d, q, base){
+  return window.IFixFilters ? IFixFilters.match(id, d, q, base) : base(d, q);
+}
+function ifxOn(id){ return !!(window.IFixFilters && IFixFilters.active(id)); }
+if(window.IFixFilters) IFixFilters.watch(['q']);
+
 function render(){
   const q = ($('q').value||'').trim();
   // بحث مرن — نفس منطق الداشبورد
-  const match = d => {
+  const base = (d, q) => {
     if(!q) return true;
     if(window.IFixSearch && IFixSearch.isIndexed(d)) return IFixSearch.matchIndexed(q, d);
     const fields = [d.type,d.model,d.customer,d.shop,d.issue,ticketNo(d.id)];
     if(window.IFixSearch) return IFixSearch.match(q, fields);
     return fields.some(v => v && String(v).includes(q));
   };
+  // 🔎 + فلاتر البحث (تاريخ / اسم / محل …)
+  const match = d => ifxMatch('q', d, q, base);
   const mine   = devices.filter(d => d.tech===ME   && ACTIVE.includes(d.status) && match(d));
   const assist = devices.filter(d => d.assist===ME && ACTIVE.includes(d.status) && match(d));
   // المرتجعات: أي جهاز رجع والفني ده شغّال عليه — أساسي أو بديل
@@ -2028,9 +2045,10 @@ function render(){
   //    بقت "🔩 قطع الغيار" جوه قايمة ⋮ فوق — عشان الشاشة الرئيسية
   //    تفضل للشغل اللي في إيد الفني دلوقتي بس.
 
+  const qq = q || (window.IFixFilters && IFixFilters.any('q'));   // 🔎 فيه بحث أو فلتر؟
   const cards = (list,canAct) => list.length
     ? `<div class="grid">${list.map(d=>ticketHtml(d,canAct)).join('')}</div>`
-    : `<div class="empty"><span class="big">${q?'🔍':'✨'}</span>${q?t('rp.noResults'):(canAct?t('tp.emptyMine'):t('tp.emptyAssist'))}</div>`;
+    : `<div class="empty"><span class="big">${qq?'🔍':'✨'}</span>${qq?t('rp.noResults'):(canAct?t('tp.emptyMine'):t('tp.emptyAssist'))}</div>`;
 
   $('app').innerHTML = `
     ${flash?`<div class="flash">✅ ${esc(flash)}</div>`:''}
