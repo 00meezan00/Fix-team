@@ -357,19 +357,8 @@ function payDrawersHtml(){
       <div class="pay-drw-m">🗓️ ${_payEsc(month)}</div>
       ${body}
     </div>` : ''}`;
-  // (الإجمالي بيتحط جوه body تحت — شوف totLine)
 
-  // الإجمالي أول سطر جوه الدرج — من كشف الشهر نفسه (السيرفر)
-  // عشان يطابق الصافي بالظبط، ولو مفيش كشف بنجمع اللي قدامنا
-  const slip = _paySlips.find(p => String(p.period).slice(0, 10) === _payPeriod.from);
-  const sumOf = list => list.filter(r => !r.waived_at && _payInPeriod(r.work_date))
-                            .reduce((a, r) => a + Number(r.amount || 0), 0);
-  const wdTotal  = slip ? Number(slip.withdraw_ded || 0) : sumOf(wd);
-  const dedTotal = slip ? Number(slip.manual_ded || 0) + Number(slip.late_ded || 0)
-                        : sumOf(man) + _payLate.filter(r => _payInPeriod(r.work_date) && !r.waived)
-                                               .reduce((a, r) => a + Number(r.penalty || 0), 0);
-  const totLine = v => `<div class="pay-drw-tot"><span>الإجمالي</span><b>−${payMoney(v)} ج.م</b></div>`;
-
+  // ⚠️ الإجماليات في كارت المرتب فوق — الدرج تفاصيل بس
   const wdBody = (wd.length
     ? wdNew.map(r => r.waived_at ? payWaivedDedCard(r) : payCard(r)).join('')
       + wdOld.map(payCard).join('')
@@ -385,8 +374,8 @@ function payDrawersHtml(){
 
   return `
     <div class="pay-drws">
-      ${drawer('wd',  '🔩 درج المسحوبات', wdCount,  totLine(wdTotal)  + wdBody)}
-      ${drawer('ded', '💸 درج الخصومات',  dedCount, totLine(dedTotal) + dedBody)}
+      ${drawer('wd',  '🔩 درج المسحوبات', wdCount,  wdBody)}
+      ${drawer('ded', '💸 درج الخصومات',  dedCount, dedBody)}
     </div>`;
 }
 
@@ -502,10 +491,14 @@ function paySlipCard(p, big){
         <small style="opacity:.75;">فلوس خدتها مقدّم</small></span>
         <b class="minus">${payMoney(p.withdraw_ded)}</b></div>` : ''}
       <div><span>− خصومات تأخير</span><b class="minus">${payMoney(p.late_ded)}</b></div>`
-      /* 🗄️ الشهر اللي لسه ماتصرفش: المسحوبات والخصومات جوه الدرجين
-         تحت بس — مش ظاهرين هنا غير لما الموظف يفتح الدرج.
-         (الشهور المصروفة بتفضل كاملة — دي ورقة قبض.) */
-      : ''}
+      /* 🗄️ الشهر اللي لسه ماتصرفش: **إجمالي** المسحوبات وإجمالي
+         الخصومات هنا في الكارت، والتفاصيل جوه الدرجين تحت.
+         الخصومات = يدوية + تأخير/بريك مع بعض — زي درج الخصومات.
+         (الشهور المصروفة بتفضل مفصّلة زي ما هي — دي ورقة قبض.) */
+      : `
+      <div><span>− إجمالي المسحوبات</span><b class="minus">${payMoney(p.withdraw_ded)}</b></div>
+      <div><span>− إجمالي الخصومات</span><b class="minus">${
+        payMoney(Number(p.manual_ded || 0) + Number(p.late_ded || 0))}</b></div>`}
       ${paySlipOvertime(p)}
       <div class="eq"><span>= الصافي</span><b>${payMoney(p.net)}</b></div>
     </div>
@@ -1100,10 +1093,6 @@ function payUrlB64ToU8(s){
   .pay-drw-body{margin-top:-6px; border:1px solid var(--p-line); border-top:none;
     background:var(--p-bg); border-radius:0 0 14px 14px; padding:12px 10px 4px;}
   .pay-drw-m{font-size:12px; font-weight:800; color:var(--p-mut); margin:0 4px 10px;}
-  .pay-drw-tot{display:flex; justify-content:space-between; align-items:baseline;
-    background:var(--p-card); border:1px solid var(--p-line); border-radius:12px;
-    padding:11px 14px; margin-bottom:11px; font-size:13.5px; font-weight:800; color:var(--p-ink2);}
-  .pay-drw-tot b{font-family:'Cairo',sans-serif; font-weight:900; font-size:17px; color:var(--p-red);}
   .pay-drw-empty{text-align:center; color:var(--p-mut); font-size:13px; padding:14px 8px 18px;}
   .pay-drw-body .pay-late{margin-bottom:11px;}
 
