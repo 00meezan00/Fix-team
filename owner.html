@@ -46,6 +46,8 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
 <script src="i18n.js"></script>
 <script src="qr-scan.js"></script>
 <script src="fuzzy-search.js"></script>
+<!-- 🔎 فلاتر البحث البيضاوية (تاريخ · موديل · اسم · محل · رقم · عطل · سريال) -->
+<script src="search-filters.js"></script>
 <script src="accounts.js"></script>
 <script src="label.js"></script>
 <script src="attendance.js"></script>
@@ -1798,6 +1800,19 @@ async function doLogout(){
       الفهرس هو اللي بيشتغل فعلياً، فلو زوّدناه في الاحتياطي بس
       البحث بالعطل مش هيشتغل خالص.
    ============================================================ */
+
+// ============================================================
+// 🔎 فلاتر البحث البيضاوية (search-filters.js)
+// ------------------------------------------------------------
+// ifxMatch = «الجهاز ده يعدّي؟» — لو مفيش فلتر متختار بيرجع للبحث
+// العادي بتاع الصفحة بالظبط. ولو الملف مش مرفوع، الصفحة متقعش.
+// ============================================================
+function ifxMatch(id, d, q, base){
+  return window.IFixFilters ? IFixFilters.match(id, d, q, base) : base(d, q);
+}
+function ifxOn(id){ return !!(window.IFixFilters && IFixFilters.active(id)); }
+if(window.IFixFilters) IFixFilters.watch(['q','invSearch','prQ']);
+
 function reindexSearch(){
   try{
     if(window.IFixSearch)
@@ -1941,12 +1956,12 @@ function render(){
   //    lastModifiedAt ممكن يكون فاضي على الأجهزة القديمة، فبننزل
   //    لتاريخ الاستلام بدل ما نحطهم آخر القايمة بالغلط.
   const touch = x => new Date((x._raw && x._raw.lastModifiedAt) || x.intake || 0);
-  const list = devices.filter(tab.filter).filter(d => matchDev(d, q))
+  const list = devices.filter(tab.filter).filter(d => ifxMatch('q', d, q, matchDev))
                       .sort((a,b) => touch(b) - touch(a));
 
   const cardFn = tab.mode === 'tech' ? techTicket : dispTicket;
 
-  const emptyMsg = q ? 'مفيش نتايج للبحث ده'
+  const emptyMsg = (q || (window.IFixFilters && IFixFilters.any('q'))) ? 'مفيش نتايج للبحث ده'
     : activeTab === 'mine' ? 'مفيش أجهزة عليها اسمك كفني دلوقتي'
     : activeTab === 'reg'  ? 'لسه ما سجّلتش أي جهاز — ابدأ بـ«جهاز جديد»'
     : activeTab === 'out'  ? 'مفيش أجهزة اتسلّمت في آخر شهر'
@@ -4002,6 +4017,7 @@ function closePartsReview(){
   const inv = document.getElementById('inventoryOverlay');
   if(!inv || inv.classList.contains('hidden')) document.body.classList.remove('inv-open');
   PR.tech = null;
+  try{ if(window.IFixFilters) IFixFilters.reset('prQ'); }catch(e){}
   PR.q = '';   // البحث بيتصفّر مع القفل — عشان المرة الجاية ميفتحش على نتايج قديمة
 }
 
@@ -4226,12 +4242,12 @@ function prRenderList(){
 
   // (٠) فيه بحث → قايمة واحدة بكل النتايج، من كل الفنيين
   const q = (PR.q || '').trim();
-  if(q){
-    const hits = rows.filter(d => prMatch(d, q)).sort(prByTouchedDesc);
+  if(q || ifxOn('prQ')){
+    const hits = rows.filter(d => ifxMatch('prQ', d, q, prMatch)).sort(prByTouchedDesc);
     host.innerHTML = hits.length
       ? `<div class="pr-res-h">🔍 ${hits.length} ${hits.length === 1 ? 'نتيجة' : 'نتايج'} في الفترة دي</div>`
         + hits.map(d => prDevHtml(d, true)).join('')
-      : `<div class="pr-empty">مفيش نتايج لـ «${esc(q)}» في الفترة دي<br><small>جرّب مدة أطول (أسبوع / شهر)</small></div>`;
+      : `<div class="pr-empty">مفيش نتايج ${q ? 'لـ «' + esc(q) + '»' : 'بالفلتر ده'} في الفترة دي<br><small>جرّب مدة أطول (أسبوع / شهر)</small></div>`;
     return;
   }
 
@@ -4456,6 +4472,7 @@ function openInventory(){
   const _shield = document.getElementById('kebabShield'); if(_shield) _shield.classList.add('hidden');
   invView = null;
   const _s = document.getElementById('invSearch'); if(_s) _s.value = '';
+  try{ if(window.IFixFilters) IFixFilters.reset('invSearch'); }catch(e){}
   document.getElementById('inventoryOverlay').classList.remove('hidden');
   document.body.classList.add('inv-open');
   renderInventory();
@@ -4537,8 +4554,8 @@ function renderInventory(){
   // ===== بحث =====
   const q = (document.getElementById('invSearch')?.value || '').trim();
   let searchHtml = '';
-  if(q){
-    const found = devices.filter(d => invMatchesSearch(d, q));
+  if(q || ifxOn('invSearch')){
+    const found = devices.filter(d => ifxMatch('invSearch', d, q, invMatchesSearch));
     searchHtml = `
       <div class="inv-section-title">🔍 نتائج البحث "${esc(q)}" — ${found.length}</div>
       <div class="iv-scroll" style="margin-bottom:20px;">

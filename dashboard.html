@@ -122,6 +122,8 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
 <script src="ai-invoice.js"></script>
 <script src="qr-scan.js"></script>
 <script src="fuzzy-search.js"></script>
+<!-- 🔎 فلاتر البحث البيضاوية (تاريخ · موديل · اسم · محل · رقم · عطل · سريال) -->
+<script src="search-filters.js"></script>
 <script src="wholesale.js"></script>
 <script src="dock.js"></script>
 <script src="dock-tools.js"></script>
@@ -3508,13 +3510,14 @@ function gsType(q){
   // ⚠️ حرف واحد يكفي. كان الحد حرفين — والموظف اللي بيدوّر على
   //    محل اسمه حرف، أو بيبدأ يكتب ويستنى نتيجة، مكانش بيشوف حاجة
   //    ويفتكر البحث واقف.
-  if(query.length < 1){
+  // 📅 لو فيه تاريخ متحدد، بنعرض أجهزة اليوم ده حتى من غير كلام
+  if(query.length < 1 && !ifxOn('gsInput')){
     wrap.classList.remove('open');
     panel.innerHTML = '';
     return;
   }
 
-  const hits = devices.filter(d => matchesSearch(d, query));
+  const hits = devices.filter(d => ifxMatch('gsInput', d, query, matchesSearch));
   wrap.classList.add('open');
 
   if(hits.length === 0){
@@ -3586,7 +3589,25 @@ function matchesSearch(d, q){
 function clearSearchBox(id){
   const el = document.getElementById(id);
   if(el) el.value = '';
+  // 🔎 الفلاتر (تاريخ/اسم/محل…) بتتصفّر مع الخانة — عشان الشاشة الجاية
+  //    متفتحش على فلتر قديم إنت ناسيه
+  try{ if(window.IFixFilters) IFixFilters.reset(id); }catch(e){}
 }
+
+// ============================================================
+// 🔎 فلاتر البحث — وسيط صغير
+// ------------------------------------------------------------
+// ifxMatch('columnSearch', d, q, matchesSearch):
+//   • مفيش فلتر متختار → نفس البحث العادي بالظبط
+//   • فيه فلتر (اسم/محل/…) → البحث في الخانة دي بس
+//   • فيه تاريخ → الجهاز لازم يكون في اليوم ده (دخول أو تحديث)
+// لو ملف search-filters.js مش مرفوع، بنرجع للبحث العادي — الصفحة متقعش.
+// ============================================================
+function ifxMatch(id, d, q, base){
+  return window.IFixFilters ? IFixFilters.match(id, d, q, base) : base(d, q);
+}
+function ifxOn(id){ return !!(window.IFixFilters && IFixFilters.active(id)); }
+if(window.IFixFilters) IFixFilters.watch(['gsInput','columnSearch','techSearch','invSearch','prQ']);
 
 function openColumn(statusKey){
   currentColumn = statusKey;
@@ -3615,9 +3636,9 @@ function renderColumn(keepPos){
   // المهملات بتتقرا من مصفوفتها، وبترتّب بالأحدث حذفاً
   const isTrash = currentColumn === 'trashed';
   colFullList = isTrash
-    ? trashDevices.filter(d => matchesSearch(d, q))
+    ? trashDevices.filter(d => ifxMatch('columnSearch', d, q, matchesSearch))
                   .sort((a,b) => new Date(b.trashedAt||0) - new Date(a.trashedAt||0))
-    : devices.filter(d => effStatus(d) === currentColumn && matchesSearch(d, q))
+    : devices.filter(d => effStatus(d) === currentColumn && ifxMatch('columnSearch', d, q, matchesSearch))
              .sort((a,b) => touchedAt(b) - touchedAt(a));
   document.getElementById('columnTitle').textContent = `${stLabel(s)} (${colFullList.length.toLocaleString('en-EG')})`;
   document.getElementById('columnTitle').style.color = accent(s.varname);
@@ -6439,7 +6460,7 @@ function renderTechPortal(){
   }
 
   const q = (document.getElementById('techSearch')?.value || '').trim();
-  const sMatch = (d) => !q || matchesSearch(d, q);
+  const sMatch = (d) => ifxMatch('techSearch', d, q, matchesSearch);
   const mine   = devices.filter(d => d.technician && d.technician.includes(name) && TP_ACTIVE.includes(d.status) && sMatch(d));
   const assist = devices.filter(d => d.assistTechnician && d.assistTechnician.includes(name) && TP_ACTIVE.includes(d.status) && sMatch(d));
 
@@ -8258,8 +8279,8 @@ function renderSummaries(){
   // ===== نتائج البحث =====
   const q = (document.getElementById('invSearch')?.value || '').trim();
   let searchHtml = '';
-  if(q){
-    const found = devices.filter(d => matchesSearch(d, q));
+  if(q || ifxOn('invSearch')){
+    const found = devices.filter(d => ifxMatch('invSearch', d, q, matchesSearch));
     searchHtml = `
       <div class="inv-section-title">🔍 ${t('inv.searchResults')} "${esc(q)}" — ${found.length}</div>
       <div class="inv-open-list">
@@ -9684,6 +9705,7 @@ function closePartsReview(){
   PR.folder = null;
   PR_RETURN = null;   // قفلها بإيده = مفيش رجوع
   PR.q = '';   // البحث بيتصفّر مع القفل — عشان المرة الجاية ميفتحش على نتايج قديمة
+  try{ if(window.IFixFilters) IFixFilters.reset('prQ'); }catch(e){}
 }
 
 // ------------------------------------------------------------
@@ -10006,7 +10028,7 @@ function prRenderFolder(){
   let list = mode === 'noparts' ? (noParts || []) : noNeed;
 
   const q = (PR.q || '').trim();
-  if(q) list = list.filter(d => prMatch(d, q));
+  list = list.filter(d => ifxMatch('prQ', d, q, prMatch));
   // الترتيب بنفس التاريخ اللي الفولدر بيفلتر بيه — آخر تعديل
   list = list.slice().sort((a, b) =>
     new Date(prTouchedEdit(b) || 0) - new Date(prTouchedEdit(a) || 0));
@@ -10143,12 +10165,12 @@ function prRenderList(){
 
   // (٠.٥) فيه بحث → قايمة واحدة بكل النتايج، من كل الفنيين
   const q = (PR.q || '').trim();
-  if(q){
-    const hits = rows.filter(d => prMatch(d, q)).sort(prByTouchedDesc);
+  if(q || ifxOn('prQ')){
+    const hits = rows.filter(d => ifxMatch('prQ', d, q, prMatch)).sort(prByTouchedDesc);
     host.innerHTML = hits.length
       ? `<div class="pr-res-h">🔍 ${hits.length} ${hits.length === 1 ? 'نتيجة' : 'نتايج'} في الفترة دي</div>`
         + hits.map(d => prDevHtml(d, true)).join('')
-      : `<div class="pr-empty">مفيش نتايج لـ «${esc(q)}» في الفترة دي<br><small>جرّب مدة أطول (أسبوع / شهر)</small></div>`;
+      : `<div class="pr-empty">مفيش نتايج ${q ? 'لـ «' + esc(q) + '»' : 'بالفلتر ده'} في الفترة دي<br><small>جرّب مدة أطول (أسبوع / شهر)</small></div>`;
     return;
   }
 
