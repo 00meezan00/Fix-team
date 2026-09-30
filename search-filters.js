@@ -10,11 +10,14 @@
         تقدر تختار أكتر من واحد (اسم + محل). ولا حاجة متختارة =
         البحث العادي بتاع الصفحة زي ما هو بالظبط.
       • دوسة على 📅 = تختار يوم. أول ما تبدأ تختار (أو بعد ما
-        تختار) بيظهر جنبها خانتين صغيرين:
+        تختار) بيظهر جنبها خانات صغيرة:
+            إلى    = لو عايز فترة (من يوم لـ يوم) مش يوم واحد
             دخول   = تاريخ استلام الجهاز   (الافتراضي)
             تحديث  = تاريخ آخر تعديل على الجهاز
-        وغير كده الخانتين دول مستخبيين.
-        و ✕ بتشيل التاريخ.
+        وغير كده الخانات دي مستخبية.
+        و ✕ بتشيل التاريخ (الاتنين).
+        «إلى» فاضية = يوم واحد بس. ولو اخترت «إلى» قبل «من»
+        بنبدّلهم لوحدنا — مفيش فترة بالمقلوب.
 
    الاستخدام من أي صفحة:
        IFixFilters.watch(['columnSearch', 'q', ...]);   // بيركّب الصف لوحده
@@ -42,12 +45,12 @@
     { k: 'serial', n: 'سريال' }
   ];
 
-  var ST = {};          // id → { f:{}, date:'', mode:'in', picking:false }
+  var ST = {};          // id → { f:{}, date:'', to:'', mode:'in', picking:false }
   var OPTS = {};        // id → { onChange }
   var WATCH = [];       // أسماء الخانات اللي بنركّب عليها
 
   function st(id) {
-    return ST[id] || (ST[id] = { f: {}, date: '', mode: 'in', picking: false });
+    return ST[id] || (ST[id] = { f: {}, date: '', to: '', mode: 'in', picking: false });
   }
 
   // ===== قراءة الجهاز — شغالة على الشكلين =====
@@ -104,7 +107,12 @@
   function match(id, d, q, base) {
     var s = ST[id];
     q = String(q == null ? '' : q).trim();
-    if (s && s.date && dayKey(val(d, s.mode === 'up' ? 'up' : 'in')) !== s.date) return false;
+    if (s && s.date) {
+      // يوم واحد: من = إلى · فترة: من ≤ اليوم ≤ إلى
+      // (المقارنة نصية آمنة لأن الشكل YYYY-MM-DD)
+      var k = dayKey(val(d, s.mode === 'up' ? 'up' : 'in'));
+      if (!k || k < s.date || k > (s.to || s.date)) return false;
+    }
     if (!q) return true;
     var ks = s ? FIELDS.filter(function (f) { return s.f[f.k]; }) : [];
     if (!ks.length) return base ? !!base(d, q) : true;      // مفيش فلتر → بحث الصفحة العادي
@@ -160,10 +168,15 @@
     document.head.appendChild(s);
   }
 
-  function dateLabel(v) {
-    if (!v) return '📅 تاريخ';
-    var p = v.split('-');
-    return '📅 ' + (+p[2]) + '/' + (+p[1]);
+  function dm(v) { var p = v.split('-'); return (+p[2]) + '/' + (+p[1]); }
+  function dateLabel(v) { return v ? '📅 ' + dm(v) : '📅 تاريخ'; }
+  function toLabel(v)   { return v ? 'إلى ' + dm(v) : 'إلى…'; }
+
+  // لو «إلى» قبل «من» → نبدّلهم. ولو زي بعض → يوم واحد.
+  function fixRange(s) {
+    if (s.date && s.to && s.to < s.date) { var t = s.to; s.to = s.date; s.date = t; }
+    if (s.to && s.to === s.date) s.to = '';
+    if (!s.date && s.to) { s.date = s.to; s.to = ''; }
   }
 
   function paint(inp) {
@@ -173,6 +186,10 @@
     var h = '<button type="button" class="ifx-c ifx-dt' + (s.date ? ' on' : '') + '">' +
               '<span class="ifx-dl">' + dateLabel(s.date) + '</span>' +
               '<input type="date" class="ifx-d" tabindex="-1" aria-label="تاريخ" value="' + (s.date || '') + '">' +
+            '</button>' +
+            '<button type="button" class="ifx-c ifx-m ifx-to' + (s.to ? ' on' : '') + '"' + (s.date ? '' : ' style="display:none"') + '>' +
+              '<span class="ifx-tl">' + toLabel(s.to) + '</span>' +
+              '<input type="date" class="ifx-d" tabindex="-1" aria-label="إلى تاريخ" value="' + (s.to || '') + '">' +
             '</button>' +
             '<button type="button" class="ifx-c ifx-m' + (s.mode === 'in' ? ' on' : '') + '" data-m="in">دخول</button>' +
             '<button type="button" class="ifx-c ifx-m' + (s.mode === 'up' ? ' on' : '') + '" data-m="up">تحديث</button>' +
@@ -198,31 +215,30 @@
 
   function wireDate(inp, bar) {
     var id = inp.id;
-    var d = bar.querySelector('input.ifx-d');
-    var lbl = bar.querySelector('.ifx-dl');
-    var chip = bar.querySelector('.ifx-dt');
-    var x = bar.querySelector('.ifx-x');
-    if (!d) return;
-    // وإنت بتختار → خانتين النوع يظهروا
-    d.addEventListener('focus', function () { st(id).picking = true; bar.classList.add('dt'); });
-    d.addEventListener('click', function () {
-      st(id).picking = true; bar.classList.add('dt');
-      // الكمبيوتر: الدوسة على الخانة مبتفتحش النتيجة لوحدها
-      try { if (!(window.matchMedia && matchMedia('(pointer: coarse)').matches) && d.showPicker) d.showPicker(); } catch (e) {}
-    });
-    d.addEventListener('change', function () {
-      var s = st(id);
-      s.date = d.value || '';
-      lbl.textContent = dateLabel(s.date);
-      chip.classList.toggle('on', !!s.date);
-      if (x) x.style.display = s.date ? '' : 'none';
-      bar.classList.toggle('dt', !!(s.date || s.picking));
-      fire(id);
-    });
-    d.addEventListener('blur', function () {
-      var s = st(id);
-      s.picking = false;
-      if (!s.date) bar.classList.remove('dt');
+    var ins = bar.querySelectorAll('input.ifx-d');   // [0] = من · [1] = إلى
+    ins.forEach(function (d, i) {
+      var key = i === 0 ? 'date' : 'to';
+      // وإنت بتختار → الخانات الصغيرة تظهر
+      d.addEventListener('focus', function () { st(id).picking = true; bar.classList.add('dt'); });
+      d.addEventListener('click', function () {
+        st(id).picking = true; bar.classList.add('dt');
+        // الكمبيوتر: الدوسة على الخانة مبتفتحش النتيجة لوحدها
+        try { if (!(window.matchMedia && matchMedia('(pointer: coarse)').matches) && d.showPicker) d.showPicker(); } catch (e) {}
+      });
+      d.addEventListener('change', function () {
+        var s = st(id);
+        s[key] = d.value || '';
+        if (key === 'date' && !s.date) s.to = '';       // مسحت «من» → الفترة كلها اتشالت
+        fixRange(s);
+        s.picking = false;
+        paint(inp);                                     // الترتيب ممكن يكون اتبدّل — نرسم من جديد
+        fire(id);
+      });
+      d.addEventListener('blur', function () {
+        var s = st(id);
+        s.picking = false;
+        if (!s.date) bar.classList.remove('dt');
+      });
     });
   }
 
@@ -230,7 +246,7 @@
     var bar = e.currentTarget;
     var id = bar.getAttribute('data-for');
     var b = e.target.closest ? e.target.closest('button.ifx-c') : null;
-    if (!b || !id || b.classList.contains('ifx-dt')) return;
+    if (!b || !id || b.classList.contains('ifx-dt') || b.classList.contains('ifx-to')) return;
     var s = st(id);
     if (b.hasAttribute('data-f')) {
       var k = b.getAttribute('data-f');
@@ -244,7 +260,7 @@
       });
       if (s.date) fire(id);
     } else if (b.hasAttribute('data-x')) {
-      s.date = ''; s.picking = false;
+      s.date = ''; s.to = ''; s.picking = false;
       var inp = document.getElementById(id);
       if (inp) paint(inp);
       fire(id);
