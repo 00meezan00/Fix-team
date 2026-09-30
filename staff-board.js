@@ -6,11 +6,13 @@
         🟢 أخضر   = حضر وشغّال (أو رجع من البريك)
         🟡 أصفر   = طالع بريك
         🟣 بنفسجي = انصرف
-        🔵 أزرق   = نسي ينصرف (حضر وما سجّلش انصراف، والوردية عدّت الحد)
+        🔵 أزرق   = نسي ينصرف (يوم الشغل اللي فات خلص ١٠ الصبح وهو ما انصرفش)
         🔴 أحمر   = مجاش خالص النهاردة
       وتحت اسمه سطر بمواعيد الوردية دي:
         🟢 حضور ١٠:٠٢ · ☕ بريك ٢:١٥ · ▶️ رجع ٢:٤٥ · 🟣 انصراف ٨:٠٠
-      ولما يوم جديد يبدأ، السطر بيتفضّى لوحده ويبدأ من الأول.
+      📅 يوم الشغل بيبدأ ١٠ الصبح وبيخلص ١٠ الصبح اللي بعده (قاعدة المحل).
+         الساعة ١٠ الصبح الصفحة بتتفضّى، واللي لسه ما انصرفش بيبقى
+         🔵 نسي ينصرف. الحساب كله في السيرفر (hr_staff_board).
 
    🔑 كل الحساب في السيرفر: دالة hr_staff_board (ملف 65).
       الصفحة دي بتعرض بس — مفيش ولا سطر بيكتب في أي جدول.
@@ -64,10 +66,6 @@
       return new Date(iso).toLocaleTimeString('ar-EG',
         { hour:'numeric', minute:'2-digit', timeZone:'Africa/Cairo' });
     }catch(e){ return ''; }
-  }
-  function todayCairo(){
-    try{ return new Date().toLocaleDateString('sv-SE', { timeZone:'Africa/Cairo' }); }
-    catch(e){ return new Date().toISOString().slice(0,10); }
   }
   function minsSince(iso){
     var t = new Date(iso).getTime();
@@ -275,16 +273,12 @@
     if(r.status === 'break')  bits.push('في بريك من ' + hm(r.since) + ' (' + durTxt(minsSince(r.since)) + ')');
     if(r.status === 'out')    bits.push('انصرف ' + hm(r.since));
     if(r.status === 'absent') bits.push(r.is_off ? '🏖️ النهاردة يوم إجازته' : 'لسه مسجّلش حضور النهاردة');
-    var yday = !!(r.work_date && String(r.work_date).slice(0,10) !== todayCairo());
     if(r.status === 'forgot'){
-      // ⚠️ مبنقولش «مجاش» — هو جه فعلاً. اللي ناقص الانصراف بس،
-      //    والـHR تقدر تكتبه يدوي من «✍️ تسجيل يدوي».
-      bits.push('⚠️ ' + (yday ? 'امبارح ' : '') + 'آخر تسجيل ' + hm(r.since) + ' وما سجّلش انصراف');
-      if(yday && r.is_off === false) bits.push('ولسه ماجاش النهاردة');
-      return bits.filter(Boolean).join(' · ');
+      // ⚠️ مبنقولش «مجاش» — هو جه فعلاً في يوم الشغل اللي فات، واللي
+      //    ناقص الانصراف بس. الـHR تقدر تكتبه يدوي من «✍️ تسجيل يدوي».
+      bits.push('⚠️ الوردية اللي فاتت: آخر تسجيل ' + hm(r.since) + ' وما سجّلش انصراف');
+      bits.push(r.is_off ? '🏖️ النهاردة يوم إجازته' : 'ولسه ماجاش النهاردة');
     }
-    // وردية بدأت امبارح ولسه مكمّلة (أو انصرف بعد نص الليل)
-    if(yday) bits.push('🌙 وردية امبارح');
     return bits.filter(Boolean).join(' · ');
   }
 
