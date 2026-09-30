@@ -798,6 +798,45 @@ async function doLogout(){
   location.href = 'index.html';
 }
 
+// ============================================================
+// 📄 القراية على صفحات — عشان ولا تسجيل يضيع
+// ------------------------------------------------------------
+// 🐞 الباج اللي اتصلّح (سبتمبر ٢٠٢٦):
+//    Supabase **بيدّي ١٠٠٠ صف بس في المرة** — ده حد ثابت عنده.
+//    الصفحة كانت بتطلب «كل تسجيلات الشهر» وتاخد اللي جه وتسكت.
+//    شهر ٩ وصل ١٠١٥ تسجيل، فآخر ١٥ اتقصّوا في صمت. ولأن الترتيب
+//    من الأقدم للأحدث، اللي بيتقص هو **أحدث حاجة** — يعني الانصراف
+//    اللي لسه حاصل. الموظف شايفه عنده (هو بيقرا تسجيلاته بس)،
+//    و HR مش شايفاه، واليوم يبان «ناقص انصراف» فالأوفر تايم
+//    والنقص مايتحسبوش. وكل يوم في الشهر كان هيقص أكتر.
+//
+// ✅ دلوقتي بنطلب صفحة ورا صفحة لحد ما السيرفر يرجّع فاضي.
+//
+// ⚠️ بنتحرك بعدد اللي **رجع فعلاً** مش بـ ١٠٠٠. لو حد غيّر الحد
+//    في إعدادات Supabase لـ ٥٠٠ مثلاً، الطريقة التانية كانت هتفتكر
+//    «رجع أقل من ١٠٠٠ يبقى خلصنا» — ونرجع لنفس الباج.
+//
+// ⚠️ makeQuery لازم فيها ترتيب **ثابت** (order). من غيره السيرفر
+//    ممكن يرجّع نفس الصف في صفحتين، أو يفوّت صف بين صفحتين.
+// ============================================================
+const HR_PAGE = 1000;
+async function hrAll(makeQuery, label){
+  const rows = [];
+  for(let off = 0, guard = 0; ; guard++){
+    if(guard >= 200){
+      // ٢٠٠ ألف صف — أكيد فيه حاجة غلط. بنقول بدل ما نلف للأبد.
+      throw new Error('البيانات أكبر من المتوقع (' + (label || 'قراءة') + ') — كلّم المطوّر');
+    }
+    const { data, error } = await makeQuery().range(off, off + HR_PAGE - 1);
+    // ⚠️ Supabase مبيرميش خطأ — بيرجّعه في .error
+    if(error) throw error;
+    if(!data || !data.length) break;
+    rows.push(...data);
+    off += data.length;
+  }
+  return rows;
+}
+
 // ===== التحميل =====
 async function loadMonth(){
   const root = document.getElementById('root');
@@ -807,15 +846,15 @@ async function loadMonth(){
   // اليوم صفر من الشهر اللي بعده = آخر يوم في الشهر ده
   const to = new Date(Date.UTC(y, m, 0)).toISOString().slice(0,10);
   try{
-    const { data, error } = await sb.from('attendance')
+    // 🔴 على صفحات — شوف hrAll فوق. id في الترتيب عشان تسجيلين
+    //    في نفس الثانية بالظبط ما يتلخبطوش بين صفحتين.
+    ROWS = await hrAll(() => sb.from('attendance')
       // ⚠️ id لازم يكون هنا — من غيره مفيش تعديل ولا مسح.
       //    و manual_by هو ختم «اتكتب بإيد HR».
       .select('id,user_email,user_name,kind,at,work_date,distance_m,verified,manual_by,manual_note')
       .gte('work_date', from).lte('work_date', to)
-      .order('at', { ascending:true });
-    // ⚠️ Supabase مبيرميش خطأ — بيرجّعه في .error
-    if(error) throw error;
-    ROWS = data || [];
+      .order('at', { ascending:true })
+      .order('id', { ascending:true }), 'سجل الحضور');
     await loadEmpSettings();   // القواعد لازم تكون موجودة قبل الرسم
     await loadPenaltyStart();       // الحاجز لازم يتقرا قبل العرض
     await loadPenalties(from, to);  // 🔴 خصم التأخير — من السيرفر
@@ -987,10 +1026,16 @@ function cardHtml(e, days){
     ${(() => {
       // شريط الخصم اليدوي — بيظهر لو فيه خصم بس، عشان الكارت
       // ما يتزحمش على الموظفين اللي مالهمش خصومات
-      const m = manualDed(e);
-      if(!m.total) return '';
-      return `<div class="card-ded">💸 خصم يدوي: <b>${m.total}</b> ج.م${
-        m.unseen ? ` · <i>${m.unseen} لسه ما اتقراش</i>` : ''}</div>`;
+      // ⚠️ الشهر المعروض بس — زي باقي أرقام الكارت (الساعات
+      //    والأوفر تايم). قبل كده كان مجموع كل الشهور جنب أرقام
+      //    شهر واحد، والمسحوبات متجمعة معاه كمان.
+      const m = manualDed(e, MONTH);
+      if(!m.total && !m.wd && !m.unseen) return '';
+      const bits = [];
+      if(m.total) bits.push(`💸 خصم يدوي: <b>${m.total}</b> ج.م`);
+      if(m.wd)    bits.push(`🔩 مسحوبات: <b>${m.wd}</b> ج.م`);
+      if(m.unseen) bits.push(`<i>${m.unseen} لسه ما اتقراش</i>`);
+      return `<div class="card-ded">${bits.join(' · ')}</div>`;
     })()}
     ${absBoxHtml(e)}
     <div class="card-foot">
@@ -1327,9 +1372,10 @@ let OVER = {};
 
 async function loadOvertime(from, to){
   try{
-    const { data, error } = await sb.rpc('hr_overtime',
-      { p_email: null, p_from: from, p_to: to });
-    if(error) throw error;
+    // 🔴 على صفحات هي كمان — موظف × يوم بيعدّي الـ ١٠٠٠ بسرعة
+    const data = await hrAll(() => sb.rpc('hr_overtime',
+      { p_email: null, p_from: from, p_to: to })
+      .order('user_email').order('work_date'), 'الأوفر تايم');
     OVER = {};
     (data || []).forEach(r => {
       const e = (r.user_email || '').toLowerCase();
@@ -1349,9 +1395,10 @@ async function loadOvertime(from, to){
 async function loadPenalties(from, to){
   try{
     // p_email فاضي = كل الموظفين (مسموح لـ HR والأدمن بس)
-    const { data, error } = await sb.rpc('hr_late_penalties',
-      { p_email: null, p_from: from, p_to: to });
-    if(error) throw error;
+    // 🔴 على صفحات — نفس سبب hrAll
+    const data = await hrAll(() => sb.rpc('hr_late_penalties',
+      { p_email: null, p_from: from, p_to: to })
+      .order('user_email').order('work_date'), 'خصم التأخير');
     PENS = {};
     (data || []).forEach(r => {
       const e = (r.user_email || '').toLowerCase();
@@ -1379,9 +1426,9 @@ let ABS = {};   // إيميل → { تاريخ: صف }
 
 async function loadAbsences(from, to){
   try{
-    const { data, error } = await sb.rpc('hr_absences',
-      { p_email: null, p_from: from, p_to: to });
-    if(error) throw error;
+    const data = await hrAll(() => sb.rpc('hr_absences',
+      { p_email: null, p_from: from, p_to: to })
+      .order('user_email').order('work_date'), 'الغياب');
     ABS = {};
     (data || []).forEach(r => {
       const e = (r.user_email || '').toLowerCase();
@@ -1539,9 +1586,9 @@ let NOBRK = {};
 
 async function loadNoBreak(from, to){
   try{
-    const { data, error } = await sb.from('hr_no_break')
-      .select('user_email,work_date').gte('work_date', from).lte('work_date', to);
-    if(error) throw error;
+    const data = await hrAll(() => sb.from('hr_no_break')
+      .select('user_email,work_date').gte('work_date', from).lte('work_date', to)
+      .order('user_email').order('work_date'), 'مطلعتش بريك');
     NOBRK = {};
     (data || []).forEach(r => {
       const e = (r.user_email || '').toLowerCase();
@@ -1561,10 +1608,10 @@ let BRKD = {};
 
 async function loadBreakDecl(from, to){
   try{
-    const { data, error } = await sb.from('hr_break_declarations')
+    const data = await hrAll(() => sb.from('hr_break_declarations')
       .select('user_email,work_date,answer,hours_min,amount')
-      .gte('work_date', from).lte('work_date', to);
-    if(error) throw error;
+      .gte('work_date', from).lte('work_date', to)
+      .order('user_email').order('work_date'), 'إقرارات البريك');
     BRKD = {};
     (data || []).forEach(r => {
       const e = (r.user_email || '').toLowerCase();
@@ -2155,11 +2202,13 @@ let DED_EMAIL = '';       // الموظف المفتوح في شاشة الخص�
 async function loadDeductions(){
   try{
     // ⚠️ ترتيب قبل قص — أحدث خصم لازم يبان حتى لو العدد وصل الحد
-    const { data, error } = await sb.from('hr_deductions')
-      .select('id,user_email,amount,reason,work_date,created_at,created_by,seen_at,waived_at,waived_by,waive_reason')
+    // 🔴 على صفحات (شوف hrAll) — كان فيه .limit(1000)، وده معناه إن
+    //    أول ما الخصومات تعدّي ١٠٠٠ (مسحوبات الإكسل بتزوّد كتير)،
+    //    الأقدم يختفي والمجموع يقل في صمت.
+    const data = await hrAll(() => sb.from('hr_deductions')
+      .select('id,user_email,amount,reason,work_date,kind,created_at,created_by,seen_at,waived_at,waived_by,waive_reason')
       .order('created_at', { ascending:false })
-      .limit(1000);
-    if(error) throw error;
+      .order('id', { ascending:true }), 'الخصومات');
     DEDS = {};
     (data || []).forEach(r => {
       const e = (r.user_email || '').toLowerCase();
@@ -2176,20 +2225,31 @@ async function loadDeductions(){
   }
 }
 
-// مجموع الخصم اليدوي لموظف (كله، مش الشهر المعروض)
+// مجموع الخصم اليدوي لموظف
 // ⚠️ اللي اتشال **مش داخل في المجموع** — بس بيفضل في القايمة
 //    بختم مين شاله وليه. لو شلناه من القايمة كمان، محدش هيعرف
 //    إن كان فيه خصم أصلاً.
-function manualDed(email){
-  const list = DEDS[(email||'').toLowerCase()] || [];
-  let total = 0, unseen = 0, waived = 0;
+//
+// 🐞 اتصلّح: مسحوبات الإكسل (kind='withdrawal') كانت بتتجمع مع
+//    الخصم اليدوي في رقم واحد. المسحوبات فلوس الموظف أخدها مقدّم
+//    مش عقوبة — وكشف الراتب في السيرفر بيفصلهم. دلوقتي:
+//      total = الخصم اليدوي بس · wd = المسحوبات لوحدها
+//
+// ym (اختياري، 'YYYY-MM'): المجموع لشهر واحد بس (حسب work_date).
+//    من غيره = كل التاريخ. «لسه ما اتقراش» دايماً على كل التاريخ —
+//    عشان HR تعرف إن فيه رسالة واقفة حتى لو من شهر فات.
+function manualDed(email, ym){
+  const all = DEDS[(email||'').toLowerCase()] || [];
+  const list = ym ? all.filter(r => String(r.work_date || '').slice(0,7) === ym) : all;
+  let total = 0, wd = 0, unseen = 0, waived = 0;
   list.forEach(r => {
-    if(r.waived_at){ waived++; }
-    else { total += Number(r.amount || 0); }
-    if(!r.seen_at) unseen++;
+    if(r.waived_at){ waived++; return; }
+    if(r.kind === 'withdrawal') wd += Number(r.amount || 0);
+    else total += Number(r.amount || 0);
   });
-  return { total: Math.round(total * 100) / 100, unseen, waived,
-           count: list.length, list };
+  all.forEach(r => { if(!r.seen_at) unseen++; });
+  return { total: Math.round(total * 100) / 100, wd: Math.round(wd * 100) / 100,
+           unseen, waived, count: list.length, list };
 }
 
 // خصم التأخير التلقائي لموظف في الشهر المعروض
@@ -2211,9 +2271,12 @@ function dedRowHtml(r){
   const w = !!r.waived_at;
   return `
     <div class="ded-row${w ? ' waived' : (r.seen_at ? '' : ' unseen')}">
-      <div class="ded-amt" ${w ? 'style="text-decoration:line-through;opacity:.55;"' : ''}>−${Number(r.amount)}</div>
+      <div class="ded-amt" ${w ? 'style="text-decoration:line-through;opacity:.55;"' : ''}>${
+        /* مبلغ بالسالب = سداد مسحوبات — «−-200» بتلخبط، فبنكتب + */
+        Number(r.amount) < 0 ? '+' + Math.abs(Number(r.amount)) : '−' + Number(r.amount)}</div>
       <div class="ded-mid">
-        <b ${w ? 'style="text-decoration:line-through;opacity:.6;"' : ''}>${esc(r.reason)}</b>
+        <b ${w ? 'style="text-decoration:line-through;opacity:.6;"' : ''}>${
+          r.kind === 'withdrawal' ? '🔩 ' : ''}${esc(r.reason)}</b>
         <span>${new Date(r.created_at).toLocaleDateString('ar-EG',
           { day:'numeric', month:'long', year:'numeric' })}
           · ${w ? '✋ اتشال' : (r.seen_at ? '✔️ قراه الموظف' : '🔔 لسه ما قراهوش')}</span>
@@ -2232,9 +2295,9 @@ function dedSectionHtml(email){
   return `
     <div style="margin-top:18px;">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:9px;">
-        <b style="flex:1;font-size:14px;">💸 الخصومات اليدوية</b>
+        <b style="flex:1;font-size:14px;">💸 الخصومات اليدوية والمسحوبات</b>
         <span style="font-size:12.5px;font-weight:800;color:var(--red);">
-          ${m.total} ج.م${m.unseen ? ` · ${m.unseen} لسه ما اتقراش` : ''}</span>
+          ${m.total} ج.م${m.wd ? ` · 🔩 ${m.wd} مسحوبات` : ''}${m.unseen ? ` · ${m.unseen} لسه ما اتقراش` : ''}</span>
       </div>
       ${m.list.map(dedRowHtml).join('')}
     </div>`;
@@ -2317,7 +2380,7 @@ async function saveDeduction(){
     renderDeduction();
     // ⚠️ لو الخصم اتعمل من صفحة المرتبات، لازم أرقامها تتحدّث كمان —
     //    من غير السطر ده الصافي بيفضل قديم قدام عين المستخدم.
-    if(document.getElementById('paySheet').classList.contains('open')) renderPayrollAdmin();
+    await payAdminReload();   // الكارت بياخد أرقامه من الكشف — لازم يتقرا تاني
     const a = document.getElementById('dedAmt'); if(a) a.value = '';
     const w = document.getElementById('dedWhy'); if(w) w.value = '';
     alert('✅ اتسجّل الخصم — هيوصل للموظف في شاشة «مرتبك»');
@@ -2340,7 +2403,7 @@ async function deleteDeduction(id){
     await loadDeductions();
     render();
     if(document.getElementById('dedSheet').classList.contains('open')) renderDeduction();
-    if(document.getElementById('paySheet').classList.contains('open')) renderPayrollAdmin();
+    await payAdminReload();   // الكارت بياخد أرقامه من الكشف — لازم يتقرا تاني
     alert('اتمسح ✅');
   }catch(e){
     console.error('deleteDeduction failed:', e);
@@ -2634,7 +2697,7 @@ async function savePenaltyStart(){
     if(error) throw error;
     // إعادة تحميل كاملة: كل الخصومات بتتحسب من أول وجديد
     await loadMonth();
-    if(document.getElementById('paySheet').classList.contains('open')) renderPayrollAdmin();
+    await payAdminReload();   // الكارت بياخد أرقامه من الكشف — لازم يتقرا تاني
     alert('✅ اتحفظ — الخصومات اتحسبت من أول وجديد');
   }catch(e){
     console.error('savePenaltyStart failed:', e);
@@ -3086,7 +3149,7 @@ async function waiveDeduction(id){
     await loadDeductions();
     render();
     if(document.getElementById('dedSheet').classList.contains('open')) renderDeduction();
-    if(document.getElementById('paySheet').classList.contains('open')) renderPayrollAdmin();
+    await payAdminReload();   // الكارت بياخد أرقامه من الكشف — لازم يتقرا تاني
     alert('✅ الخصم اتشال — والموظف هيشوف السبب');
   }catch(e){
     console.error('waiveDeduction failed:', e);
@@ -3102,7 +3165,7 @@ async function unwaiveDeduction(id){
     await loadDeductions();
     render();
     if(document.getElementById('dedSheet').classList.contains('open')) renderDeduction();
-    if(document.getElementById('paySheet').classList.contains('open')) renderPayrollAdmin();
+    await payAdminReload();   // الكارت بياخد أرقامه من الكشف — لازم يتقرا تاني
   }catch(e){
     console.error('unwaiveDeduction failed:', e);
     alert('❌ ' + (e.message || e));
@@ -3190,6 +3253,57 @@ async function loadSalaries(){
   }
 }
 
+// ============================================================
+// 🧾 أرقام الكارت من كشف الراتب نفسه — مصدر واحد
+// ------------------------------------------------------------
+// 🐞 الباج اللي اتصلّح:
+//    الكارت كان بيحسب الصافي هنا في الصفحة:
+//        مرتب **شهر واحد** − خصومات **كل الشهور** − تأخير الشهر
+//    وكمان مسحوبات الإكسل كانت متجمعة مع الخصم اليدوي، والأوفر
+//    تايم مش داخل خالص. فمن تاني شهر الرقم بيطلع أقل من الحقيقة،
+//    ومختلف عن زرار «🧾 الكشوف» اللي جنبه.
+//
+// ✅ دلوقتي الكارت بيقرا من hr_payroll_periods — نفس الدالة اللي
+//    الكشف وشاشة «مرتبك» عند الموظف بيقروا منها. رقم واحد في
+//    تلات أماكن، ومستحيل يختلفوا.
+//
+// الشهر = الشهر المعروض في الصفحة الرئيسية (MONTH).
+// ============================================================
+let PAYROWS = {};      // إيميل → { 'YYYY-MM-01': صف الكشف }
+let PAYROWS_ERR = '';
+
+async function loadPayRows(){
+  PAYROWS_ERR = '';
+  try{
+    const data = await hrAll(() => sb.rpc('hr_payroll_periods', { p_email: null })
+      .order('user_email').order('period'), 'كشوف الرواتب');
+    PAYROWS = {};
+    data.forEach(r => {
+      const e = (r.user_email || '').toLowerCase();
+      (PAYROWS[e] = PAYROWS[e] || {})[String(r.period).slice(0,10)] = r;
+    });
+  }catch(e){
+    // بنقول بصوت عالي — الكارت الفاضي هنا معناه «صافي صفر» وده كدب
+    console.error('loadPayRows failed:', e);
+    PAYROWS = {};
+    PAYROWS_ERR = (e && e.message) ? e.message : String(e);
+  }
+}
+
+// بتتنده بعد أي تغيير فلوس (مرتب · خصم · شيل · تاريخ البداية)
+// ⚠️ لو الصفحة مقفولة مبتعملش حاجة — مفيش داعي نحمّل على الفاضي
+async function payAdminReload(){
+  const sh = document.getElementById('paySheet');
+  if(!sh || !sh.classList.contains('open')) return;
+  await loadSalaries();
+  await loadPayRows();
+  renderPayrollAdmin();
+}
+
+function payRowOf(email){
+  return (PAYROWS[(email||'').toLowerCase()] || {})[MONTH + '-01'] || null;
+}
+
 async function openPayrollAdmin(){
   PAY_Q = '';
   const box = document.getElementById('payBody');
@@ -3200,6 +3314,7 @@ async function openPayrollAdmin(){
   //    والصفحة مفتوحة من ساعة
   await loadSalaries();
   await loadDeductions();
+  await loadPayRows();
   renderPayrollAdmin();
 }
 
@@ -3221,43 +3336,50 @@ function renderPayrollAdmin(){
     return;
   }
 
-  // ملخص فوق: كام مرتب متحدد، وإجمالي المرتبات والخصومات
-  let setN = 0, totSal = 0, totDed = 0;
+  // ملخص فوق: كام مرتب متحدد، وإجمالي المرتبات والخصومات والصافي
+  // ⚠️ كله للشهر المعروض بس — من نفس صفوف الكشف
+  let setN = 0, totSal = 0, totDed = 0, totNet = 0;
   allPeople().forEach(e => {
     if(SALS[e] != null){ setN++; totSal += SALS[e]; }
-    totDed += manualDed(e).total + lateDed(e).total;
+    const r = payRowOf(e);
+    if(r){
+      totDed += Number(r.manual_ded || 0) + Number(r.late_ded || 0);
+      totNet += Number(r.net || 0);
+    }
   });
+  const n = v => Math.round(v * 100) / 100;
 
   box.innerHTML = `
     ${penStartHtml()}
 
-    <div class="kpis" style="margin:14px 0 16px;">
+    <div style="margin:14px 2px 0;font-weight:900;font-size:13.5px;color:var(--ink-2);">
+      🗓️ أرقام شهر ${esc(monthLabel())}
+      <span style="font-weight:400;font-size:11.5px;color:var(--muted);">— غيّر الشهر من الصفحة الرئيسية</span>
+    </div>
+    ${PAYROWS_ERR ? `<div class="hintbox" style="margin-top:10px;background:var(--rejected-bg,#FEF2F2);color:var(--red);">
+      ❌ مقدرناش نقرا الكشوف — الأرقام تحت <b>مش مضمونة</b>.<br><small>${esc(PAYROWS_ERR)}</small></div>` : ''}
+
+    <div class="kpis" style="margin:10px 0 16px;">
       <div class="kpi"><div class="v">${setN}/${allPeople().length}</div><div class="l">مرتب متحدد</div></div>
-      <div class="kpi"><div class="v">${totSal.toLocaleString('en-US')}</div><div class="l">إجمالي المرتبات</div></div>
-      <div class="kpi"><div class="v" style="color:${totDed?'var(--red)':'inherit'}">${totDed.toLocaleString('en-US')}</div><div class="l">كل الخصومات</div></div>
+      <div class="kpi"><div class="v">${n(totSal).toLocaleString('en-US')}</div><div class="l">إجمالي المرتبات</div></div>
+      <div class="kpi"><div class="v" style="color:${totDed?'var(--red)':'inherit'}">${n(totDed).toLocaleString('en-US')}</div><div class="l">خصومات الشهر</div></div>
+      <div class="kpi"><div class="v" style="color:var(--done)">${n(totNet).toLocaleString('en-US')}</div><div class="l">إجمالي الصافي</div></div>
     </div>
     ${list.map(prCardHtml).join('')}`;
 }
 
-// مجموع ساعات الشهر المعروض لموظف
-function monthHours(email){
-  const byDay = OVER[(email||'').toLowerCase()] || {};
-  let over = 0, short = 0;
-  Object.keys(byDay).forEach(d => {
-    over  += Number(byDay[d].over_min  || 0);
-    short += Number(byDay[d].short_min || 0);
-  });
-  return { over, short, net: over - short };
-}
-
 function prCardHtml(e){
-  const m   = manualDed(e);
-  // ⚠️ خصم التأخير بتاع **الشهر المعروض فوق في الصفحة الرئيسية**
-  //    مش كل التاريخ — عشان يتماشى مع المرتب الشهري.
-  const lt  = lateDed(e);
+  const m   = manualDed(e);          // للجرس بس («لسه ما اتقراش»)
+  const lt  = lateDed(e);            // لعدد أيام التأخير في الشهر
   const sal = SALS[e];
   const has = sal != null;
-  const net = (has ? sal : 0) - m.total - lt.total;
+  // 🔴 الأرقام من كشف الراتب — شوف الشرح فوق loadPayRows
+  const r   = payRowOf(e);
+  const man = r ? Number(r.manual_ded   || 0) : 0;
+  const wdr = r ? Number(r.withdraw_ded || 0) : 0;
+  const lat = r ? Number(r.late_ded     || 0) : 0;
+  const net = r ? Number(r.net          || 0) : null;
+  const money = v => (Math.round(Number(v || 0) * 100) / 100).toLocaleString('en-US');
   // معرّف آمن للخانة: الإيميل فيه @ و . فمينفعش يبقى id مباشرة
   const uid = 'sal_' + e.replace(/[^a-z0-9]/gi, '_');
   return `
@@ -3277,31 +3399,40 @@ function prCardHtml(e){
       <button onclick="saveSalary('${esc(e)}','${uid}')">💾</button>
     </div>
 
-    <div class="pr-nums" style="grid-template-columns:repeat(3,1fr);">
+    <div class="pr-nums">
       <div>
-        <b style="color:${m.total ? 'var(--red)' : 'inherit'}">${m.total.toLocaleString('en-US')}</b>
+        <b style="color:${man ? 'var(--red)' : 'inherit'}">${money(man)}</b>
         <span>خصم يدوي</span>
       </div>
       <div>
-        <b style="color:${lt.total ? 'var(--red)' : 'inherit'}">${lt.total.toLocaleString('en-US')}</b>
+        <b style="color:${lat ? 'var(--red)' : 'inherit'}">${money(lat)}</b>
         <span>خصم تأخير</span>
       </div>
       <div>
-        <b style="color:${has ? (net < 0 ? 'var(--red)' : 'var(--done)') : 'var(--muted)'}">${
-          has ? net.toLocaleString('en-US') : '—'}</b>
+        <b style="color:${wdr ? 'var(--red)' : 'inherit'}">${money(wdr)}</b>
+        <span>🔩 مسحوبات</span>
+      </div>
+      <div>
+        <b style="color:${net == null ? 'var(--muted)' : (net < 0 ? 'var(--red)' : 'var(--done)')}">${
+          net == null ? '—' : money(net)}</b>
         <span>الصافي ج.م</span>
       </div>
     </div>
 
     ${(() => {
-      const h = monthHours(e);
-      if(!h.over && !h.short) return '';
-      const plus = h.net >= 0;
+      // الأوفر تايم/العجز **بالفلوس** زي ما هو في الكشف بالظبط
+      if(!r) return '';
+      const om = Number(r.over_min || 0), sm = Number(r.short_min || 0);
+      if(!om && !sm) return '';
+      const nm = Number(r.net_min || 0), amt = Number(r.overtime_amt || 0);
+      const plus = nm >= 0;
       return `<div class="pr-bell" style="color:${plus ? 'var(--done)' : 'var(--red)'};">
-        ${plus ? '⏫ أوفر تايم' : '⏬ عجز ساعات'} ${fmtDur(Math.abs(h.net))}
-        <span style="opacity:.75;font-weight:400;">(زيادة ${fmtDur(h.over)} · ناقص ${fmtDur(h.short)})</span>
+        ${plus ? '⏫ أوفر تايم' : '⏬ عجز ساعات'} ${fmtDur(Math.abs(nm))} = ${plus ? '+' : '−'}${money(Math.abs(amt))} ج.م
+        <span style="opacity:.75;font-weight:400;">(زيادة ${fmtDur(om)} · ناقص ${fmtDur(sm)})</span>
       </div>`;
     })()}
+    ${r && r.paid ? `<div class="pr-bell" style="color:var(--done);">🔒 مرتب الشهر ده اتصرف — الأرقام متقفلة</div>` : ''}
+    ${!r && has ? `<div class="pr-bell" style="color:var(--muted);">مفيش كشف للشهر ده (مفيش حضور ولا خصومات فيه)</div>` : ''}
     ${lt.days ? `<div class="pr-bell" style="color:var(--waiting);">⏰ ${lt.days} يوم تأخير
       محسوب تلقائي — تقدر تشيله من 📋 السجل</div>` : ''}
     ${m.unseen ? `<div class="pr-bell">🔔 ${m.unseen} رسالة لسه ما قراهاش الموظف</div>` : ''}
@@ -3336,7 +3467,7 @@ async function saveSalary(email, uid){
     SALS[email] = amt;
     if(btn){ btn.textContent = '✅'; }
     // بنعيد الرسم بعد لحظة عشان الصافي يتحدّث، والعلامة تبان للمستخدم
-    setTimeout(renderPayrollAdmin, 700);
+    setTimeout(payAdminReload, 700);
   }catch(e){
     console.error('saveSalary failed:', e);
     if(btn){ btn.disabled = false; btn.textContent = '💾'; }

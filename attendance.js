@@ -579,8 +579,14 @@ async function attPunch(kind){
     // ⚠️ التنبيه بيتحط في **نفس الرسالة** مش في alert تانية.
     //    اتنين ورا بعض على الموبايل: الأولى بتتقفل بالغلط والتانية
     //    بتبان من غير سياق — والموظف يفتكر إن فيه حاجة بايظة.
+    // 🐞 اليوم بياخده من **التسجيل نفسه** (data.work_date) — مش من
+    //    _attState. بعد انصراف بعد نص الليل، attLoadState اللي فوق
+    //    كانت بترجّع اليوم الجديد (فاضي)، فالتنبيه كان بيدوّر على
+    //    ساعات يوم مفيهوش حاجة ويسكت — والموظف ما يعرفش إنه ناقص.
+    //    السيرفر (hr_punch) هو اللي قرر اليوم، فبناخده منه.
     let extra = '';
-    try{ extra = await attDayWarning(kind); }catch(e){ console.error('attDayWarning:', e); }
+    try{ extra = await attDayWarning(kind, (data && data.work_date) || _attState.work_date); }
+    catch(e){ console.error('attDayWarning:', e); }
 
     alert('✅ اتسجّل — ' + ATT_LABELS[kind].t + '\n' +
           new Date(data.at).toLocaleString('ar-EG', { timeZone:'Africa/Cairo' }) +
@@ -624,13 +630,14 @@ async function attPunch(kind){
 //    اتم خلاص والرسالة بتطلع من غير السطر الزيادة وبس. التنبيه
 //    خدمة إضافية مش شرط.
 // ============================================================
-async function attDayWarning(kind){
+async function attDayWarning(kind, wd){
+  wd = wd || _attState.work_date || null;   // يوم الوردية اللي اتسجّل عليه
   // البريك والاستئناف: الوردية لسه شغّالة، فأي كلام عن نقص
   // ساعات دلوقتي هيبقى مضلّل.
   if(kind !== 'in' && kind !== 'out') return '';
 
   const { data, error } = await sb.rpc('hr_my_day_status',
-    { p_date: _attState.work_date || null });
+    { p_date: wd });
   if(error) throw error;
 
   const r = Array.isArray(data) ? data[0] : data;
@@ -680,7 +687,7 @@ async function attDayWarning(kind){
   let d = null;
   try{
     const { data:ov, error:e2 } = await sb.rpc('hr_overtime',
-      { p_email:null, p_from:_attState.work_date, p_to:_attState.work_date });
+      { p_email:null, p_from:wd, p_to:wd });
     if(!e2 && ov && ov.length) d = ov[0];
   }catch(e){ console.error('hr_overtime (warning):', e); }
 
@@ -729,8 +736,30 @@ async function attLoadState(){
   }catch(e){}
 }
 
+// ============================================================
+// 🐞 مين أنا؟ — لازم في كل قراية من جدول الحضور
+// ------------------------------------------------------------
+// الموظف العادي قاعدة البيانات بتديله تسجيلاته هو بس، فكان
+// باين إن الفلتر مش لازم. **بس HR والأدمن بيشوفوا تسجيلات الكل**
+// (دي صلاحيتهم في شاشة HR). فلما HR تفتح شاشة المواعيد بتاعتها:
+//   • «سجلي» كان بيعرض تسجيلات كل الموظفين مخلوطة
+//   • سؤال البريك كان بيتحسب على بريكات ناس تانية
+//   • زرار «مطلعتش بريك» كان بيبان متسجّل لو أي حد داسه
+// الحل: كل قراية بتقول صراحةً «تسجيلاتي أنا».
+// ⚠️ الإيميل lowercase — كل دوال الكتابة في السيرفر بتكتبه كده.
+// ============================================================
+let _attMe = '';
+async function attMe(){
+  if(_attMe) return _attMe;
+  const { data:{ session } } = await sb.auth.getSession();
+  _attMe = ((session && session.user && session.user.email) || '').toLowerCase();
+  return _attMe;
+}
+
 // سجل الشهر بتاعي
 async function attMyMonth(ym){
+  const me = await attMe();
+  if(!me) throw new Error('لازم تكون مسجّل دخول');
   const [y,m] = ym.split('-').map(Number);
   const from = `${y}-${String(m).padStart(2,'0')}-01`;
   const to   = new Date(Date.UTC(y, m, 0)).toISOString().slice(0,10);
@@ -739,6 +768,7 @@ async function attMyMonth(ym){
     //    يشوفه في سجله. سجل بيتعدّل من غير ما صاحبه يعرف = سجل
     //    مالوش قيمة كدليل.
     .select('kind,at,work_date,distance_m,verified,manual_by')
+    .eq('user_email', me)
     .gte('work_date', from).lte('work_date', to)
     .order('at', { ascending:true });
   if(error) throw error;
@@ -864,8 +894,11 @@ async function attLoadNoBreak(){
   _attNoBreak = false;
   if(!_attState.work_date) return;
   try{
+    const me = await attMe();
+    if(!me) return;
     const { data, error } = await sb.from('hr_no_break')
-      .select('work_date').eq('work_date', _attState.work_date).limit(1);
+      .select('work_date').eq('user_email', me)
+      .eq('work_date', _attState.work_date).limit(1);
     if(error) throw error;
     _attNoBreak = !!(data && data.length);
   }catch(e){
@@ -889,8 +922,11 @@ async function attLoadDayKinds(){
   _attDayKinds = [];
   if(!_attState.work_date) return;
   try{
+    const me = await attMe();
+    if(!me) return;
     const { data, error } = await sb.from('attendance')
-      .select('kind,at').eq('work_date', _attState.work_date).order('at', { ascending:true });
+      .select('kind,at').eq('user_email', me)
+      .eq('work_date', _attState.work_date).order('at', { ascending:true });
     if(error) throw error;
     _attDayKinds = (data || []).map(r => r.kind);
   }catch(e){
