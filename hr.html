@@ -939,22 +939,46 @@ function fmtTime(iso){
 }
 
 // ===== العرض =====
-function render(){
-  const root = document.getElementById('root');
+// ============================================================
+// 🐞 الباج اللي اتصلّح (أكتوبر ٢٠٢٦): البحث بيقفل الكيبورد بعد كل حرف
+// ------------------------------------------------------------
+// 🧠 بالبلدي: خانة البحث كانت جوه الحتة اللي render بترسمها من
+//    الأول. فكل حرف تكتبه → render → الصفحة ترمي الخانة القديمة
+//    وترسم واحدة جديدة مكانها → الكيبورد كان شغّال على الخانة
+//    القديمة اللي «اختفت»، فيقفل. وتدوس تاني وتكتب حرف → نفس الحكاية.
+//
+// ✅ دلوقتي الرسم على جزئين (نفس فكرة مراجعة قطع الغيار):
+//    • render()      = الشريط (الشهر + البحث) + المؤشرات + مكان الكروت
+//    • renderCards() = الكروت بس — دي اللي بتتنده مع كل حرف
+//    فخانة البحث نفسها مبتتلمسش وإنت بتكتب، والكيبورد بيفضل مفتوح.
+//
+// ⚠️ المؤشرات فوق (موظف · يوم · ساعات · ناقص انصراف) محسوبة على كل
+//    الموظفين مش على نتيجة البحث — فمش محتاجة تتحدّث مع الكتابة.
+// ============================================================
 
-  // تجميع: موظف → يوم → تسجيلات
+// تجميع: موظف → يوم → تسجيلات
+function groupEmps(){
   const emps = {};
   for(const r of ROWS){
     const e = (r.user_email || '').toLowerCase();
     (emps[e] = emps[e] || {})[r.work_date] = (emps[e][r.work_date] || []);
     emps[e][r.work_date].push(r);
   }
+  return emps;
+}
 
-  let keys = Object.keys(emps).sort((a,b) => nameOf(a).localeCompare(nameOf(b),'ar'));
-  if(SEARCH){
-    const q = SEARCH.toLowerCase();
-    keys = keys.filter(k => k.includes(q) || nameOf(k).toLowerCase().includes(q));
+function render(){
+  const root = document.getElementById('root');
+
+  // حد بيكتب في البحث دلوقتي وجه تحديث من بره؟ نحدّث الكروت بس —
+  // عشان الكيبورد ما يقفلش في وشه
+  const qEl = document.getElementById('hrQ');
+  if(qEl && document.activeElement === qEl && document.getElementById('hrCards')){
+    renderCards();
+    return;
   }
+
+  const emps = groupEmps();
 
   // مؤشرات فوق
   let totalMin = 0, totalDays = 0, flagged = 0;
@@ -969,8 +993,8 @@ function render(){
   const bar = `
     <div class="bar">
       <input type="month" value="${MONTH}" onchange="MONTH=this.value; loadMonth()">
-      <input type="search" placeholder="ابحث باسم الموظف…" value="${esc(SEARCH)}"
-             oninput="SEARCH=this.value; render()">
+      <input type="search" id="hrQ" autocomplete="off" placeholder="ابحث باسم الموظف…" value="${esc(SEARCH)}"
+             oninput="SEARCH=this.value; renderCards()">
     </div>
     <div class="kpis">
       <div class="kpi"><div class="v">${Object.keys(emps).length}</div><div class="l">موظف</div></div>
@@ -979,18 +1003,37 @@ function render(){
       <div class="kpi"><div class="v" style="color:var(--waiting)">${flagged}</div><div class="l">يوم ناقص انصراف</div></div>
     </div>`;
 
-  if(!keys.length){
-    root.innerHTML = bar + '<div class="empty">مفيش تسجيلات في الشهر ده' +
-      (ROWS.length ? '' : '<br><small>لو إنت مش HR ولا أدمن، مش هتشوف غير سجلك إنت</small>') +
-      '</div>';
-    return;
-  }
-
-  root.innerHTML = bar + '<div class="cards">' +
-    keys.map(e => cardHtml(e, emps[e])).join('') + '</div>';
+  root.innerHTML = bar + '<div id="hrCards"></div>';
+  renderCards(emps);
   // ⚠️ السجل بقى شاشة كاملة (empSheet) مش قسم بيتفتح تحت الكارت.
   //    لو كان مفتوح وحصل تحديث، بنعيد رسمه بالبيانات الجديدة.
   if(OPEN_EMP && emps[OPEN_EMP]) renderEmpSheet(OPEN_EMP, emps[OPEN_EMP]);
+}
+
+// الكروت بس — من غير ما نلمس خانة البحث
+function renderCards(emps){
+  const host = document.getElementById('hrCards');
+  if(!host) return;
+  emps = emps || groupEmps();
+
+  let keys = Object.keys(emps).sort((a,b) => nameOf(a).localeCompare(nameOf(b),'ar'));
+  const q = (SEARCH || '').trim().toLowerCase();
+  if(q){
+    keys = keys.filter(k => k.includes(q) || nameOf(k).toLowerCase().includes(q));
+  }
+
+  if(!keys.length){
+    // فيه تسجيلات بس البحث مالقاش حد → نقول كده، مش «مفيش تسجيلات»
+    host.innerHTML = (q && Object.keys(emps).length)
+      ? '<div class="empty">مفيش موظف بالاسم «' + esc(SEARCH.trim()) + '» في الشهر ده</div>'
+      : '<div class="empty">مفيش تسجيلات في الشهر ده' +
+        (ROWS.length ? '' : '<br><small>لو إنت مش HR ولا أدمن، مش هتشوف غير سجلك إنت</small>') +
+        '</div>';
+    return;
+  }
+
+  host.innerHTML = '<div class="cards">' +
+    keys.map(e => cardHtml(e, emps[e])).join('') + '</div>';
 }
 
 // تجميع أيام موظف واحد — بيتستخدم في الكروت وفي الشاشة
