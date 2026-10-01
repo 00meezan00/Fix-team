@@ -2282,10 +2282,14 @@ async function requireAccess(){
 // الـ ٥ ميجا) فمكانش بيفرق — دلوقتي بقى شغال فعلاً، ولو فني تاني دخل
 // على نفس الجهاز كان هيشوف أجهزة اللي قبله لحد ما المزامنة تصلّحها.
 async function clearDeviceCache(){
+  // 🔒 ممنوع أي كتابة بعد كده — من غيرها، pagehide كانت هتكتب
+  //    أجهزة المحاسب في الدرج تاني وهو خارج، والحساب اللي بعده يلاقيها.
+  _cacheLocked = true;
+  clearTimeout(_cacheTimer);
+  _cacheRef.clear();
   try{ localStorage.removeItem(HAS_CACHE_FLAG); }catch(e){}
   try{ localStorage.removeItem(DEVICES_CACHE_KEY); }catch(e){}
-  clearTimeout(_cacheTimer);
-  await idbSafe(idbSet('devices', []), false, 3000);
+  await idbSafe(devTx(s => s.clear()), false, 3000);
   await idbSafe(idbSet('sync_meta', {}), false, 3000);
 }
 
@@ -2327,6 +2331,7 @@ function startRealtimeSync(){
         if(payload.eventType === 'DELETE'){
           if(importing) return;   // وقت المسح الجماعي بنتجاهل إشعارات الحذف عشان الصفحة ما تهنجش (كانت بترسم ١٩ ألف مرة)
           const id = payload.old && payload.old.id;
+          if(id) _freshIds.add(id);    // النسخة القديمة من الدرج متعرفش ترجّعه
           if(id && lastSynced[id] !== undefined){
             devices = devices.filter(d => d.id !== id);
             delete lastSynced[id];
@@ -2339,6 +2344,7 @@ function startRealtimeSync(){
         if(importing) return;   // وقت الاستيراد بنتجاهل المزامنة اللحظية عشان الأرقام ما ترعشش
         const j = JSON.stringify(row.data);
         if(lastSynced[row.id] === j) return;   // التغيير أصلاً من عندنا
+        _freshIds.add(row.id);                 // أحدث من أي نسخة في الدرج
         devices = [row.data, ...devices.filter(d => d.id !== row.id)];
         devices.sort((a,b) => new Date(b.intakeDate||0) - new Date(a.intakeDate||0));
         lastSynced[row.id] = j;
@@ -2494,16 +2500,35 @@ function withTimeout(promise, ms, label){
 const isOnline = () => (typeof navigator === 'undefined') || navigator.onLine !== false;
 
 // ============================================================
-// الكاش المحلي — IndexedDB بدل localStorage
+// الكاش المحلي — IndexedDB (النسخة ٢: خانة لكل جهاز)
 // ------------------------------------------------------------
-// localStorage سقفه ٥ ميجا، وداتا ١٩ ألف جهاز حوالي ١٨ ميجا.
-// يعني setItem كان بيرمي QuotaExceededError في كل مرة، والـ catch
-// الفاضي كان بيبلعه — فالأوفلاين كان مكسور من غير ما حد ياخد باله.
-// IndexedDB مفيهاش السقف ده، وبتخزّن الكائنات زي ما هي من غير
-// تحويل لنص، فهي أسرع كمان.
+// 🧠 الحكاية بالبلدي:
+//    قبل كده الـ ١٩ ألف جهاز كانوا متخزنين في «علبة واحدة» حجمها
+//    ١٨ ميجا. الآيفون لما التطبيق يتقفل من الخلفية ويتفتح تاني، كان
+//    بياخد أكتر من ٤ ثواني عشان يفتح العلبة دي — والمهلة كانت ٤ ثواني.
+//    فالبرنامج كان يفتكر إن الدرج فاضي، ويحمّل كل حاجة من السيرفر
+//    (١٤ ثانية + ١٨ ميجا من حصة Supabase) — في كل فتحة.
+//    وكمان أي تعديل من أي موظف كان بيعيد كتابة الـ ١٨ ميجا كلها.
+//
+// ✅ دلوقتي: كل جهاز في خانة لوحده جوه مخزن 'dev'، وعلى كل خانة
+//    علامتين صغيرين:
+//      a = 1 لو الجهاز لسه «شغّال» (مش مسلّم ومدفوع، ومش مرفوض)
+//      t = تاريخ الاستلام بالملّي
+//    فبنقرا على مراحل:
+//      ① الساخن: الشغّال + اللي دخل آخر ٤٥ يوم → يترسم على طول
+//      ② الأرشيف على دفعات في الخلفية، والشاشة شغالة
+//    والكتابة بقت «بالفرق»: الجهاز اللي اتغيّر بس هو اللي بيتكتب.
+//
+// ⚠️ المخزن القديم 'kv' لسه موجود — بيشيل sync_meta بس.
+//    العلبة القديمة ('devices') بتتمسح وقت الترقية **من غير ما
+//    نقراها** — قرايتها هي المشكلة أصلاً.
 // ============================================================
-const IDB_NAME = 'ifix_db', IDB_STORE = 'kv';
-const HAS_CACHE_FLAG = 'ifix_has_cache';   // علامة صغيرة في localStorage عشان الفحص السريع
+const IDB_NAME = 'ifix_db', IDB_STORE = 'kv', DEV_STORE = 'dev', IDB_VER = 2;
+// ⚠️ لو غيّرت شكل اللي بيتخزّن في الدرج، زوّد الرقم ده —
+//    كل الأجهزة هتعمل تحميل كامل مرة واحدة وتبني الدرج من جديد.
+const CACHE_VER = 2;
+const HOT_DAYS  = 45;                        // «الساخن» = اللي دخل آخر ٤٥ يوم
+const HAS_CACHE_FLAG = 'ifix_has_cache';     // علامة صغيرة في localStorage عشان الفحص السريع
 let _idbConn = null;
 let _idbDead = false;   // اتعطّلت؟ نبطّل نحاول ونشتغل من غير كاش
 
@@ -2515,13 +2540,41 @@ function idbOpen(){
   _idbConn = new Promise((res, rej) => {
     let done = false;
     const fail = (why) => { if(done) return; done = true; _idbDead = true; _idbConn = null; rej(new Error(why)); };
-    const timer = setTimeout(() => fail('IndexedDB اتأخرت في الفتح'), 4000);
+    const timer = setTimeout(() => fail('IndexedDB اتأخرت في الفتح'), 8000);
     try{
-      const r = indexedDB.open(IDB_NAME, 1);
-      r.onupgradeneeded = () => { if(!r.result.objectStoreNames.contains(IDB_STORE)) r.result.createObjectStore(IDB_STORE); };
-      r.onsuccess = () => { if(done) return; done = true; clearTimeout(timer); res(r.result); };
+      const r = indexedDB.open(IDB_NAME, IDB_VER);
+      r.onupgradeneeded = () => {
+        const db = r.result;
+        if(!db.objectStoreNames.contains(IDB_STORE)){
+          db.createObjectStore(IDB_STORE);
+        } else {
+          // 🧹 العلبة القديمة + علامة المزامنة القديمة → تتمسح.
+          //    مسح علامة المزامنة معناه تحميل كامل مرة واحدة بالشكل الجديد.
+          try{
+            const kv = r.transaction.objectStore(IDB_STORE);
+            kv.delete('devices');
+            kv.delete('sync_meta');
+          }catch(e){}
+        }
+        if(!db.objectStoreNames.contains(DEV_STORE)){
+          const s = db.createObjectStore(DEV_STORE, { keyPath:'id' });
+          s.createIndex('a', 'a');
+          s.createIndex('t', 't');
+        }
+      };
+      r.onsuccess = () => {
+        if(done){ try{ r.result.close(); }catch(e){} return; }
+        done = true; clearTimeout(timer);
+        const db = r.result;
+        // تاب تاني (نسخة أحدث) عايز يرقّي الدرج؟ نقفل ونسيبه —
+        // من غير كده التاب الجديد بيفضل مستني ومبيلاقيش كاش.
+        db.onversionchange = () => { try{ db.close(); }catch(e){} _idbConn = null; };
+        res(db);
+      };
       r.onerror   = () => { clearTimeout(timer); fail('فشل فتح IndexedDB'); };
-      r.onblocked = () => { clearTimeout(timer); fail('IndexedDB متقفلة من تاب تاني'); };
+      // تاب قديم ماسك النسخة القديمة؟ منفشلش على طول — لو قفل،
+      // الفتح بيكمّل لوحده. المهلة فوق هي اللي بتقرر في الآخر.
+      r.onblocked = () => { console.warn('IndexedDB مستنية تاب قديم يتقفل'); };
     }catch(e){ clearTimeout(timer); fail(String(e)); }
   });
   return _idbConn;
@@ -2553,38 +2606,118 @@ async function idbGet(key){
   });
 }
 
-// الكتابة مؤجّلة: المزامنة اللحظية بتنادي writeCache مع كل تعديل من أي موظف.
-// من غير التأجيل ده كنا هنكتب ١٨ ميجا على القرص مع كل ضغطة زرار من أي حد.
+// ---------- مخزن الأجهزة (خانة لكل جهاز) ----------
+// الخانة = { id, a, t, d } — d هو الجهاز نفسه زي ما هو.
+// ⚠️ العلامتين a و t برّه الجهاز عن قصد: لو اتحطوا جواه، persist
+//    هتشوف الجهاز «اتغيّر» وتبعته للسيرفر بحقول غريبة.
+function devRec(d){
+  const st = effStatus(d);
+  return { id: d.id,
+           a: (st === 'delivered_paid' || st === 'rejected') ? 0 : 1,
+           t: Date.parse(d.intakeDate) || 0,
+           d };
+}
+async function devGetAll(indexName, range, count){
+  const db = await idbOpen();
+  return new Promise((res, rej) => {
+    const st  = db.transaction(DEV_STORE, 'readonly').objectStore(DEV_STORE);
+    const src = indexName ? st.index(indexName) : st;
+    const q = (count === undefined) ? src.getAll(range) : src.getAll(range, count);
+    q.onsuccess = () => res(q.result || []);
+    q.onerror   = () => rej(q.error);
+  });
+}
+async function devCount(){
+  const db = await idbOpen();
+  return new Promise((res, rej) => {
+    const q = db.transaction(DEV_STORE, 'readonly').objectStore(DEV_STORE).count();
+    q.onsuccess = () => res(q.result || 0);
+    q.onerror   = () => rej(q.error);
+  });
+}
+function devTx(fn){
+  return idbOpen().then(db => new Promise((res, rej) => {
+    const tx = db.transaction(DEV_STORE, 'readwrite');
+    fn(tx.objectStore(DEV_STORE));
+    tx.oncomplete = () => res(true);
+    tx.onerror    = () => rej(tx.error);
+    tx.onabort    = () => rej(tx.error || new Error('الكتابة في الدرج اتلغت'));
+  }));
+}
+
+// ---------- الكتابة بالفرق ----------
+// _cacheRef = «آخر نسخة من كل جهاز اتكتبت في الدرج» (نفس الكائن بالظبط).
+// الداشبورد بيعدّل الأجهزة بإنه يعمل كائن جديد ({...x, ...}) — فلو
+// الكائن اللي في devices مش هو اللي في _cacheRef، يبقى اتغيّر ولازم
+// يتكتب. ولو id موجود في _cacheRef ومش في devices، يبقى اتشال.
+// ⚠️ التعديل «في المكان» (d.x = ...) مبيغيّرش الكائن — عشان كده
+//    persist بتنادي cacheForce على اللي اتغيّر، زيادة أمان.
+const _cacheRef = new Map();
 let _cacheTimer = null;
+let _cacheBusy  = null;
+let _cacheLocked = false;   // بعد تسجيل الخروج: ممنوع أي كتابة تانية
+
+// الكتابة مؤجّلة: المزامنة اللحظية بتنادي writeCache مع كل تعديل من أي موظف.
 function writeCache(){
+  if(_cacheLocked) return;
   try{ localStorage.setItem(HAS_CACHE_FLAG, '1'); }catch(e){}
   clearTimeout(_cacheTimer);
-  const snap = devices;
-  _cacheTimer = setTimeout(() => {
-    idbSafe(idbSet('devices', snap), false, 8000);
-  }, 1500);
+  _cacheTimer = setTimeout(() => { flushCache(); }, 1200);
 }
-// نسخة فورية — بنستخدمها قبل ما الصفحة تتقفل
-function flushCache(){
-  clearTimeout(_cacheTimer);
-  return idbSet('devices', devices).catch(() => {});
+function cacheForce(list){
+  (list || []).forEach(d => { if(d && d.id) _cacheRef.delete(d.id); });
 }
-window.addEventListener('pagehide', flushCache);
 
-async function readCache(){
-  try{
-    const v = await idbGet('devices');
-    if(Array.isArray(v) && v.length) return v;
-    // ترحيل لمرة واحدة من الكاش القديم لو كان لسه فيه حاجة
-    const old = localStorage.getItem(DEVICES_CACHE_KEY);
-    if(old){
-      const arr = JSON.parse(old);
-      try{ localStorage.removeItem(DEVICES_CACHE_KEY); }catch(e){}
-      if(Array.isArray(arr) && arr.length){ await idbSafe(idbSet('devices', arr), false, 5000); return arr; }
+async function flushCache(){
+  clearTimeout(_cacheTimer);
+  if(_cacheLocked || _idbDead) return false;
+  if(_cacheBusy){ try{ await _cacheBusy; }catch(e){} }   // واحدة ورا التانية
+  const puts = [], seen = new Set();
+  for(const d of devices){
+    if(!d || !d.id) continue;
+    seen.add(d.id);
+    if(_cacheRef.get(d.id) !== d) puts.push(d);
+  }
+  const dels = [];
+  for(const id of _cacheRef.keys()) if(!seen.has(id)) dels.push(id);
+  if(!puts.length && !dels.length) return true;
+
+  // بنعلّم قبل الكتابة عشان نداء تاني في نفس اللحظة ميكتبش نفس الحاجة
+  puts.forEach(d => _cacheRef.set(d.id, d));
+  dels.forEach(id => _cacheRef.delete(id));
+  const job = (async () => {
+    // دفعات ١٥٠٠ — عشان الشاشة ماتهنّجش وقت الكتابة الكبيرة (أول تحميل)
+    const CH = 1500;
+    for(let i = 0; i < puts.length; i += CH){
+      const part = puts.slice(i, i + CH);
+      await devTx(s => part.forEach(d => s.put(devRec(d))));
     }
-  }catch(e){ console.error('فشل قراءة الكاش:', e); }
-  return [];
+    if(dels.length) await devTx(s => dels.forEach(id => s.delete(id)));
+  })();
+  _cacheBusy = job;
+  try{
+    await job;
+    return true;
+  }catch(e){
+    console.warn('الكاش: الكتابة فشلت —', e && e.message);
+    // نشيل العلامة عشان المحاولة الجاية تكتبهم تاني
+    puts.forEach(d => { if(_cacheRef.get(d.id) === d) _cacheRef.delete(d.id); });
+    return false;
+  }finally{
+    if(_cacheBusy === job) _cacheBusy = null;
+  }
 }
+window.addEventListener('pagehide', () => { flushCache(); });
+
+// مسح الدرج كله والتليفون شغّال (مسح البيانات / الاستبدال الكامل)
+async function cacheResetAll(){
+  clearTimeout(_cacheTimer);
+  _cacheRef.clear();
+  _memMeta = null;
+  await idbSafe(devTx(s => s.clear()), false, 5000);
+  await idbSafe(idbSet('sync_meta', {}), false, 5000);
+}
+
 function snapshotSynced(){
   lastSynced = {};
   devices.forEach(d => { lastSynced[d.id] = JSON.stringify(d); });
@@ -2644,22 +2777,51 @@ function exitOfflineMode(){
 let lastLoadError = '';
 
 // ============================================================
-// تحميل الأجهزة — مزامنة تزايدية
+// تحميل الأجهزة — على مراحل + مزامنة تزايدية
 // ------------------------------------------------------------
-// الفكرة: بدل ما نجيب الـ ١٩ ألف جهاز كل مرة (١٤ ثانية)، بنجيبهم
-// مرة واحدة بس. بعد كده بنسأل السيرفر "إيه اللي اتعدّل من آخر مرة؟"
-// وبنجيب ده بس — عادةً كام صف، يعني أقل من ثانية.
+// 🧠 زي المطعم: السلطة والعيش الأول، والأكل الرئيسي بيتجهّز وإنت بتاكل.
 //
-// العلامة اللي بنعتمد عليها هي عمود updated_at، وبناخد قيمتها من
-// السيرفر نفسه مش من ساعة الجهاز — عشان لو ساعة الكمبيوتر غلط
-// مانفوّتش تعديلات.
+// لو الدرج فيه نسخة (الطبيعي):
+//   ① الساخن من الدرج (الشغّال + آخر ٤٥ يوم) → الشاشة تترسم في ثانية
+//   ② في نفس الوقت:
+//        • الأرشيف من الدرج على دفعات
+//        • السيرفر: «إيه اللي اتغيّر من آخر مرة؟» → كام صف بس
+//   ③ مرة كل ٢٤ ساعة: تنضيف المحذوفات (بجلب الـ IDs بس)
 //
-// الحذف: العلامة دي مبتشوفش الصفوف المحذوفة (مفيش صف يتعدّل).
-// عشان كده بنعمل مزامنة كاملة كل ٢٤ ساعة، وكمان في أي وقت لو
-// المستخدم دوس "مزامنة كاملة". والحذف اللي بيحصل والصفحة مفتوحة
-// بتمسكه المزامنة اللحظية أصلاً.
+// لو الدرج فاضي (أول مرة / بعد تسجيل خروج / ترقية الدرج):
+//   ① من السيرفر: الشغّال + أحدث ١٠٠٠ جهاز → الشاشة تترسم
+//   ② باقي الأرشيف على صفحات في الخلفية، وبيتخزن في الدرج
+//
+// 🔑 العلامة (updated_at) بتتقري **قبل** ما نجيب التغييرات مش بعدها،
+//    وبنرجع لورا دقيقتين كهامش أمان — عشان أي تعديل حصل في نفس
+//    لحظة التحميل ميفوتناش. التكرار مش مشكلة: نفس الجهاز بيتكتب
+//    فوق نفسه.
+//    والسيرفر هو اللي بيختم updated_at بساعته (ملف 65) — مش ساعة
+//    الموبايل، اللي ممكن تكون غلط.
+//
+// ⚠️ الحذف: العلامة مبتشوفش الصفوف المحذوفة (مفيش صف يتعدّل).
+//    عشان كده بنعمل تنضيف مرة كل ٢٤ ساعة، والحذف اللي بيحصل والصفحة
+//    مفتوحة بتمسكه المزامنة اللحظية أصلاً.
 // ============================================================
 const FULL_SYNC_EVERY_MS = 24*60*60*1000;
+const SYNC_OVERLAP_MS    = 2*60*1000;
+
+// الأجهزة كلها وصلت (مش الساخن بس)؟
+// ⚠️ النسخ الاحتياطي التلقائي وترتيب الفنيين **لازم** يستنوا ده —
+//    نسخة احتياطية من نص الأجهزة، أو ترتيب محسوب على نص الشغل،
+//    أسوأ من مفيش خالص.
+let devicesComplete = false;
+let _completeWaiters = [];
+function whenDevicesComplete(){
+  return devicesComplete ? Promise.resolve() : new Promise(r => _completeWaiters.push(r));
+}
+
+// أجهزة وصلتنا «طازة» أثناء التحميل ده (من السيرفر أو اللحظي أو
+// من تعديل المستخدم نفسه). النسخة القديمة من الدرج مبتكتبش فوقها.
+let _freshIds = new Set();
+// آخر علامة مزامنة في الذاكرة — عشان إعادة التحميل وإحنا فاتحين
+// متعتمدش على الدرج (ولو الدرج مش شغال أصلاً)
+let _memMeta = null;
 
 // مزامنة كاملة يدوية — للحالات اللي فيها حذف من جهاز تاني
 async function forceFullSync(){
@@ -2691,13 +2853,24 @@ async function reconcileDeletes(){
     for(const r of data) serverIds.add(r.id);
     lastId = data[data.length - 1].id;
   }
+  // 🛡️ حزام أمان: لو السيرفر رجّع قايمة فاضية أو أقل من نص اللي
+  //    عندنا، يبقى فيه حاجة غلط (صلاحية اترفضت في صمت مثلاً) — مش إن
+  //    نص المحل اتمسح. منمسحش حاجة، ونستنى المرة الجاية.
+  if(serverIds.size === 0 || serverIds.size < devices.length * 0.5){
+    console.warn('تنضيف المحذوفات اتلغى: السيرفر رجّع', serverIds.size, 'بس وعندنا', devices.length);
+    return;
+  }
   const before = devices.length;
-  devices = devices.filter(d => serverIds.has(d.id));
+  devices = devices.filter(d => {
+    if(serverIds.has(d.id) || _freshIds.has(d.id)) return true;
+    delete lastSynced[d.id];      // اتمسح من السيرفر خلاص — مش محتاجين نبعت حذف
+    return false;
+  });
   if(devices.length !== before) sortDevices();
 }
 
 // بيجيب صفوف بالـ keyset. لو اتبعت since بيجيب المتغيّر بس.
-// onPage بتتنادى بعد كل صفحة — عشان نقدر نعرض قبل ما الكل يخلص.
+// onPage(page) بتتنادى بعد كل صفحة بالصفوف الجديدة بس.
 async function fetchRows(since, onPage){
   const PAGE = 1000, out = [];
   let lastId = '', guard = 0;
@@ -2711,7 +2884,7 @@ async function fetchRows(since, onPage){
     if(!data || !data.length) break;
     out.push(...data);
     lastId = data[data.length-1].id;
-    if(onPage) onPage(out);
+    if(onPage) onPage(data);
   }
   return out;
 }
@@ -2720,6 +2893,13 @@ async function fetchRows(since, onPage){
 function loadProgress(n){
   const el = document.getElementById('saveIndicator');
   if(el) el.textContent = n ? t('app.loadingCount', { n: n.toLocaleString('en-EG') }) : '';
+}
+// «بنكمّل الأرشيف» — الشاشة شغالة، بس فيه أجهزة قديمة لسه جاية
+function archiveProgress(on, n){
+  const el = document.getElementById('saveIndicator');
+  if(!el) return;
+  if(on) el.textContent = '📦 بنكمّل تحميل الأرشيف' + (n ? ' (' + n.toLocaleString('en-EG') + ')' : '') + '…';
+  else if(el.textContent.indexOf('📦') === 0) el.textContent = '';
 }
 
 // بنبني فهرس البحث مرة واحدة بعد كل تحميل بدل ما نحسبه مع كل
@@ -2762,96 +2942,245 @@ function sortDevices(){
   reindexSearch();      // الفهرس بيتبني مع كل تحميل — الترتيب هو نقطة الالتقاء
 }
 
+// ============================================================
+// دمج أجهزة في devices — ٣ أنواع:
+//   'fresh'  → من السيرفر وأحدث حاجة (التغييرات / الساخن). بتكسب دايماً.
+//   'server' → من السيرفر بس ممكن يكون فيه أحدث منها (صفحات الأرشيف).
+//              بتكسب إلا لو الجهاز وصلنا «طازة» أثناء التحميل ده.
+//   'cache'  → من الدرج (قديمة شوية). بتتضاف بس لو الجهاز مش موجود
+//              خالص — ومش في المهملات، ومش وصلنا طازة.
+// ⚠️ lastSynced بيتحدّث هنا جهاز جهاز (مش snapshotSynced على الكل) —
+//    عشان أي تعديل عمله المستخدم وإحنا بنحمّل ميتعلّمش «اتحفظ» غلط.
+// ============================================================
+function mergeDevices(list, mode){
+  if(!list || !list.length) return 0;
+  const byId = new Map(devices.map(d => [d.id, d]));
+  const trashIds = new Set(trashDevices.map(d => d.id));
+  const unTrash = [];
+  let n = 0;
+  for(const d of list){
+    if(!d || !d.id) continue;
+    if(mode === 'cache' && (byId.has(d.id) || _freshIds.has(d.id) || trashIds.has(d.id))) continue;
+    if(mode === 'server' && _freshIds.has(d.id)) continue;
+    byId.set(d.id, d);
+    lastSynced[d.id] = JSON.stringify(d);
+    if(mode === 'fresh') _freshIds.add(d.id);
+    if(mode === 'cache') _cacheRef.set(d.id, d);     // نفس اللي في الدرج — مش محتاج يتكتب تاني
+    // اترجع من المهملات من جهاز تاني؟ يطلع من قايمة المهملات
+    if(mode !== 'cache' && trashIds.has(d.id) && d.status !== 'trashed') unTrash.push(d.id);
+    n++;
+  }
+  if(n) devices = Array.from(byId.values());
+  if(unTrash.length){
+    const u = new Set(unTrash);
+    trashDevices = trashDevices.filter(x => !u.has(x.id));
+  }
+  return n;
+}
+
+function paintDevices(){
+  sortDevices();
+  devicesLoaded = true;
+  render();
+  try{ if(isTechnician()) revealAfterDevices(); }catch(e){}
+}
+
+// ---------- القراية من الدرج ----------
+async function cacheReadHot(){
+  const cut = Date.now() - HOT_DAYS * 86400000;
+  const [act, rec] = await Promise.all([
+    devGetAll('a', IDBKeyRange.only(1)),
+    devGetAll('t', IDBKeyRange.lowerBound(cut))
+  ]);
+  return act.concat(rec).map(r => r && r.d).filter(Boolean);
+}
+
+// الأرشيف على دفعات ٢٥٠٠ — وبين كل دفعة والتانية بنسيب الشاشة
+// تتنفّس. بترجّع false لو الدرج فشل أو اتأخر.
+async function cacheReadRest(){
+  let last = null;
+  for(let guard = 0; guard < 400; guard++){
+    const range = (last === null) ? undefined : IDBKeyRange.lowerBound(last, true);
+    const recs = await idbSafe(devGetAll(null, range, 2500), null, 15000);
+    if(recs === null) return false;
+    if(!recs.length) return true;
+    last = recs[recs.length - 1].id;
+    mergeDevices(recs.map(r => r && r.d).filter(Boolean), 'cache');
+    archiveProgress(true, devices.length);
+    await new Promise(r => setTimeout(r, 0));
+  }
+  return true;
+}
+
+// ---------- من السيرفر ----------
+// الشغّال (أي حاجة مش «اتسلّم واتدفع» ومش «مرفوض») + أحدث ١٠٠٠ جهاز.
+// eff_status و intake_at أعمدة محسوبة على السيرفر وعليها فهرس.
+async function fetchHotFromServer(){
+  const [a, b] = await Promise.all([
+    withTimeout(sb.from('devices_data').select('id,data')
+      .not('eff_status', 'in', '(delivered_paid,rejected)').limit(1000),
+      30000, 'تحميل الأجهزة الشغّالة'),
+    withTimeout(sb.from('devices_data').select('id,data')
+      .order('intake_at', { ascending:false, nullsFirst:false }).limit(1000),
+      30000, 'تحميل أحدث الأجهزة')
+  ]);
+  if(a.error) throw a.error;
+  if(b.error) throw b.error;
+  return [...(a.data || []), ...(b.data || [])].map(r => r && r.data).filter(Boolean);
+}
+
+// «إيه اللي اتغيّر من آخر مرة؟»
+async function syncDeltaFromServer(meta){
+  const wmNew = await serverWatermark();          // ⚠️ قبل الجلب مش بعده
+  let since = meta && meta.watermark;
+  if(!since) throw new Error('مفيش علامة مزامنة');
+  const ts = Date.parse(since);
+  if(ts) since = new Date(ts - SYNC_OVERLAP_MS).toISOString();
+  const rows = await fetchRows(since);
+  const n = mergeDevices(rows.map(r => r && r.data).filter(Boolean), 'fresh');
+  console.log('مزامنة تزايدية:', rows.length, 'جهاز');
+  return { wm: wmNew || meta.watermark, n };
+}
+
+// التحميل الكامل من السيرفر — الساخن الأول، وبعدين الأرشيف
+async function loadFullFromServer(){
+  const wm = await serverWatermark();
+  const seen = new Set();
+
+  const hot = await fetchHotFromServer();
+  hot.forEach(d => seen.add(d.id));
+  mergeDevices(hot, 'fresh');
+  paintDevices();
+  writeCache();
+  archiveProgress(true, devices.length);
+
+  let lastPaint = performance.now();
+  await fetchRows(null, (page) => {
+    const list = page.map(r => r && r.data).filter(Boolean);
+    list.forEach(d => seen.add(d.id));
+    mergeDevices(list, 'server');
+    writeCache();
+    archiveProgress(true, devices.length);
+    const now = performance.now();
+    if(now - lastPaint > 2500){ lastPaint = now; paintDevices(); }
+  });
+
+  // أي جهاز على الشاشة مش موجود على السيرفر (ومش جديد من الجلسة دي)
+  // يبقى اتمسح — يتشال من هنا ومن الدرج
+  devices = devices.filter(d => {
+    if(seen.has(d.id) || _freshIds.has(d.id)) return true;
+    delete lastSynced[d.id];
+    return false;
+  });
+  sortDevices();
+  const ok = await flushCache();
+  console.log('مزامنة كاملة:', devices.length, 'جهاز', ok ? '' : '(الدرج ماتكتبش كله — هنعيد المرة الجاية)');
+  // full = الدرج اتكتب كله. لو لأ، المرة الجاية تحميل كامل تاني.
+  return { v: CACHE_VER, full: !!ok, watermark: wm, lastFullSync: Date.now() };
+}
+
+// ⚠️ تحميل واحد في نفس الوقت. من غير ده، رجوع النت وزرار التحديث
+//    ممكن يشغّلوا تحميلين فوق بعض ويتخانقوا على نفس المصفوفة.
+let _loadP = null;
 async function loadDevices(opts){
+  if(_loadP){
+    if(!(opts && opts.full)) return _loadP;   // نفس التحميل الشغّال
+    try{ await _loadP; }catch(e){}            // المزامنة الكاملة تستنى اللي قبلها
+  }
+  _loadP = _loadDevicesRun(opts);
+  try{ return await _loadP; } finally { _loadP = null; }
+}
+async function _loadDevicesRun(opts){
   const forceFull = !!(opts && opts.full);
   lastLoadError = '';
+  _freshIds = new Set();
+  let netErr = null;
+
+  // الأجهزة كلها أصلاً في الذاكرة (إعادة تحميل وإحنا فاتحين)؟
+  // يبقى نسأل السيرفر عن الجديد بس — من غير ما نقرا الدرج تاني.
+  const memFull = !forceFull && devicesComplete && devices.length > 0 && _memMeta && _memMeta.watermark;
+  let meta = memFull ? Object.assign({}, _memMeta)
+                     : ((await idbSafe(idbGet('sync_meta'), null, 8000)) || {});
+  if(!devices.length) devicesComplete = false;
+
   try{
-    const meta = (await idbSafe(idbGet('sync_meta'), null)) || {};
-    const cached = forceFull ? [] : await idbSafe(readCache(), []);
-    const stale  = !meta.lastFullSync || (Date.now() - meta.lastFullSync) > FULL_SYNC_EVERY_MS;
-    const hasBase = !forceFull && cached.length && meta.watermark;   // عندنا كاش نبني عليه؟
-
-    if(hasBase){
-      // ✅ الطريق السريع: الكاش على الشاشة فوراً، وبعدين المتغيّر بس
-      devices = cached;
-      sortDevices();
-      devicesLoaded = true;
-      render();
-
-      const changed = await fetchRows(meta.watermark);
-      if(changed.length){
-        const byId = new Map(devices.map(d => [d.id, d]));
-        for(const r of changed) byId.set(r.id, r.data);
-        devices = Array.from(byId.values());
-        sortDevices();
-      }
-      // بدل التحميل الكامل الدوري (كان ~١٨ ميجا كل ٢٤ ساعة × كل مستخدم → أكبر مصدر Egress متبقّي):
-      // تنظيف المحذوفات بجلب الـ IDs بس — أرخص بحوالي ٩٠×. المحذوفات والصفحة مفتوحة
-      // بيمسكها الـ realtime أصلاً، فده بس للمحذوفات اللي حصلت والصفحة مقفولة.
-      if(stale){
+    if(memFull){
+      if(!isOnline()) throw new Error('مفيش نت');
+      const delta = await syncDeltaFromServer(meta);
+      meta.watermark = delta.wm;
+      if(!meta.lastFullSync || (Date.now() - meta.lastFullSync) > FULL_SYNC_EVERY_MS){
         await reconcileDeletes();
         meta.lastFullSync = Date.now();
       }
-      meta.watermark = (await serverWatermark()) || meta.watermark;
-      await idbSafe(idbSet('sync_meta', meta), false, 5000);
-      console.log('مزامنة تزايدية:', changed.length, 'جهاز' + (stale ? ' + تنظيف محذوفات' : ''));
     } else {
-      // 🐢 الطريق الكامل: أول مرة، أو الكاش فاضي، أو عدّى ٢٤ ساعة
-      const wm = await serverWatermark();
+      const haveCache = !forceFull && meta.v === CACHE_VER && meta.full
+                        && (await idbSafe(devCount(), 0, 8000)) > 0;
+      if(haveCache){
+        // ① الساخن من الدرج → الشاشة على طول
+        const hot = await idbSafe(cacheReadHot(), null, 10000);
+        if(hot && hot.length){ mergeDevices(hot, 'cache'); paintDevices(); }
+        archiveProgress(true, devices.length);
 
-      // ✅ عرض تدريجي: بنرسم الشاشة بعد أول ألف جهاز وبنكمّل في الخلفية.
-      // التحميل لسه بياخد نفس الوقت، بس المستخدم بيشوف الشاشة في ثانية
-      // بدل ما يقعد قدام صفحة فاضية ١٥ ثانية.
-      // بنرسم كل ٨٠٠ مللي على الأكتر عشان الرسم ما ياكلش وقت الجلب.
-      let painted = 0, lastPaint = 0;
-      const rows = await fetchRows(null, (sofar) => {
-        const now = performance.now();
-        if(painted && (now - lastPaint) < 800) return;
-        painted = sofar.length; lastPaint = now;
-        devices = sofar.map(r => r.data);
-        sortDevices();
-        devicesLoaded = true;
-        loadProgress(sofar.length);
-        render();
-        try{ if(isTechnician()) revealAfterDevices(); }catch(e){}
-      });
-      loadProgress(0);
-
-      if(rows.length){
-        devices = rows.map(r => r.data);
-      } else {
-        let old = null;
-        try{ old = await window.storage.get(STORAGE_KEY); }catch(e){}
-        devices = old ? JSON.parse(old.value) : [];
-        if(devices.length){
-          await sb.from('devices_data').upsert(
-            devices.map(d => ({ id:d.id, data:d, updated_at:new Date().toISOString() }))
-          );
+        // ② الأرشيف من الدرج + الجديد من السيرفر في نفس الوقت
+        const restP = cacheReadRest();
+        let delta = null;
+        if(isOnline()){
+          try{
+            delta = await syncDeltaFromServer(meta);
+            if(delta.n) paintDevices();    // الجديد يبان من غير ما يستنى الأرشيف
+          }catch(e){ netErr = e; }
+        } else {
+          netErr = new Error('مفيش نت');
         }
+        const restOk = await restP;
+
+        if(!restOk && !netErr){
+          // الدرج مقدرش يكمّل → نكمّل من السيرفر
+          console.warn('الدرج مكمّلش — بنكمّل من السيرفر');
+          meta = await loadFullFromServer();
+        } else if(delta){
+          meta.watermark = delta.wm;
+          // ③ تنضيف المحذوفات مرة كل ٢٤ ساعة — بعد ما الكل وصل بس
+          if(restOk && (!meta.lastFullSync || (Date.now() - meta.lastFullSync) > FULL_SYNC_EVERY_MS)){
+            try{ await reconcileDeletes(); meta.lastFullSync = Date.now(); }
+            catch(e){ console.warn('تنضيف المحذوفات:', e && e.message); }
+          }
+        }
+      } else {
+        // 🐢 مفيش درج: أول مرة، أو بعد تسجيل خروج، أو مزامنة كاملة يدوية
+        if(!isOnline()) throw new Error('مفيش نت ومفيش نسخة محفوظة على الجهاز');
+        meta = await loadFullFromServer();
       }
-      sortDevices();
-      await idbSafe(idbSet('sync_meta', { watermark: wm, lastFullSync: Date.now() }), false, 5000);
-      console.log('مزامنة كاملة:', devices.length, 'جهاز');
     }
-    exitOfflineMode();
   }catch(e){
-    const msg = (e && e.message) ? e.message : String(e);
-    console.error('فشل تحميل الأجهزة:', e);
-    if(!devices.length) devices = await idbSafe(readCache(), []);
+    netErr = e;
+  }
+
+  // ===== النهاية — مهما حصل فوق =====
+  archiveProgress(false);
+  loadProgress(0);
+  sortDevices();
+  devicesLoaded = true;   // خلاص عندنا بيانات — البوابة تقدر تعرض
+  devicesComplete = true;
+  _completeWaiters.splice(0).forEach(f => { try{ f(); }catch(e){} });
+
+  if(netErr){
+    const msg = (netErr && netErr.message) ? netErr.message : String(netErr);
+    console.error('فشل تحميل الأجهزة:', netErr);
     lastLoadError = navigator.onLine ? ('تعذّر الوصول للسيرفر: ' + msg) : '';
     enterOfflineMode();
+  } else {
+    exitOfflineMode();
+    _memMeta = meta;
+    await idbSafe(idbSet('sync_meta', meta), false, 5000);
   }
-  snapshotSynced();
-  devicesLoaded = true;   // خلاص عندنا بيانات — البوابة تقدر تعرض
   writeCache();
   render();
   // لو البوابة مفتوحة وكانت بتوري "جاري التحميل"، تتحدّث دلوقتي
   try{ if(isTechnician()) revealAfterDevices(); }catch(e){}
   // ننشر ترتيب الفنيين لصفحاتهم — بيتكتب لما يتغيّر بس
   try{ publishTechBoard(); }catch(e){}
-  
 }
-
 async function persist(){
   setSaving(true);
   showError('');
@@ -2863,6 +3192,10 @@ async function persist(){
   devices.forEach(d => { if(lastSynced[d.id] !== JSON.stringify(d)) changed.push(d); });
   // الجهاز اتغيّر → فهرس البحث بتاعه بقى قديم
   try{ if(window.IFixSearch) changed.forEach(d => IFixSearch.invalidate(d)); }catch(e){}
+  // 🗄️ الدرج: اللي اتغيّر يتكتب حتى لو اتعدّل «في مكانه» (نفس الكائن)،
+  //    والنسخة القديمة من الدرج متكتبش فوقه لو التحميل لسه شغّال
+  cacheForce(changed);
+  changed.forEach(d => _freshIds.add(d.id));
   Object.keys(lastSynced).forEach(id => { if(!ids.has(id)) removed.push(id); });
 
   if(!changed.length && !removed.length){ setSaving(false); return; }
@@ -2969,6 +3302,8 @@ function intervalMsFor(freq){
 async function checkAutoBackup(){
   const ms = intervalMsFor(backupSettings.frequency);
   if(!ms) return;
+  // ⚠️ نسخة احتياطية من نص الأجهزة (والأرشيف لسه بيتحمّل) = نسخة بايظة
+  await whenDevicesComplete();
   const last = backupSettings.lastAutoBackupAt ? new Date(backupSettings.lastAutoBackupAt).getTime() : 0;
   if(Date.now() - last >= ms && devices.length > 0){
     exportBackup();
@@ -3064,7 +3399,7 @@ async function wipeAllData(){
     // مسح محلي + الكاش
     devices = [];
     lastSynced = {};
-    writeCache();
+    await cacheResetAll();
     importing = false;
     hideImportProgress();
     render();
@@ -5520,8 +5855,8 @@ async function purgeAllData(){
     }
     try{ await sb.from('app_data').delete().eq('key', STORAGE_KEY); }catch(e){}
     try{ await window.storage.set(STORAGE_KEY, JSON.stringify([])); }catch(e){}
-    devices = []; lastSynced = {}; writeCache();
-    await idbSafe(idbSet('sync_meta', {}), false, 5000);   // نصفّر العلامة عشان أول تحميل جاي يبقى كامل
+    devices = []; lastSynced = {};
+    await cacheResetAll();   // الدرج + العلامة — أول تحميل جاي يبقى كامل
     importing = false; hideImportProgress(); setSaving(false);
     return true;
   }catch(e){
@@ -9079,6 +9414,9 @@ const BOARD_HEARTBEAT_MS = 5 * 60 * 1000;
 async function publishTechBoard(){
   try{
     if(!Array.isArray(devices) || !devices.length) return;
+    // ⚠️ الترتيب محسوب على آخر ٣٠ يوم — لو الأرشيف لسه بيتحمّل
+    //    هيتنشر ترتيب ناقص للفنيين. loadDevices بتنده دي تاني في الآخر.
+    if(!devicesComplete) return;
     const rows = { today: techBoardFor('today'), d30: techBoardFor('month') };
 
     // ⚠️ المقارنة على **الأرقام بس** — من غير الوقت.
