@@ -58,6 +58,12 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
   .topbar h1{ font-family:'Cairo',sans-serif; font-size:19px; margin:0; }
   .topbar .sub{ font-size:12px; opacity:.7; margin-top:2px; }
   .topbar .who{ font-family:'Cairo',sans-serif; font-size:13px; font-weight:700; opacity:.92; margin-top:8px; }
+  /* زرار الرجوع لحساب المحاسب العام — فوق خالص زي أي شاشة داخلية */
+  .tb-back{ display:inline-flex; align-items:center; gap:6px; margin-bottom:10px;
+    background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.22); color:#fff;
+    border-radius:10px; padding:9px 14px; font-family:'Tajawal',sans-serif; font-size:14px;
+    font-weight:800; cursor:pointer; touch-action:manipulation; }
+  .tb-back:active{ background:rgba(255,255,255,.2); }
   .wrap{ max-width:640px; margin:0 auto; padding:16px; }
   .sec{ background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; margin-bottom:14px;
     box-shadow:0 2px 10px rgba(16,16,20,.04); }
@@ -123,10 +129,24 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
 </head>
 <body>
 
+<!-- ============================================================
+     🧾 اللوحة دي **أوضة جوه حساب المحاسب العام** — مش حساب لوحدها
+     ------------------------------------------------------------
+     🧠 بالبلدي: الحساب نفسه هو «المحاسب العام» (شاشة الداشبورد).
+        لوحة الأدمن باب جواه — من درج «🛡️ إدارة النظام» في قايمة
+        التلت نقط. عشان كده:
+          • فوق زرار «رجوع للمحاسب العام» (زي أي شاشة جوه الحساب)
+          • مفيش هنا زرار «فتح شاشة المحاسب» — الشاشة دي هي البيت أصلاً
+          • مفيش «تسجيل خروج» هنا — الخروج من قايمة الحساب نفسه
+     ⚠️ استثناء واحد: لو الاشتراك خلصان والفون فاتح، index.html بيودّي
+        هنا على طول عشان زرار التفعيل. «رجوع» ساعتها بيودّي لشاشة
+        «تم إيقاف الخدمة» — وزرار «فهمت» فيها بيسجّل الخروج.
+     ============================================================ -->
 <div class="topbar">
-  <h1>⚙️ <span data-i18n="adm.title">لوحة تحكم الأدمن</span></h1>
-  <div class="sub" data-i18n="adm.subtitle">I Fix Team — إدارة النظام</div>
-  <div class="who" id="whoBox" data-i18n="adm.checking">جارٍ التحقق…</div>
+  <button class="tb-back" onclick="backToAccount()">→ رجوع للمحاسب العام</button>
+  <h1>🛡️ لوحة الأدمن</h1>
+  <div class="sub">جوه حساب المحاسب العام — I Fix Team</div>
+  <div class="who" id="whoBox">جارٍ التحقق…</div>
   <div id="langHost" style="margin-top:10px;"></div>
 </div>
 
@@ -372,12 +392,11 @@ function render(){
 
   document.getElementById('wrap').innerHTML = `
     <div class="sec">
-      <div class="mode-box">
+      <div class="mode-box" style="margin-bottom:0;">
         <div style="font-size:13px;color:var(--muted);">${t('adm.currentMode')}</div>
         <div style="font-weight:800;font-size:17px;margin-top:2px;">${modeLabel}</div>
         ${m==='trial' ? `<div style="font-size:13px;color:var(--warn);margin-top:4px;">${t('adm.daysLeft',{n:left})}</div>` : ''}
       </div>
-      <button class="btn ghost" onclick="location.href='dashboard.html'">🗂️ ${t('adm.openDashboard')}</button>
     </div>
 
     <!-- ⚠️ قسم «وضع البيتا» وقسم «الفترة المجانية» اتشالوا بالكامل
@@ -530,9 +549,6 @@ function render(){
         : `<div style="color:var(--faint);font-size:12.5px;">${t('adm.noAudit')}</div>`}
     </div>
 
-    <div class="sec">
-      <button class="btn ghost" onclick="doLogout()">${t('adm.logout')}</button>
-    </div>
   `;
   try{ showPaidUntil(); }catch(e){}   // تاريخ نهاية الاشتراك تحت الزرار
   // ⚠️ render() بيعيد بناء الـ HTML كله، فالعناصر اللي كتبنا فيها
@@ -972,6 +988,12 @@ async function sendBroadcast(){
     toast(`اتبعت لـ ${who} ✅`);
   }catch(e){ toast('فشل الإرسال: ' + (e.message||e), false); }
 }
+// ← رجوع لحساب المحاسب العام (الداشبورد)
+// ⚠️ replace مش href: عشان زرار «رجوع» في المتصفح ميرجّعش للوحة تاني
+function backToAccount(){ location.replace('dashboard.html'); }
+
+// ⚠️ مفيش زرار بيندهها هنا دلوقتي (الخروج من قايمة الحساب) — سايبينها
+//    احتياطي لو اتحتاجت.
 async function doLogout(){
   try{ await sb.auth.signOut(); }catch(e){}
   location.href = 'index.html';
@@ -992,7 +1014,8 @@ async function doLogout(){
     location.href = 'dashboard.html';
     return;
   }
-  document.getElementById('whoBox').textContent = `${currentUser.name} — ${t('adm.roleSuper')}`;
+  // 🧾 الحساب ده اسمه «المحاسب العام» — اللوحة جواه، مش العكس
+  document.getElementById('whoBox').textContent = `${currentUser.name} — المحاسب العام`;
   try{ I18N.setUser(currentUser.email); I18N.mountLangToggle(document.getElementById('langHost')); }catch(e){}
   // ============================================================
   // 💻 لوحة الأدمن على الفون بس — **من غير أي استثناء**

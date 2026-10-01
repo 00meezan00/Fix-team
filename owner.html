@@ -206,6 +206,15 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
   .kebab-menu button.hidden{display:none !important;}
   .kebab-menu .sep{height:1px; background:var(--line); margin:5px 8px;}
   .kebab-menu .danger{color:var(--red);}
+  /* 🗂️ عنوان المجموعة — صغير وباهت عشان مايتلخبطش مع الزراير.
+     الخط الرفيع فوقه بيفصل المجموعة عن اللي قبلها. */
+  .kebab-menu .mh{font-size:11.5px; font-weight:800; color:var(--faint); letter-spacing:.2px;
+    padding:11px 5px 4px; margin:4px 8px 0; border-top:1px solid var(--line); user-select:none;}
+  /* أول عنوان ظاهر في القايمة مالوش خط فوقه */
+  .kebab-menu .mh.first{border-top:none; margin-top:0; padding-top:6px;}
+  /* القايمة طويلة على الموبايل — لو مش هتكفي الشاشة تتسكرول جواها */
+  .kebab-menu{max-height:calc(100vh - 90px - env(safe-area-inset-top)); overflow-y:auto;
+    -webkit-overflow-scrolling:touch;}
   /* عدّاد أحمر صغير على خانة مشاركات المالك */
   .kebab-menu .badge{display:inline-block; background:var(--red); color:#fff;
     border-radius:999px; font-size:11px; font-weight:900; padding:1px 7px; margin-inline-start:6px;}
@@ -876,27 +885,49 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
   <div class="kebab-wrap">
     <button class="kebab-btn" onclick="toggleKebab()" aria-label="قائمة">⋮</button>
     <div id="kebabShield" class="kebab-shield hidden" onclick="closeKebab()"></div>
+    <!-- ============================================================
+         🗂️ القايمة متقسّمة مجموعات — فوق كل مجموعة عنوان صغير (mh)
+         ------------------------------------------------------------
+         ⚠️ كل الزراير **ولاد مباشرين** للقايمة (مفيش div حواليهم) عن قصد:
+            staff-board.js و common.js بيدوّروا على الزراير ويحطّوا جنبها،
+            ولو الزرار جوه div تاني الحط بيقع.
+         ⚠️ «🔄 تحديث» القديم اتشال — «تحديث التطبيق» (من common.js)
+            بيعمل نفس الشغل وأكتر: بيجيب الكود الجديد **والبيانات** كمان.
+         ⚠️ العنوان اللي كل خاناته مقفولة بالصلاحية بيستخبى لوحده
+            (ifxTidyMenu في common.js — بتتنده مع كل فتحة للقايمة).
+         ============================================================ -->
     <div id="kebabMenu" class="kebab-menu hidden">
-      <button onclick="closeKebab(); refresh()">🔄 تحديث</button>
-      <div class="sep"></div>
-      <button class="cap-purchases" style="display:none;" onclick="openCap('PUR')" data-i18n="dp.purchases">🧾 فواتير المشتريات</button>
-      <button class="cap-purchases" style="display:none;" onclick="openCap('INV')" data-i18n="dp.parts">📦 مخزن قطع الغيار</button>
-      <button class="cap-partsreview" style="display:none;" onclick="closeKebab(); openPartsReview()">🔩 مراجعة قطع الغيار</button>
-      <button class="cap-accounts" style="display:none;" onclick="closeKebab(); openAccounts()">🧾 الحسابات</button>
-      <button class="cap-inventory" style="display:none;" onclick="closeKebab(); openInventory()">📋 الجرد</button>
-      <button id="accountMenuBtn" class="hidden" style="display:none;" onclick="closeKebab(); openAccountShared()">👤 حسابي</button>
+      <div class="mh">👤 أنا</div>
       <button class="att-menu-btn" style="display:none;" onclick="closeKebab(); openAttendance()">⏰ المواعيد</button>
       <!-- ⚠️ الكلاس pay-menu-btn مهم: payroll.js بيدوّر عليه بنفسه
            ويظهّره على الموبايل بس ويحط عليه عدد الخصومات الجديدة. -->
       <button class="pay-menu-btn" style="display:none;" onclick="closeKebab(); openPayroll()">💰 مرتبك</button>
+      <button id="accountMenuBtn" class="hidden" style="display:none;" onclick="closeKebab(); openAccountShared()">👤 حسابي</button>
+
+      <div class="mh">🏪 المحل</div>
+      <!-- 👥 مكان زرار «الموظفين» محجوز هنا. staff-board.js لما يلاقي
+           زرار بنفس الـid بيسيبه ومبيعملش واحد تاني. بيظهر بس لما
+           الملف يتحمّل فعلاً (شوف toggleKebab تحت). -->
+      <button id="sbOwnerBtn" style="display:none;" onclick="closeKebab(); if(window.StaffBoard) StaffBoard.open({ adminLabel:'المحاسب العام' });">👥 الموظفين</button>
+      <button class="cap-accounts" style="display:none;" onclick="closeKebab(); openAccounts()">📒 الحسابات</button>
+      <button class="cap-inventory" style="display:none;" onclick="closeKebab(); openInventory()">📋 الجرد</button>
+
+      <div class="mh">🔩 قطع الغيار</div>
+      <button class="cap-purchases" style="display:none;" onclick="openCap('PUR')" data-i18n="dp.purchases">🧾 فواتير المشتريات</button>
+      <button class="cap-purchases" style="display:none;" onclick="openCap('INV')" data-i18n="dp.parts">📦 مخزن قطع الغيار</button>
+      <button class="cap-partsreview" style="display:none;" onclick="closeKebab(); openPartsReview()">🔍 مراجعة قطع الغيار</button>
+
+      <!-- 🏷️ التسعير — آخر مجموعة شغل (تحت زي ما اتفقنا).
+           العدّاد الأصفر جنبها بيقول كام جهاز مستني تسعير. -->
+      <div class="mh">🏷️ التسعير</div>
+      <button onclick="openPricing()">🏷️ تسعير أجهزة<span id="pzBadge" class="pz-badge" style="display:none;"></span></button>
+
       <div class="sep"></div>
       <button onclick="openSettings()">⚙️ الإعدادات</button>
-      <!-- 💰 خانة التسعير — تحت خالص زي ما اتفقنا.
-           العدّاد الأصفر جنبها بيقول كام جهاز مستني تسعير. -->
+      <!-- 📍 «🔄 تحديث التطبيق (vXX)» بيتحط هنا مكان العلامة دي (common.js) -->
+      <span id="ifxUpdSlot" hidden></span>
       <div class="sep"></div>
-      <button onclick="openPricing()">💰 تسعير أجهزة<span id="pzBadge" class="pz-badge" style="display:none;"></span></button>
-      <div class="sep"></div>
-      <button class="danger" onclick="kebabLogout()">تسجيل الخروج ⏻</button>
+      <button class="danger" onclick="kebabLogout()">⏻ تسجيل الخروج</button>
     </div>
   </div>
 </div>
@@ -3296,6 +3327,14 @@ function toggleKebab(){
   const m = $('kebabMenu'), s = $('kebabShield');
   if(!m) return;
   const open = m.classList.contains('hidden');
+  if(open){
+    // 👥 «الموظفين» يظهر بس لو staff-board.js اتحمّل فعلاً —
+    //    من غيره الزرار هيتداس ومش هيحصل حاجة
+    const sbb = $('sbOwnerBtn');
+    if(sbb) sbb.style.display = window.StaffBoard ? '' : 'none';
+    // 🗂️ العناوين اللي كل خاناتها مقفولة بالصلاحية تستخبى
+    if(typeof ifxTidyMenu === 'function') ifxTidyMenu(m);
+  }
   m.classList.toggle('hidden', !open);
   if(s) s.classList.toggle('hidden', !open);
 }

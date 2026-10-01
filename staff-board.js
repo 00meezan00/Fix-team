@@ -80,7 +80,7 @@
   }
   function roleTxt(r){
     var map = {
-      super_admin: opts.adminLabel || 'أدمن',
+      super_admin: opts.adminLabel || 'المحاسب العام',
       accountant:'محاسب', dispatcher:'مسؤول حركة', technician:'فني',
       hr:'شؤون العاملين', staff:'موظف', owner:'المالك'
     };
@@ -379,7 +379,8 @@
   // ============================================================
   function takeOverDashboard(){
     if(!$('staffOverlay')) return;
-    window.openStaff = function(){ open({ adminLabel:'أدمن' }); };
+    // 🧾 حساب السوبر أدمن **هو** «المحاسب العام» — نفس الاسم في كل حتة
+    window.openStaff = function(){ open({ adminLabel:'المحاسب العام' }); };
   }
 
   // ============================================================
