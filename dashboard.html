@@ -1326,6 +1326,37 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
   @media (max-width:820px){
     input, textarea, select, .tech-select{ font-size:16px !important; }
   }
+  /* ============================================================
+     ☀️ الثيم الفاتح — الخانات لازم تبان من الخلفية
+     ------------------------------------------------------------
+     🧸 بالبلدي: الخانة كانت رمادي فاتح (#EEF0F3) على خلفية رمادي
+        فاتح برضه (#F3F5F7) — الفرق بينهم ٥ درجات بس. على شاشة
+        كمبيوتر المحل القديمة (والموبايل في الشمس) الاتنين بيبانوا
+        لون واحد، والخانة كأنها مش موجودة.
+
+     ✅ الحل — ٣ حاجات مع بعض:
+        ١) الخلفية بقت أغمق شوية (#E6EBF1) والخانة بقت بيضا —
+           أبيض على رمادي بيبان على أي شاشة.
+        ٢) إطار رفيع + ظل خفيف حوالين الخانة.
+        ٣) شريط فوق الخانة بلون حالتها (برتقاني «قيد الانتظار»،
+           بنفسجي «الكشف»…) — عينك تعرف الخانة من لونها.
+        وقايمة التلت نقط خدت إطار هي كمان — كانت بيضا على أبيض.
+
+     ⚠️ الغامق مالوش دعوة بالكلام ده خالص (:not([data-theme="dark"])).
+     ============================================================ */
+  html:not([data-theme="dark"]){ --bg:#E6EBF1; }
+  html:not([data-theme="dark"]) .column{
+    background:var(--surface);
+    border:1px solid #C9D3DE;
+    border-top:4px solid var(--col, #C9D3DE);
+    box-shadow:0 1px 3px rgba(16,24,40,.10);
+  }
+  html:not([data-theme="dark"]) .column:hover{box-shadow:0 6px 16px rgba(16,24,40,.14);}
+  html:not([data-theme="dark"]) .day-column{background:var(--surface); border:1px solid #C9D3DE;}
+  html:not([data-theme="dark"]) .menu-dropdown{
+    border:1px solid #C9D3DE;
+    box-shadow:0 12px 32px rgba(16,24,40,.28);
+  }
 </style>
 <style id="ios-safe-head-fix">
 /* ============================================================
@@ -3848,7 +3879,10 @@ function renderBoard(){
     const count = (s.key === 'trashed')
       ? trashDevices.length
       : devices.filter(d => effStatus(d) === s.key).length;
-    return `<button class="column" onclick="openColumn('${s.key}')">
+    // --col = لون الخانة (للشريط الملوّن فوقها في الثيم الفاتح).
+    // ⚠️ var(--…) مش accent(): كده لو المظهر اتغيّر، اللون بيتغيّر
+    //    لوحده من غير ما الخانات تترسم تاني.
+    return `<button class="column" style="--col:var(--${s.varname})" onclick="openColumn('${s.key}')">
       <div class="column-head">
         <span class="title" style="color:${accent(s.varname)}">${stLabel(s)}</span>
       </div>

@@ -45,7 +45,11 @@ let _paySlips  = [];   // كشوف الرواتب — شهر بشهر
 // 🗄️ الدرجين: الشهر اللي بيعرضوه + مفتوحين ولا لأ
 //    (بيفضلوا زي ما هم لو الشاشة اترسمت تاني بعد «فهمت»)
 let _payPeriod = null;               // { from:'YYYY-MM-01', to:'YYYY-MM-DD' }
-let _payOpen   = { wd:false, ded:false };
+let _payOpen   = { wd:false, ded:false, exw:false };
+// 🔗 درج «اسمي في الإكسل» — للمحاسب العام بس (migration 66)
+//    null = لسه ماتقراش · { allowed:false } = مش ليك · { allowed:true, … } = ليك
+let _payExw    = null;
+let _payExwErr = '';
 // ⚠️ wd_* = المسحوبات (فلوس الموظف أخدها مقدّم) — دي **مش** خصم.
 //    الاتنين بيقلّلوا الصافي، بس الخصم عقوبة والمسحوبات فلوسه هو.
 //    دمجهم في رقم واحد بيخلّي الموظف يعترض على حاجة مالهاش لزمة.
@@ -243,7 +247,10 @@ async function openPayroll(){
   if(!ov){ console.error('payroll: العنصر #payOverlay مش موجود في الصفحة'); return; }
   ov.classList.remove('hidden');
   payRender('⏳ جاري التحميل…');
-  await payLoad();
+  // ⚠️ درج الإكسل بيتقرا هنا بس (لما الشاشة تتفتح) — مش في payBoot.
+  //    payBoot بيشتغل عند **كل** موظف مع كل رجوع للتطبيق، ومفيش
+  //    داعي نسأل السيرفر سؤال إجابته «مش ليك» كل مرة.
+  await Promise.all([payLoad(), payExwLoad()]);
   payRender('');
 }
 function closePayroll(){
@@ -376,6 +383,7 @@ function payDrawersHtml(){
     <div class="pay-drws">
       ${drawer('wd',  '🔩 درج المسحوبات', wdCount,  wdBody)}
       ${drawer('ded', '💸 درج الخصومات',  dedCount, dedBody)}
+      ${payExwDrawerHtml()}
     </div>`;
 }
 
@@ -707,6 +715,174 @@ function payCard(r){
   </div>`;
 }
 
+
+// ============================================================
+// 🔗 درج «اسمي في الإكسل» — للمحاسب العام بس
+// ------------------------------------------------------------
+// 🧸 بالبلدي: المحاسب العام مش موظف، فـ HR مش شايفاه في قايمة
+//    «اختار الموظف»، واسمه في الإكسل كان بيفضل واقف للأبد.
+//    الدرج ده بيخلّيه يقول للنظام بنفسه: «الاسم ده أنا».
+//
+// 🔴 مفيش هنا أي خانة إيميل — السيرفر بياخد الإيميل من الحساب
+//    اللي داخل. يعني الزرار ده **مستحيل** يربط اسم بحد تاني،
+//    حتى لو حد عدّل الصفحة من الكونسول.
+//
+// 🔴 والدرج **مبيسجّلش فلوس**. بيربط الاسم بس. الفلوس بتنزل لما
+//    ملف الإكسل يتحفظ (hr_excel_sync) — نفس الطريق الوحيد بتاع
+//    كل الموظفين.
+//
+// ⚠️ لأي حساب تاني: السيرفر بيرجّع allowed=false والدرج مبيظهرش
+//    أصلاً. ولو ملف 66 لسه ماتشغّلش: نفس الكلام — نسكت.
+// ============================================================
+async function payExwLoad(){
+  _payExwErr = '';
+  try{
+    const { data, error } = await sb.rpc('hr_excel_self_state');
+    // ⚠️ Supabase مبيرميش خطأ — بيرجّعه في .error
+    if(error) throw error;
+    _payExw = data || { allowed:false };
+  }catch(e){
+    const t = (e && e.message) ? e.message : String(e);
+    // الدالة مش موجودة = ملف 66 ماتشغّلش → الدرج مبيظهرش لحد. ده مش خطأ.
+    if(/does not exist|42883|PGRST202/i.test(t)){ _payExw = { allowed:false }; return; }
+    console.error('payExwLoad failed:', e);
+    // ⚠️ بنحتفظ بالحالة القديمة لو كانت ليك — عشان الدرج يفضل ظاهر
+    //    ويقول «فيه مشكلة» بدل ما يختفي في صمت
+    _payExwErr = t;
+  }
+}
+
+function payExwDrawerHtml(){
+  if(!_payExw || !_payExw.allowed) return '';
+  const mine    = _payExw.mine    || [];
+  const pending = _payExw.pending || [];
+  const orphans = _payExw.orphans || [];
+  const open = _payOpen.exw;
+
+  const head = `
+    <button class="pay-drw${open ? ' open' : ''}" onclick="payToggleDrawer('exw')">
+      <span class="pay-drw-t">🔗 اسمي في الإكسل</span>
+      <span class="pay-drw-a">${open ? '▴' : '▾'}</span>
+    </button>`;
+  if(!open) return head;
+
+  const money = n => payMoney(n);
+
+  // ✅ أسمائي المربوطة
+  const mineHtml = mine.length
+    ? mine.map((r, i) => `
+        <div class="pay-exw-row ok">
+          <div class="pay-exw-mid">
+            <b>${_payEsc(r.raw_name)}</b>
+            <span>${Number(r.rows_cnt) ? `${r.rows_cnt} سحبة · ${money(r.total)} ج.م`
+                                        : 'لسه مفيش سحبات اتسجّلت عليه'}${
+              Number(r.waiting) ? ` · ⏳ ${r.waiting} مستنية حفظ الإكسل` : ''}</span>
+          </div>
+          <button class="pay-exw-x" title="فك الربط" onclick="payExwUnlink(${i})">✖</button>
+        </div>`).join('')
+    : `<div class="pay-drw-empty">لسه مفيش اسم مربوط بيك</div>`;
+
+  // 🧩 مربوطة بحساب اتمسح
+  const orphHtml = orphans.map((r, i) => `
+        <div class="pay-exw-row warn">
+          <div class="pay-exw-mid">
+            <b>${_payEsc(r.raw_name)}</b>
+            <span>${r.rows_cnt} سحبة · ${money(r.total)} ج.م<br>
+              مربوط بـ <span dir="ltr">${_payEsc(r.old_email)}</span> — الحساب ده اتمسح</span>
+          </div>
+          <button class="pay-exw-me" onclick="payExwLink('orphans', ${i})">🙋 ده أنا</button>
+        </div>`).join('');
+
+  // ⏳ الأسماء الواقفة
+  const pendHtml = pending.map((r, i) => `
+        <div class="pay-exw-row">
+          <div class="pay-exw-mid">
+            <b>${_payEsc(r.raw_name)}</b>
+            <span>${r.rows_cnt} سحبة · ${money(r.total)} ج.م${r.months ? ' · ' + _payEsc(r.months) : ''}</span>
+          </div>
+          <button class="pay-exw-me" onclick="payExwLink('pending', ${i})">🙋 ده أنا</button>
+        </div>`).join('');
+
+  return head + `
+    <div class="pay-drw-body">
+      ${_payExwErr ? `<div class="pay-warn">⚠️ مقدرناش نقرا أسماء الإكسل — اللي تحت ممكن يكون قديم.
+        <span class="pay-warn-d">${_payEsc(_payExwErr)}</span></div>` : ''}
+      <div class="pay-exw-hint">
+        🧸 دوس <b>«ده أنا»</b> جنب اسمك زي ما هو مكتوب في ملف الإكسل.
+        الاسم بيتربط <b>بيك إنت بس</b>.<br>
+        ⚠️ الربط لوحده مبينزّلش الفلوس — بعده <b>احفظ ملف الإكسل تاني</b>،
+        والمسحوبات تنزل في «درج المسحوبات» فوق.
+      </div>
+
+      <div class="pay-exw-sec ok">✅ مربوط بيك (${mine.length})</div>
+      ${mineHtml}
+
+      ${orphans.length ? `
+        <div class="pay-exw-sec warn">🧩 مربوطة بحساب اتمسح (${orphans.length})</div>
+        ${orphHtml}` : ''}
+
+      <div class="pay-exw-sec">⏳ أسماء واقفة من غير ربط (${pending.length})</div>
+      ${pending.length ? pendHtml : `<div class="pay-drw-empty">مفيش أسماء واقفة ✅</div>`}
+    </div>`;
+}
+
+// list = 'pending' أو 'orphans' — بنبعت رقم الصف مش الاسم نفسه،
+// عشان الأسامي اللي فيها ' أو " ما تكسرش الـ onclick
+async function payExwLink(list, i){
+  if(_payBusy || !_payExw) return;
+  const r = (_payExw[list] || [])[i];
+  if(!r) return;
+  const msg = list === 'orphans'
+    ? `«${r.raw_name}» مربوط دلوقتي بحساب اتمسح (${r.old_email}).\n\n` +
+      `هتاخده لنفسك؟ أول ما تحفظ ملف الإكسل، الـ ${r.rows_cnt} سحبة ` +
+      `(${payMoney(r.total)} ج.م) هيتنقلوا لدرج المسحوبات بتاعك.`
+    : `هتربط «${r.raw_name}» اللي في الإكسل بيك إنت.\n\n` +
+      `يعني ${r.rows_cnt} سحبة (${payMoney(r.total)} ج.م) هتتحسب عليك ` +
+      `أول ما تحفظ ملف الإكسل.\n\nمتأكد إنه إنت؟`;
+  if(!confirm(msg)) return;
+
+  _payBusy = true;
+  try{
+    const { data, error } = await sb.rpc('hr_excel_self_link', { p_alias: r.raw_name });
+    if(error) throw error;
+    await payExwLoad();
+    payRender('');
+    alert((data && data.already) ? 'الاسم ده مربوط بيك أصلاً ✅'
+      : 'اتربط ✅\n\nدلوقتي احفظ ملف الإكسل تاني عشان المسحوبات تنزل في «درج المسحوبات».');
+  }catch(e){
+    console.error('payExwLink failed:', e);
+    alert('❌ ' + (e.message || e));
+  }finally{
+    _payBusy = false;
+  }
+}
+
+async function payExwUnlink(i){
+  if(_payBusy || !_payExw) return;
+  const r = (_payExw.mine || [])[i];
+  if(!r) return;
+  if(!confirm(`هتفك ربط «${r.raw_name}» من عندك؟\n\n` +
+              'المسحوبات اللي طلعت منه هتتشال من درجك — ماعدا الشهور ' +
+              'اللي اتصرفت خلاص، دي بتفضل زي ما هي.\n' +
+              'والاسم هيرجع «واقف» لحد ما يتربط تاني.')) return;
+
+  _payBusy = true;
+  try{
+    const { data, error } = await sb.rpc('hr_excel_self_unlink', { p_alias: r.raw_name });
+    if(error) throw error;
+    // الخصومات اتشالت من hr_deductions → الدرجين والكشف لازم يتقروا تاني
+    await Promise.all([payLoad(), payExwLoad()]);
+    payRender('');
+    const d = data || {};
+    alert('اتفك ✅\n\nسحبات اتشالت: ' + (d.unlinked || 0) +
+          '\nفضلت (شهور اتصرفت): ' + (d.kept_paid || 0));
+  }catch(e){
+    console.error('payExwUnlink failed:', e);
+    alert('❌ ' + (e.message || e));
+  }finally{
+    _payBusy = false;
+  }
+}
 
 // ============================================================
 // «فهمت»
@@ -1095,6 +1271,27 @@ function payUrlB64ToU8(s){
   .pay-drw-m{font-size:12px; font-weight:800; color:var(--p-mut); margin:0 4px 10px;}
   .pay-drw-empty{text-align:center; color:var(--p-mut); font-size:13px; padding:14px 8px 18px;}
   .pay-drw-body .pay-late{margin-bottom:11px;}
+
+  /* 🔗 درج «اسمي في الإكسل» */
+  .pay-exw-hint{font-size:12.5px; line-height:1.95; color:var(--p-ink2);
+    background:var(--p-card); border:1px solid var(--p-line); border-radius:11px;
+    padding:11px 12px; margin:0 0 12px;}
+  .pay-exw-sec{font-weight:900; font-size:13px; color:var(--p-ink2); margin:14px 4px 8px;}
+  .pay-exw-sec.ok{color:var(--p-green);}
+  .pay-exw-sec.warn{color:#B45309;}
+  html[data-theme="dark"] #payOverlay .pay-exw-sec.warn{color:#FBBF24;}
+  .pay-exw-row{display:flex; align-items:center; gap:10px; background:var(--p-card);
+    border:1px solid var(--p-line); border-radius:12px; padding:11px 12px; margin-bottom:8px;}
+  .pay-exw-row.ok{border-color:var(--p-green);}
+  .pay-exw-row.warn{border-color:#B45309;}
+  .pay-exw-mid{flex:1; min-width:0;}
+  .pay-exw-mid b{display:block; font-size:14.5px; color:var(--p-ink); word-break:break-word;}
+  .pay-exw-mid span{font-size:11.5px; color:var(--p-mut); line-height:1.8; word-break:break-word;}
+  .pay-exw-me{flex:none; border:none; border-radius:10px; padding:10px 12px;
+    background:var(--p-green); color:#fff; cursor:pointer;
+    font:900 13px/1 'Tajawal',system-ui,sans-serif;}
+  .pay-exw-x{flex:none; border:none; background:none; color:var(--p-mut);
+    font-size:17px; cursor:pointer; padding:4px 6px;}
 
   .pay-note{margin-top:18px; font-size:12px; line-height:2; color:var(--p-mut);
     text-align:center;}`;

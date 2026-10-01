@@ -645,3 +645,120 @@ const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
     latest:  function(){ return NEW_VER; }
   };
 })();
+
+// ============================================================
+// 🔒 قايمة التلت نقط مفتوحة = الصفحة اللي وراها متتحركش
+// ------------------------------------------------------------
+// 🧸 بالبلدي: القايمة زي ورقة فوق كراسة. لما تحط صباعك على
+//    الورقة وتسحب، المفروض الورقة بس اللي تتحرك (لو طويلة) —
+//    مش الكراسة اللي تحتها. قبل كده الموبايل كان بيعدّي السحبة
+//    للصفحة اللي ورا، فالشاشة الرئيسية تتزحلق والقايمة مفتوحة.
+//
+// ✅ دلوقتي، طول ما القايمة مفتوحة:
+//    • صباعك **على القايمة**: لو القايمة طويلة بتتسكرول هي بس.
+//      ولما توصل لآخرها (فوق أو تحت) بتقف — مبتزقّش الصفحة.
+//      ولو القايمة قصيرة أصلاً، مفيش أي حاجة بتتحرك.
+//    • صباعك **برّه القايمة**: الصفحة واقفة برضه.
+//    • نفس الكلام لعجلة الماوس على الكمبيوتر.
+//    أول ما القايمة تتقفل، كل حاجة بترجع طبيعي.
+//
+// ⚠️ ليه مش «body{position:fixed}» المشهورة؟ لأنها بترجّع الصفحة
+//    لفوق خالص وهي مقفولة، والشريط اللي فوق (sticky) بيطير معاها
+//    — فالقايمة نفسها كانت هتختفي من قدامك. الطريقة دي مبتحرّكش
+//    أي حاجة من مكانها، بتمنع السحبة بس.
+//
+// ⚠️ ليه هنا في common.js؟ نفس الأسماء التلاتة بتاعة زرار التحديث:
+//      #menuDropdown → الداشبورد (المحاسب والأدمن)
+//      #kebabMenu    → الفني · الديسباتشر · المالك · الموظف
+//      #menuDrop     → شؤون العاملين
+//    فكل الشاشات بتاخدها من غير ما نلمس ولا صفحة.
+//    وكل صفحة بتفتح قايمتها بطريقتها (hidden / open / display) —
+//    فإحنا مش بنسأل «إزاي اتفتحت»، بنسأل «هي باينة على الشاشة؟».
+// ============================================================
+(function(){
+  if(window.__ifxMenuLock) return;
+  window.__ifxMenuLock = true;
+
+  var LOCK_MENUS = ['menuDropdown', 'kebabMenu', 'menuDrop'];
+
+  // overscroll-behavior:contain = الطريقة الرسمية في المتصفحات الجديدة
+  // («السكرول ميعدّيش للي ورايا»). اللي تحت في الجافاسكريبت بيغطّي
+  // الموبايلات القديمة اللي مبتفهمهاش.
+  try{
+    var st = document.createElement('style');
+    st.id = 'ifxMenuLockCss';
+    st.textContent = '#menuDropdown,#kebabMenu,#menuDrop{overscroll-behavior:contain;}';
+    (document.head || document.documentElement).appendChild(st);
+  }catch(e){}
+
+  // القايمة المفتوحة دلوقتي (أو null)
+  function openMenu(){
+    for(var i = 0; i < LOCK_MENUS.length; i++){
+      var el = document.getElementById(LOCK_MENUS[i]);
+      if(!el) continue;
+      // getClientRects فاضية = display:none (هي أو أبوها) = مقفولة
+      if(!el.getClientRects().length) continue;
+      var cs = getComputedStyle(el);
+      if(cs.visibility === 'hidden' || cs.display === 'none') continue;
+      return el;
+    }
+    return null;
+  }
+
+  // أقرب حاجة بتتسكرول فعلاً — من مكان الصباع لحد القايمة
+  function scrollerIn(menu, target){
+    var n = target;
+    while(n && n !== menu && n.nodeType === 1){
+      if(n.scrollHeight > n.clientHeight + 1){
+        var oy = getComputedStyle(n).overflowY;
+        if(oy === 'auto' || oy === 'scroll') return n;
+      }
+      n = n.parentNode;
+    }
+    return (menu.scrollHeight > menu.clientHeight + 1) ? menu : null;
+  }
+
+  // dy > 0 = الصباع/العجلة عايزة تطلع لفوق (المحتوى ينزل)
+  // بترجّع true لو الحركة دي هتعدّي للصفحة اللي ورا
+  function wouldLeak(box, dy){
+    if(!box) return true;                                       // مفيش حاجة تتسكرول أصلاً
+    var atTop    = box.scrollTop <= 0;
+    var atBottom = box.scrollTop + box.clientHeight >= box.scrollHeight - 1;
+    return (dy > 0 && atTop) || (dy < 0 && atBottom);
+  }
+
+  var lastY = 0, tMenu = null;
+
+  document.addEventListener('touchstart', function(e){
+    tMenu = openMenu();
+    if(tMenu && e.touches && e.touches.length) lastY = e.touches[0].clientY;
+  }, { passive:true, capture:true });
+
+  // ⚠️ passive:false لازم — من غيرها preventDefault مبيشتغلش
+  //    والمتصفح بيكمّل السكرول عادي.
+  document.addEventListener('touchmove', function(e){
+    if(!tMenu) return;
+    if(!openMenu()){ tMenu = null; return; }                    // اتقفلت في النص
+    if(!e.cancelable) return;
+    var y  = (e.touches && e.touches.length) ? e.touches[0].clientY : lastY;
+    var dy = y - lastY;
+    lastY = y;
+
+    // برّه القايمة → الصفحة واقفة
+    if(!tMenu.contains(e.target)){ e.preventDefault(); return; }
+    // جوه القايمة → تتسكرول هي، بس متعدّيش للصفحة
+    if(wouldLeak(scrollerIn(tMenu, e.target), dy)) e.preventDefault();
+  }, { passive:false, capture:true });
+
+  document.addEventListener('touchend',    function(){ tMenu = null; }, { passive:true, capture:true });
+  document.addEventListener('touchcancel', function(){ tMenu = null; }, { passive:true, capture:true });
+
+  // 🖱️ عجلة الماوس / التاتش باد على الكمبيوتر — نفس القاعدة
+  document.addEventListener('wheel', function(e){
+    var menu = openMenu();
+    if(!menu || !e.cancelable) return;
+    if(!menu.contains(e.target)){ e.preventDefault(); return; }
+    // deltaY موجب = العجلة نازلة = المحتوى بيطلع (عكس الصباع)
+    if(wouldLeak(scrollerIn(menu, e.target), -e.deltaY)) e.preventDefault();
+  }, { passive:false, capture:true });
+})();
