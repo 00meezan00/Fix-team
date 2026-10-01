@@ -14,6 +14,8 @@
 //     SUPABASE_ENVS · PROD_HOSTS · APP_ENV · sb · esc  (+ شريط STAGING)
 //     لو فضلت متعرّفة في الصفحة كمان، المتصفح هيقول
 //     "Identifier already declared" والصفحة **كلها هتقع**.
+//
+// 🔄 وفي آخر الملف: «التحديث بدوسة واحدة» لكل الشاشات (IFixUpdate).
 // ============================================================
 
 // ===== إعدادات البيئة: إنتاج / تجريبي (Staging) =====
@@ -291,3 +293,285 @@ addEventListener('DOMContentLoaded', function(){
 // النسخة الأأمن: بتأمّن ٥ رموز (بما فيها ' المفردة) — بتمنع أي حقن HTML.
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+// ============================================================
+// 🔄 التحديث بدوسة واحدة — لكل الشاشات (IFixUpdate)
+// ------------------------------------------------------------
+// 🧠 الحكاية بالبلدي:
+//    الآيفون لما التطبيق يبقى متثبّت على الشاشة الرئيسية، مبيقفلوش
+//    بجد لما الموظف يخرج منه — بيحطه «نايم» في الخلفية. ولما يرجع،
+//    بيصحّيه بنفس الكود القديم اللي كان شغّال. ومفيش زرار تحديث ولا
+//    سحب لتحت. فالموظف كان لازم يقفل التطبيق من شاشة التطبيقات عشان
+//    التحديث يوصله — وأغلبهم مايعرفوش كده.
+//
+// ✅ دلوقتي التطبيق نفسه بيسأل السيرفر: «فيه نسخة أجدد منّي؟»
+//    • رقم النسخة بيتقري من سطر CACHE_NAME في sw.js.
+//    • بيسأل: أول ما الصفحة تفتح · كل ما الموظف يرجع للتطبيق ·
+//      كل ١٠ دقايق وهو فاتح · لما النت يرجع.
+//    • فيه جديد؟ → شريط تحت «🎁 فيه تحديث جديد» وزرار «🔄 حدّث».
+//    • الموظف كان سايب التطبيق ربع ساعة أو أكتر ورجع، ومفيش أي كلام
+//      مكتوب في خانة لسه ما اتحفظش → التطبيق بيحدّث نفسه لوحده.
+//    • وفي قايمة التلت نقط بند «🔄 تحديث التطبيق» موجود دايماً،
+//      وجنبه رقم النسخة اللي الموظف شغّال بيها (مفيد لو بتسأله).
+//
+// 🔴 الشرط الوحيد: **كل ما ترفع أي تعديل، زوّد رقم CACHE_NAME في sw.js**
+//    (v74 → v75). ده الجرس اللي بيقول للموبايلات «فيه جديد».
+//    لو نسيته، التحديث التلقائي مش هيشتغل — بس زرار القايمة هيفضل
+//    شغّال يدوي.
+//
+// ⚠️ ليه هنا في common.js؟ لأنه متحمّل في كل الشاشات (محاسب ·
+//    ديسباتشر · فني · HR · موظف · مالك · أدمن) — فكلهم بياخدوا
+//    الميزة من مكان واحد، من غير ما نلمس أي صفحة.
+// ============================================================
+(function(){
+  if(window.IFixUpdate) return;
+
+  var BOOT_VER = null;     // النسخة اللي الصفحة دي شغّالة بيها دلوقتي
+  var NEW_VER  = null;     // نسخة أجدد لقيناها على السيرفر
+  var lastCheck = 0, hiddenAt = 0, snoozeUntil = 0, autoArm = false, busy = false;
+
+  var GAP      = 60 * 1000;        // مانسألش السيرفر أكتر من مرة في الدقيقة
+  var POLL     = 10 * 60 * 1000;   // وهو فاتح: نسأل كل ١٠ دقايق
+  var AWAY_MIN = 15 * 60 * 1000;   // غاب ربع ساعة → نحدّث لوحدنا لو آمن
+  var SNOOZE   = 10 * 60 * 1000;   // «✕» = الشريط يرجع بعد ١٠ دقايق
+
+  // شريط STAGING بيقعد تحت خالص — فشريطنا يطلع فوقه مش عليه
+  var STG = (typeof APP_ENV !== 'undefined' && APP_ENV === 'staging') ? 34 : 0;
+
+  // ① الحارس (service worker) لازم يبقى متسجّل من أي شاشة.
+  //    قبل كده كان بيتسجّل من صفحة الدخول والداشبورد بس — فالفني اللي
+  //    مثبّت «أجهزتي» على طول ممكن ميكونش عنده حارس أصلاً.
+  //    تكرار التسجيل آمن — المتصفح بيتجاهله لو موجود.
+  try{
+    if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function(){});
+  }catch(e){}
+
+  // ② رقم النسخة اللي على السيرفر — من سطر CACHE_NAME في sw.js
+  //    cache:'no-store' = هات من السيرفر نفسه، مش من أي نسخة محفوظة.
+  //    ⚠️ من غير «?رقم» في الرابط عن قصد: الحارس بيخزّن ملفات .js
+  //       بالرابط، ورابط مختلف كل مرة كان هيملا الكاش بنسخ ملهاش لازمة.
+  function readServerVer(){
+    return fetch('sw.js', { cache:'no-store' }).then(function(r){
+      if(!r.ok) throw new Error('HTTP ' + r.status);
+      return r.text();
+    }).then(function(txt){
+      var m = txt.match(/CACHE_NAME\s*=\s*['"]([^'"]+)['"]/);
+      return m ? m[1] : null;
+    });
+  }
+
+  // الصفحة فتحت من غير نت؟ يبقى شغّالة بالنسخة اللي في درج الحارس
+  function readCachedVer(){
+    if(!window.caches) return Promise.resolve(null);
+    return caches.keys().then(function(keys){
+      var k = keys.filter(function(x){ return x.indexOf('ifixteam-') === 0; });
+      return k.length ? k[k.length - 1] : null;
+    }).catch(function(){ return null; });
+  }
+
+  function check(force){
+    if(busy || !navigator.onLine) return Promise.resolve();
+    var now = Date.now();
+    if(!force && now - lastCheck < GAP) return Promise.resolve();
+    lastCheck = now;
+    return readServerVer().then(function(v){
+      if(!v) return;
+      if(!BOOT_VER){ BOOT_VER = v; paintMenu(); return; }   // أول مرة = ده رقمنا
+      if(v !== BOOT_VER){ NEW_VER = v; paintMenu(); onNewVersion(); }
+    }).catch(function(e){
+      // مش كارثة — هنسأل تاني بعدين. بنكتب في الكونسول بس.
+      console.warn('[التحديث] مقدرناش نسأل السيرفر:', e && e.message ? e.message : e);
+    });
+  }
+
+  function onNewVersion(){
+    // راجع بعد غياب طويل ومفيش شغل متساب في نص → نحدّث لوحدنا
+    if(autoArm && !hasUnsaved()){ autoArm = false; apply(); return; }
+    autoArm = false;
+    if(Date.now() < snoozeUntil) return;      // داس «✕» من شوية
+    showBanner();
+  }
+
+  // ③ «فيه كلام مكتوب ولسه ما اتحفظش؟»
+  //    لو أيوه → **مانحدّثش لوحدنا أبداً**. نطلّع الشريط بس، والموظف
+  //    يقرر. أحسن تحديث يتأخر من شغل يضيع.
+  //    ⚠️ خانات البحث مش محسوبة — اللي مكتوب فيها مش «شغل».
+  function hasUnsaved(){
+    try{
+      var a = document.activeElement;
+      if(a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && a.type !== 'search') return true;
+      var els = document.querySelectorAll('input, textarea');
+      for(var i = 0; i < els.length; i++){
+        var el = els[i];
+        var t = (el.type || '').toLowerCase();
+        if(el.disabled || el.readOnly) continue;
+        if(/^(search|hidden|checkbox|radio|button|submit|reset|file|range|color)$/.test(t)) continue;
+        if(el.id === 'q' || el.id === 'prQ' || /search/i.test(el.id || '')) continue;
+        if(!el.getClientRects().length) continue;            // مخفية خالص (display:none)
+        if(el.value && el.value !== el.defaultValue) return true;
+      }
+    }catch(e){ return true; }   // مش متأكدين؟ يبقى مانحدّثش لوحدنا
+    return false;
+  }
+
+  // ④ التحديث نفسه:
+  //    (أ) نقول للحارس «روح هات النسخة الجديدة»
+  //    (ب) نرمي الدرج القديم (صور · مكتبات · صفحات قديمة)
+  //    (ج) نعيد فتح الصفحة — فتيجي كلها طازة من السيرفر
+  //    ⚠️ تعديلات الأوفلاين اللي لسه ما اترفعتش متخزّنة في localStorage
+  //       مش في الدرج ده — فمش بتتلمس.
+  function apply(){
+    if(busy) return;
+    busy = true;
+    hideBanner();
+    showBusy();
+    var keep = NEW_VER;   // درج النسخة الجديدة (لو الحارس الجديد لحق يعمله) — مانرميهوش
+    var p = Promise.resolve();
+    try{
+      if('serviceWorker' in navigator){
+        p = navigator.serviceWorker.getRegistration().then(function(reg){
+          return reg ? reg.update().catch(function(){}) : null;
+        }).catch(function(){});
+      }
+    }catch(e){}
+    p.then(function(){
+      if(!window.caches) return;
+      return caches.keys().then(function(keys){
+        return Promise.all(keys.filter(function(k){
+          return k.indexOf('ifixteam-') === 0 && k !== keep;
+        }).map(function(k){ return caches.delete(k); }));
+      });
+    }).catch(function(){}).then(function(){
+      location.reload();
+    });
+    // شبكة أمان: لو حاجة علّقت، نعيد الفتح بعد ٨ ثواني برضه
+    setTimeout(function(){ location.reload(); }, 8000);
+  }
+
+  // ===== الشريط اللي تحت =====
+  // ⚠️ الألوان مكتوبة ثابتة جوه الشريط عن قصد (مش من متغيرات الصفحة):
+  //    كل شاشة في النظام ليها أسماء ألوان مختلفة، والشريط لازم يبان
+  //    بنفس الشكل في الكل — في الفاتح والداكن.
+  function showBanner(){
+    if(document.getElementById('ifxUpdBar')) return;
+    if(!document.body){ addEventListener('DOMContentLoaded', showBanner); return; }
+    var b = document.createElement('div');
+    b.id = 'ifxUpdBar';
+    b.setAttribute('dir', 'rtl');
+    b.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);'
+      + 'width:calc(100% - 24px);max-width:520px;box-sizing:border-box;'
+      + 'bottom:calc(env(safe-area-inset-bottom, 0px) + ' + (12 + STG) + 'px);z-index:99998;'
+      + 'background:#0B6E7F;color:#fff;border-radius:16px;padding:12px 14px;'
+      + 'box-shadow:0 12px 32px rgba(0,0,0,.35);display:flex;align-items:center;gap:10px;'
+      + 'font-family:Tajawal,system-ui,-apple-system,"Segoe UI",sans-serif;';
+    b.innerHTML =
+        '<div style="font-size:26px;line-height:1;flex:none;">🎁</div>'
+      + '<div style="flex:1;min-width:0;line-height:1.5;">'
+      +   '<div style="font-weight:900;font-size:14.5px;">فيه تحديث جديد للتطبيق</div>'
+      +   '<div style="font-size:12px;opacity:.9;">دوس «حدّث» — مش هياخد غير ثانيتين</div>'
+      + '</div>'
+      + '<button type="button" id="ifxUpdGo" style="flex:none;border:none;border-radius:11px;'
+      +   'padding:11px 15px;background:#fff;color:#0B6E7F;font-family:inherit;font-weight:900;'
+      +   'font-size:14px;line-height:1;cursor:pointer;">🔄 حدّث</button>'
+      + '<button type="button" id="ifxUpdLater" aria-label="بعدين" style="flex:none;border:none;'
+      +   'background:rgba(255,255,255,.16);color:#fff;width:34px;height:34px;border-radius:10px;'
+      +   'font-size:16px;line-height:1;cursor:pointer;">✕</button>';
+    document.body.appendChild(b);
+    document.getElementById('ifxUpdGo').onclick = apply;
+    document.getElementById('ifxUpdLater').onclick = function(){
+      snoozeUntil = Date.now() + SNOOZE;
+      hideBanner();
+    };
+  }
+  function hideBanner(){
+    var b = document.getElementById('ifxUpdBar');
+    if(b) b.remove();
+  }
+
+  // شاشة «بنحدّث…» — عشان الموظف ميدوسش على حاجة وإحنا بنعيد الفتح
+  function showBusy(){
+    if(document.getElementById('ifxUpdBusy') || !document.body) return;
+    var o = document.createElement('div');
+    o.id = 'ifxUpdBusy';
+    o.setAttribute('dir', 'rtl');
+    o.style.cssText = 'position:fixed;inset:0;z-index:2147483646;background:rgba(8,14,20,.82);'
+      + 'color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;'
+      + 'gap:12px;font-family:Tajawal,system-ui,-apple-system,sans-serif;text-align:center;padding:24px;';
+    o.innerHTML = '<div style="font-size:42px;line-height:1;">🔄</div>'
+      + '<div style="font-weight:900;font-size:17px;">بنحدّث التطبيق…</div>'
+      + '<div style="font-size:13px;opacity:.85;">ثانية واحدة بس</div>';
+    document.body.appendChild(o);
+  }
+
+  // ===== بند «🔄 تحديث التطبيق» في قايمة التلت نقط =====
+  // كل شاشة اسم قايمتها مختلف — فبندوّر على الأسماء الأربعة:
+  //   #menuDropdown → المحاسب والأدمن (الداشبورد)
+  //   #kebabMenu    → الفني · الديسباتشر · المالك · الموظف
+  //   #menuDrop     → شؤون العاملين
+  // وبنحطه قبل «تسجيل الخروج» (ولو قبله خط فاصل، قبل الخط).
+  // ⚠️ الزرار ده بيحدّث **دايماً** حتى لو مفيش رقم جديد — يعني
+  //    «تحديث بالعافية». مفيد لو الموظف بيقول «الشاشة شكلها غريب».
+  var MENUS = ['#menuDropdown', '#kebabMenu', '#menuDrop'];
+  function mountMenuBtn(){
+    if(document.getElementById('ifxUpdMenuBtn')) return;
+    var menu = null;
+    for(var i = 0; i < MENUS.length && !menu; i++) menu = document.querySelector(MENUS[i]);
+    if(!menu) return;
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.id = 'ifxUpdMenuBtn';
+    btn.onclick = function(e){ if(e) e.stopPropagation(); apply(); };
+    var out = null, kids = menu.querySelectorAll('button');
+    for(var j = 0; j < kids.length; j++){
+      if(/logout/i.test(kids[j].getAttribute('onclick') || '')){ out = kids[j]; break; }
+    }
+    var before = out;
+    if(out && out.previousElementSibling && /(^|\s)sep(\s|$)/.test(out.previousElementSibling.className || '')){
+      before = out.previousElementSibling;
+    }
+    if(before) menu.insertBefore(btn, before); else menu.appendChild(btn);
+    paintMenu();
+  }
+  function paintMenu(){
+    var b = document.getElementById('ifxUpdMenuBtn');
+    if(!b) return;
+    var ver = String(BOOT_VER || '').replace(/^ifixteam-/, '');
+    b.innerHTML = NEW_VER
+      ? '🎁 فيه تحديث — حدّث دلوقتي <span style="display:inline-block;width:8px;height:8px;'
+        + 'border-radius:50%;background:#DC2626;vertical-align:middle;margin-inline-start:4px;"></span>'
+      : '🔄 تحديث التطبيق' + (ver ? ' <span style="opacity:.55;font-size:.82em;">(' + esc(ver) + ')</span>' : '');
+  }
+
+  // ===== إمتى بنسأل؟ =====
+  function boot(){
+    mountMenuBtn();
+    setTimeout(mountMenuBtn, 2500);   // احتياطي لو القايمة اتبنت متأخر
+    if(navigator.onLine) check(true);
+    else readCachedVer().then(function(v){ if(v && !BOOT_VER){ BOOT_VER = v; paintMenu(); } });
+  }
+  if(document.readyState === 'loading') addEventListener('DOMContentLoaded', boot);
+  else boot();
+
+  // الموظف رجع للتطبيق (من واتساب، من القفل، من أي حتة)
+  document.addEventListener('visibilitychange', function(){
+    if(document.hidden){ hiddenAt = Date.now(); return; }
+    var away = hiddenAt ? (Date.now() - hiddenAt) : 0;
+    hiddenAt = 0;
+    autoArm = away >= AWAY_MIN;
+    // ⚠️ autoArm بيتطفي بعد السؤال ده بالظبط — عشان السؤال اللي بعده
+    //    بعشر دقايق (والموظف شغّال قدام الشاشة) ميحدّثش لوحده.
+    check(true).then(function(){ autoArm = false; });
+  });
+  // سفاري ساعات بيرجّع الصفحة من «الدرج» من غير ما يفتحها من جديد
+  addEventListener('pageshow', function(e){ if(e && e.persisted) check(true); });
+  addEventListener('online', function(){ check(true); });
+  setInterval(function(){ if(!document.hidden) check(false); }, POLL);
+
+  // للكونسول ولأي شاشة عايزة تستخدمه
+  window.IFixUpdate = {
+    check:   function(){ return check(true); },
+    apply:   apply,
+    version: function(){ return BOOT_VER; },
+    latest:  function(){ return NEW_VER; }
+  };
+})();
