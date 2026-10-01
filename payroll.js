@@ -32,9 +32,10 @@
 //    data-theme من <html> ويعرّف ألوانه بنفسه — نفس درس
 //    attendance.js. أي صفحة جديدة هتشتغل من غير أي تعديل.
 //
-// 🧾 (ملف 67) المحاسب العام بيقفل مرتبه بنفسه من هنا — زرار
-//    «✅ استلمت مرتب الشهر ده» على كارت الشهر. الـHR مش شايفة
-//    مرتبه أصلاً، والسيرفر بيرفض لو حاولت تقفله.
+// 🧾 (ملف 68) المحاسب العام مالوش «مرتبك» — ليه شاشة لوحده
+//    «🧾 كشف مرتبي»: بيكتب فيها مرتبه، ويشوف مسحوباته شهر بشهر،
+//    ويدوس «تم صرف الراتب» بنفسه. ومن غير أي جرس ولا بانر.
+//    الملف بيعمل الزرار في القايمة لوحده جنب «مرتبك».
 // ============================================================
 
 // ⚙️ مفتاح الإشعارات خارج التطبيق (VAPID public key).
@@ -64,6 +65,13 @@ let _payTotals = Object.assign({}, PAY_EMPTY);
 let _payErr    = '';
 let _payBusy   = false;
 let _payLoaded = false;
+// 🧾 المحاسب العام (ملف 68) — null = لسه مش عارفين · true/false
+let _paySelf     = null;
+let _selfData    = null;   // رد hr_self_payroll
+let _selfErr     = '';
+let _selfOpenOld = false;  // سجل الشهور المصروفة مفتوح؟
+let _selfOpenWd  = {};     // 'YYYY-MM' → تفاصيل الشهر مفتوحة؟
+let _selfBusy    = false;
 
 // ===== هل ده موبايل؟ =====
 // ⚠️ نفس منطق attIsPhone بالحرف — بس متكرّر عن قصد عشان
@@ -195,6 +203,19 @@ async function payLoad(){
 // ============================================================
 function paySyncBadge(){
   const show = payIsPhone();
+
+  // 🧾 المحاسب العام: «مرتبك» تستخبى، و«كشف مرتبي» تظهر مكانها.
+  //    ومفيش نقطة حمرا ولا بانر — دي فلوسه هو، مش أخبار ليه.
+  if(_paySelf === true){
+    document.querySelectorAll('.pay-menu-btn').forEach(b => {
+      b.style.display = 'none';
+      _payEnsureSelfBtn(b, show);
+    });
+    document.querySelectorAll('.pay-dot').forEach(x => x.remove());
+    payRenderBanner(false);
+    return;
+  }
+
   const n    = Number(_payTotals.unseen_count || 0);
 
   // (١) زرار القايمة: يظهر على الموبايل بس، وعليه العدد
@@ -243,6 +264,8 @@ function payRenderBanner(on){
 // الشاشة
 // ============================================================
 async function openPayroll(){
+  // المحاسب العام → شاشته هو (لو وصل هنا من أي زرار قديم)
+  if(_paySelf === true) return openSelfPay();
   if(!payIsPhone()){
     alert('شاشة «مرتبك» بتتفتح من الموبايل بس');
     return;
@@ -393,7 +416,7 @@ function payDrawersHtml(){
 
 function payToggleDrawer(key){
   _payOpen[key] = !_payOpen[key];
-  payRender('');
+  payRenderAny();   // الدرج ممكن يكون في «مرتبك» أو في «كشف مرتبي»
 }
 
 // ============================================================
@@ -520,7 +543,6 @@ function paySlipCard(p, big){
         { day:'numeric', month:'long', year:'numeric' }))}
       — الأرقام دي متقفلة ومش بتتغيّر.</div>` : ''}
 
-    ${_paySelfBtns(p)}
   </div>`;
 }
 
@@ -568,86 +590,307 @@ async function payAckSlip(period){
 }
 
 // ============================================================
-// 🧾 المحاسب العام بيقفل مرتبه بنفسه (ملف 67)
+// 🧾 «كشف مرتبي» — شاشة المحاسب العام لوحده (ملف 68)
 // ------------------------------------------------------------
-// 🧸 بالبلدي: زي الخزنة اللي ليها مفتاح واحد. الـHR معاها مفاتيح
-//    خزن الموظفين، بس خزنتك إنت مفتاحها معاك إنت.
+// 🧸 بالبلدي:
+//    «مرتبك» معمولة للموظف: كل سحبة جرس، وكل جرس عايز «فهمت».
+//    إنت اللي بتسحب، فمش محتاج حد يقولك إنك سحبت. عشان كده ليك
+//    شاشة هادية لوحدك فيها ٣ حاجات بس:
+//      💵 خانة «مرتبي» — بتكتب فيها مرتبك
+//      🗓️ كارت لكل شهر — مرتب − مسحوبات = صافي، والتفاصيل تحته
+//      ✅ «تم صرف الراتب» — بيقفل الشهر، والشهر اللي بعده يبدأ نضيف
 //
-// 🔴 الزرار بيظهر بس لو السيرفر قال إنك المحاسب العام
-//    (hr_excel_self_state → allowed). ولو حد ظهّره بالعافية من
-//    الكونسول، hr_mark_paid في السيرفر بتفحص تاني.
+// 🔴 كل حاجة بتتقرا من hr_self_payroll، والسيرفر بياخد الإيميل من
+//    الحساب اللي داخل — مش من الصفحة. يعني مستحيل تقرا أو تقفل
+//    كشف حد تاني من هنا.
 //
-// 🔴 الإيميل من السيرفر (_payExw.me) مش من خانة — يعني الزرار
-//    ده مستحيل يقفل مرتب حد تاني.
-//
-// ⚠️ بعد القفل بنعلّم الخبر «اتقرا» على طول — إنت اللي قفلته،
-//    مش محتاج جرس «اتصرف مرتبك» لنفسك.
+// 🔴 مفيش أجراس: تريجر في ملف 68 بيعلّم أي سحبة عليك «اتقرت»
+//    لحظة ما بتتسجّل. والصفحة كمان مبتطلّعش بانر ولا نقطة حمرا.
 // ============================================================
-function _payIsSelf(){
-  return !!(_payExw && _payExw.allowed && _payExw.me);
-}
 
-function _paySelfBtns(p){
-  if(!_payIsSelf()) return '';
-  const per = _payEsc(String(p.period).slice(0, 10));
-  return p.paid
-    ? `<button class="pay-self-btn undo" onclick="paySelfUnpaid('${per}')">
-         ↩️ تراجع — الشهر ده ما اتقفلش</button>`
-    : `<button class="pay-self-btn" onclick="paySelfPaid('${per}')">
-         ✅ استلمت مرتب الشهر ده</button>`;
-}
-
-async function paySelfPaid(period){
-  if(_payBusy || !_payIsSelf()) return;
-  const p = _paySlips.find(x => String(x.period).slice(0, 10) === period);
-  if(!p) return;
-  if(!confirm(`هتقفل مرتب ${_paySlipMonth(period)}؟\n\n` +
-              `المسحوبات: ${payMoney(p.withdraw_ded)} ج.م\n` +
-              `الصافي: ${payMoney(p.net)} ج.م\n\n` +
-              '🔒 الأرقام هتتقفل. أي سحبة تتكتب على الشهر ده في الإكسل ' +
-              'بعد كده مش هتتحسب فيه.\n' +
-              'والدرجين هيتنقلوا للشهر اللي بعده.')) return;
-
-  _payBusy = true;
+// إنت المحاسب العام؟ — سؤال واحد للسيرفر ونفتكر الإجابة
+async function payDetectSelf(){
+  if(_paySelf !== null) return _paySelf;
   try{
-    const { error } = await sb.rpc('hr_mark_paid',
-      { p_email: _payExw.me, p_period: period });
+    const { data, error } = await sb.rpc('my_app_role');
     // ⚠️ Supabase مبيرميش خطأ — بيرجّعه في .error
     if(error) throw error;
-    // إنت اللي قفلته — مفيش داعي لكارت «اتصرف مرتبك» يطلعلك
-    const ack = await sb.rpc('hr_ack_payslip', { p_period: period });
-    if(ack.error) console.warn('hr_ack_payslip:', ack.error);
-    await payLoad();
-    payRender('');
-    alert('✅ مرتب ' + _paySlipMonth(period) + ' اتقفل.');
+    _paySelf = (data === 'super_admin');
   }catch(e){
-    console.error('paySelfPaid failed:', e);
-    alert('❌ ' + (e.message || e));
-  }finally{
-    _payBusy = false;
+    // ⚠️ مش بنحفظ الفشل — المرة الجاية (رجوع للتطبيق) نسأل تاني
+    console.warn('payDetectSelf failed:', e);
+    return false;
+  }
+  return _paySelf;
+}
+
+// زرار «🧾 كشف مرتبي» في القايمة — جنب «مرتبك» على طول.
+// ⚠️ لازم يبقى ابن مباشر للقايمة (نفس مكان «مرتبك») — common.js
+//    بيرتّب الزراير على الأساس ده.
+function _payEnsureSelfBtn(anchor, show){
+  if(!anchor || !anchor.parentNode) return;
+  let s = anchor.nextElementSibling;
+  if(!s || !s.classList || !s.classList.contains('pay-self-menu-btn')){
+    s = document.createElement('button');
+    s.className = 'pay-self-menu-btn';
+    s.textContent = '🧾 كشف مرتبي';
+    s.onclick = () => openSelfPay();
+    anchor.parentNode.insertBefore(s, anchor.nextSibling);
+  }
+  s.style.display = show ? '' : 'none';
+}
+
+function _selfIsOpen(){
+  const ov = document.getElementById('selfPayOverlay');
+  return !!(ov && !ov.classList.contains('hidden'));
+}
+
+// يرسم أي شاشة مفتوحة — «مرتبك» أو «كشف مرتبي»
+// (درج «اسمي في الإكسل» موجود في الاتنين)
+function payRenderAny(){
+  const ov = document.getElementById('payOverlay');
+  if(ov && !ov.classList.contains('hidden')) payRender('');
+  if(_selfIsOpen()) selfRender('');
+}
+
+async function openSelfPay(){
+  if(!payIsPhone()){
+    alert('شاشة «كشف مرتبي» بتتفتح من الموبايل بس');
+    return;
+  }
+  let ov = document.getElementById('selfPayOverlay');
+  if(!ov){
+    // ⚠️ الصفحة مش محتاجة تحط العنصر ده — الملف بيعمله بنفسه
+    ov = document.createElement('div');
+    ov.id = 'selfPayOverlay';
+    document.body.appendChild(ov);
+  }
+  ov.classList.remove('hidden');
+  selfRender('⏳ جاري التحميل…');
+  await Promise.all([selfLoad(), payExwLoad()]);
+  selfRender('');
+}
+
+function closeSelfPay(){
+  const ov = document.getElementById('selfPayOverlay');
+  if(ov) ov.classList.add('hidden');
+}
+
+async function selfLoad(){
+  _selfErr = '';
+  try{
+    const { data, error } = await sb.rpc('hr_self_payroll');
+    if(error) throw error;
+    _selfData = data || { allowed:false };
+  }catch(e){
+    // ⚠️ بنقول بصوت عالي — الشاشة الفاضية هنا معناها «مفيش مسحوبات»
+    //    وده كدب مطمّن
+    console.error('selfLoad failed:', e);
+    const t = (e && e.message) ? e.message : String(e);
+    _selfErr = /does not exist|42883|PGRST202/i.test(t)
+      ? 'الشاشة لسه ماتركبتش — شغّل ملف 68-accountant-payslip-screen.sql'
+      : t;
   }
 }
 
-async function paySelfUnpaid(period){
-  if(_payBusy || !_payIsSelf()) return;
-  if(!confirm(`تراجع عن قفل مرتب ${_paySlipMonth(period)}؟\n\n` +
-              'الكشف هيرجع «لسه»، وأرقامه هترجع تتحسب لحظياً تاني ' +
+function selfRender(busyMsg){
+  const ov = document.getElementById('selfPayOverlay');
+  if(!ov) return;
+  const d = _selfData || {};
+
+  let body;
+  if(busyMsg){
+    body = `<div class="pay-busy">${_payEsc(busyMsg)}</div>`;
+  }else if(_selfErr){
+    body = `<div class="pay-warn">⚠️ مقدرناش نقرا كشفك — حدّث الصفحة وجرّب تاني.
+      <span class="pay-warn-d">${_payEsc(_selfErr)}</span></div>`;
+  }else if(d.allowed === false){
+    body = `<div class="pay-tot"><div class="pay-tot-hint">الشاشة دي للمحاسب العام بس.</div></div>`;
+  }else{
+    body = _selfSalaryHtml(d) + _selfPeriodsHtml(d)
+         + `<div class="pay-drws">${payExwDrawerHtml()}</div>`;
+  }
+
+  ov.innerHTML = `
+    <div class="pay-page">
+      <div class="pay-head">
+        <h2>🧾 كشف مرتبي</h2>
+        <button class="pay-close" onclick="closeSelfPay()">×</button>
+      </div>
+      <div class="pay-body">${body}</div>
+    </div>`;
+}
+
+// 💵 خانة «مرتبي»
+// ⚠️ null (لسه ماتكتبش) غير صفر — زي قاعدة has_salary في «مرتبك»
+function _selfSalaryHtml(d){
+  const has = d.salary !== null && d.salary !== undefined;
+  return `
+  <div class="sp-sal-card">
+    <div class="sp-sal-h">💵 مرتبي الشهري</div>
+    <div class="sp-sal-row">
+      <input id="spSal" type="number" min="0" step="50" inputmode="decimal"
+             placeholder="اكتب مرتبك" value="${has ? _payEsc(Number(d.salary)) : ''}">
+      <button onclick="selfSaveSalary()">💾 حفظ</button>
+    </div>
+    <div class="sp-sal-hint${has ? '' : ' warn'}">${has
+      ? 'بيتحسب على كل شهر لسه ما اتصرفش. الشهور اللي اتصرفت متقفلة ومبتتغيّرش.'
+      : '⚠️ لسه ما كتبتش مرتبك — عشان كده الصافي تحت بيطلع بالسالب.'}</div>
+  </div>`;
+}
+
+// 🗓️ الشهور: اللي لسه برّه (الأقدم الأول — بتصرف بالترتيب)،
+//    واللي اتصرف جوه سجل مطوي (الأحدث الأول)
+function _selfPeriodsHtml(d){
+  const per = d.periods || [];
+  if(!per.length){
+    return `<div class="pay-tot"><div class="pay-tot-hint">لسه مفيش شهور —
+      أول ما يبقى فيه مرتب أو مسحوبات هتظهر هنا.</div></div>`;
+  }
+  const due  = per.filter(p => !p.paid);              // السيرفر مرتّبها من الأقدم
+  const paid = per.filter(p =>  p.paid).reverse();
+
+  return `
+    ${due.length
+      ? `<div class="pay-sec dim">⏳ لسه ما اتصرفش</div>${due.map(_selfCard).join('')}`
+      : `<div class="pay-ok" style="margin-top:16px;">✅ كل الشهور اتصرفت</div>`}
+    ${paid.length ? `
+      <button class="pay-more" onclick="selfToggleOld()">
+        ${_selfOpenOld ? '▴' : '▾'} 📜 الشهور اللي اتصرفت (${paid.length})</button>
+      ${_selfOpenOld ? `<div class="pay-old">${paid.map(_selfCard).join('')}</div>` : ''}` : ''}`;
+}
+
+function _selfCard(p){
+  const per  = String(p.period).slice(0, 10);
+  const ym   = per.slice(0, 7);
+  const rows = ((_selfData && _selfData.deductions) || [])
+                 .filter(r => String(r.work_date || '').slice(0, 7) === ym);
+  const ded  = Number(p.manual_ded || 0) + Number(p.late_ded || 0);
+  const net  = Number(p.net || 0);
+  const open = !!_selfOpenWd[ym];
+
+  return `
+  <div class="pay-tot slip${p.paid ? ' paid' : ''}">
+    <div class="pay-slip-h">
+      <b>${_payEsc(_paySlipMonth(per))}</b>
+      <span class="pay-slip-tag ${p.paid ? 'ok' : 'wait'}">${p.paid ? '✅ اتصرف' : '⏳ لسه'}</span>
+    </div>
+
+    <div class="pay-calc">
+      <div><span>المرتب</span><b>${payMoney(p.salary)}</b></div>
+      <div><span>− المسحوبات</span><b class="minus">${payMoney(p.withdraw_ded)}</b></div>
+      ${ded ? `<div><span>− الخصومات</span><b class="minus">${payMoney(ded)}</b></div>` : ''}
+      ${paySlipOvertime(p)}
+      <div class="eq"><span>= الصافي</span><b${net < 0 ? ' style="color:var(--p-red)"' : ''}>${payMoney(net)}</b></div>
+    </div>
+
+    ${rows.length ? `
+      <button class="sp-wd-btn" onclick="selfToggleWd('${ym}')">
+        ${open ? '▴' : '▾'} 🔩 التفاصيل (${rows.length})</button>
+      ${open ? `<div class="sp-wd">${rows.map(_selfRow).join('')}</div>` : ''}` : ''}
+
+    ${p.paid
+      ? `<div class="pay-slip-meta">🔒 اتقفل ${_payEsc(new Date(p.paid_at).toLocaleDateString('ar-EG',
+            { day:'numeric', month:'long', year:'numeric' }))} — الأرقام دي مبتتغيّرش.</div>
+         <button class="pay-self-btn undo" onclick="selfUnpaid('${per}')">↩️ تراجع عن الصرف</button>`
+      : `<button class="pay-self-btn" onclick="selfPaid('${per}')">✅ تم صرف الراتب</button>`}
+  </div>`;
+}
+
+// سطر سحبة/خصم جوه تفاصيل الشهر
+function _selfRow(r){
+  const off  = !!r.waived_at;
+  const back = Number(r.amount) < 0;     // بالسالب = فلوس رجعت
+  const day  = new Date(r.work_date).toLocaleDateString('ar-EG',
+                 { weekday:'short', day:'numeric', month:'short' });
+  return `
+    <div class="sp-wd-row${off ? ' off' : ''}">
+      <span class="d">${_payEsc(day)}</span>
+      <span class="t">${r.kind === 'withdrawal' ? '' : '💸 '}${_payEsc(r.reason || '')}</span>
+      <b class="${back ? 'ok' : ''}">${back ? '+' : '−'}${payMoney(Math.abs(Number(r.amount) || 0))}</b>
+    </div>`;
+}
+
+function selfToggleOld(){ _selfOpenOld = !_selfOpenOld; selfRender(''); }
+function selfToggleWd(ym){ _selfOpenWd[ym] = !_selfOpenWd[ym]; selfRender(''); }
+
+async function selfSaveSalary(){
+  if(_selfBusy) return;
+  const el  = document.getElementById('spSal');
+  const raw = el ? String(el.value).trim() : '';
+  if(raw === ''){ alert('اكتب المرتب الأول'); if(el) el.focus(); return; }
+  const amt = parseFloat(raw.replace(',', '.'));
+  if(isNaN(amt) || amt < 0){ alert('المرتب لازم يكون رقم صفر أو أكتر'); return; }
+  if(!confirm(`مرتبك هيبقى ${payMoney(amt)} ج.م\n\n` +
+              'وهيتحسب على كل شهر لسه ما اتصرفش.')) return;
+
+  _selfBusy = true;
+  try{
+    const { error } = await sb.rpc('hr_self_set_salary', { p_amount: amt });
+    // ⚠️ Supabase مبيرميش خطأ — بيرجّعه في .error
+    if(error) throw error;
+    await selfLoad();
+    selfRender('');
+    alert('✅ اتحفظ');
+  }catch(e){
+    console.error('selfSaveSalary failed:', e);
+    alert('❌ ' + (e.message || e));
+  }finally{
+    _selfBusy = false;
+  }
+}
+
+// ✅ تم صرف الراتب — بيستخدم hr_mark_paid (ملف 67 سامح للمحاسب العام بس)
+async function selfPaid(period){
+  if(_selfBusy || !_selfData || !_selfData.me) return;
+  const p = (_selfData.periods || []).find(x => String(x.period).slice(0, 10) === period);
+  if(!p) return;
+  const noSal = _selfData.salary === null || _selfData.salary === undefined;
+  if(!confirm(`تم صرف راتب ${_paySlipMonth(period)}؟\n\n` +
+              `المرتب: ${payMoney(p.salary)} ج.م\n` +
+              `المسحوبات: ${payMoney(p.withdraw_ded)} ج.م\n` +
+              `الصافي: ${payMoney(p.net)} ج.م\n\n` +
+              (noSal ? '⚠️ لسه ما كتبتش مرتبك — الشهر هيتقفل على مرتب صفر.\n\n' : '') +
+              '🔒 الأرقام هتتقفل. أي سحبة تتكتب على الشهر ده في الإكسل ' +
+              'بعد كده مش هتتحسب فيه.')) return;
+
+  _selfBusy = true;
+  try{
+    const { error } = await sb.rpc('hr_mark_paid',
+      { p_email: _selfData.me, p_period: period });
+    if(error) throw error;
+    await selfLoad();
+    selfRender('');
+    alert('✅ راتب ' + _paySlipMonth(period) + ' اتقفل');
+  }catch(e){
+    console.error('selfPaid failed:', e);
+    alert('❌ ' + (e.message || e));
+  }finally{
+    _selfBusy = false;
+  }
+}
+
+async function selfUnpaid(period){
+  if(_selfBusy || !_selfData || !_selfData.me) return;
+  if(!confirm(`تراجع عن صرف راتب ${_paySlipMonth(period)}؟\n\n` +
+              'الشهر هيرجع «لسه»، وأرقامه هترجع تتحسب لحظياً ' +
               '(يعني أي سحبة اتكتبت بعد القفل هتدخل).')) return;
 
-  _payBusy = true;
+  _selfBusy = true;
   try{
     const { error } = await sb.rpc('hr_unmark_paid',
-      { p_email: _payExw.me, p_period: period });
+      { p_email: _selfData.me, p_period: period });
     if(error) throw error;
-    await payLoad();
-    payRender('');
+    await selfLoad();
+    selfRender('');
   }catch(e){
-    console.error('paySelfUnpaid failed:', e);
+    console.error('selfUnpaid failed:', e);
     alert('❌ ' + (e.message || e));
   }finally{
-    _payBusy = false;
+    _selfBusy = false;
   }
 }
+
 
 // ⚠️ دالة payTotalsHtml اتشالت من هنا.
 // كانت بتوري كشف الشهر الحالي بس. دلوقتي paySlipsHtml بتوري كل
@@ -934,7 +1177,8 @@ async function payExwLink(list, i){
     const { data, error } = await sb.rpc('hr_excel_self_link', { p_alias: r.raw_name });
     if(error) throw error;
     await payExwLoad();
-    payRender('');
+    if(_selfIsOpen()) await selfLoad();
+    payRenderAny();
     alert((data && data.already) ? 'الاسم ده مربوط بيك أصلاً ✅'
       : 'اتربط ✅\n\nدلوقتي احفظ ملف الإكسل تاني عشان المسحوبات تنزل في «درج المسحوبات».');
   }catch(e){
@@ -959,8 +1203,8 @@ async function payExwUnlink(i){
     const { data, error } = await sb.rpc('hr_excel_self_unlink', { p_alias: r.raw_name });
     if(error) throw error;
     // الخصومات اتشالت من hr_deductions → الدرجين والكشف لازم يتقروا تاني
-    await Promise.all([payLoad(), payExwLoad()]);
-    payRender('');
+    await Promise.all([payLoad(), payExwLoad(), _selfIsOpen() ? selfLoad() : null]);
+    payRenderAny();
     const d = data || {};
     alert('اتفك ✅\n\nسحبات اتشالت: ' + (d.unlinked || 0) +
           '\nفضلت (شهور اتصرفت): ' + (d.kept_paid || 0));
@@ -1148,6 +1392,12 @@ function payUrlB64ToU8(s){
     try{
       const { data:{ session } } = await sb.auth.getSession();
       if(!session) return;           // لسه ما دخلش — مفيش داعي نقرا
+      // 🧾 المحاسب العام: مفيش «مرتبك» ولا أجراس — شاشته لوحدها
+      if(await payDetectSelf()){
+        paySyncBadge();
+        if(_selfIsOpen()){ await selfLoad(); selfRender(''); }
+        return;
+      }
       await payLoad();
     }catch(e){ console.error('payBoot refresh failed:', e); }
     // لو الشاشة مفتوحة وإحنا بنحدّث، نعيد رسمها كمان
@@ -1201,12 +1451,13 @@ function payUrlB64ToU8(s){
   const s = document.createElement('style');
   s.id = 'payCss';
   s.textContent = `
-  #payOverlay, #payBanner{
+  #payOverlay, #payBanner, #selfPayOverlay{
     --p-bg:#F1F5F9; --p-card:#FFFFFF; --p-line:#E2E8F0;
     --p-ink:#101014; --p-ink2:#334155; --p-mut:#64748B;
     --p-red:#DC2626; --p-red-bg:#FEF2F2; --p-green:#16A34A;
   }
-  html[data-theme="dark"] #payOverlay, html[data-theme="dark"] #payBanner{
+  html[data-theme="dark"] #payOverlay, html[data-theme="dark"] #payBanner,
+  html[data-theme="dark"] #selfPayOverlay{
     --p-bg:#131E29; --p-card:#1B2A3A; --p-line:#2F4356;
     --p-ink:#E9EFF5; --p-ink2:#C3D2DF; --p-mut:#92A6B8;
     --p-red:#F0554A; --p-red-bg:rgba(240,85,74,.14); --p-green:#4ADE80;
@@ -1230,10 +1481,10 @@ function payUrlB64ToU8(s){
     pointer-events:none;}
 
   /* ===== الشاشة ===== */
-  #payOverlay{position:fixed; inset:0; z-index:9400; background:var(--p-bg);
+  #payOverlay, #selfPayOverlay{position:fixed; inset:0; z-index:9400; background:var(--p-bg);
     overflow-y:auto; color:var(--p-ink);
     font-family:'Tajawal',system-ui,sans-serif;}
-  #payOverlay.hidden{display:none;}
+  #payOverlay.hidden, #selfPayOverlay.hidden{display:none;}
   .pay-page{min-height:100%;}
   /* env(safe-area-inset-top) = النتش وشريط الساعة في الأيفون */
   .pay-head{display:flex; align-items:center; gap:10px;
@@ -1313,6 +1564,37 @@ function payUrlB64ToU8(s){
     font:900 14.5px/1.3 'Tajawal',system-ui,sans-serif;}
   .pay-self-btn.undo{background:var(--p-bg); color:var(--p-mut);
     border:1px solid var(--p-line); font-size:12.5px; padding:10px;}
+
+  /* 🧾 «كشف مرتبي» — المحاسب العام */
+  html[data-theme="dark"] #selfPayOverlay .pay-warn{color:#FBBF24;}
+  html[data-theme="dark"] #selfPayOverlay .pay-slip-tag.wait{color:#FBBF24;}
+  html[data-theme="dark"] #selfPayOverlay .pay-exw-sec.warn{color:#FBBF24;}
+  .sp-sal-card{background:var(--p-card); border:1px solid var(--p-line);
+    border-radius:16px; padding:14px 16px;}
+  .sp-sal-h{font-weight:900; font-size:14.5px; color:var(--p-ink); margin-bottom:10px;}
+  .sp-sal-row{display:flex; gap:8px;}
+  .sp-sal-row input{flex:1; min-width:0; border:1px solid var(--p-line);
+    background:var(--p-bg); color:var(--p-ink); border-radius:11px; padding:11px 12px;
+    font:800 16px/1.2 'Tajawal',system-ui,sans-serif; text-align:center;}
+  .sp-sal-row button{flex:none; border:none; border-radius:11px; padding:11px 16px;
+    background:var(--p-green); color:#fff; cursor:pointer;
+    font:900 14px/1 'Tajawal',system-ui,sans-serif;}
+  .sp-sal-hint{margin-top:9px; font-size:12px; line-height:1.8; color:var(--p-mut);}
+  .sp-sal-hint.warn{color:#B45309; font-weight:800;}
+  html[data-theme="dark"] #selfPayOverlay .sp-sal-hint.warn{color:#FBBF24;}
+  .sp-wd-btn{width:100%; margin-top:10px; border:1px dashed var(--p-line);
+    background:none; color:var(--p-ink2); border-radius:10px; padding:10px;
+    font:800 13px/1 'Tajawal',system-ui,sans-serif; cursor:pointer;}
+  .sp-wd{margin-top:8px; text-align:start; border:1px solid var(--p-line);
+    border-radius:11px; padding:4px 11px; background:var(--p-bg);}
+  .sp-wd-row{display:flex; align-items:baseline; gap:9px; padding:8px 0;
+    border-bottom:1px solid var(--p-line); font-size:13px;}
+  .sp-wd-row:last-child{border-bottom:none;}
+  .sp-wd-row .d{flex:none; font-weight:800; color:var(--p-ink); font-size:12px;}
+  .sp-wd-row .t{flex:1; min-width:0; color:var(--p-mut); font-size:12px; word-break:break-word;}
+  .sp-wd-row b{flex:none; font-family:'Cairo',sans-serif; font-weight:900; color:var(--p-red);}
+  .sp-wd-row b.ok{color:var(--p-green);}
+  .sp-wd-row.off .d, .sp-wd-row.off .t, .sp-wd-row.off b{opacity:.5; text-decoration:line-through;}
   .pay-tot-big{display:flex; align-items:baseline; justify-content:center; gap:6px;}
   .pay-tot-n{font-family:'Cairo',sans-serif; font-weight:900; font-size:36px;
     color:var(--p-red); line-height:1;}
