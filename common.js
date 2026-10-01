@@ -289,6 +289,67 @@ addEventListener('DOMContentLoaded', function(){
   }catch(e){ console.error('staff-board loader:', e); }
 });
 
+// ============================================================
+// 🗂️ ترتيب قايمة التلت نقط — إخفاء العناوين الفاضية
+// ------------------------------------------------------------
+// 🧠 بالبلدي: القايمة متقسّمة مجموعات، فوق كل مجموعة عنوان صغير
+//    (class="mh") زي «قطع الغيار». بس خانات كتير بتظهر **حسب
+//    الصلاحية** — فممكن مجموعة كاملة تبقى مخفية عند حد معيّن.
+//    ساعتها العنوان بيفضل واقف لوحده فوق ولا حاجة، وده شكله وحش.
+//
+//    الدالة دي بتعدّي على القايمة وتسأل لكل عنوان: «تحتك زرار ظاهر؟»
+//    لأ → العنوان يستخبى. ونفس الكلام للخطوط الفاصلة (sep / hr):
+//    خط مالوش زراير ظاهرة قبله أو بعده بيستخبى.
+//
+// ⚠️ بتتنده كل ما القايمة تتفتح — لأن الصلاحيات بتوصل من السيرفر
+//    بعد ما الصفحة ترسم، فمينفعش نحسبها مرة واحدة في الأول.
+// ============================================================
+function ifxTidyMenu(menu){
+  try{
+    if(typeof menu === 'string') menu = document.querySelector(menu);
+    if(!menu) return;
+    var kids = Array.prototype.slice.call(menu.children);
+    var isSep  = function(el){ return el.tagName === 'HR' || /(^|\s)sep(\s|$)/.test(el.className || ''); };
+    var isHead = function(el){ return /(^|\s)mh(\s|$)/.test(el.className || ''); };
+    // getComputedStyle بيدّي display بتاع العنصر نفسه حتى لو القايمة مقفولة
+    var shown  = function(el){ return el.tagName === 'BUTTON' && getComputedStyle(el).display !== 'none'; };
+
+    // ① العناوين: يظهر بس لو تحته زرار ظاهر قبل العنوان/الخط اللي بعده
+    kids.forEach(function(el, i){
+      if(!isHead(el)) return;
+      var any = false;
+      for(var j = i + 1; j < kids.length; j++){
+        if(isHead(kids[j]) || isSep(kids[j])) break;
+        if(shown(kids[j])){ any = true; break; }
+      }
+      el.style.display = any ? '' : 'none';
+    });
+
+    // ② الخطوط: يظهر بس لو فيه زرار ظاهر قبله (من آخر خط ظاهر) وبعده
+    var seenBtn = false, lastSep = null;
+    kids.forEach(function(el){
+      if(isSep(el)){
+        el.style.display = 'none';
+        if(seenBtn){ lastSep = el; seenBtn = false; }
+        return;
+      }
+      if(shown(el)){
+        if(lastSep){ lastSep.style.display = ''; lastSep = null; }
+        seenBtn = true;
+      }
+    });
+
+    // ③ أول عنوان ظاهر فوق خالص مالوش خط فوقه (class="first")
+    var firstDone = false;
+    kids.forEach(function(el){
+      if(isHead(el)) el.classList.remove('first');
+      if(firstDone || getComputedStyle(el).display === 'none') return;
+      firstDone = true;
+      if(isHead(el)) el.classList.add('first');
+    });
+  }catch(e){ console.warn('ifxTidyMenu:', e); }
+}
+
 // ===== تأمين النصوص قبل عرضها في الصفحة =====
 // النسخة الأأمن: بتأمّن ٥ رموز (بما فيها ' المفردة) — بتمنع أي حقن HTML.
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
@@ -521,6 +582,15 @@ const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
     btn.type = 'button';
     btn.id = 'ifxUpdMenuBtn';
     btn.onclick = function(e){ if(e) e.stopPropagation(); apply(); };
+    // 📍 الصفحة حاجزة له مكان بالاسم (#ifxUpdSlot)؟ يتحط فيه بالظبط.
+    //    ده بيخلّي كل صفحة ترتّب قايمتها زي ما هي عايزة (مثلاً تحت
+    //    «الإعدادات» على طول) بدل ما يتحط قبل الخروج وخلاص.
+    var slot = menu.querySelector('#ifxUpdSlot');
+    if(slot){
+      slot.parentNode.replaceChild(btn, slot);
+      paintMenu();
+      return;
+    }
     var out = null, kids = menu.querySelectorAll('button');
     for(var j = 0; j < kids.length; j++){
       if(/logout/i.test(kids[j].getAttribute('onclick') || '')){ out = kids[j]; break; }

@@ -142,6 +142,15 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
     padding:12px 13px; border-radius:10px; cursor:pointer;}
   .menu-drop button:hover{background:var(--surface-2);}
   .menu-drop hr{border:none; border-top:1px solid var(--border); margin:5px 8px;}
+  /* 🗂️ عنوان المجموعة — صغير وباهت عشان مايتلخبطش مع الزراير.
+     الخط الرفيع فوقه بيفصل المجموعة عن اللي قبلها. */
+  .menu-drop .mh{font-size:11.5px; font-weight:800; color:var(--faint); letter-spacing:.2px;
+    padding:11px 5px 4px; margin:4px 8px 0; border-top:1px solid var(--border); user-select:none;}
+  /* أول عنوان ظاهر في القايمة مالوش خط فوقه */
+  .menu-drop .mh.first{border-top:none; margin-top:0; padding-top:6px;}
+  /* القايمة طويلة على الموبايل — لو مش هتكفي الشاشة تتسكرول جواها */
+  .menu-drop{max-height:calc(100vh - 90px - env(safe-area-inset-top)); overflow-y:auto;
+    -webkit-overflow-scrolling:touch;}
 
   /* ===== الشاشات المنبثقة ===== */
   .sheet{position:fixed; inset:0; z-index:60; background:var(--bg); overflow-y:auto; display:none;}
@@ -541,19 +550,35 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
   <button class="icon-btn att-menu-btn" style="display:none;" title="المواعيد" onclick="openAttendance()">⏰</button>
   <div class="menu-wrap">
     <button class="icon-btn" title="القايمة" onclick="toggleMenu(event)">⋮</button>
+    <!-- ============================================================
+         🗂️ القايمة متقسّمة مجموعات — فوق كل مجموعة عنوان صغير (mh)
+         ------------------------------------------------------------
+         ⚠️ كل الزراير **ولاد مباشرين** للقايمة (مفيش div حواليهم) عن قصد:
+            common.js بيدوّر على الزراير ويحط جنبها.
+         ⚠️ «↻ تحديث» القديم اتشال — «تحديث التطبيق» (من common.js)
+            بيعيد فتح الصفحة كلها، فبيجيب السجل من جديد هو كمان.
+         ⚠️ مجموعة «أدوات المحل» كلها بالصلاحية — لو الأدمن مافعّلش ولا
+            واحدة، العنوان بيستخبى لوحده (ifxTidyMenu في common.js).
+         ============================================================ -->
     <div class="menu-drop" id="menuDrop">
+      <div class="mh first">👥 شؤون العاملين</div>
       <button onclick="closeMenu(); openPayrollAdmin()">💰 المخصومات والمرتبات</button>
-      <button onclick="closeMenu(); openExcelW()">🔩 مسحوبات الإكسل</button>
+      <button onclick="closeMenu(); openExcelW()">📊 مسحوبات الإكسل</button>
       <button onclick="closeMenu(); openHrSettings()">⏰ إعدادات المواعيد</button>
-      <button onclick="closeMenu(); openGeneral()">⚙️ الإعدادات العامة</button>
+
       <!-- 🧰 أدوات الديسباتشر — مخفية لحد ما الأدمن يفعّلها للحساب ده
            (applyHrCaps تحت بتسأل السيرفر has_cap وبتظهّر اللي مسموح بس) -->
+      <div class="mh">🔩 قطع الغيار والجرد</div>
       <button class="hr-cap-pur" style="display:none;" onclick="hrOpenTool('PUR')">🧾 فواتير المشتريات</button>
-      <button class="hr-cap-pur" style="display:none;" onclick="hrOpenTool('INV')">🧰 مخزن قطع الغيار</button>
-      <button class="hr-cap-rev" style="display:none;" onclick="hrOpenTool('REV')">🔩 مراجعة قطع الغيار</button>
+      <button class="hr-cap-pur" style="display:none;" onclick="hrOpenTool('INV')">📦 مخزن قطع الغيار</button>
+      <button class="hr-cap-rev" style="display:none;" onclick="hrOpenTool('REV')">🔍 مراجعة قطع الغيار</button>
       <button class="hr-cap-inv" style="display:none;" onclick="hrOpenTool('JARD')">📋 الجرد</button>
+
       <hr>
-      <button onclick="closeMenu(); loadMonth()">↻ تحديث</button>
+      <button onclick="closeMenu(); openGeneral()">⚙️ الإعدادات العامة</button>
+      <!-- 📍 «🔄 تحديث التطبيق (vXX)» بيتحط هنا مكان العلامة دي (common.js) -->
+      <span id="ifxUpdSlot" hidden></span>
+      <hr>
       <button onclick="closeMenu(); doLogout()" style="color:var(--red);">⏻ تسجيل الخروج</button>
     </div>
   </div>
@@ -638,7 +663,7 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
      للفلوس، مش اتنين ممكن يختلفوا. -->
 <div class="sheet" id="exwSheet" style="z-index:58;">
   <div class="sheet-head">
-    <h2>🔩 مسحوبات الإكسل</h2>
+    <h2>📊 مسحوبات الإكسل</h2>
     <button class="icon-btn" style="background:var(--surface-2); color:var(--ink);"
             onclick="closeSheet('exwSheet')">×</button>
   </div>
@@ -1309,7 +1334,10 @@ async function adjustHours(email, date, force){
 // ============================================================
 function toggleMenu(ev){
   ev.stopPropagation();
-  document.getElementById('menuDrop').classList.toggle('open');
+  const m = document.getElementById('menuDrop');
+  // 🗂️ العناوين اللي كل خاناتها مقفولة بالصلاحية تستخبى
+  if(!m.classList.contains('open') && typeof ifxTidyMenu === 'function') ifxTidyMenu(m);
+  m.classList.toggle('open');
 }
 function closeMenu(){ document.getElementById('menuDrop').classList.remove('open'); }
 document.addEventListener('click', closeMenu);
