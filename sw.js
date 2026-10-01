@@ -12,7 +12,7 @@
 //       شغّال بالكود القديم لحد ما الموظف يقفل التطبيق بإيده.
 //
 // ⚠️ لو ضفت صفحة أو ملف جديد للنظام: زوّده كمان في APP_SHELL تحت.
-const CACHE_NAME = 'ifixteam-v79';
+const CACHE_NAME = 'ifixteam-v80';
 
 const APP_SHELL = [
   './',
