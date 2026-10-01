@@ -12,7 +12,8 @@
 //       شغّال بالكود القديم لحد ما الموظف يقفل التطبيق بإيده.
 //
 // ⚠️ لو ضفت صفحة أو ملف جديد للنظام: زوّده كمان في APP_SHELL تحت.
-const CACHE_NAME = 'ifixteam-v81';
+// v82 — payroll.js: المحاسب العام بيقفل مرتبه بنفسه (ملف 67)
+const CACHE_NAME = 'ifixteam-v82';
 
 const APP_SHELL = [
   './',

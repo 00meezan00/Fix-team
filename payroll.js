@@ -31,6 +31,10 @@
 // ٤) **الملف مش بيعتمد على أي متغيّر من الصفحة.** بيقرا
 //    data-theme من <html> ويعرّف ألوانه بنفسه — نفس درس
 //    attendance.js. أي صفحة جديدة هتشتغل من غير أي تعديل.
+//
+// 🧾 (ملف 67) المحاسب العام بيقفل مرتبه بنفسه من هنا — زرار
+//    «✅ استلمت مرتب الشهر ده» على كارت الشهر. الـHR مش شايفة
+//    مرتبه أصلاً، والسيرفر بيرفض لو حاولت تقفله.
 // ============================================================
 
 // ⚙️ مفتاح الإشعارات خارج التطبيق (VAPID public key).
@@ -515,6 +519,8 @@ function paySlipCard(p, big){
       ${_payEsc(new Date(p.paid_at).toLocaleDateString('ar-EG',
         { day:'numeric', month:'long', year:'numeric' }))}
       — الأرقام دي متقفلة ومش بتتغيّر.</div>` : ''}
+
+    ${_paySelfBtns(p)}
   </div>`;
 }
 
@@ -556,6 +562,88 @@ async function payAckSlip(period){
   }catch(e){
     console.error('payAckSlip failed:', e);
     alert('❌ مقدرناش نسجّل إنك قريته: ' + (e.message || e));
+  }finally{
+    _payBusy = false;
+  }
+}
+
+// ============================================================
+// 🧾 المحاسب العام بيقفل مرتبه بنفسه (ملف 67)
+// ------------------------------------------------------------
+// 🧸 بالبلدي: زي الخزنة اللي ليها مفتاح واحد. الـHR معاها مفاتيح
+//    خزن الموظفين، بس خزنتك إنت مفتاحها معاك إنت.
+//
+// 🔴 الزرار بيظهر بس لو السيرفر قال إنك المحاسب العام
+//    (hr_excel_self_state → allowed). ولو حد ظهّره بالعافية من
+//    الكونسول، hr_mark_paid في السيرفر بتفحص تاني.
+//
+// 🔴 الإيميل من السيرفر (_payExw.me) مش من خانة — يعني الزرار
+//    ده مستحيل يقفل مرتب حد تاني.
+//
+// ⚠️ بعد القفل بنعلّم الخبر «اتقرا» على طول — إنت اللي قفلته،
+//    مش محتاج جرس «اتصرف مرتبك» لنفسك.
+// ============================================================
+function _payIsSelf(){
+  return !!(_payExw && _payExw.allowed && _payExw.me);
+}
+
+function _paySelfBtns(p){
+  if(!_payIsSelf()) return '';
+  const per = _payEsc(String(p.period).slice(0, 10));
+  return p.paid
+    ? `<button class="pay-self-btn undo" onclick="paySelfUnpaid('${per}')">
+         ↩️ تراجع — الشهر ده ما اتقفلش</button>`
+    : `<button class="pay-self-btn" onclick="paySelfPaid('${per}')">
+         ✅ استلمت مرتب الشهر ده</button>`;
+}
+
+async function paySelfPaid(period){
+  if(_payBusy || !_payIsSelf()) return;
+  const p = _paySlips.find(x => String(x.period).slice(0, 10) === period);
+  if(!p) return;
+  if(!confirm(`هتقفل مرتب ${_paySlipMonth(period)}؟\n\n` +
+              `المسحوبات: ${payMoney(p.withdraw_ded)} ج.م\n` +
+              `الصافي: ${payMoney(p.net)} ج.م\n\n` +
+              '🔒 الأرقام هتتقفل. أي سحبة تتكتب على الشهر ده في الإكسل ' +
+              'بعد كده مش هتتحسب فيه.\n' +
+              'والدرجين هيتنقلوا للشهر اللي بعده.')) return;
+
+  _payBusy = true;
+  try{
+    const { error } = await sb.rpc('hr_mark_paid',
+      { p_email: _payExw.me, p_period: period });
+    // ⚠️ Supabase مبيرميش خطأ — بيرجّعه في .error
+    if(error) throw error;
+    // إنت اللي قفلته — مفيش داعي لكارت «اتصرف مرتبك» يطلعلك
+    const ack = await sb.rpc('hr_ack_payslip', { p_period: period });
+    if(ack.error) console.warn('hr_ack_payslip:', ack.error);
+    await payLoad();
+    payRender('');
+    alert('✅ مرتب ' + _paySlipMonth(period) + ' اتقفل.');
+  }catch(e){
+    console.error('paySelfPaid failed:', e);
+    alert('❌ ' + (e.message || e));
+  }finally{
+    _payBusy = false;
+  }
+}
+
+async function paySelfUnpaid(period){
+  if(_payBusy || !_payIsSelf()) return;
+  if(!confirm(`تراجع عن قفل مرتب ${_paySlipMonth(period)}؟\n\n` +
+              'الكشف هيرجع «لسه»، وأرقامه هترجع تتحسب لحظياً تاني ' +
+              '(يعني أي سحبة اتكتبت بعد القفل هتدخل).')) return;
+
+  _payBusy = true;
+  try{
+    const { error } = await sb.rpc('hr_unmark_paid',
+      { p_email: _payExw.me, p_period: period });
+    if(error) throw error;
+    await payLoad();
+    payRender('');
+  }catch(e){
+    console.error('paySelfUnpaid failed:', e);
+    alert('❌ ' + (e.message || e));
   }finally{
     _payBusy = false;
   }
@@ -810,8 +898,8 @@ function payExwDrawerHtml(){
       <div class="pay-exw-hint">
         🧸 دوس <b>«ده أنا»</b> جنب اسمك زي ما هو مكتوب في ملف الإكسل.
         الاسم بيتربط <b>بيك إنت بس</b>.<br>
-        ⚠️ الربط لوحده مبينزّلش الفلوس — بعده <b>احفظ ملف الإكسل تاني</b>،
-        والمسحوبات تنزل في «درج المسحوبات» فوق.
+        ⚠️ الربط لوحده مبينزّلش الفلوس — بعده <b>احفظ ملف الإكسل تاني</b>
+        (ملف كل شهر لوحده)، والمسحوبات تنزل في «درج المسحوبات» فوق.
       </div>
 
       <div class="pay-exw-sec ok">✅ مربوط بيك (${mine.length})</div>
@@ -1219,6 +1307,12 @@ function payUrlB64ToU8(s){
   html[data-theme="dark"] #payOverlay .pay-slip-tag.wait{color:#FBBF24;}
   .pay-slip-meta{margin-top:10px; padding-top:9px; border-top:1px solid var(--p-line);
     font-size:11px; line-height:1.8; color:var(--p-mut); text-align:start;}
+  /* 🧾 زرار المحاسب العام: قفل مرتبه بنفسه */
+  .pay-self-btn{width:100%; margin-top:12px; border:none; border-radius:12px;
+    padding:13px; background:var(--p-green); color:#fff; cursor:pointer;
+    font:900 14.5px/1.3 'Tajawal',system-ui,sans-serif;}
+  .pay-self-btn.undo{background:var(--p-bg); color:var(--p-mut);
+    border:1px solid var(--p-line); font-size:12.5px; padding:10px;}
   .pay-tot-big{display:flex; align-items:baseline; justify-content:center; gap:6px;}
   .pay-tot-n{font-family:'Cairo',sans-serif; font-weight:900; font-size:36px;
     color:var(--p-red); line-height:1;}
