@@ -400,16 +400,137 @@ function stmtDescHtml(e){
 // القيود اللي مش مربوطة بجهاز (دفعة · رصيد افتتاحي · خصم) بتفضل
 // على تاريخ القيد — وده صح ليها: ده فعلاً يوم ما حصلت.
 // ============================================================
+// ============================================================
+// 🧳 رحلات الجهاز — دخل · خرج · رجع · خرج تاني …
+// ------------------------------------------------------------
+// 🔴 المشكلة اللي كانت:
+//    الكشف كان بياخد «تاريخ الخروج» من **آخر مرة** الجهاز اتسلّم.
+//    فالجهاز اللي رجع واتسلّم تاني، سطره الأصلي وسطر المرتجع
+//    الاتنين كانوا بياخدوا **نفس** التاريخ (تسليم ما بعد المرتجع)
+//    — وبما إن التاريخ واحد، الترتيب كان بيتلخبط والمرتجع ييجي
+//    قبل الأصلي.
+//
+// 🧠 الحل بالبلدي: بنقرا سجل الجهاز كأنه تذاكر سفر:
+//       رحلة ١ (الأصلية): دخل → … → خرج (اتسلّم)
+//       رحلة ٢ (مرتجع ١): رجع → … → خرج تاني
+//       رحلة ٣ (مرتجع ٢): رجع → … → خرج تالت
+//    وكل سطر في الكشف بياخد تواريخ **رحلته هو** بس.
+//
+// ⚠️ بنعدّ **تغيير الحالة** بس، مش أي سطر في السجل. ليه؟ لأن
+//    السجل فيه ملاحظات كتير (تسعير · تحويل آجل · تعديل مبلغ)
+//    بتتكتب بحالة الجهاز وقتها — يعني «delivered» ممكن تتكرر عشر
+//    مرات وهي تسليم واحد بس. فبنعدّ اللحظة اللي الحالة **اتغيّرت** فيها.
+// ============================================================
+function accStatusMoves(d){
+  const h = (d && Array.isArray(d.statusHistory)) ? d.statusHistory : [];
+  const out = []; let prev = null;
+  for(let i = 0; i < h.length; i++){
+    const x = h[i];
+    if(!x || !x.status || !x.date) continue;
+    if(x.status !== prev){ out.push({ s: x.status, t: x.date }); prev = x.status; }
+  }
+  return out;
+}
+
+// أماكن «رجع» في السجل — بس اللي بعد تسليم فعلاً (ده المرتجع الحقيقي)
+function accReturnMoves(moves){
+  const rets = []; let seenDelivered = false;
+  for(let i = 0; i < moves.length; i++){
+    if(moves[i].s === 'delivered') seenDelivered = true;
+    else if(moves[i].s === 'returned' && seenDelivered) rets.push(i);
+  }
+  return rets;
+}
+
+// أول تسليم بين مكانين في السجل (من بعد a لحد قبل b)
+function accFirstDelivered(moves, a, b){
+  for(let i = a; i < b; i++) if(moves[i].s === 'delivered') return moves[i].t;
+  return null;
+}
+
+// قيد المرتجع ده بتاع أنهي رجعة؟ (رقم من صفر — أو -1 لو مش لاقيين)
+// 🧠 بندوّر على آخر رجعة حصلت **قبل** ما القيد يتكتب — لأن قيد المرتجع
+//    بيتعمل وهو في المرتجعات أو بعد ما يتسلّم، مش قبل ما يرجع.
+function accReturnRoundIdx(e, moves, rets){
+  if(!rets.length) return -1;
+  const et = new Date(e.date || 0).getTime();
+  let k = -1;
+  for(let j = 0; j < rets.length; j++){
+    if(new Date(moves[rets[j]].t).getTime() <= et + 1000) k = j;
+  }
+  if(k < 0) k = Math.min(Math.max((e.retRound || 1) - 1, 0), rets.length - 1);
+  return k;
+}
+
+// 📤 تاريخ الخروج لسطر جهاز — حسب رحلته
+function accEntryExitDate(e, d){
+  const moves = accStatusMoves(d);
+  if(!moves.length) return null;
+  const rets = accReturnMoves(moves);
+  if(e.kind === 'return'){
+    const k = accReturnRoundIdx(e, moves, rets);
+    if(k < 0) return null;
+    const end = (k + 1 < rets.length) ? rets[k + 1] : moves.length;
+    return accFirstDelivered(moves, rets[k] + 1, end);   // null = لسه ما خرجش
+  }
+  // السطر الأصلي: آخر تسليم **قبل** أول رجعة
+  const end = rets.length ? rets[0] : moves.length;
+  for(let i = end - 1; i >= 0; i--) if(moves[i].s === 'delivered') return moves[i].t;
+  return null;
+}
+
+// 📥 تاريخ دخول المرتجع = يوم ما رجع في **الرجعة بتاعته**
+function accEntryReturnIntake(e, d){
+  const moves = accStatusMoves(d);
+  const rets = accReturnMoves(moves);
+  const k = accReturnRoundIdx(e, moves, rets);
+  return k < 0 ? null : moves[rets[k]].t;
+}
+
 function stmtDate(e){
   if(e && e.deviceId){
     const dev = accDevices().find(x => x.id === e.deviceId);
-    // deliveredDateOf موجودة في الداشبورد بس — من غيرها بنرجع
-    // لتاريخ القيد، وده أسوأ حاجة ممكن تحصل: تاريخ أقل دقة،
-    // مش صفحة واقعة.
-    const dd = (dev && typeof deliveredDateOf === 'function') ? deliveredDateOf(dev) : null;
+    // من غير الجهاز (اتمسح / الصفحة مفيهاش أجهزة) بنرجع لتاريخ
+    // القيد — تاريخ أقل دقة، بس مش صفحة واقعة.
+    const dd = dev ? accEntryExitDate(e, dev) : null;
     if(dd) return dd;
   }
   return e && e.date;
+}
+
+// ============================================================
+// 📥 تاريخ الدخول — يوم ما الجهاز دخل المحل
+// ------------------------------------------------------------
+// 🧠 بالبلدي: الكشف كان فيه تاريخ واحد بس = يوم ما الجهاز **خرج**
+//    (اتسلّم). دلوقتي فيه كمان يوم ما الجهاز **دخل**. فالمحل يشوف
+//    «الجهاز ده قعد عندكم من كذا لكذا».
+//
+// من فين بنجيبه؟
+//   • القيود الجديدة: محفوظ جوه القيد نفسه (intakeDate) — بيتحفظ
+//     من addLedgerDebit في الداشبورد. فلو الجهاز اتمسح بعدين،
+//     التاريخ يفضل موجود.
+//   • القيود القديمة: بنجيبه من الجهاز نفسه (d.intakeDate).
+//   • المرتجع: «دخوله» = يوم ما رجع في **الرجعة بتاعته** (حالة returned
+//     في سجل الحالات) — مش يوم دخوله أول مرة خالص.
+//   • دفعة / خصم / رصيد افتتاحي: مالهمش دخول → «—».
+// ============================================================
+function stmtIntakeDate(e){
+  if(!e || e.type !== 'debit') return null;
+  const d = e.deviceId ? accDevices().find(x => x.id === e.deviceId) : null;
+  if(e.kind === 'return'){
+    // يوم ما رجع في **رجعته هو** — مش آخر رجعة للجهاز
+    return d ? accEntryReturnIntake(e, d) : null;
+  }
+  if(e.intakeDate) return e.intakeDate;
+  return (d && d.intakeDate) || null;
+}
+
+// تاريخ + ساعة للكشف — ولو مفيش تاريخ (أو تاريخ بايظ) بنكتب «—»
+function accFmtDT(iso){
+  if(!iso) return '—';
+  const d = new Date(iso);
+  if(isNaN(d.getTime())) return '—';
+  try{ return d.toLocaleString('ar-EG'); }catch(e){ return d.toISOString(); }
 }
 
 // 🎨 لون الجهاز في كشف الحساب.
@@ -1131,9 +1252,12 @@ function exportShopPdf(shop){
   const rowsHtml = entries.map((e,i) => {
     const issue = stmtIssue(e);
     const color = stmtColor(e);
+    // 📥 تاريخ الدخول — للأجهزة بس. الدفعة والخصم والرصيد السابق «—»
+    const inDate = accFmtDT(stmtIntakeDate(e));
     return `
     <tr style="background:${e._carry ? '#FFFBEB' : (i%2 ? '#F8FAFC' : '#FFFFFF')};">
-      <td>${e._carry ? '—' : new Date(stmtDate(e)).toLocaleString('ar-EG')}</td>
+      <td>${inDate}</td>
+      <td>${e._carry ? '—' : accFmtDT(stmtDate(e))}</td>
       <td style="text-align:right;">${stmtDescHtml(e)}</td>
       <td style="text-align:right; color:#475569;">${issue ? esc(issue) : '—'}</td>
       <td style="color:#475569;">${color ? esc(color) : '—'}</td>
@@ -1157,11 +1281,11 @@ function exportShopPdf(shop){
     .tcard{flex:1; border-radius:12px; padding:14px 18px; color:#fff;}
     .tcard .lbl{font-size:13px; opacity:.92;}
     .tcard .num{font-family:'Cairo',-apple-system,'SF Arabic',sans-serif; font-size:26px; font-weight:900; margin-top:2px;}
-    table{width:100%; border-collapse:collapse; font-size:13.5px;}
-    th{background:#101014; color:#fff; padding:11px 8px; font-size:13px;}
-    td{padding:10px 8px; border-bottom:1px solid #E5E7EB; text-align:center;}
+    table{width:100%; border-collapse:collapse; font-size:13px;}
+    th{background:#101014; color:#fff; padding:11px 6px; font-size:12.5px;}
+    td{padding:10px 6px; border-bottom:1px solid #E5E7EB; text-align:center;}
     .foot{margin-top:18px; font-size:12px; color:#6B7280; display:flex; justify-content:space-between;}
-    /* الجدول بقى ستة أعمدة (العطل + اللون) — الأفقي ضروري */
+    /* الجدول بقى سبعة أعمدة (الدخول + الخروج + العطل + اللون) — الأفقي ضروري */
     @page{ size:A4 landscape; margin:10mm; }
     @media print{ body{padding:12px;} }
   </style></head><body>
@@ -1175,8 +1299,8 @@ function exportShopPdf(shop){
       <div class="tcard" style="background:${balance>0 ? '#DC2626' : '#2563EB'};"><div class="lbl">المتبقي على المحل</div><div class="num">${balance.toLocaleString('en-EG')} ج.م</div></div>
     </div>
     <table>
-      <tr><th style="width:18%;">تاريخ التسليم</th><th style="width:28%;">البيان</th><th style="width:22%;">العطل</th><th style="width:10%;">اللون</th><th>عليه (آجل)</th><th>له (دفعات)</th></tr>
-      ${rowsHtml || '<tr><td colspan="6">مفيش حركات متسجلة</td></tr>'}
+      <tr><th style="width:13%;">تاريخ الدخول</th><th style="width:13%;">تاريخ الخروج</th><th style="width:24%;">البيان</th><th style="width:19%;">العطل</th><th style="width:8%;">اللون</th><th>عليه (آجل)</th><th>له (دفعات)</th></tr>
+      ${rowsHtml || '<tr><td colspan="7">مفيش حركات متسجلة</td></tr>'}
     </table>
     <div class="foot"><span>نظام I Fix Team لإدارة الصيانة</span><span>عدد الحركات: ${realCount}</span></div>
   </body></html>`, 'كشف حساب — ' + shop);
