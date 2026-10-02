@@ -400,13 +400,99 @@ function stmtDescHtml(e){
 // القيود اللي مش مربوطة بجهاز (دفعة · رصيد افتتاحي · خصم) بتفضل
 // على تاريخ القيد — وده صح ليها: ده فعلاً يوم ما حصلت.
 // ============================================================
+// ============================================================
+// 🧳 رحلات الجهاز — دخل · خرج · رجع · خرج تاني …
+// ------------------------------------------------------------
+// 🔴 المشكلة اللي كانت:
+//    الكشف كان بياخد «تاريخ الخروج» من **آخر مرة** الجهاز اتسلّم.
+//    فالجهاز اللي رجع واتسلّم تاني، سطره الأصلي وسطر المرتجع
+//    الاتنين كانوا بياخدوا **نفس** التاريخ (تسليم ما بعد المرتجع)
+//    — وبما إن التاريخ واحد، الترتيب كان بيتلخبط والمرتجع ييجي
+//    قبل الأصلي.
+//
+// 🧠 الحل بالبلدي: بنقرا سجل الجهاز كأنه تذاكر سفر:
+//       رحلة ١ (الأصلية): دخل → … → خرج (اتسلّم)
+//       رحلة ٢ (مرتجع ١): رجع → … → خرج تاني
+//       رحلة ٣ (مرتجع ٢): رجع → … → خرج تالت
+//    وكل سطر في الكشف بياخد تواريخ **رحلته هو** بس.
+//
+// ⚠️ بنعدّ **تغيير الحالة** بس، مش أي سطر في السجل. ليه؟ لأن
+//    السجل فيه ملاحظات كتير (تسعير · تحويل آجل · تعديل مبلغ)
+//    بتتكتب بحالة الجهاز وقتها — يعني «delivered» ممكن تتكرر عشر
+//    مرات وهي تسليم واحد بس. فبنعدّ اللحظة اللي الحالة **اتغيّرت** فيها.
+// ============================================================
+function accStatusMoves(d){
+  const h = (d && Array.isArray(d.statusHistory)) ? d.statusHistory : [];
+  const out = []; let prev = null;
+  for(let i = 0; i < h.length; i++){
+    const x = h[i];
+    if(!x || !x.status || !x.date) continue;
+    if(x.status !== prev){ out.push({ s: x.status, t: x.date }); prev = x.status; }
+  }
+  return out;
+}
+
+// أماكن «رجع» في السجل — بس اللي بعد تسليم فعلاً (ده المرتجع الحقيقي)
+function accReturnMoves(moves){
+  const rets = []; let seenDelivered = false;
+  for(let i = 0; i < moves.length; i++){
+    if(moves[i].s === 'delivered') seenDelivered = true;
+    else if(moves[i].s === 'returned' && seenDelivered) rets.push(i);
+  }
+  return rets;
+}
+
+// أول تسليم بين مكانين في السجل (من بعد a لحد قبل b)
+function accFirstDelivered(moves, a, b){
+  for(let i = a; i < b; i++) if(moves[i].s === 'delivered') return moves[i].t;
+  return null;
+}
+
+// قيد المرتجع ده بتاع أنهي رجعة؟ (رقم من صفر — أو -1 لو مش لاقيين)
+// 🧠 بندوّر على آخر رجعة حصلت **قبل** ما القيد يتكتب — لأن قيد المرتجع
+//    بيتعمل وهو في المرتجعات أو بعد ما يتسلّم، مش قبل ما يرجع.
+function accReturnRoundIdx(e, moves, rets){
+  if(!rets.length) return -1;
+  const et = new Date(e.date || 0).getTime();
+  let k = -1;
+  for(let j = 0; j < rets.length; j++){
+    if(new Date(moves[rets[j]].t).getTime() <= et + 1000) k = j;
+  }
+  if(k < 0) k = Math.min(Math.max((e.retRound || 1) - 1, 0), rets.length - 1);
+  return k;
+}
+
+// 📤 تاريخ الخروج لسطر جهاز — حسب رحلته
+function accEntryExitDate(e, d){
+  const moves = accStatusMoves(d);
+  if(!moves.length) return null;
+  const rets = accReturnMoves(moves);
+  if(e.kind === 'return'){
+    const k = accReturnRoundIdx(e, moves, rets);
+    if(k < 0) return null;
+    const end = (k + 1 < rets.length) ? rets[k + 1] : moves.length;
+    return accFirstDelivered(moves, rets[k] + 1, end);   // null = لسه ما خرجش
+  }
+  // السطر الأصلي: آخر تسليم **قبل** أول رجعة
+  const end = rets.length ? rets[0] : moves.length;
+  for(let i = end - 1; i >= 0; i--) if(moves[i].s === 'delivered') return moves[i].t;
+  return null;
+}
+
+// 📥 تاريخ دخول المرتجع = يوم ما رجع في **الرجعة بتاعته**
+function accEntryReturnIntake(e, d){
+  const moves = accStatusMoves(d);
+  const rets = accReturnMoves(moves);
+  const k = accReturnRoundIdx(e, moves, rets);
+  return k < 0 ? null : moves[rets[k]].t;
+}
+
 function stmtDate(e){
   if(e && e.deviceId){
     const dev = accDevices().find(x => x.id === e.deviceId);
-    // deliveredDateOf موجودة في الداشبورد بس — من غيرها بنرجع
-    // لتاريخ القيد، وده أسوأ حاجة ممكن تحصل: تاريخ أقل دقة،
-    // مش صفحة واقعة.
-    const dd = (dev && typeof deliveredDateOf === 'function') ? deliveredDateOf(dev) : null;
+    // من غير الجهاز (اتمسح / الصفحة مفيهاش أجهزة) بنرجع لتاريخ
+    // القيد — تاريخ أقل دقة، بس مش صفحة واقعة.
+    const dd = dev ? accEntryExitDate(e, dev) : null;
     if(dd) return dd;
   }
   return e && e.date;
@@ -424,7 +510,7 @@ function stmtDate(e){
 //     من addLedgerDebit في الداشبورد. فلو الجهاز اتمسح بعدين،
 //     التاريخ يفضل موجود.
 //   • القيود القديمة: بنجيبه من الجهاز نفسه (d.intakeDate).
-//   • المرتجع: «دخوله» = آخر مرة الجهاز رجع فيها (حالة returned
+//   • المرتجع: «دخوله» = يوم ما رجع في **الرجعة بتاعته** (حالة returned
 //     في سجل الحالات) — مش يوم دخوله أول مرة خالص.
 //   • دفعة / خصم / رصيد افتتاحي: مالهمش دخول → «—».
 // ============================================================
@@ -432,11 +518,8 @@ function stmtIntakeDate(e){
   if(!e || e.type !== 'debit') return null;
   const d = e.deviceId ? accDevices().find(x => x.id === e.deviceId) : null;
   if(e.kind === 'return'){
-    const h = (d && Array.isArray(d.statusHistory)) ? d.statusHistory : [];
-    for(let i = h.length - 1; i >= 0; i--){
-      if(h[i] && h[i].status === 'returned' && h[i].date) return h[i].date;
-    }
-    return null;
+    // يوم ما رجع في **رجعته هو** — مش آخر رجعة للجهاز
+    return d ? accEntryReturnIntake(e, d) : null;
   }
   if(e.intakeDate) return e.intakeDate;
   return (d && d.intakeDate) || null;
