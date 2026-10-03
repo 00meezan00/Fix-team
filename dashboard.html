@@ -1452,6 +1452,8 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
     <div class="mh">🏪 المحل</div>
     <button class="money-menu-item" onclick="openAnalytics()">📊 الملخص المالي</button>
     <button class="money-menu-item" onclick="openAccounts()">📒 الحسابات</button>
+    <!-- 💬 للسوبر أدمن بس — syncWaHeldMenu بيظهّره ويحط عليه العدد -->
+    <button id="waHeldMenuBtn" style="display:none;" onclick="openWaHeld()">💬 مسدجات الواتساب المتوقفة <span id="waHeldCount" style="display:none;background:#DC2626;color:#fff;border-radius:10px;padding:1px 7px;font-size:11.5px;font-weight:800;margin-inline-start:4px;"></span></button>
     <button class="admin-menu-item" onclick="openSummaries()">📋 الجرد</button>
     <button class="admin-menu-item" onclick="openTechEval()">🏆 تقييم الفنيين</button>
     <button class="money-menu-item" onclick="openStaff()">👥 الموظفين</button>
@@ -3682,6 +3684,7 @@ function render(){
   renderBoard();
   renderApprovalsPanel();
   renderOwnerHoldPanel();
+  try{ syncWaHeldMenu(); }catch(e){ console.warn('مسدجات الواتساب:', e); }
   renderPartsLogPanel();
   if(currentColumn) renderColumn(true);
   refreshOpenOverlays();
@@ -7588,6 +7591,139 @@ function openWa(phone, msg, pendingLabel){
   return true;
 }
 
+// ============================================================
+// 💬 مسدجات الواتساب المتوقفة (أجهزة المالك اللي اتقيّدت آجل)
+// ------------------------------------------------------------
+// 🧠 بالبلدي:
+//    المالك بيقيّد أجهزة آجل كتير من صفحته. مش عايزين الواتس يفتحله
+//    كل شوية. فالرسالة **بتستنى** هنا، والسوبر أدمن يبعتها لما يحب.
+//
+// 📍 مين بيظهر هنا؟ جهاز:
+//    • المالك ردّ عليه «آجل» (ownerPriced.pay = 'deferred')
+//    • والرد ده بعد يوم تشغيل الميزة (SHOP_NOTICE_FROM) — وإلا كل
+//      أجهزة المالك القديمة هتنزل هنا مرة واحدة
+//    • ولسه محدش بعتله ولا تجاهله (shopNoticeAt فاضي)
+//
+// ✅ «ابعت» → الواتس بيفتح على رقم المحل والرسالة جاهزة، والجهاز بيتعلّم
+//    إنه اتبعت. «تجاهل» → بيتعلّم ومش بيبعت حاجة.
+//    العلامة بتتكتب على الجهاز نفسه — فبتبان عند أي سوبر أدمن تاني.
+//
+// 🔒 للسوبر أدمن بس.
+// ============================================================
+const SHOP_NOTICE_FROM = '2026-10-03T00:00:00+03:00';
+
+function isWaHeld(d){
+  if(!d || d.status === 'trashed' || d.shopNoticeAt) return false;
+  const p = d.ownerPriced;
+  if(!p || p.pay !== 'deferred') return false;
+  const at = new Date(p.at || 0).getTime();
+  return !!at && at >= new Date(SHOP_NOTICE_FROM).getTime();
+}
+
+function waHeldList(){
+  if(!isSuperAdmin()) return [];
+  return devices.filter(isWaHeld)
+    .sort((a,b) => new Date(b.ownerPriced.at || 0) - new Date(a.ownerPriced.at || 0));
+}
+
+// القيد اللي المالك عمله — ولو مش لاقيينه (الدفتر لسه بيتحمّل) بنبنيه من الجهاز
+function waHeldItem(d){
+  const e = ledger.find(x => x.type === 'debit' && x.deviceId === d.id && !x.kind);
+  const shop = ((e && e.shop) || d.billedShop || d.shopName || '').trim();
+  const entry = e || { type:'debit', shop, amount: Number(d.agreedPrice) || Number((d.ownerPriced||{}).price) || 0, issue: d.reportedIssue || '' };
+  return { entry, d, shop };
+}
+
+// الزرار في القايمة المنسدلة — بيظهر للسوبر أدمن بس، وعليه العدد
+function syncWaHeldMenu(){
+  const b = document.getElementById('waHeldMenuBtn');
+  if(!b) return;
+  if(!isSuperAdmin()){ b.style.display = 'none'; return; }
+  b.style.display = '';
+  const n = waHeldList().length;
+  const c = document.getElementById('waHeldCount');
+  if(c){ c.textContent = n ? String(n) : ''; c.style.display = n ? '' : 'none'; }
+  if(document.getElementById('waHeldOv')) renderWaHeld();
+}
+
+function openWaHeld(){
+  const _menu = document.getElementById('menuDropdown');
+  if(_menu) _menu.classList.add('hidden');
+  if(!isSuperAdmin()){ showError('الخانة دي للمحاسب العام بس'); return; }
+  let ov = document.getElementById('waHeldOv');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.id = 'waHeldOv';
+    ov.className = 'overlay';
+    ov.style.zIndex = '70';
+    ov.onclick = e => { if(e.target === ov) closeWaHeld(); };
+    document.body.appendChild(ov);
+  }
+  renderWaHeld();
+}
+function closeWaHeld(){ const ov = document.getElementById('waHeldOv'); if(ov) ov.remove(); }
+
+function renderWaHeld(){
+  const ov = document.getElementById('waHeldOv');
+  if(!ov) return;
+  const list = waHeldList();
+  const rows = list.map(d => {
+    const { entry, shop } = waHeldItem(d);
+    const p = d.ownerPriced || {};
+    let when = '';
+    try{ when = p.at ? new Date(p.at).toLocaleString(getLocale()) : ''; }catch(e){}
+    const hasPh = !!shopPhones[shop];
+    return `<div class="appr-row">
+      <div class="appr-row-info" style="cursor:pointer;" onclick="closeWaHeld();openDetail('${d.id}')">
+        <div class="appr-row-dev">📱 ${esc(d.deviceType || '')} ${esc(d.model || '')}${d.customerName ? ' — ' + esc(d.customerName) : ''}</div>
+        <div class="appr-row-meta">🏬 ${esc(shop || 'من غير محل')} · 💰 ${(Number(entry.amount)||0).toLocaleString('en-EG')} ج.م${when ? ' · ' + esc(when) : ''}${hasPh ? '' : ' · <b style="color:var(--warn);">مفيش رقم للمحل</b>'}</div>
+      </div>
+      <div class="appr-row-actions" style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button class="oh-btn" style="background:#16A34A;" onclick="event.stopPropagation();waHeldSend('${d.id}')">💬 ابعت</button>
+        <button class="oh-btn oh-cancel" onclick="event.stopPropagation();waHeldSkip('${d.id}')">تجاهل</button>
+      </div>
+    </div>`;
+  }).join('');
+  ov.innerHTML = `<div class="modal" style="max-width:560px;width:100%;max-height:88vh;overflow-y:auto;">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;">
+      <h2 style="margin:0;font-size:18px;">💬 مسدجات الواتساب المتوقفة</h2>
+      <button class="acc-mini-btn" style="margin:0;" onclick="closeWaHeld()">✕</button>
+    </div>
+    <div style="font-size:12.5px;color:var(--muted);margin-bottom:12px;line-height:1.7;">
+      أجهزة المالك قيّدها آجل على حساب محل. دوس «ابعت» والواتس هيفتح على رقم المحل والرسالة جاهزة.
+    </div>
+    ${list.length ? rows : `<div class="empty-col">✅ مفيش رسايل مستنية</div>`}
+  </div>`;
+}
+
+// ⚠️ الواتس بيتفتح **الأول** وبعدين الحفظ — عشان على الكمبيوتر
+//    المتصفح مبيسمحش يفتح تاب جديد غير في نفس لحظة الضغطة.
+async function waHeldSend(id){
+  const d = devices.find(x => x.id === id);
+  if(!d || !isWaHeld(d)){ renderWaHeld(); return; }
+  const { entry, shop } = waHeldItem(d);
+  if(!shop){ alert('الجهاز ده مالوش اسم محل.'); return; }
+  let ph = shopPhones[shop];
+  if(!ph){ ph = await setShopPhone(shop); if(!ph) return; }
+  const ok = openWa(ph, shopNoticeMsg([{ entry, d }], shop), '💬 اضغط لإرسال رسالة الحساب للمحل');
+  if(!ok) return;                      // النت مقطوع — منعلّمش إنه اتبعت
+  await waHeldMark(id, 'sent');
+}
+
+async function waHeldSkip(id){
+  if(!confirm('تتجاهل الرسالة دي؟ مش هتتبعت للمحل، والجهاز هيختفي من القايمة.')) return;
+  await waHeldMark(id, 'skipped');
+}
+
+async function waHeldMark(id, how){
+  const now = new Date().toISOString();
+  devices = devices.map(x => x.id === id
+    ? { ...x, shopNoticeAt: now, shopNoticeBy: currentUser.name, shopNoticeHow: how }
+    : x);
+  render();
+  await persist();
+}
+
 // زرار عائم للرسالة اللي اتمنعت
 function showWaPending(url, label){
   let b = document.getElementById('waPending');
@@ -8070,43 +8206,26 @@ function queueShopNotice(entry, d){
   }catch(e){ console.warn('رسالة المحل:', e); }
 }
 
+// ✂️ الرسالة ٥ سطور بالكتير — المحل بيقراها على الموبايل وهو شغّال
 function shopNoticeMsg(items, shop){
-  const L = [];
-  L.push('السلام عليكم ورحمة الله وبركاته 🌹');
-  L.push('');
-  L.push(items.length > 1
-    ? 'نحيطكم علمًا بأنه تم تسجيل الأجهزة التالية على حسابكم الخاص لدى *شركة Fix Team للصيانة*:'
-    : 'نحيطكم علمًا بأنه تم تسجيل الجهاز التالي على حسابكم الخاص لدى *شركة Fix Team للصيانة*:');
-  let sum = 0;
-  items.forEach(({ entry, d }, i) => {
-    const dev = (`${d.deviceType||''} ${d.model||''}`.trim()) || (entry.deviceLabel || 'جهاز');
-    const amt = Number(entry.amount) || 0; sum += amt;
-    L.push('');
-    if(items.length > 1) L.push(`*${i + 1})*`);
-    L.push(`📱 الجهاز: *${dev}*` + (entry.kind === 'return' ? ' _(صيانة مرتجع)_' : ''));
-    if(d.customerName) L.push(`👤 اسم العميل: ${d.customerName}`);
-    if(d.deviceColor)  L.push(`🎨 اللون: ${d.deviceColor}`);
-    if(entry.issue)    L.push(`🔧 العطل: ${entry.issue}`);
-    if(d.id)           L.push(`🔢 رقم المتابعة: ${devRef(d)}`);
-    L.push(`💰 قيمة الصيانة: *${amt.toLocaleString('en-EG')} ج.م*`);
-  });
-  L.push('');
+  const devName = ({ entry, d }) => {
+    const n = (`${d.deviceType||''} ${d.model||''}`.trim()) || (entry.deviceLabel || 'جهاز');
+    return n + (d.customerName ? ` (${d.customerName})` : '') + (entry.kind === 'return' ? ' — صيانة مرتجع' : '');
+  };
+  const sum = items.reduce((t, x) => t + (Number(x.entry.amount) || 0), 0);
   let day = '';
   try{ day = new Date().toLocaleDateString('ar-EG', { weekday:'long', year:'numeric', month:'long', day:'numeric' }); }
   catch(e){ day = new Date().toLocaleDateString('ar-EG'); }
-  L.push(`📅 تاريخ التسجيل: ${day}`);
-  if(items.length > 1) L.push(`💵 إجمالي ما تم تسجيله: *${sum.toLocaleString('en-EG')} ج.م*`);
-  // الرصيد بعد التسجيل — عشان المحل يعرف هو واقف فين
-  try{
-    const st = (typeof shopStats === 'function') ? shopStats()[shop] : null;
-    if(st && st.balance > 0) L.push(`📒 إجمالي المستحق على حسابكم حتى الآن: *${st.balance.toLocaleString('en-EG')} ج.م*`);
-  }catch(e){}
-  L.push('');
-  L.push('نشكركم على ثقتكم الدائمة بنا 🙏');
-  L.push('وفي حال وجود أي ملاحظة أو مشكلة في الجهاز، يُرجى التواصل معنا فورًا، ويسعدنا دائمًا خدمتكم.');
-  L.push('');
-  L.push('مع خالص التحية،');
-  L.push('*فريق Fix Team للصيانة*');
+  let bal = 0;
+  try{ const st = (typeof shopStats === 'function') ? shopStats()[shop] : null; bal = st ? st.balance : 0; }catch(e){}
+
+  const L = ['السلام عليكم 🌹'];
+  L.push(items.length > 1
+    ? `تم تسجيل ${items.length === 2 ? 'جهازين' : items.length + ' أجهزة'} على حسابكم لدى *شركة Fix Team للصيانة* يوم ${day}: ${items.map(devName).join('، ')}.`
+    : `تم تسجيل جهاز *${devName(items[0])}* على حسابكم لدى *شركة Fix Team للصيانة* يوم ${day}.`);
+  L.push(`💰 قيمة الصيانة: *${sum.toLocaleString('en-EG')} ج.م*`);
+  if(bal > 0) L.push(`📒 إجمالي المستحق على حسابكم: *${bal.toLocaleString('en-EG')} ج.م*`);
+  L.push('نشكر ثقتكم، ولأي ملاحظة على الجهاز يُرجى التواصل معنا فورًا 🙏');
   return L.join('\n');
 }
 
