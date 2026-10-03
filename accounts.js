@@ -147,6 +147,38 @@ function cycleStartIds(entries){
   return starts;
 }
 
+// ============================================================
+// 📥📤 التاريخين على كارت الجهاز في شاشة الحسابات
+// ------------------------------------------------------------
+// 🧠 قبل كده الكارت كان عليه تاريخ واحد من غير اسم — وده كان
+//    عملياً يوم الخروج (اتسلّم). وفي الطباعة كان فيه تاريخين.
+//    فمكنتش عارف الرقم اللي قدامك ده دخول ولا خروج.
+//    دلوقتي الاتنين مكتوبين ومتسمّيين، ونفس الأرقام اللي في الـPDF.
+// ============================================================
+function accFmtShort(iso){
+  if(!iso) return '—';
+  const d = new Date(iso);
+  if(isNaN(d.getTime())) return '—';
+  try{ return d.toLocaleString(accLocale()); }catch(e){ return d.toISOString(); }
+}
+function accEntryDatesHtml(e){
+  const inn = stmtIntakeDate(e);
+  // الجهاز موجود بس لسه ما اتسلّمش؟ (مرتجع لسه في الورشة مثلاً)
+  // → «لسه ما خرجش» بدل ما نكتب تاريخ القيد كأنه يوم الخروج
+  const dev = (e && e.deviceId) ? accDevices().find(x => x.id === e.deviceId) : null;
+  if(dev && e.type === 'debit' && !accEntryExitDate(e, dev)){
+    return `<div class="acc-entry-meta" style="display:flex;flex-wrap:wrap;gap:4px 12px;">`
+      + `<span>📥 دخل: <b>${accFmtShort(inn)}</b></span>`
+      + `<span>📤 خرج: <b style="color:var(--warn);">لسه ما خرجش</b></span>`
+      + `</div>`;
+  }
+  const out = stmtDate(e);
+  return `<div class="acc-entry-meta" style="display:flex;flex-wrap:wrap;gap:4px 12px;">`
+    + `<span>📥 دخل: <b>${accFmtShort(inn)}</b></span>`
+    + `<span>📤 خرج: <b>${accFmtShort(out)}</b></span>`
+    + `</div>`;
+}
+
 // رسم حركة واحدة في كشف المحل حسب نوعها
 function accEntryHtml(e){
   const amt = (e.amount||0).toLocaleString('en-EG');
@@ -187,7 +219,8 @@ function accEntryHtml(e){
   return `<div class="acc-entry">
     <div><div style="font-weight:700;">📱 ${esc(e.deviceLabel||'جهاز')}</div>
       ${extra}
-      <div class="acc-entry-meta">${new Date(e.date).toLocaleString(accLocale())} — ${t('acc.by')} ${esc(e.by||'')}${e.prevShop ? ` — <span style="color:var(--warn);">منقول من حساب "${esc(e.prevShop)}"</span>` : ''}</div></div>
+      ${accEntryDatesHtml(e)}
+      <div class="acc-entry-meta">${t('acc.by')} ${esc(e.by||'')}${e.prevShop ? ` — <span style="color:var(--warn);">منقول من حساب "${esc(e.prevShop)}"</span>` : ''}</div></div>
     <div style="text-align:left;"><div style="font-weight:800; color:var(--warn);">+ ${amt} ج.م</div>
       ${ACC_CAN_EDIT ? `<button class="acc-mini-btn" onclick="transferDebit('${e.id}')">⇄ ${t('acc.moveShop')}</button>` : ''}</div>
   </div>`;
@@ -569,19 +602,42 @@ function stmtIssue(e){
 // ⚠️ الحركات اللي **بعد** آخر يوم في الفترة مش داخلة خالص —
 //    فالمتبقي = الرصيد لحد آخر يوم في الفترة.
 // ============================================================
+// ============================================================
+// 📅 الفترة «حسب أنهي تاريخ»؟
+// ------------------------------------------------------------
+// basis = 'out' → تاريخ الخروج (الافتراضي — زي ما كان)
+// basis = 'in'  → تاريخ الدخول
+//
+// 🧠 بالبلدي: لو اخترت «الشهر ده حسب الدخول»، هيطلع كل جهاز
+//    **دخل** المحل الشهر ده — حتى لو خرج الشهر اللي بعده.
+//    ولو «حسب الخروج»، هيطلع كل جهاز **اتسلّم** الشهر ده.
+//
+// ⚠️ الدفعة والخصم والرصيد الافتتاحي مالهمش «دخول» — فبنستعمل
+//    تاريخهم هم في الحالتين (يوم ما الدفعة حصلت فعلاً).
+// ============================================================
+function accBasisDate(e, basis){
+  if(basis === 'in'){
+    const inn = stmtIntakeDate(e);
+    if(inn) return inn;
+  }
+  return stmtDate(e);
+}
+
 function shopStatementRows(shop){
-  // الترتيب بنفس التاريخ اللي بيتعرض — وإلا السطور تطلع مبعثرة
-  // قدام المحل. مفيش عمود رصيد جاري، فالترتيب عرض بحت.
-  const all = ledger.filter(e => (e.shop||'بدون محل') === shop)
-    .slice().sort((a,b) => new Date(stmtDate(a)) - new Date(stmtDate(b)));
-  let entries = all;
+  // الترتيب بنفس التاريخ اللي الفترة ماشية عليه — وإلا السطور تطلع
+  // مبعثرة قدام المحل. مفيش عمود رصيد جاري، فالترتيب عرض بحت.
   const r = ACC_RANGE;
+  const basis = (r && r.basis) || 'out';
+  const bd = e => accBasisDate(e, basis);
+  const all = ledger.filter(e => (e.shop||'بدون محل') === shop)
+    .slice().sort((a,b) => new Date(bd(a)) - new Date(bd(b)));
+  let entries = all;
   if(r){
-    entries = all.filter(e => accInRange(stmtDate(e), r));
+    entries = all.filter(e => accInRange(bd(e), r));
     if(r.from){
       const fromT = r.from.getTime();
       const prior = all.filter(e => {
-        const tt = new Date(stmtDate(e) || 0).getTime();
+        const tt = new Date(bd(e) || 0).getTime();
         return tt && tt < fromT;
       }).reduce((s,e) => s + (isDebitLike(e) ? (e.amount||0) : -(e.amount||0)), 0);
       if(prior){
@@ -1344,6 +1400,7 @@ var ACC_RANGE = null;          // { from:Date|null, to:Date|null } — أو null
 var ACC_PERIOD_LABEL = '';     // «الفترة: من … إلى …» — بيتكتب في رأس الـPDF
 var ACC_RD = null;             // الشاشة المفتوحة دلوقتي (إعداداتها)
 var ACC_RANGE_PREF_KEY = 'ifix_export_range';
+var ACC_BASIS_PREF_KEY = 'ifix_export_basis';   // 'in' أو 'out' — آخر اختيار على الجهاز ده
 
 function accYmd(d){
   return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
@@ -1364,9 +1421,12 @@ function accInRange(iso, r){
 
 function accRangeLabel(r){
   if(!r) return '';
-  if(r.from && r.to) return 'الفترة: من ' + accFmtDay(r.from) + ' إلى ' + accFmtDay(r.to);
-  if(r.from) return 'الفترة: من ' + accFmtDay(r.from) + ' لحد النهاردة';
-  if(r.to)   return 'الفترة: من الأول لحد ' + accFmtDay(r.to);
+  // «حسب تاريخ الدخول/الخروج» — بيتكتب على الورقة نفسها عشان اللي
+  // ماسكها يعرف الفترة دي محسوبة على أنهي تاريخ
+  const b = r.basis === 'in' ? ' (حسب تاريخ الدخول)' : (r.basis === 'out' ? ' (حسب تاريخ الخروج)' : '');
+  if(r.from && r.to) return 'الفترة' + b + ': من ' + accFmtDay(r.from) + ' إلى ' + accFmtDay(r.to);
+  if(r.from) return 'الفترة' + b + ': من ' + accFmtDay(r.from) + ' لحد النهاردة';
+  if(r.to)   return 'الفترة' + b + ': من الأول لحد ' + accFmtDay(r.to);
   return '';
 }
 
@@ -1487,6 +1547,11 @@ function accRangeCss(){
     + '#accRangeOv .arg-chip{border:1.5px solid var(--border,#E2E8F0);background:var(--surface-2,#F8FAFC);'
     + 'color:var(--ink,#1A2332);border-radius:20px;padding:8px 13px;font:700 13px/1.2 inherit;cursor:pointer;}'
     + '#accRangeOv .arg-chip.on{background:#E8321E;border-color:#E8321E;color:#fff;}'
+    + '#accRangeOv .arg-basis{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;}'
+    + '#accRangeOv .arg-bbtn{border:1.5px solid var(--border,#E2E8F0);background:var(--surface-2,#F8FAFC);'
+    + 'color:var(--ink,#1A2332);border-radius:12px;padding:11px 8px;font:800 13.5px/1.3 inherit;cursor:pointer;}'
+    + '#accRangeOv .arg-bbtn.on{background:#1F3864;border-color:#1F3864;color:#fff;}'
+    + '#accRangeOv .arg-lbl{font-size:12px;font-weight:700;color:var(--muted,#64748B);margin:0 0 6px;}'
     + '#accRangeOv .arg-dates{display:grid;grid-template-columns:1fr 1fr;gap:10px;}'
     + '#accRangeOv .arg-dates label{font-size:12px;font-weight:700;color:var(--muted,#64748B);display:block;}'
     + '#accRangeOv .arg-dates input{display:block;width:100%;box-sizing:border-box;margin-top:5px;'
@@ -1524,6 +1589,13 @@ function accRangeOpen(opts){
   let dates = mode === 'custom' ? { from: pref.from || '', to: pref.to || '' } : accPresetDates(mode);
   if(!ACC_RANGE_PRESETS.some(p => p.k === mode) && mode !== 'custom'){ mode = 'all'; dates = { from:'', to:'' }; }
   ACC_RD.mode = mode;
+  // 📥📤 «حسب أنهي تاريخ» — بيظهر بس لو الشاشة اللي فاتحاها طلبته
+  //    (كشف المحل). شاشة «بانتظار الدفع» مالهاش دعوة بيه.
+  if(opts.basis){
+    let b = 'out';
+    try{ const v = localStorage.getItem(ACC_BASIS_PREF_KEY); if(v === 'in' || v === 'out') b = v; }catch(e){}
+    ACC_RD.basisSel = b;
+  }
 
   const isPdf = opts.fmt !== 'xlsx';
   const goTxt = isPdf
@@ -1538,6 +1610,13 @@ function accRangeOpen(opts){
     '<div class="arg-card">'
     + '<div class="arg-h">📅 ' + esc(opts.title || 'اختار الفترة') + '</div>'
     + '<div class="arg-s">عايز تطبع من إمتى لإمتى؟</div>'
+    + (opts.basis
+        ? '<div class="arg-lbl">الفترة دي محسوبة على:</div>'
+          + '<div class="arg-basis">'
+            + '<button type="button" class="arg-bbtn" data-b="in" onclick="accRangeBasis(\'in\')">📥 تاريخ الدخول</button>'
+            + '<button type="button" class="arg-bbtn" data-b="out" onclick="accRangeBasis(\'out\')">📤 تاريخ الخروج</button>'
+          + '</div>'
+        : '')
     + '<div class="arg-chips">'
       + ACC_RANGE_PRESETS.map(p =>
           '<button type="button" class="arg-chip" data-k="' + p.k + '" onclick="accRangePick(\'' + p.k + '\')">' + p.n + '</button>'
@@ -1571,6 +1650,14 @@ function accRangePick(k){
   accRangeSync();
 }
 
+// دوست «تاريخ الدخول» أو «تاريخ الخروج»
+function accRangeBasis(b){
+  if(!ACC_RD || !ACC_RD.basis) return;
+  ACC_RD.basisSel = (b === 'in') ? 'in' : 'out';
+  try{ localStorage.setItem(ACC_BASIS_PREF_KEY, ACC_RD.basisSel); }catch(e){}
+  accRangeSync();
+}
+
 // كتبت تاريخ بإيدك → بقى «فترة مخصوصة»
 function accRangeCustom(){
   if(!ACC_RD) return;
@@ -1589,7 +1676,10 @@ function accRangeRead(){
     const f2 = accDayStart(ts), t3 = accDayEnd(fs);
     from = f2; to = t3;
   }
-  return (from || to) ? { from, to } : null;
+  if(!(from || to)) return null;
+  const r = { from, to };
+  if(ACC_RD && ACC_RD.basis) r.basis = ACC_RD.basisSel || 'out';
+  return r;
 }
 
 // بنحدّث الشاشة: الاختيار الملوّن + «هيطلع كام حاجة»
@@ -1597,6 +1687,9 @@ function accRangeSync(){
   if(!ACC_RD) return;
   document.querySelectorAll('#accRangeOv .arg-chip').forEach(b => {
     b.classList.toggle('on', b.getAttribute('data-k') === ACC_RD.mode);
+  });
+  document.querySelectorAll('#accRangeOv .arg-bbtn').forEach(b => {
+    b.classList.toggle('on', b.getAttribute('data-b') === ACC_RD.basisSel);
   });
   const r = accRangeRead();
   const info = document.getElementById('argInfo');
@@ -1652,6 +1745,7 @@ function accRangeShop(fmt, shop){
     title: (isX ? 'Excel — ' : 'كشف PDF — ') + shop,
     fmt: fmt,
     unit: 'حركة',
+    basis: true,     // 📥📤 اعرض «حسب تاريخ الدخول / الخروج»
     count: r => accWithRange(r, () => shopStatementRows(shop).entries.filter(e => !e._carry).length),
     run: r => accWithRange(r, () => isX
       ? accExcelStamped(accRangeLabel(r), () => exportShopExcel(shop))
