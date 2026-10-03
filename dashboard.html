@@ -1735,6 +1735,13 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
         <p class="set-hint" id="setThemeHint"></p>
       </div>
 
+      <!-- 💬 رسايل الواتساب بتتفتح فين — اختيار لكل موبايل/كمبيوتر لوحده -->
+      <div class="set-group">
+        <div class="set-label">💬 رسايل الواتساب تتفتح في</div>
+        <div class="set-choices" id="setWaChoices" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"></div>
+        <p class="set-hint" id="setWaHint"></p>
+      </div>
+
     </div>
   </div>
 </div>
@@ -6639,6 +6646,7 @@ const SET_THEMES = [
 ];
 
 function renderSettings(){
+  renderWaModeSetting();
   const th = document.getElementById('setThemeChoices');
   if(th){
     const cur = themeMode();
@@ -7564,6 +7572,44 @@ async function copyTrackLink(id){
   }
 }
 
+// ============================================================
+// 💬 الرسايل تتفتح فين؟ (اختيار لكل جهاز لوحده)
+// ------------------------------------------------------------
+//   'app' → تطبيق الواتساب اللي على الموبايل (زي ما كان)
+//   'web' → واتساب ويب — رقم الشركة (01028794359) اللي فاتح على المتصفح
+//
+// 🧠 ليه مقدرش أختار «أنهي رقم» من هنا؟
+//    لينك الواتساب بيقول «افتح شات مع فلان والرسالة دي جاهزة» — بس.
+//    الرسالة بتطلع من **الرقم اللي فاتح في المكان اللي اللينك وصله**.
+//    فالحل إننا نبعت اللينك للمكان اللي رقم الشركة فاتح فيه: واتساب ويب.
+//
+// ⚠️ على الأيفون: اللينك بيفتح في **سفاري العادي** — مش في أيقونة
+//    واتساب ويب اللي على الشاشة الرئيسية. الأيفون بيعزل الأيقونة دي
+//    عن سفاري (كأنهم متصفحين مختلفين)، فلازم رقم الشركة يكون عامل
+//    دخول على web.whatsapp.com **في سفاري نفسه** كمان.
+// ============================================================
+const WA_MODE_KEY = 'ifix_wa_mode';
+const WA_COMPANY_NUMBER = '01028794359';
+function waMode(){
+  try{ return localStorage.getItem(WA_MODE_KEY) === 'web' ? 'web' : 'app'; }catch(e){ return 'app'; }
+}
+function setWaMode(m){
+  try{ localStorage.setItem(WA_MODE_KEY, m === 'web' ? 'web' : 'app'); }catch(e){}
+  renderWaModeSetting();
+}
+function renderWaModeSetting(){
+  const box = document.getElementById('setWaChoices');
+  if(!box) return;
+  const cur = waMode();
+  const opt = (k, ico, txt) => `<button type="button" class="set-opt${k===cur?' active':''}" onclick="setWaMode('${k}')">
+      <span class="ico">${ico}</span><span>${txt}</span></button>`;
+  box.innerHTML = opt('app', '📱', 'تطبيق الواتساب') + opt('web', '🏢', 'واتساب الشركة (ويب)');
+  const h = document.getElementById('setWaHint');
+  if(h) h.textContent = cur === 'web'
+    ? 'الرسايل هتفتح على web.whatsapp.com — يعني هتطلع من رقم الشركة ' + WA_COMPANY_NUMBER + ' لو هو اللي فاتح هناك. على الأيفون: لازم يكون فاتح في سفاري نفسه، مش بس في الأيقونة اللي على الشاشة.'
+    : 'الرسايل هتفتح في تطبيق الواتساب اللي على الموبايل — وهتطلع من الرقم اللي فاتح فيه.';
+}
+
 // إرسال واتساب: على الموبايل يفتح التطبيق مباشرة على شات العميل بالرسالة جاهزة
 function openWa(phone, msg, pendingLabel){
   const p = waPhone(phone);
@@ -7573,6 +7619,19 @@ function openWa(phone, msg, pendingLabel){
     return false;
   }
   const text = encodeURIComponent(msg);
+
+  // 🏢 واتساب الشركة (ويب) — تاب جديد على web.whatsapp.com والرسالة جاهزة
+  if(waMode() === 'web'){
+    const url = 'https://web.whatsapp.com/send?phone=' + p + '&text=' + text;
+    // احتياطي: الرسالة بتتنسخ كمان — لو الصفحة طلبت دخول أو ما ملتش
+    // الرسالة، تقدر تلصقها بإيدك
+    try{ navigator.clipboard && navigator.clipboard.writeText(msg).catch(() => {}); }catch(e){}
+    let w = null;
+    try{ w = window.open(url, '_blank'); }catch(e){}
+    if(!w || w.closed || typeof w.closed === 'undefined') showWaPending(url, pendingLabel);
+    return true;
+  }
+
   const webUrl = 'https://wa.me/' + p + '?text=' + text;
   const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
