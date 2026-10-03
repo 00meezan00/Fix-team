@@ -1234,11 +1234,11 @@ function dayHtml(d, punches, email){
       <span class="meta">${r.isOff ? '🏖️ يوم إجازته — نزل ' + fmtMinTime(r.arrived) + ' · كل ساعاته أوفر تايم' : 'ميعاده ' + fmtMinTime(r.shift) + ' · حضر ' + fmtMinTime(r.arrived)}${
         (!r.isOff && r.lateBy) ? ' (متأخر ' + fmtDur(r.lateBy) + ')' : ''}${r.isOff ? '' : ' · يتحسب ' + fmtMinTime(r.counted) + ' · ينصرف ' + fmtMinTime(r.leaveAt)}${
         r.breakMin ? ' · ☕ بريك ' + fmtDur(r.breakMin) + (r.breakLimit ? ' من ' + fmtDur(r.breakLimit) : '') : ''}${(() => {
-          // البريك اللي ضحّى بيه + الشغل الخام قبل ما يتشال منه
+          // البريك اللي ما اتاخدش (واتشال من الساعات) + الشغل الخام قبل ما يتشال
           const o = email ? dayOvertime(email, punches, d) : null;
           if(!o || !o.has || !o.brkUnused) return '';
-          return ' · ☕ ضحّى بـ ' + fmtDur(o.brkUnused) +
-                 (o.eff !== o.worked ? ' · شغل فعلي ' + fmtHm(o.worked) : '');
+          return ' · ☕ بريك ما اتاخدش ' + fmtDur(o.brkUnused) + ' (اتشال من الساعات)' +
+                 (o.eff !== o.worked ? ' · قعد فعلاً ' + fmtHm(o.worked) : '');
         })()}</span>
     </div>
     ${r.beforeStart ? `
@@ -1838,7 +1838,7 @@ function renderHrSettings(){
     </div>
 
     <label class="fld"><span>☕ البريك المسموح (بالدقايق في اليوم)</span>
-      <small>بيتزاد على ساعات العمل فوق. اللي بيضحّي ببريكه <b>مش بياخد عليه أوفر تايم</b> — بيتحسبله يوم مظبوط.<br>سيبه صفر لو مفيش بريك.</small>
+      <small>بيتزاد على ساعات العمل فوق. <b>البريك ده بيتشال من ساعاته دايماً — خده أو ما خدهوش.</b><br>يعني لو ٩ شغل + ٦٠ بريك، لازم يقعد ١٠ ساعات، واللي مطلعش بريك وقعد ٩ ونص عليه نقص نص ساعة.<br>سيبه صفر لو مفيش بريك.</small>
       <input type="number" id="fBreak" min="0" max="480" value="${Number(c.break_minutes||0)}">
     </label>
 
@@ -2053,19 +2053,20 @@ function dayOvertime(email, punches, workDate){
     return { worked: raw.minutes, eff: raw.minutes, over: 0, short: 0, need: 0, has: false };
   }
 
-  // 🔴 «الساعات المحسوبة» = الشغل الفعلي ناقص البريك اللي ضحّى بيه،
-  //    بس **في حدود الزيادة بس**. يعني:
-  //      • قعد ١٠:٣١ ومطلوب ٨:٣٠ وضحّى بساعتين → يتحسبله ٨:٣١
-  //        (بدل ما يبان ١٠:٣١ وكأن عنده ساعتين أوفر تايم)
-  //      • قعد ٤ ساعات ومطلوب ٩ → يفضل ٤، والنقص ٥ ساعات
-  //        ⚠️ البريك المتساب **مبيغطّيش النقص** — اللي بيمشي بدري
-  //           مكانش ينفع ياخد ساعتين مجاناً كل يوم.
-  //    والنتيجة إن الرقم المعروض دايماً = المطلوب ± الزيادة/النقص،
-  //    فمفيش رقمين متناقضين قدام عين الموظف.
+  // 🔴 (70) «الساعات المحسوبة» = الشغل الفعلي ناقص البريك المسموح
+  //    اللي ما اتاخدش — **كله، دايماً**.
+  //    🧸 مطلوب ٩ شغل + ساعة بريك = يقعد ١٠. مطلعش بريك وقعد ٩:٣٣
+  //       → يتحسبله ٨:٣٣ ونقص ٢٧ دقيقة.
+  //    🐞 قبل كده البريك كان بيتشال **في حدود الزيادة بس**، فنفس
+  //       الموظف كان بيطلع ٩:٠٠ بالظبط ومن غير نقص — والسيرفر كمان
+  //       كان بيحسب النقص على ٩ مش ١٠. الاتنين اتصلّحوا مع بعض
+  //       (ملف 70-break-always-deducted.sql).
+  //    ⚠️ لازم يفضل نفس معادلة السيرفر بالظبط: الرقم المعروض =
+  //       المطلوب + الأوفر تايم − النقص. لو اختلفوا، HR هتشوف رقم
+  //       والكشف هيحسب فلوس على رقم تاني.
   const _w = Number(row.worked_min || 0);
-  const _n = Number(row.need_min   || 0);
   const _u = Number(row.break_unused_min || 0);
-  const _eff = _w - Math.min(_u, Math.max(0, _w - _n));
+  const _eff = Math.max(0, _w - _u);
 
   return {
     worked: _w,
