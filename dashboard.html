@@ -6313,6 +6313,7 @@ async function changeStatus(newStatus, paymentChoice, rejectedInShopChoice){
   renderDetail();
   render();
   await persist();
+  flushShopNotices();   // 💬 لو الجهاز دخل حساب محل دلوقتي → واتساب للمحل
   const stDev = devices.find(x => x.id === selectedId);
   if(stDev){ if(!stDev.trackToken){ await ensureTrackToken(stDev.id); } syncTrack(devices.find(x => x.id === selectedId)); }
 }
@@ -7561,7 +7562,7 @@ async function copyTrackLink(id){
 }
 
 // إرسال واتساب: على الموبايل يفتح التطبيق مباشرة على شات العميل بالرسالة جاهزة
-function openWa(phone, msg){
+function openWa(phone, msg, pendingLabel){
   const p = waPhone(phone);
   if(!p) return false;
   if(!isOnline()){
@@ -7576,19 +7577,19 @@ function openWa(phone, msg){
     // فتح تطبيق الواتساب مباشرة على المحادثة
     window.location.href = 'whatsapp://send?phone=' + p + '&text=' + text;
     // احتياطي: لو التطبيق مفتحش لأي سبب، نظهر الزرار الأخضر بلينك الويب
-    setTimeout(() => { if(!document.hidden) showWaPending(webUrl); }, 1500);
+    setTimeout(() => { if(!document.hidden) showWaPending(webUrl, pendingLabel); }, 1500);
     return true;
   }
 
   // على الكمبيوتر: تاب جديد بـ wa.me
   let w = null;
   try{ w = window.open(webUrl, '_blank'); }catch(e){}
-  if(!w || w.closed || typeof w.closed === 'undefined') showWaPending(webUrl);
+  if(!w || w.closed || typeof w.closed === 'undefined') showWaPending(webUrl, pendingLabel);
   return true;
 }
 
 // زرار عائم للرسالة اللي اتمنعت
-function showWaPending(url){
+function showWaPending(url, label){
   let b = document.getElementById('waPending');
   if(!b){
     b = document.createElement('a');
@@ -7600,6 +7601,8 @@ function showWaPending(url){
     document.body.appendChild(b);
   }
   b.href = url;
+  // نص الزرار حسب الرسالة (العميل ولا المحل)
+  b.innerHTML = label || '💬 اضغط لإرسال رسالة الواتساب للعميل';
 }
 const devRef = d => '#' + d.id.slice(-5).toUpperCase();
 
@@ -7748,6 +7751,7 @@ async function editPayType(t){
         { status:x.status, label:note, labelKey:noteKey, labelVars:noteVars, date:new Date().toISOString(), by:currentUser.name }] }
     : x);
   renderDetail(); render(); await persist();
+  flushShopNotices();   // 💬 لو الجهاز دخل حساب محل دلوقتي → واتساب للمحل
   const t2 = devices.find(x => x.id === selectedId);
   if(t2) syncTrack(t2);
 }
@@ -7785,6 +7789,7 @@ async function editPrice(value){
     ? { ...x, ...extra, statusHistory: histEntry ? [...(x.statusHistory||[]), histEntry] : (x.statusHistory||[]) }
     : x);
   renderDetail(); render(); await persist();
+  flushShopNotices();   // 💬 لو الجهاز دخل حساب محل دلوقتي → واتساب للمحل
   const updT = devices.find(x => x.id === selectedId);
   if(updT){ if(!updT.trackToken){ await ensureTrackToken(updT.id); } syncTrack(devices.find(x => x.id === selectedId)); }
 }
@@ -8030,6 +8035,98 @@ function addLedgerDebit(d, price, opts){
   if(opts.retRound) entry.retRound = opts.retRound;   // رقم جولة المرتجع (١ = أول رجوع) — شوف curReturnEntry
   ledger = [entry, ...ledger];
   persistLedger();
+  // 💬 رسالة واتساب للمحل «اتسجّل على حسابكم جهاز كذا» — بتتبعت بعد الحفظ
+  queueShopNotice(entry, d);
+}
+
+// ============================================================
+// 💬 رسالة الواتساب للمحل لما جهاز يدخل حسابه
+// ------------------------------------------------------------
+// 🧠 بالبلدي: كل مرة جهاز يتقيّد آجل على حساب محل، بيطلع واتساب
+//    على رقم المحل والرسالة مكتوبة جاهزة — واللي سلّم الجهاز يدوس
+//    «إرسال» بس. نفس طريقة رسالة العميل بالظبط (openWa).
+//
+// 📍 بتحصل في اللحظات اللي الجهاز بيدخل فيها الحساب فعلاً:
+//    • اتسلّم وهو آجل ومتسعّر
+//    • اتسلّم الأول، وبعدين اتسعّر وهو آجل
+//    • اتسلّم واتسعّر، وبعدين اتحدد آجل
+//    • وكمان المرتجع لما يتقيّد آجل
+//
+// ⚠️ ليه «طابور» ومش بنبعت على طول؟
+//    القيد بيتكتب في نص الشغل، قبل ما الجهاز يتحفظ. ولو فتحنا
+//    الواتس ساعتها، الموبايل بيقلب على الواتس والصفحة بتنام —
+//    والحفظ ممكن يتعلّق. فبنكتب الرسالة في ورقة جنبنا، ولما الحفظ
+//    يخلص (flushShopNotices بعد persist) بنفتح الواتس.
+//
+// ⚠️ تعديل مبلغ قيد موجود **مش** بيبعت رسالة — دي مش «جهاز جديد
+//    على الحساب». الرسالة للتسجيل الجديد بس.
+// ============================================================
+let _shopNoticeQueue = [];
+
+function queueShopNotice(entry, d){
+  try{
+    if(!entry || entry.type !== 'debit') return;
+    _shopNoticeQueue.push({ entry, d: d || {} });
+  }catch(e){ console.warn('رسالة المحل:', e); }
+}
+
+function shopNoticeMsg(items, shop){
+  const L = [];
+  L.push('السلام عليكم ورحمة الله وبركاته 🌹');
+  L.push('');
+  L.push(items.length > 1
+    ? 'نحيطكم علمًا بأنه تم تسجيل الأجهزة التالية على حسابكم الخاص لدى *شركة Fix Team للصيانة*:'
+    : 'نحيطكم علمًا بأنه تم تسجيل الجهاز التالي على حسابكم الخاص لدى *شركة Fix Team للصيانة*:');
+  let sum = 0;
+  items.forEach(({ entry, d }, i) => {
+    const dev = (`${d.deviceType||''} ${d.model||''}`.trim()) || (entry.deviceLabel || 'جهاز');
+    const amt = Number(entry.amount) || 0; sum += amt;
+    L.push('');
+    if(items.length > 1) L.push(`*${i + 1})*`);
+    L.push(`📱 الجهاز: *${dev}*` + (entry.kind === 'return' ? ' _(صيانة مرتجع)_' : ''));
+    if(d.customerName) L.push(`👤 اسم العميل: ${d.customerName}`);
+    if(d.deviceColor)  L.push(`🎨 اللون: ${d.deviceColor}`);
+    if(entry.issue)    L.push(`🔧 العطل: ${entry.issue}`);
+    if(d.id)           L.push(`🔢 رقم المتابعة: ${devRef(d)}`);
+    L.push(`💰 قيمة الصيانة: *${amt.toLocaleString('en-EG')} ج.م*`);
+  });
+  L.push('');
+  let day = '';
+  try{ day = new Date().toLocaleDateString('ar-EG', { weekday:'long', year:'numeric', month:'long', day:'numeric' }); }
+  catch(e){ day = new Date().toLocaleDateString('ar-EG'); }
+  L.push(`📅 تاريخ التسجيل: ${day}`);
+  if(items.length > 1) L.push(`💵 إجمالي ما تم تسجيله: *${sum.toLocaleString('en-EG')} ج.م*`);
+  // الرصيد بعد التسجيل — عشان المحل يعرف هو واقف فين
+  try{
+    const st = (typeof shopStats === 'function') ? shopStats()[shop] : null;
+    if(st && st.balance > 0) L.push(`📒 إجمالي المستحق على حسابكم حتى الآن: *${st.balance.toLocaleString('en-EG')} ج.م*`);
+  }catch(e){}
+  L.push('');
+  L.push('نشكركم على ثقتكم الدائمة بنا 🙏');
+  L.push('وفي حال وجود أي ملاحظة أو مشكلة في الجهاز، يُرجى التواصل معنا فورًا، ويسعدنا دائمًا خدمتكم.');
+  L.push('');
+  L.push('مع خالص التحية،');
+  L.push('*فريق Fix Team للصيانة*');
+  return L.join('\n');
+}
+
+async function flushShopNotices(){
+  if(!_shopNoticeQueue.length) return;
+  const q = _shopNoticeQueue; _shopNoticeQueue = [];
+  // لو أكتر من جهاز لنفس المحل في نفس اللحظة → رسالة واحدة بيهم كلهم
+  const byShop = {};
+  q.forEach(x => { const sh = x.entry.shop || 'بدون محل'; (byShop[sh] = byShop[sh] || []).push(x); });
+  for(const shop of Object.keys(byShop)){
+    if(shop === 'بدون محل') continue;
+    let ph = shopPhones[shop];
+    if(!ph){
+      // مفيش رقم للمحل؟ نسأل مرة — ولو اتلغى، الجهاز اتقيّد عادي ومفيش رسالة
+      ph = await setShopPhone(shop);
+      if(!ph) continue;
+    }
+    openWa(ph, shopNoticeMsg(byShop[shop], shop), '💬 اضغط لإرسال رسالة الحساب للمحل');
+    break;   // واتساب واحد في المرة — الموبايل مبيفتحش اتنين ورا بعض
+  }
 }
 
 // ============================================================
@@ -8136,6 +8233,7 @@ async function editReturnPrice(value){
     ? { ...x, ...extra, statusHistory: histEntry ? [...(x.statusHistory||[]), histEntry] : (x.statusHistory||[]) }
     : x);
   renderDetail(); render(); await persist();
+  flushShopNotices();   // 💬 لو الجهاز دخل حساب محل دلوقتي → واتساب للمحل
   const updT = devices.find(x => x.id === selectedId);
   if(updT){ if(!updT.trackToken){ await ensureTrackToken(updT.id); } syncTrack(devices.find(x => x.id === selectedId)); }
 }
@@ -8179,6 +8277,7 @@ async function editReturnPayType(pt){
         { status:x.status, labelKey:noteKey, labelVars:noteVars, date:new Date().toISOString(), by:currentUser.name }] }
     : x);
   renderDetail(); render(); await persist();
+  flushShopNotices();   // 💬 لو المرتجع دخل حساب المحل دلوقتي → واتساب للمحل
 }
 
 // تأكيد دفع حساب المرتجع فوري (زي markPaid — الفوري مبيتقيّدش على الدفتر)
