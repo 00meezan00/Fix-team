@@ -969,6 +969,10 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
       <div class="fld"><label>المحل (اختياري)</label><input id="f_shop" list="ownShopList" autocomplete="off" placeholder="لو الجهاز من محل"></div>
       <datalist id="ownShopList"></datalist>
     </div>
+    <!-- 🛵 المندوب = اللي جاب الجهاز للمحل (مش صاحبه). اختياري.
+         ⚠️ محتاج ملف SQL رقم 69 — من غيره السيرفر بيرمي الخانة في صمت. -->
+    <div class="fld"><label>🛵 اسم المندوب (اللي جاب الجهاز)</label><input id="f_bb" list="ownBBList" autocomplete="off" maxlength="60" placeholder="سيبه فاضي لو صاحب الجهاز جابه بنفسه"></div>
+    <datalist id="ownBBList"></datalist>
     <div class="fld"><label>الفني</label>
       <select id="f_tech" class="tech-select"></select>
       <div id="f_techHint" class="fld-hint" style="display:none;"></div>
@@ -1259,6 +1263,7 @@ function adapt(row){
     customer: d.customerName || '',
     phone:    d.customerPhone || '',
     shop:     d.shopName || '',
+    bb:       (d.broughtBy || '').trim(),   // 🛵 المندوب
     issue:    d.reportedIssue || '',
     cond:     d.conditionNotes || '',
     status:   d.status || row.status || 'waiting',
@@ -1848,7 +1853,7 @@ function reindexSearch(){
   try{
     if(window.IFixSearch)
       IFixSearch.index(devices, d => [d.type, d.model, d.customer, d.shop,
-        d.phone, d.tech, d.by, d.issue, d.serial], true);
+        d.phone, d.tech, d.by, d.issue, d.serial, d.bb], true);
   }catch(e){}
 }
 
@@ -2280,6 +2285,8 @@ function showInfo(id){
         <div class="di-card-h">👤 العميل</div>
         ${row('العميل', esc(d.customer || '—'))}
         ${row('المحل', d.shop ? esc(d.shop) : '')}
+        ${row('🛵 المندوب', (d.bb ? esc(d.bb) : '<span style="color:var(--muted)">—</span>')
+            + `<button class="di-edit" onclick="editBB('${d.id}')">✏️ ${d.bb ? 'تعديل' : 'اكتب'}</button>`)}
         ${row('التليفون', d.phone ? `<span dir="ltr">${esc(d.phone)}</span>` : '')}
         ${tel ? `<div class="di-contact">
           <a class="di-btn di-call" href="tel:${esc(tel)}">📞 اتصال</a>
@@ -2408,6 +2415,63 @@ async function addDispNote(id){
       الكتابة، فأي حد يفتح السجل يشوف: كان كذا وبقى كذا ومين
       غيّره وإمتى. ده الفرق بين «تعديل» و«مسح».
    ============================================================ */
+// ============================================================
+// 🛵 المندوب — أسامي للاقتراح + تعديل من التفاصيل
+// ------------------------------------------------------------
+// 🧸 المندوب = اللي جاب الجهاز للمحل (صبي محل · موتوسيكل)، مش صاحبه.
+// ⚠️ الحفظ عبر device_patch — والسيرفر لازم يكون مسموحله بالخانة دي
+//    (ملف SQL رقم 69). من غيره الخانة بتترمي في صمت، فبعد الحفظ
+//    بنقرا الخانة من السيرفر ونتأكد إنها اتكتبت.
+// ⚠️ الاسم القديم بيتسجّل في ملاحظات الجهاز — عشان لو اتعدّل غلط،
+//    الأصل لسه موجود.
+// ============================================================
+function bbNames(){
+  const seen = new Map();
+  for(const d of devices){
+    const n = (d.bb || '').trim();
+    if(!n) continue;
+    const k = n.toLowerCase().replace(/\s+/g, ' ');
+    const ts = new Date(d.intake || 0).getTime() || 0;
+    const p = seen.get(k);
+    if(!p || ts > p.ts) seen.set(k, { n, ts });
+  }
+  return [...seen.values()].sort((a,b) => b.ts - a.ts).map(x => x.n);
+}
+
+function editBB(id){
+  const d = devices.find(x => x.id === id); if(!d) return;
+  openAct('🛵 المندوب', `
+    ${actDevBlock(d)}
+    <div class="de-cur">المندوب دلوقتي: <b>${esc(d.bb || '—')}</b></div>
+    <input id="deBB" class="de-ta" style="min-height:0;" list="deBBList" autocomplete="off" maxlength="60"
+           placeholder="اسم اللي جاب الجهاز…" value="${esc(d.bb || '')}">
+    <datalist id="deBBList">${bbNames().map(n => `<option value="${esc(n)}">`).join('')}</datalist>
+    <div class="de-hint">سيبه فاضي لو صاحب الجهاز جابه بنفسه.</div>
+    <button class="act-btn act-primary" id="deGo" onclick="doEditBB('${d.id}')">💾 حفظ</button>
+    <button class="act-btn act-ghost" onclick="showInfo('${d.id}')">إلغاء</button>`);
+  setTimeout(() => { const el = $('deBB'); if(el) el.focus(); }, 250);
+}
+
+async function doEditBB(id){
+  const d = devices.find(x => x.id === id); if(!d) return;
+  const val = (($('deBB') || {}).value || '').trim();
+  const old = (d.bb || '').trim();
+  if(val === old){ showInfo(id); return; }
+
+  const note = mkNote('🛵 المندوب اتعدّل: «' + (old || '—') + '» ← «' + (val || '—') + '»');
+  const btn = $('deGo'); if(btn) btn.disabled = true;
+  const notes = await notesWith(id, note);   // نسخة السيرفر — عشان مانمسحش ملاحظات حد تاني
+  const p = notes && { broughtBy: val, activityNotes: notes,
+                       lastModifiedAt: nowIso(), lastModifiedBy: ME };
+  const ok = !!p && await patch(id, p) && await verifyField(id, 'broughtBy', val, 'اسم المندوب');
+  if(btn) btn.disabled = false;
+  if(!ok) return;
+
+  applyLocal(d, p);
+  toast(val ? '🛵 المندوب اتحفظ' : '🛵 المندوب اتشال');
+  showInfo(id);
+}
+
 function editIssue(id, back){
   const d = devices.find(x => x.id === id); if(!d) return;
   openAct('🛠️ تعديل العطل', `
@@ -2519,6 +2583,7 @@ function applyLocal(d, raw){
     d.isMine = (d.tech === MY_TECH) || (d.assist === MY_TECH);
   }
   if('reportedIssue' in raw) d.issue = raw.reportedIssue || '';
+  if('broughtBy'     in raw) d.bb    = (raw.broughtBy || '').trim();
   if('partsComment'  in raw) d.parts = raw.partsComment || '';
   if('status'        in raw) d.status = raw.status;
   if('activityNotes' in raw){
@@ -3157,6 +3222,9 @@ function buildSuggest(){
   shopList  = [...shopSeen.values()].sort((a,b)=>b.ts-a.ts);
   const sl = $('ownShopList');
   if(sl) sl.innerHTML = shopList.map(x=>`<option value="${esc(x.name)}">`).join('');
+  // 🛵 أسامي المناديب — الأحدث فوق، من غير تكرار
+  const bbl = $('ownBBList');
+  if(bbl) bbl.innerHTML = bbNames().map(n=>`<option value="${esc(n)}">`).join('');
 }
 
 function onOwnCustInput(){
@@ -3203,12 +3271,13 @@ function closeIntake(){ $('sheet').classList.remove('on'); $('sheetBg').classLis
 //    من الحمولة وبتتجاهل أي حاجة تانية **في صمت**. فبدل ما نعتمد
 //    على إنها بتاخدهم، بنضيفهم بعدها بـdevice_patch.
 //    الكتابة مرتين بنفس القيمة مالهاش أي ضرر.
-async function afterIntake(newId, text, lock, color, serial){
+async function afterIntake(newId, text, lock, color, serial, bb){
   if(!newId) return false;
   const p = {};
   if(lock) Object.assign(p, lock);
   if(color) p.deviceColor = color;
   if(serial) p.serialNumber = serial;
+  if(bb) p.broughtBy = bb;          // 🛵 ضمان تاني — نفس فكرة اللون
   if(text){
     const notes = await notesWith(newId, mkNote('📝 ' + text));
     if(!notes) return false;
@@ -3242,6 +3311,7 @@ async function saveIntake(){
 
   // 🔢 السريال اختياري — بس لو مكرر بنسأل
   const serial = $('f_serial').value.trim();
+  const bb = (($('f_bb') || {}).value || '').trim();   // 🛵 المندوب
   if(serial){
     const dup = devices.find(d => (d.serial || '').trim().toLowerCase() === serial.toLowerCase());
     // ⚠️ التحذير ده مش شامل كل تاريخ المحل (بنحمّل ٣٠ يوم للمسلّم
@@ -3266,6 +3336,7 @@ async function saveIntake(){
     technician:    ($('f_tech') ? $('f_tech').value : ''),
     deviceColor:   color,
     serialNumber:  serial,
+    broughtBy:     bb,                 // 🛵 (ملف SQL رقم 69)
     registeredBy:  ME
   }});
 
@@ -3295,11 +3366,11 @@ async function saveIntake(){
         if(mine.length === 1) newId = mine[0].id;
       }catch(e){ console.error('البحث عن الجهاز الجديد:', e); }
     }
-    lost = !(await afterIntake(newId, noteText0, lock0, color, serial));
+    lost = !(await afterIntake(newId, noteText0, lock0, color, serial, bb));
   }
 
   ownMountLock('ownLockHostIntake');   // 🔒 تصفير شاشة الباسورد
-  ['f_type','f_model','f_cust','f_phone','f_shop','f_issue','f_note','f_color','f_serial'].forEach(id=>{
+  ['f_type','f_model','f_cust','f_phone','f_shop','f_bb','f_issue','f_note','f_color','f_serial'].forEach(id=>{
     const e = $(id); if(!e) return; e.value=''; if(e.dataset) e.dataset.autoFill='';
   });
   ['ownCustList','ownPhoneList'].forEach(id=>{ const e=$(id); if(e) e.innerHTML=''; });
