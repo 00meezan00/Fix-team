@@ -8535,6 +8535,49 @@ async function recordPayment(){
   document.getElementById('payNote').value = '';
   await persistLedger();
   renderAccounts();
+  // 💬 رسالة واتساب للمحل «استلمنا دفعة» — **بعد** الحفظ عن قصد:
+  //    الموبايل بيقلب على الواتس والصفحة بتنام، فلو فتحناه قبل الحفظ
+  //    الدفعة ممكن متتحفظش (نفس درس flushShopNotices).
+  try{ await sendPaymentNotice(shop, amount); }catch(e){ console.warn('رسالة الدفعة:', e); }
+}
+
+// ============================================================
+// 💬 رسالة الواتساب للمحل لما يدفع
+// ------------------------------------------------------------
+// 🧸 بالبلدي: المحل دفع فلوس ← بنبعتله «وصل» على الواتس:
+//    دفعتوا كام · فاضل عليكم كام · وكلمة حلوة في الآخر.
+//    زي الوصل الورق اللي بيتقطع من الدفتر، بس على الموبايل.
+//
+// 📒 المتبقي بيتحسب **بعد** ما الدفعة اتسجّلت (shopStats) — يعني
+//    الرقم اللي في الرسالة هو نفس الرقم اللي في شاشة الحسابات بالظبط.
+//
+// ⚠️ ملاحظة الدفعة **مش** بتتبعت للمحل عن قصد — ساعات بتبقى كلام
+//    داخلي («كاش مع حمادة»، «باقي ١٠٠ هيجيبهم بكرة»).
+// ⚠️ مفيش رقم للمحل؟ بنسأل مرة ونحفظه. ولو اتلغى → الدفعة متسجّلة
+//    عادي ومفيش رسالة.
+// ============================================================
+function paymentNoticeMsg(shop, amount, balance){
+  let day = '';
+  try{ day = new Date().toLocaleDateString('ar-EG', { weekday:'long', year:'numeric', month:'long', day:'numeric' }); }
+  catch(e){ day = new Date().toLocaleDateString('ar-EG'); }
+  const n = v => Number(v || 0).toLocaleString('en-EG');
+
+  const L = ['السلام عليكم 🌹'];
+  L.push(`تم استلام دفعة بمبلغ *${n(amount)} ج.م* من حسابكم لدى *شركة Fix Team للصيانة* يوم ${day} ✅`);
+  if(balance > 0)      L.push(`📒 المتبقي على حسابكم: *${n(balance)} ج.م*`);
+  else if(balance < 0) L.push(`📒 حسابكم خالص، وليكم رصيد عندنا *${n(-balance)} ج.م* 💚`);
+  else                 L.push('📒 حسابكم بقى *خالص تمامًا* 🎉 متشكرين جدًا على التزامكم');
+  L.push('نشكر ثقتكم، ونتمنى لكم يوم سعيد وشغل موفّق دايمًا 🌟');
+  return L.join('\n');
+}
+
+async function sendPaymentNotice(shop, amount){
+  if(!shop) return;
+  let ph = shopPhones[shop];
+  if(!ph){ ph = await setShopPhone(shop); if(!ph) return; }
+  let bal = 0;
+  try{ const st = shopStats()[shop]; bal = st ? st.balance : 0; }catch(e){}
+  openWa(ph, paymentNoticeMsg(shop, amount, bal), '💬 اضغط لإرسال رسالة الدفعة للمحل');
 }
 
 async function deletePayment(id){
