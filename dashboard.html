@@ -9039,10 +9039,43 @@ function invIsLegacy(d){
   return false;
 }
 
+// ============================================================
+// 🔁 مين ماسك الجهاز دلوقتي؟
+// ------------------------------------------------------------
+// 🐞 الباج اللي اتصلّح (أكتوبر ٢٠٢٦):
+//    الجهاز اللي بيرجع المرتجعات ويتسجّل عليه «فني بديل» كان بيفضل
+//    في الجرد على الفني القديم. السبب: الجرد كان بيبص على خانة
+//    technician بس — والبديل بيتكتب في خانة تانية اسمها
+//    substituteTechnician، فالجرد ماكانش شايفها أصلاً.
+//
+// 🧸 بالبلدي: الجهاز ليه «كارت ملكية». أول ما يتسلّم لفني اسمه
+//    بيتكتب عليه. لو رجع واتسلّم لفني بديل، بنكتب اسم البديل في
+//    خانة جنبه — والجرد دلوقتي بيقرا آخر اسم اتكتب، مش أول اسم.
+//
+// الترتيب (نفس منطق النقاط في returnPointParts بالظبط):
+//   ١) بديل الجولة الحالية (substituteTechnician)
+//   ٢) لو مفيش: آخر بديل في الجولات القديمة (returnRounds) —
+//      عشان لو رجع تاني ولسه محدش اتسند ليه، يفضل عند آخر واحد مسكه
+//   ٣) لو مفيش خالص: الفني الأصلي (technician)
+//
+// ⚠️ ده للجرد بس — مش بيغيّر أي بيانات محفوظة، ولا بيلمس النقاط.
+// ============================================================
+function invHolderOf(d){
+  if(!d) return '';
+  const cur = String(d.substituteTechnician || '').trim();
+  if(cur) return cur;
+  const past = Array.isArray(d.returnRounds) ? d.returnRounds : [];
+  for(let i = past.length - 1; i >= 0; i--){
+    const s = String((past[i] && past[i].substituteTechnician) || '').trim();
+    if(s) return s;
+  }
+  return String(d.technician || '').trim();
+}
+
 // اسم الكارت اللي الجهاز ده المفروض يقف فيه
 function invTechKey(d){
-  const tech = (d.technician || '').trim();
-  if(tech) return tech;                                   // مكتوب ليه فني → كارت الفني
+  const tech = invHolderOf(d);
+  if(tech) return tech;                                   // مكتوب ليه فني → كارت اللي ماسكه دلوقتي
   return invIsLegacy(d) ? invLegacyName() : invNoTechName();
 }
 

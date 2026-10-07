@@ -4513,10 +4513,34 @@ function ivxIsLegacy(d){
   return false;
 }
 
+// ============================================================
+// 🔁 مين ماسك الجهاز دلوقتي؟ (نفس invHolderOf في dashboard.html)
+// ------------------------------------------------------------
+// 🐞 اتصلّح (أكتوبر ٢٠٢٦): الجهاز اللي بيرجع ويتسجّل عليه «فني
+//    بديل» كان بيفضل في الجرد على الفني القديم — لأن d.tech هو
+//    technician بس، والبديل في خانة تانية (substituteTechnician).
+//
+// الترتيب: بديل الجولة الحالية ← آخر بديل في returnRounds ← الفني الأصلي.
+// ⚠️ ده للجرد بس. d.tech نفسه مبيتغيّرش — عشان «تغيير الفني»
+//    وباقي الصفحة يفضلوا شغالين على الفني الأصلي زي ما هما.
+// ============================================================
+function ivxHolder(d){
+  if(!d) return '';
+  const r = d._raw || {};
+  const cur = String(r.substituteTechnician || '').trim();
+  if(cur) return cur;
+  const past = Array.isArray(r.returnRounds) ? r.returnRounds : [];
+  for(let i = past.length - 1; i >= 0; i--){
+    const s = String((past[i] && past[i].substituteTechnician) || '').trim();
+    if(s) return s;
+  }
+  return (d.tech || '').trim();
+}
+
 // اسم الكارت اللي الجهاز ده المفروض يقف فيه
 function ivxKey(d){
-  const tech = (d.tech || '').trim();
-  if(tech) return tech;                 // عليه فني → كارت الفني، مبنلمسوش
+  const tech = ivxHolder(d);
+  if(tech) return tech;                 // عليه فني → كارت اللي ماسكه دلوقتي
   return ivxIsLegacy(d) ? ivxLegacyName() : ivxNoTechName();
 }
 
@@ -4574,7 +4598,7 @@ function invStuckDevices(){
 }
 
 function invMatchesSearch(d, q){
-  const hay = [d.customer, d.shop, d.tech, d.type, d.model, d.phone, d.issue].join(' ').toLowerCase();
+  const hay = [d.customer, d.shop, d.tech, ivxHolder(d), d.type, d.model, d.phone, d.issue].join(' ').toLowerCase();   // 🔁 البحث باسم الفني البديل كمان
   return hay.includes(q.toLowerCase());
 }
 
