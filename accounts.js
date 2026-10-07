@@ -37,6 +37,28 @@
 //     ACC_CAN_EDIT = false;
 var ACC_CAN_EDIT = true;
 
+// ============================================================
+// 🛵 «المندوب» — اللي جاب الجهاز للمحل (مش صاحبه)
+// ------------------------------------------------------------
+// 🧸 بالبلدي: ساعات الجهاز بييجي مع واحد من المحل (صبي · موتوسيكل)
+//    مش مع صاحبه. الاسم ده بيتكتب وقت الاستلام (d.broughtBy)،
+//    وبيظهر في الحسابات والـPDF والإكسيل.
+//
+// ✏️ عايز تغيّر الكلمة («الطيّار» / «الموصّل»…)؟ غيّرها هنا بس —
+//    كل الشاشات والكشوف بتقرا من السطر ده.
+// ============================================================
+var ACC_BB_LABEL = 'المندوب';
+
+// اسم المندوب لسطر في الكشف.
+// ⚠️ الجهاز نفسه الأول (لو المحاسب صحّح الاسم من التفاصيل بعدين،
+//    الكشف ياخد الصح)، ولو الجهاز اتمسح بنرجع للنسخة المحفوظة في القيد.
+//    الدفعة والخصم والرصيد الافتتاحي مالهمش مندوب.
+function stmtBroughtBy(e){
+  if(!e || e.type !== 'debit') return '';
+  const d = e.deviceId ? accDevices().find(x => x.id === e.deviceId) : null;
+  return String((d && d.broughtBy) || e.broughtBy || '').trim();
+}
+
 // قايمة الأجهزة — بتُستخدم في تاريخ التسليم وفي العطل في الكشف.
 // الصفحة اللي مفيهاش أجهزة بترجّع قايمة فاضية والكشف يشتغل عادي
 // بتاريخ القيد بدل تاريخ التسليم.
@@ -210,15 +232,21 @@ function accEntryHtml(e){
   // العطل، واللون مكانش بيبان خالص.
   const issue = stmtIssue(e);
   const color = stmtColor(e);
+  const bb = stmtBroughtBy(e);
   const bits = [];
   if(issue) bits.push(`⚠️ ${esc(issue)}`);
   if(color) bits.push(`🎨 ${esc(color)}`);
   const extra = bits.length
     ? `<div class="acc-entry-meta" style="color:var(--ink-2);">${bits.join(' <span style="opacity:.5;">·</span> ')}</div>`
     : '';
+  // 🛵 المندوب في سطر لوحده — عشان المحل يعرف مين من عنده جاب الجهاز
+  const bbLine = bb
+    ? `<div class="acc-entry-meta" style="color:var(--ink-2);">🛵 ${esc(ACC_BB_LABEL)}: <b>${esc(bb)}</b></div>`
+    : '';
   return `<div class="acc-entry">
     <div><div style="font-weight:700;">📱 ${esc(e.deviceLabel||'جهاز')}</div>
       ${extra}
+      ${bbLine}
       ${accEntryDatesHtml(e)}
       <div class="acc-entry-meta">${t('acc.by')} ${esc(e.by||'')}${e.prevShop ? ` — <span style="color:var(--warn);">منقول من حساب "${esc(e.prevShop)}"</span>` : ''}</div></div>
     <div style="text-align:left;"><div style="font-weight:800; color:var(--warn);">+ ${amt} ج.م</div>
@@ -1308,6 +1336,7 @@ function exportShopPdf(shop){
   const rowsHtml = entries.map((e,i) => {
     const issue = stmtIssue(e);
     const color = stmtColor(e);
+    const bb = stmtBroughtBy(e);     // 🛵
     // 📥 تاريخ الدخول — للأجهزة بس. الدفعة والخصم والرصيد السابق «—»
     const inDate = accFmtDT(stmtIntakeDate(e));
     return `
@@ -1317,6 +1346,7 @@ function exportShopPdf(shop){
       <td style="text-align:right;">${stmtDescHtml(e)}</td>
       <td style="text-align:right; color:#475569;">${issue ? esc(issue) : '—'}</td>
       <td style="color:#475569;">${color ? esc(color) : '—'}</td>
+      <td style="color:#475569;">${bb ? esc(bb) : '—'}</td>
       <td style="color:#B45309; font-weight:800;">${isDebitLike(e) ? (e.amount||0).toLocaleString('en-EG') : '—'}</td>
       <td style="color:#16A34A; font-weight:800;">${!isDebitLike(e) ? (e.amount||0).toLocaleString('en-EG') : '—'}</td>
     </tr>`;
@@ -1341,7 +1371,7 @@ function exportShopPdf(shop){
     th{background:#101014; color:#fff; padding:11px 6px; font-size:12.5px;}
     td{padding:10px 6px; border-bottom:1px solid #E5E7EB; text-align:center;}
     .foot{margin-top:18px; font-size:12px; color:#6B7280; display:flex; justify-content:space-between;}
-    /* الجدول بقى سبعة أعمدة (الدخول + الخروج + العطل + اللون) — الأفقي ضروري */
+    /* الجدول بقى تمن أعمدة (الدخول + الخروج + العطل + اللون + المندوب) — الأفقي ضروري */
     @page{ size:A4 landscape; margin:10mm; }
     @media print{ body{padding:12px;} }
   </style></head><body>
@@ -1355,8 +1385,8 @@ function exportShopPdf(shop){
       <div class="tcard" style="background:${balance>0 ? '#DC2626' : '#2563EB'};"><div class="lbl">المتبقي على المحل</div><div class="num">${balance.toLocaleString('en-EG')} ج.م</div></div>
     </div>
     <table>
-      <tr><th style="width:13%;">تاريخ الدخول</th><th style="width:13%;">تاريخ الخروج</th><th style="width:24%;">البيان</th><th style="width:19%;">العطل</th><th style="width:8%;">اللون</th><th>عليه (آجل)</th><th>له (دفعات)</th></tr>
-      ${rowsHtml || '<tr><td colspan="7">مفيش حركات متسجلة</td></tr>'}
+      <tr><th style="width:12%;">تاريخ الدخول</th><th style="width:12%;">تاريخ الخروج</th><th style="width:21%;">البيان</th><th style="width:17%;">العطل</th><th style="width:8%;">اللون</th><th style="width:10%;">${esc(ACC_BB_LABEL)}</th><th>عليه (آجل)</th><th>له (دفعات)</th></tr>
+      ${rowsHtml || '<tr><td colspan="8">مفيش حركات متسجلة</td></tr>'}
     </table>
     <div class="foot"><span>نظام I Fix Team لإدارة الصيانة</span><span>عدد الحركات: ${realCount}</span></div>
   </body></html>`, 'كشف حساب — ' + shop);

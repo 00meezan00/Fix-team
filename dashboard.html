@@ -1587,6 +1587,10 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
       <label class="field"><span data-i18n="add.shopName">اسم المحل</span><input id="f_shopName" list="shopNameList" autocomplete="off" oninput="autoWholesaleCheck()" /></label>
       <div id="wsAutoHint" style="display:none;background:var(--violet-bg,#F5F3FF);color:var(--violet);border:1px solid var(--violet);border-radius:9px;padding:8px 11px;font-size:12.5px;font-weight:800;margin-bottom:10px;">🏷️ عميل جملة معروف — اتظبط تلقائي (تقدر تغيّره تحت)</div>
       <datalist id="shopNameList"></datalist>
+      <!-- 🛵 المندوب = اللي جاب الجهاز للمحل (مش صاحبه). اختياري.
+           اسم الخانة متعرّف في مكان واحد: ACC_BB_LABEL في accounts.js -->
+      <label class="field"><span>🛵 اسم المندوب (اللي جاب الجهاز)</span><input id="f_broughtBy" list="broughtByList" autocomplete="off" placeholder="سيبه فاضي لو صاحب الجهاز جابه بنفسه" /></label>
+      <datalist id="broughtByList"></datalist>
       <label class="field"><span data-i18n="add.registeredBy">اسم المحاسب اللي بيسجل الجهاز</span><input id="f_registeredBy" list="accountantList" /></label>
       <datalist id="accountantList"></datalist>
       <label class="field"><span data-i18n="add.phone">رقم التليفون</span><input id="f_customerPhone" list="phoneHistory" autocomplete="off" inputmode="tel" oninput="fixDigitsInput(this); this.dataset.autoFill='';" /></label>
@@ -3002,7 +3006,7 @@ function reindexSearch(force){
   try{
     if(!window.IFixSearch) return;
     IFixSearch.index(devices, d => [d.customerName, d.shopName, d.customerPhone,
-      d.serialNumber, d.deviceType, d.model, d.reportedIssue, d.technician], !!force);
+      d.serialNumber, d.deviceType, d.model, d.reportedIssue, d.technician, d.broughtBy], !!force);
   }catch(e){}
 }
 
@@ -4014,7 +4018,7 @@ function matchesSearch(d, q){
   // فبنطابق بالهيكل الصوتي مش بالحروف. تفاصيله في fuzzy-search.js
   if(window.IFixSearch && IFixSearch.isIndexed(d)) return IFixSearch.matchIndexed(q, d);
   const fields = [d.customerName,d.shopName,d.customerPhone,d.serialNumber,
-                  d.deviceType,d.model,d.reportedIssue,d.technician];
+                  d.deviceType,d.model,d.reportedIssue,d.technician,d.broughtBy];
   if(window.IFixSearch) return IFixSearch.match(q, fields);
   return fields.some(v => v && String(v).includes(q));
 }
@@ -4202,7 +4206,7 @@ async function markPaid(){
 
 // Add device modal
 function openAddModal(){
-  ['customerName','shopName','registeredBy','customerPhone','deviceType','model','deviceColor','serialNumber','reportedIssue','conditionNotes','agreedPrice']
+  ['customerName','shopName','broughtBy','registeredBy','customerPhone','deviceType','model','deviceColor','serialNumber','reportedIssue','conditionNotes','agreedPrice']
     .forEach(id => { const _e = document.getElementById('f_'+id); if(!_e) return; _e.value = ''; if(_e.dataset) _e.dataset.autoFill = ''; });
   document.getElementById('accountantList').innerHTML = accountantOptions();
   const _sec = document.getElementById('lockSection'), _back = document.getElementById('lockHostAdd');
@@ -4211,6 +4215,8 @@ function openAddModal(){
   buildCustPhoneMap();
   const _shopDl = document.getElementById('shopNameList');
   if(_shopDl) _shopDl.innerHTML = shopNamesForDatalist();
+  const _bbDl = document.getElementById('broughtByList');
+  if(_bbDl) _bbDl.innerHTML = broughtByOptions();
   setAddPayType('cash');
   setAddWholesale(false);
   togglePayTypeVisibility();
@@ -4461,7 +4467,7 @@ document.addEventListener('click', (e) => {
 // التنقل بزرار Enter بين خانات التسجيل — من غير ماوس خالص
 // (Shift+Enter بيعمل سطر جديد في خانات الملاحظات)
 function setupAddFormEnterNav(){
-  const order = ['f_customerName','f_shopName','f_registeredBy','f_customerPhone',
+  const order = ['f_customerName','f_shopName','f_broughtBy','f_registeredBy','f_customerPhone',
                  'f_deviceType','f_model','f_deviceColor','f_serialNumber','f_reportedIssue',
                  'f_conditionNotes','f_agreedPrice','f_intakeDateOnly','f_intakeTimeOnly'];
   order.forEach((id, i) => {
@@ -4509,6 +4515,7 @@ async function submitAdd(){
     customerName, deviceType, deviceColor,
     shopName: get('shopName'),
     registeredBy: get('registeredBy'),
+    broughtBy: get('broughtBy'),        // 🛵 المندوب
     customerPhone: get('customerPhone'),
     model: get('model'),
     serialNumber: get('serialNumber'),
@@ -5070,6 +5077,39 @@ function techSelectHtml(current, handler, opts){
       <option value="__ADD_TECH__">➕ ${t('tech.addNew')}</option>
     </select>`;
 }
+// ============================================================
+// 🛵 عجلة استبن — لو accounts.js القديم لسه في كاش الموبايل
+// ------------------------------------------------------------
+// الاسم (ACC_BB_LABEL) والدالة (stmtBroughtBy) متعرّفين في accounts.js.
+// لو موبايل لسه شايل النسخة القديمة منه، من غير السطور دي تفاصيل
+// الجهاز والإكسيل كانوا هيقعوا بـ «ACC_BB_LABEL is not defined».
+// ⚠️ بنعرّفهم بس لو **مش موجودين** — فالنسخة اللي في accounts.js هي الأصل.
+// ============================================================
+if(typeof ACC_BB_LABEL === 'undefined') window.ACC_BB_LABEL = 'المندوب';
+if(typeof stmtBroughtBy !== 'function'){
+  window.stmtBroughtBy = function(e){
+    if(!e || e.type !== 'debit') return '';
+    const d = e.deviceId ? devices.find(x => x.id === e.deviceId) : null;
+    return String((d && d.broughtBy) || e.broughtBy || '').trim();
+  };
+}
+
+// 🛵 أسامي المناديب اللي اتكتبت قبل كده — عشان تختار بدل ما تكتب.
+// ⚠️ بندمج «أحمد» و«احمد » (مسافات/حالة حروف بس) عشان مايطلعوش سطرين،
+//    والترتيب بالأحدث — المندوب اللي بييجي كل يوم يبقى فوق.
+function broughtByOptions(){
+  const seen = new Map();
+  devices.forEach(d => {
+    const n = String(d.broughtBy || '').trim();
+    if(!n) return;
+    const k = n.toLowerCase().replace(/\s+/g, ' ');
+    const ts = Date.parse(d.intakeDate) || 0;
+    const p = seen.get(k);
+    if(!p || ts > p.ts) seen.set(k, { n, ts });
+  });
+  return [...seen.values()].sort((a,b) => b.ts - a.ts)
+    .map(x => `<option value="${esc(x.n)}"></option>`).join('');
+}
 function accountantOptions(){
   const names = [...new Set(devices.map(d => d.registeredBy).filter(Boolean))];
   return names.map(n => `<option value="${esc(n)}"></option>`).join('');
@@ -5208,6 +5248,12 @@ function renderDetailNow(){
     <label class="field"><span>${t('det.customerPhone') || 'رقم العميل'}</span>
       <input type="tel" inputmode="tel" dir="ltr" value="${esc(d.customerPhone||'')}"${roI}
              onblur="editField('customerPhone', this.value)" placeholder="01xxxxxxxxx" /></label>
+    <!-- 🛵 المندوب — يتعدّل من هنا لو اتكتب غلط وقت الاستلام -->
+    <label class="field"><span>🛵 ${esc(ACC_BB_LABEL)}</span>
+      <input value="${esc(d.broughtBy||'')}" list="broughtByListDetail" autocomplete="off"
+             placeholder="اللي جاب الجهاز — فاضي = صاحبه جابه"${roI}
+             onblur="editField('broughtBy', this.value)" /></label>
+    <datalist id="broughtByListDetail">${broughtByOptions()}</datalist>
     <div class="money-only">
     <label class="field"><span>${t('det.price')}</span><input type="text" inputmode="numeric" value="${esc(d.agreedPrice||'')}" oninput="fixDigitsInput(this)"${roI} onblur="editPrice(this.value)" /></label>
     ${isPriced(d) && d.priceConfirmation && d.priceConfirmation.requested ? `
@@ -8223,6 +8269,8 @@ function addLedgerDebit(d, price, opts){
     // 📥 تاريخ دخول الجهاز المحل — بيتحفظ مع القيد عشان «تاريخ الدخول»
     //    في الكشف يفضل موجود حتى لو الجهاز اتمسح بعدين
     intakeDate: d.intakeDate || null,
+    // 🛵 نسخة من اسم المندوب — لو الجهاز اتمسح بعدين، الكشف يفضل فاكره
+    broughtBy: String(d.broughtBy || '').trim(),
     date: new Date().toISOString(),
     by: currentUser.name
   };
@@ -8487,6 +8535,49 @@ async function recordPayment(){
   document.getElementById('payNote').value = '';
   await persistLedger();
   renderAccounts();
+  // 💬 رسالة واتساب للمحل «استلمنا دفعة» — **بعد** الحفظ عن قصد:
+  //    الموبايل بيقلب على الواتس والصفحة بتنام، فلو فتحناه قبل الحفظ
+  //    الدفعة ممكن متتحفظش (نفس درس flushShopNotices).
+  try{ await sendPaymentNotice(shop, amount); }catch(e){ console.warn('رسالة الدفعة:', e); }
+}
+
+// ============================================================
+// 💬 رسالة الواتساب للمحل لما يدفع
+// ------------------------------------------------------------
+// 🧸 بالبلدي: المحل دفع فلوس ← بنبعتله «وصل» على الواتس:
+//    دفعتوا كام · فاضل عليكم كام · وكلمة حلوة في الآخر.
+//    زي الوصل الورق اللي بيتقطع من الدفتر، بس على الموبايل.
+//
+// 📒 المتبقي بيتحسب **بعد** ما الدفعة اتسجّلت (shopStats) — يعني
+//    الرقم اللي في الرسالة هو نفس الرقم اللي في شاشة الحسابات بالظبط.
+//
+// ⚠️ ملاحظة الدفعة **مش** بتتبعت للمحل عن قصد — ساعات بتبقى كلام
+//    داخلي («كاش مع حمادة»، «باقي ١٠٠ هيجيبهم بكرة»).
+// ⚠️ مفيش رقم للمحل؟ بنسأل مرة ونحفظه. ولو اتلغى → الدفعة متسجّلة
+//    عادي ومفيش رسالة.
+// ============================================================
+function paymentNoticeMsg(shop, amount, balance){
+  let day = '';
+  try{ day = new Date().toLocaleDateString('ar-EG', { weekday:'long', year:'numeric', month:'long', day:'numeric' }); }
+  catch(e){ day = new Date().toLocaleDateString('ar-EG'); }
+  const n = v => Number(v || 0).toLocaleString('en-EG');
+
+  const L = ['السلام عليكم 🌹'];
+  L.push(`تم استلام دفعة بمبلغ *${n(amount)} ج.م* من حسابكم لدى *شركة Fix Team للصيانة* يوم ${day} ✅`);
+  if(balance > 0)      L.push(`📒 المتبقي على حسابكم: *${n(balance)} ج.م*`);
+  else if(balance < 0) L.push(`📒 حسابكم خالص، وليكم رصيد عندنا *${n(-balance)} ج.م* 💚`);
+  else                 L.push('📒 حسابكم بقى *خالص تمامًا* 🎉 متشكرين جدًا على التزامكم');
+  L.push('نشكر ثقتكم، ونتمنى لكم يوم سعيد وشغل موفّق دايمًا 🌟');
+  return L.join('\n');
+}
+
+async function sendPaymentNotice(shop, amount){
+  if(!shop) return;
+  let ph = shopPhones[shop];
+  if(!ph){ ph = await setShopPhone(shop); if(!ph) return; }
+  let bal = 0;
+  try{ const st = shopStats()[shop]; bal = st ? st.balance : 0; }catch(e){}
+  openWa(ph, paymentNoticeMsg(shop, amount, bal), '💬 اضغط لإرسال رسالة الدفعة للمحل');
 }
 
 async function deletePayment(id){
@@ -8601,11 +8692,12 @@ async function exportShopExcel(shop){
 
   // العناوين العلوية
   // ⚙️ الجدول بقى ٧ أعمدة (اتزاد «تاريخ الدخول») — فالدمج لحد G
-  ws.mergeCells('A1:G1');
+  // ⚙️ ٨ أعمدة (اتزاد «المندوب» بعد «اللون») — فالدمج لحد H
+  ws.mergeCells('A1:H1');
   ws.getCell('A1').value = 'كشف حساب — ' + shop;
   ws.getCell('A1').font = { size:16, bold:true, color:{argb:'FF1F3864'} };
   ws.getCell('A1').alignment = { horizontal:'center' };
-  ws.mergeCells('A2:G2');
+  ws.mergeCells('A2:H2');
   ws.getCell('A2').value = 'I Fix Team for Mobile Services — تاريخ الكشف: ' + new Date().toLocaleDateString('ar-EG');
   ws.getCell('A2').font = { size:11, color:{argb:'FF6B7280'} };
   ws.getCell('A2').alignment = { horizontal:'center' };
@@ -8618,7 +8710,7 @@ async function exportShopExcel(shop){
   ws.getCell('C3').value = 'إجمالي المدفوع (له)';
   ws.getCell('D3').value = credit;
   // ⚙️ المتبقي واخد F→G (مدموجين) بعد ما «تاريخ الدخول» اتزاد
-  ws.mergeCells('F3:G3');
+  ws.mergeCells('F3:H3');
   ws.getCell('F3').value = 'المتبقي على المحل: ' + Number(balance||0).toLocaleString('en-EG') + ' ج.م';
   ws.getRow(3).height = 20;
   ws.getCell('B3').numFmt = money;
@@ -8636,7 +8728,7 @@ async function exportShopExcel(shop){
   const head = ws.getRow(4);
   // "بواسطة" اتشالت — اسم المحاسب اللي سجّل الجهاز مايهمش المحل
   // 📥📤 «تاريخ الدخول» = يوم ما الجهاز دخل المحل · «تاريخ الخروج» = يوم ما اتسلّم
-  head.values = ['تاريخ الدخول','تاريخ الخروج','البيان','العطل','اللون','عليه (آجل)','له (دفعات)'];
+  head.values = ['تاريخ الدخول','تاريخ الخروج','البيان','العطل','اللون', ACC_BB_LABEL,'عليه (آجل)','له (دفعات)'];
   head.height = 22;
   head.eachCell(cell => {
     cell.font = { bold:true, color:{argb:'FFFFFFFF'}, size:12 };
@@ -8653,14 +8745,16 @@ async function exportShopExcel(shop){
       stmtDesc(e),
       stmtIssue(e),
       stmtColor(e),
+      stmtBroughtBy(e),
       isDebitLike(e) ? (e.amount||0) : null,
       !isDebitLike(e) ? (e.amount||0) : null
     ]);
     r.eachCell({ includeEmpty:true }, cell => { cell.border = border; cell.alignment = { vertical:'middle', wrapText:true }; });
-    // ⚙️ أعمدة الفلوس اتزحلقت لـ 6و7 بعد ما «تاريخ الدخول» اتحط في 1
-    r.getCell(6).numFmt = money; r.getCell(7).numFmt = money;
-    r.getCell(6).alignment = { horizontal:'center', vertical:'middle' };
+    // ⚙️ أعمدة الفلوس اتزحلقت لـ 7و8 بعد ما «المندوب» اتحط في 6
+    r.getCell(7).numFmt = money; r.getCell(8).numFmt = money;
     r.getCell(7).alignment = { horizontal:'center', vertical:'middle' };
+    r.getCell(8).alignment = { horizontal:'center', vertical:'middle' };
+    r.getCell(6).alignment = { horizontal:'center', vertical:'middle', wrapText:true };
     r.getCell(1).alignment = { horizontal:'center', vertical:'middle' };
     r.getCell(2).alignment = { horizontal:'center', vertical:'middle' };
   });
@@ -8668,18 +8762,19 @@ async function exportShopExcel(shop){
   ws.addRow([]);
   // عمودين فاضيين زيادة (العطل + اللون) قبل خانات الفلوس
   // ⚙️ عمود زيادة في الأول (تاريخ الدخول) — فالكلام في 3 والفلوس في 6و7
-  [['','','إجمالي الآجل','','', debit, null], ['','','إجمالي المدفوع/الخصم','','', null, credit], ['','','المتبقي على المحل','','', balance, null]]
+  // ⚙️ خانة فاضية زيادة (المندوب) — فالفلوس في 7و8
+  [['','','إجمالي الآجل','','','', debit, null], ['','','إجمالي المدفوع/الخصم','','','', null, credit], ['','','المتبقي على المحل','','','', balance, null]]
     .forEach((t, i) => {
       const r = ws.addRow(t);
       r.getCell(3).font = { bold:true };
-      r.getCell(6).numFmt = money; r.getCell(7).numFmt = money;
+      r.getCell(7).numFmt = money; r.getCell(8).numFmt = money;
       r.eachCell({ includeEmpty:true }, cell => {
         cell.border = border;
         cell.fill = { type:'pattern', pattern:'solid', fgColor:{argb: i===2 ? 'FFFDE68A' : 'FFF1F5F9'} };
       });
     });
 
-  [20,20,40,28,14,16,16].forEach((w,i) => ws.getColumn(i+1).width = w);
+  [20,20,40,28,14,16,16,16].forEach((w,i) => ws.getColumn(i+1).width = w);
 
   const buf = await wb.xlsx.writeBuffer();
   const blob = new Blob([buf], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
@@ -9261,6 +9356,7 @@ function deliveredUnpaidRows(list){
       issue: (d.reportedIssue || '').trim(),
       customer: d.customerName || '',
       shop: d.shopName || '',
+      broughtBy: String(d.broughtBy || '').trim(),   // 🛵
       phone: d.customerPhone || '',
       technician: d.technician || '',
       deliveredDate: deliveredDateOf(d),
@@ -9280,17 +9376,17 @@ async function exportDeliveredUnpaidExcel(list){
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet('تم التسليم بانتظار الدفع', { views:[{ rightToLeft:true }] });
 
-  ws.mergeCells('A1:G1');
+  ws.mergeCells('A1:I1');
   ws.getCell('A1').value = 'تم التسليم بانتظار الدفع';
   ws.getCell('A1').font = { size:16, bold:true, color:{argb:'FF9A6A0C'} };
   ws.getCell('A1').alignment = { horizontal:'center' };
-  ws.mergeCells('A2:G2');
+  ws.mergeCells('A2:I2');
   ws.getCell('A2').value = 'I Fix Team for Mobile Services — تاريخ التصدير: ' + new Date().toLocaleDateString('ar-EG');
   ws.getCell('A2').font = { size:11, color:{argb:'FF6B7280'} };
   ws.getCell('A2').alignment = { horizontal:'center' };
 
   const head = ws.getRow(4);
-  head.values = ['الجهاز','العطل','العميل','المحل','رقم الهاتف','الفني','تاريخ التسليم','المبلغ المستحق'];
+  head.values = ['الجهاز','العطل','العميل','المحل', ACC_BB_LABEL,'رقم الهاتف','الفني','تاريخ التسليم','المبلغ المستحق'];
   head.height = 22;
   head.eachCell(cell => {
     cell.font = { bold:true, color:{argb:'FFFFFFFF'}, size:12 };
@@ -9301,26 +9397,26 @@ async function exportDeliveredUnpaidExcel(list){
 
   rows.forEach(r => {
     const row = ws.addRow([
-      r.device, r.issue || '—', r.customer, r.shop, r.phone, r.technician,
+      r.device, r.issue || '—', r.customer, r.shop, r.broughtBy || '—', r.phone, r.technician,
       r.deliveredDate ? new Date(r.deliveredDate).toLocaleDateString('ar-EG') : '',
       r.amount
     ]);
     row.eachCell({ includeEmpty:true }, cell => { cell.border = border; cell.alignment = { horizontal:'center', vertical:'middle', wrapText:true }; });
     row.getCell(2).alignment = { horizontal:'right', vertical:'middle', wrapText:true };
-    row.getCell(8).numFmt = money;
+    row.getCell(9).numFmt = money;
   });
 
   ws.addRow([]);
-  const totalRow = ws.addRow(['', '', '', '', '', '', 'الإجمالي المستحق', total]);
-  totalRow.getCell(7).font = { bold:true };
+  const totalRow = ws.addRow(['', '', '', '', '', '', '', 'الإجمالي المستحق', total]);
   totalRow.getCell(8).font = { bold:true };
-  totalRow.getCell(8).numFmt = money;
+  totalRow.getCell(9).font = { bold:true };
+  totalRow.getCell(9).numFmt = money;
   totalRow.eachCell({ includeEmpty:true }, cell => {
     cell.border = border;
     cell.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFFDE68A'} };
   });
 
-  [24,38,20,18,16,16,16,18].forEach((w,i) => ws.getColumn(i+1).width = w);
+  [24,38,20,18,16,16,16,16,18].forEach((w,i) => ws.getColumn(i+1).width = w);
 
   const buf = await wb.xlsx.writeBuffer();
   const blob = new Blob([buf], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
@@ -9339,6 +9435,7 @@ function exportDeliveredUnpaidPdf(list){
       <td class="issue">${r.issue ? esc(r.issue) : '—'}</td>
       <td>${esc(r.customer)}</td>
       <td>${esc(r.shop)}</td>
+      <td>${r.broughtBy ? esc(r.broughtBy) : '—'}</td>
       <td>${esc(r.phone)}</td>
       <td>${esc(r.technician)}</td>
       <td>${r.deliveredDate ? new Date(r.deliveredDate).toLocaleDateString('ar-EG') : '—'}</td>
@@ -9377,8 +9474,8 @@ function exportDeliveredUnpaidPdf(list){
       <div class="tcard" style="background:#DC2626;"><div class="lbl">إجمالي المبلغ المستحق</div><div class="num">${total.toLocaleString('en-EG')} ج.م</div></div>
     </div>
     <table>
-      <tr><th>الجهاز</th><th>العطل</th><th>العميل</th><th>المحل</th><th>الهاتف</th><th>الفني</th><th>تاريخ التسليم</th><th>المبلغ</th></tr>
-      ${rowsHtml || '<tr><td colspan="8">مفيش أجهزة حالياً</td></tr>'}
+      <tr><th>الجهاز</th><th>العطل</th><th>العميل</th><th>المحل</th><th>${esc(ACC_BB_LABEL)}</th><th>الهاتف</th><th>الفني</th><th>تاريخ التسليم</th><th>المبلغ</th></tr>
+      ${rowsHtml || '<tr><td colspan="9">مفيش أجهزة حالياً</td></tr>'}
     </table>
     <div class="foot"><span>نظام I Fix Team لإدارة الصيانة</span><span>عدد الأجهزة: ${rows.length}</span></div>
   </body></html>`, 'تم التسليم بانتظار الدفع');
