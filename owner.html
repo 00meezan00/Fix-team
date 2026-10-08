@@ -505,6 +505,10 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
     padding:15px; font-weight:700; font-size:13.5px; margin-bottom:12px;}
   .pz-toggle{width:100%; margin:14px 0 10px; background:var(--paper); color:var(--muted); border:1px solid var(--line);
     border-radius:11px; padding:11px; font-family:'Tajawal',sans-serif; font-weight:700; font-size:13px; cursor:pointer;}
+  /* 📒 درج الآجل — زرار بلون الآجل الأصفر عشان يتميّز */
+  .pz-toggle-def{color:#8A6410; border-color:#C9A227; display:flex; flex-direction:column; align-items:center; gap:3px;}
+  .pz-toggle-sub{font-size:11px; font-weight:600; color:var(--muted);}
+  html[data-theme="dark"] .pz-toggle-def{color:#E8C25A;}
   .pz-card{background:var(--card); border:1px solid var(--line); border-radius:15px;
     padding:14px 15px; margin-bottom:12px; box-shadow:0 2px 8px rgba(16,22,32,.05);}
   .pz-top{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px;}
@@ -3535,12 +3539,14 @@ let pzRows  = [];        // الأجهزة اللي في الصندوق
 let pzBusy  = false;     // بيحفظ دلوقتي؟ (عشان مايدوسش مرتين)
 let pzOpen  = false;     // الشاشة مفتوحة؟
 let pzShowDone = false;  // نعرض اللي اتسعّر خلاص؟
+let pzShowDef  = false;  // 📒 درج الآجل مفتوح؟ (مقفول افتراضياً)
 
 /* عدّاد الخانة في قايمة التلت نقط — بيتحدّث لوحده */
 async function pzRefreshBadge(){
   try{
     const { count, error } = await sb.from('devices_owner_pricing')
       .select('id', { count:'exact', head:true })
+      .eq('status', 'delivered')          // 🆕 نفس فلتر الصندوق — المرفوض واللي في الورشة مايتعدّوش
       .is('data->ownerPriced', null);
     if(error) throw error;
     const b = $('pzBadge');
@@ -3572,7 +3578,14 @@ async function pzLoad(){
       .select('id,status,payment_status,delivered_at,data')
       .order('delivered_at', { ascending:false }));
 
-    pzRows = (rows || []).map(r => {
+    // 🆕 الصندوق بيعرض «تم التسليم» بس.
+    //    🧠 ليه؟ المحاسب العام ممكن يرفض الجهاز أو يرجّعه للورشة بعد ما
+    //       بعته. وقتها مالوش تسعير أصلاً (السيرفر بيرفض: «لسه ما اتسلّمش»)،
+    //       فمالوش لازمة يفضل قدامك. ولما يتسلّم تاني بيظهر لوحده.
+    pzRows = (rows || []).filter(r => {
+      const st = r.status || (r.data && r.data.status) || '';
+      return st === 'delivered';
+    }).map(r => {
       const d = r.data || {};
       return {
         id:       d.id || r.id,
@@ -3586,7 +3599,7 @@ async function pzLoad(){
         price:    (d.agreedPrice === 0 || d.agreedPrice) ? String(d.agreedPrice) : '',
         payType:  d.paymentType || '',
         payState: r.payment_status || d.paymentStatus || '',
-        answered: d.ownerPriced || null,
+        answered: pzFreshAnswer(d, r),
         sharedAt: (d.ownerShare && d.ownerShare.at) || '',
         out:      r.delivered_at || '',
         paidAt:   pzPaidAt(d, r),
@@ -3615,6 +3628,26 @@ async function pzLoad(){
       موجود في الداشبورد والحسابات زي ما هو.
    ============================================================ */
 const PZ_KEEP_PAID_MS = 24 * 3600000;
+
+/* ============================================================
+   🆕 إجابتك لسه صالحة ولا قديمة؟
+   ------------------------------------------------------------
+   🧠 لو إنت سعّرت الجهاز، وبعدين المحاسب العام رجّعه للورشة،
+      واتسلّم تاني — إجابتك القديمة تخص المرة اللي فاتت.
+      فبنقارن: إجابتك قبل آخر «تم التسليم»؟ يبقى قديمة → «محتاج تسعير».
+   ⚠️ الجهاز اللي اتحصّل خلاص (paid) مبنلمسش إجابته — دي فلوس اتقفلت.
+   ============================================================ */
+function pzFreshAnswer(d, row){
+  const op = d.ownerPriced;
+  if(!op) return null;
+  if(((row && row.payment_status) || d.paymentStatus || '') === 'paid') return op;
+  const hist = Array.isArray(d.statusHistory) ? d.statusHistory : [];
+  const lastDel = hist.filter(h => h && h.status === 'delivered' && h.date).pop();
+  const tDel = lastDel ? new Date(lastDel.date).getTime() : 0;
+  const tAns = op.at ? new Date(op.at).getTime() : 0;
+  if(tDel && tAns && tAns < tDel) return null;   // إجابة من مرة تسليم قديمة
+  return op;
+}
 
 function pzPaidAt(d, row){
   const hist = Array.isArray(d.statusHistory) ? d.statusHistory : [];
@@ -3652,7 +3685,12 @@ function pzRender(){
     return;
   }
   const todo = live.filter(r => !r.answered);
-  const done = live.filter(r => r.answered);
+  // 📒 درج الآجل: الجهاز اللي راح على حساب محل — بيقعد فيه ٢٤ ساعة
+  //    (pzExpired فوق هو اللي بيخفيه) ومايتلخبطش مع باقي الإجابات.
+  const isDef = r => r.payState === 'paid' && (r.payType === 'deferred'
+                     || (r.answered && r.answered.pay === 'deferred'));
+  const def  = live.filter(r => r.answered && isDef(r));
+  const done = live.filter(r => r.answered && !isDef(r));
 
   let html = '';
 
@@ -3661,6 +3699,13 @@ function pzRender(){
           + todo.map(pzCard).join('');
   } else {
     html += '<div class="pz-ok">✅ خلصت كل اللي عندك. تسلم إيدك.</div>';
+  }
+
+  if(def.length){
+    html += '<button class="pz-toggle pz-toggle-def" onclick="pzToggleDef()">'
+          + (pzShowDef ? '▲ إقفل' : '▼ افتح') + ' 📒 درج الآجل (' + def.length + ')'
+          + '<span class="pz-toggle-sub">بيفضلوا هنا ٢٤ ساعة وبعدين بيختفوا</span></button>';
+    if(pzShowDef) html += def.map(pzCard).join('');
   }
 
   if(done.length){
@@ -3673,6 +3718,7 @@ function pzRender(){
 }
 
 function pzToggleDone(){ pzShowDone = !pzShowDone; pzRenderKeep(); }
+function pzToggleDef(){ pzShowDef = !pzShowDef; pzRenderKeep(); }
 
 function pzCard(r){
   // 🔒 اتحصّل خلاص → للعرض بس، مفيش أي تعديل
@@ -4513,34 +4559,10 @@ function ivxIsLegacy(d){
   return false;
 }
 
-// ============================================================
-// 🔁 مين ماسك الجهاز دلوقتي؟ (نفس invHolderOf في dashboard.html)
-// ------------------------------------------------------------
-// 🐞 اتصلّح (أكتوبر ٢٠٢٦): الجهاز اللي بيرجع ويتسجّل عليه «فني
-//    بديل» كان بيفضل في الجرد على الفني القديم — لأن d.tech هو
-//    technician بس، والبديل في خانة تانية (substituteTechnician).
-//
-// الترتيب: بديل الجولة الحالية ← آخر بديل في returnRounds ← الفني الأصلي.
-// ⚠️ ده للجرد بس. d.tech نفسه مبيتغيّرش — عشان «تغيير الفني»
-//    وباقي الصفحة يفضلوا شغالين على الفني الأصلي زي ما هما.
-// ============================================================
-function ivxHolder(d){
-  if(!d) return '';
-  const r = d._raw || {};
-  const cur = String(r.substituteTechnician || '').trim();
-  if(cur) return cur;
-  const past = Array.isArray(r.returnRounds) ? r.returnRounds : [];
-  for(let i = past.length - 1; i >= 0; i--){
-    const s = String((past[i] && past[i].substituteTechnician) || '').trim();
-    if(s) return s;
-  }
-  return (d.tech || '').trim();
-}
-
 // اسم الكارت اللي الجهاز ده المفروض يقف فيه
 function ivxKey(d){
-  const tech = ivxHolder(d);
-  if(tech) return tech;                 // عليه فني → كارت اللي ماسكه دلوقتي
+  const tech = (d.tech || '').trim();
+  if(tech) return tech;                 // عليه فني → كارت الفني، مبنلمسوش
   return ivxIsLegacy(d) ? ivxLegacyName() : ivxNoTechName();
 }
 
@@ -4598,7 +4620,7 @@ function invStuckDevices(){
 }
 
 function invMatchesSearch(d, q){
-  const hay = [d.customer, d.shop, d.tech, ivxHolder(d), d.type, d.model, d.phone, d.issue].join(' ').toLowerCase();   // 🔁 البحث باسم الفني البديل كمان
+  const hay = [d.customer, d.shop, d.tech, d.type, d.model, d.phone, d.issue].join(' ').toLowerCase();
   return hay.includes(q.toLowerCase());
 }
 

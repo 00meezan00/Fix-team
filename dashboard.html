@@ -4840,8 +4840,9 @@ async function ownerHoldReturn(id, st){
   }
 
   // ✅ نتأكد بعينينا: الحالة اتغيّرت والعلامة اتشالت
+  //    (المشاركة بتفضل عن قصد — عشان يرجع للمالك «محتاج تسعير» لما يتسلّم تاني)
   const after = devices.find(x => x.id === id);
-  if(!after || after.status !== st || after.ownerPriced || after.ownerShare){
+  if(!after || after.status !== st || after.ownerPriced){
     showError('⚠️ الجهاز ما رجعش صح — افتح تفاصيله واتأكد');
   }
   render();
@@ -6349,7 +6350,17 @@ async function changeStatus(newStatus, paymentChoice, rejectedInShopChoice){
   //    ⚠️ بيشتغل كمان لو حد حرّك الجهاز بالطريقة العادية من غير
   //       زرار «↩️ رجّعه» — عشان العلامة متفضلش معلّقة للأبد.
   // 🚫 ونفس الكلام لعلامة «اترفض» — لو الجهاز خرج من التسليم، العلامة خلصت
-  const dropOwnerHold = d.status === 'delivered' && newStatus !== 'delivered' && (isOwnerHold(d) || isOwnerRej(d));
+  //
+  // 🆕 (٢٠٢٦-١٠-٠٨) القاعدة بقت أعم — أي جهاز متشارك مع المالك وخارج من «تم التسليم»:
+  //    🚫 اترفض        → نشيل المشاركة والإجابة مع بعض → يختفي من صندوق المالك خالص.
+  //    ↩️ رجع للورشة   → نشيل إجابة المالك بس ونسيب المشاركة. صندوق المالك بيعرض
+  //                       «تم التسليم» بس، فالجهاز يستخبّى وهو في الورشة، وأول ما
+  //                       يتسلّم تاني يظهرله «🆕 محتاج تسعير» لوحده من غير ما تبعته.
+  //    قبل كده العلامة كانت بتتشال بس لو المالك كان قال «لسه» أو «اترفض» —
+  //    فالجهاز اللي رفضته أو رجّعته إنت بنفسك كان بيفضل معلّق عند المالك.
+  const leavingDelivered = d.status === 'delivered' && newStatus !== 'delivered';
+  const dropOwnerHold    = leavingDelivered && newStatus === 'rejected' && !!(d.ownerShare || d.ownerPriced);
+  const resetOwnerAnswer = leavingDelivered && newStatus !== 'rejected' && !!d.ownerPriced;
 
   showError('');
   if(newStatus === 'rejected' && d.status !== 'rejected') extra.rejectedInShop = (rejectedInShopChoice !== undefined) ? !!rejectedInShopChoice : true;   // رفض جديد → درج الرفض افتراضياً (أو حسب اختيار الديسباتشر)
@@ -6364,6 +6375,7 @@ async function changeStatus(newStatus, paymentChoice, rejectedInShopChoice){
     // ⚠️ delete مش «= null»: الحفظ بيبعت الجهاز كله، والمفتاح اللي
     //    قيمته null لسه موجود — وشباك المالك بيشوف أي مفتاح موجود.
     if(dropOwnerHold){ delete nx.ownerShare; delete nx.ownerPriced; }
+    if(resetOwnerAnswer){ delete nx.ownerPriced; }
     return nx;
   });
   renderDetail();
@@ -9039,43 +9051,10 @@ function invIsLegacy(d){
   return false;
 }
 
-// ============================================================
-// 🔁 مين ماسك الجهاز دلوقتي؟
-// ------------------------------------------------------------
-// 🐞 الباج اللي اتصلّح (أكتوبر ٢٠٢٦):
-//    الجهاز اللي بيرجع المرتجعات ويتسجّل عليه «فني بديل» كان بيفضل
-//    في الجرد على الفني القديم. السبب: الجرد كان بيبص على خانة
-//    technician بس — والبديل بيتكتب في خانة تانية اسمها
-//    substituteTechnician، فالجرد ماكانش شايفها أصلاً.
-//
-// 🧸 بالبلدي: الجهاز ليه «كارت ملكية». أول ما يتسلّم لفني اسمه
-//    بيتكتب عليه. لو رجع واتسلّم لفني بديل، بنكتب اسم البديل في
-//    خانة جنبه — والجرد دلوقتي بيقرا آخر اسم اتكتب، مش أول اسم.
-//
-// الترتيب (نفس منطق النقاط في returnPointParts بالظبط):
-//   ١) بديل الجولة الحالية (substituteTechnician)
-//   ٢) لو مفيش: آخر بديل في الجولات القديمة (returnRounds) —
-//      عشان لو رجع تاني ولسه محدش اتسند ليه، يفضل عند آخر واحد مسكه
-//   ٣) لو مفيش خالص: الفني الأصلي (technician)
-//
-// ⚠️ ده للجرد بس — مش بيغيّر أي بيانات محفوظة، ولا بيلمس النقاط.
-// ============================================================
-function invHolderOf(d){
-  if(!d) return '';
-  const cur = String(d.substituteTechnician || '').trim();
-  if(cur) return cur;
-  const past = Array.isArray(d.returnRounds) ? d.returnRounds : [];
-  for(let i = past.length - 1; i >= 0; i--){
-    const s = String((past[i] && past[i].substituteTechnician) || '').trim();
-    if(s) return s;
-  }
-  return String(d.technician || '').trim();
-}
-
 // اسم الكارت اللي الجهاز ده المفروض يقف فيه
 function invTechKey(d){
-  const tech = invHolderOf(d);
-  if(tech) return tech;                                   // مكتوب ليه فني → كارت اللي ماسكه دلوقتي
+  const tech = (d.technician || '').trim();
+  if(tech) return tech;                                   // مكتوب ليه فني → كارت الفني
   return invIsLegacy(d) ? invLegacyName() : invNoTechName();
 }
 
