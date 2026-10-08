@@ -7737,10 +7737,18 @@ function isWaHeld(d){
   return !!at && at >= new Date(SHOP_NOTICE_FROM).getTime();
 }
 
+// 🆕 الترتيب: **الأقدم دخولاً للحساب الأول**.
+//    🧠 ليه؟ كل رسالة فيها «إجمالي الحساب وقت ما الجهاز ده دخل».
+//       لو بعت الأحدث الأول وبعدين الأقدم، المحل هيشوف الرقم بيقل
+//       بدل ما يزيد — ويفتكر فيه غلط.
+function waHeldTime(d){
+  const e = ledger.find(x => x.type === 'debit' && x.deviceId === d.id && !x.kind);
+  return new Date((e && e.date) || (d.ownerPriced && d.ownerPriced.at) || 0).getTime();
+}
 function waHeldList(){
   if(!isSuperAdmin()) return [];
   return devices.filter(isWaHeld)
-    .sort((a,b) => new Date(b.ownerPriced.at || 0) - new Date(a.ownerPriced.at || 0));
+    .sort((a,b) => waHeldTime(a) - waHeldTime(b));
 }
 
 // القيد اللي المالك عمله — ولو مش لاقيينه (الدفتر لسه بيتحمّل) بنبنيه من الجهاز
@@ -7748,7 +7756,8 @@ function waHeldItem(d){
   const e = ledger.find(x => x.type === 'debit' && x.deviceId === d.id && !x.kind);
   const shop = ((e && e.shop) || d.billedShop || d.shopName || '').trim();
   const entry = e || { type:'debit', shop, amount: Number(d.agreedPrice) || Number((d.ownerPriced||{}).price) || 0, issue: d.reportedIssue || '' };
-  return { entry, d, shop };
+  // inLedger = القيد موجود فعلاً في الدفتر → نقدر نحسب الرصيد لحظة دخوله
+  return { entry, d, shop, inLedger: !!e };
 }
 
 // الزرار في القايمة المنسدلة — بيظهر للسوبر أدمن بس، وعليه العدد
@@ -7784,8 +7793,13 @@ function renderWaHeld(){
   const ov = document.getElementById('waHeldOv');
   if(!ov) return;
   const list = waHeldList();
+  // ترتيب كل جهاز جوه محله: «١ من ٣» — عشان تبعت بالترتيب
+  const perShop = {}, seq = {};
+  list.forEach(d => { const sh = waHeldItem(d).shop; perShop[sh] = (perShop[sh] || 0) + 1; seq[d.id] = perShop[sh]; });
   const rows = list.map(d => {
-    const { entry, shop } = waHeldItem(d);
+    const { entry, shop, inLedger } = waHeldItem(d);
+    const balAt = inLedger ? shopBalanceAt(shop, entry) : null;
+    const ord = perShop[shop] > 1 ? `<b style="color:#0891A8;">#${seq[d.id]} من ${perShop[shop]}</b> · ` : '';
     const p = d.ownerPriced || {};
     let when = '';
     try{ when = p.at ? new Date(p.at).toLocaleString(getLocale()) : ''; }catch(e){}
@@ -7793,7 +7807,8 @@ function renderWaHeld(){
     return `<div class="appr-row">
       <div class="appr-row-info" style="cursor:pointer;" onclick="closeWaHeld();openDetail('${d.id}')">
         <div class="appr-row-dev">📱 ${esc(d.deviceType || '')} ${esc(d.model || '')}${d.customerName ? ' — ' + esc(d.customerName) : ''}</div>
-        <div class="appr-row-meta">🏬 ${esc(shop || 'من غير محل')} · 💰 ${(Number(entry.amount)||0).toLocaleString('en-EG')} ج.م${when ? ' · ' + esc(when) : ''}${hasPh ? '' : ' · <b style="color:var(--warn);">مفيش رقم للمحل</b>'}</div>
+        <div class="appr-row-meta">${ord}🏬 ${esc(shop || 'من غير محل')} · 💰 ${(Number(entry.amount)||0).toLocaleString('en-EG')} ج.م${when ? ' · ' + esc(when) : ''}${hasPh ? '' : ' · <b style="color:var(--warn);">مفيش رقم للمحل</b>'}</div>
+        ${balAt !== null ? `<div class="appr-row-meta">📒 إجمالي الحساب وقتها: <b>${balAt.toLocaleString('en-EG')} ج.م</b></div>` : ''}
       </div>
       <div class="appr-row-actions" style="display:flex;gap:6px;flex-wrap:wrap;">
         <button class="oh-btn" style="background:#16A34A;" onclick="event.stopPropagation();waHeldSend('${d.id}')">💬 ابعت</button>
@@ -7818,11 +7833,15 @@ function renderWaHeld(){
 async function waHeldSend(id){
   const d = devices.find(x => x.id === id);
   if(!d || !isWaHeld(d)){ renderWaHeld(); return; }
-  const { entry, shop } = waHeldItem(d);
+  const { entry, shop, inLedger } = waHeldItem(d);
   if(!shop){ alert('الجهاز ده مالوش اسم محل.'); return; }
+  // ⚠️ فيه جهاز أقدم لنفس المحل لسه مستني؟ نحذّرك — عشان الرقم عند المحل ما يقلّش
+  const older = waHeldList().filter(x => x.id !== id && waHeldItem(x).shop === shop && waHeldTime(x) < waHeldTime(d));
+  if(older.length && !confirm('فيه ' + older.length + ' جهاز أقدم لنفس المحل لسه ما اتبعتش.\n\n'
+      + 'لو بعت ده الأول، المحل هيشوف إجمالي الحساب في الرسالة الجاية أقل من دي.\n\nتبعت ده برضه؟')) return;
   let ph = shopPhones[shop];
   if(!ph){ ph = await setShopPhone(shop); if(!ph) return; }
-  const ok = openWa(ph, shopNoticeMsg([{ entry, d }], shop), '💬 اضغط لإرسال رسالة الحساب للمحل');
+  const ok = openWa(ph, shopNoticeMsg([{ entry, d }], shop, inLedger ? entry : null), '💬 اضغط لإرسال رسالة الحساب للمحل');
   if(!ok) return;                      // النت مقطوع — منعلّمش إنه اتبعت
   await waHeldMark(id, 'sent');
 }
@@ -8326,7 +8345,35 @@ function queueShopNotice(entry, d){
 }
 
 // ✂️ الرسالة ٥ سطور بالكتير — المحل بيقراها على الموبايل وهو شغّال
-function shopNoticeMsg(items, shop){
+// ============================================================
+// 📒 رصيد المحل **لحظة** ما قيد معيّن دخل الدفتر
+// ------------------------------------------------------------
+// 🧠 بالبلدي: بنقلّب الكشكول لحد السطر بتاع الجهاز ده ونقف.
+//    كل اللي قبله (أجهزة · دفعات · خصم · رصيد افتتاحي) + الجهاز نفسه.
+//    أي حاجة اتكتبت بعده — حتى لو دفعة — مش داخلة.
+// ⚠️ لو قيدين ليهم نفس الوقت بالظبط: الدفتر بيحط الجديد في الأول
+//    ([entry, ...ledger])، فاللي مكانه أبعد في المصفوفة هو الأقدم.
+// ============================================================
+function shopBalanceAt(shop, entry){
+  const key = s => String(s || 'بدون محل').trim();
+  const sh = key(shop);
+  const tE = new Date(entry && entry.date || 0).getTime();
+  const iE = ledger.indexOf(entry);
+  let bal = 0;
+  ledger.forEach((e, i) => {
+    if(key(e.shop) !== sh) return;
+    const t = new Date(e.date || 0).getTime();
+    const before = t < tE || (t === tE && (iE < 0 || i >= iE));
+    if(!before) return;
+    const amt = Number(e.amount) || 0;
+    bal += (e.type === 'credit' || e.type === 'discount') ? -amt : amt;
+  });
+  return bal;
+}
+
+// asOf = القيد اللي نحسب الرصيد لحد لحظته. من غيره (أو لو مش في الدفتر)
+//        بناخد آخر قيد في الرسالة — ولو برضه مفيش، الرصيد الحالي.
+function shopNoticeMsg(items, shop, asOf){
   const devName = ({ entry, d }) => {
     const n = (`${d.deviceType||''} ${d.model||''}`.trim()) || (entry.deviceLabel || 'جهاز');
     return n + (d.customerName ? ` (${d.customerName})` : '') + (entry.kind === 'return' ? ' — صيانة مرتجع' : '');
@@ -8336,7 +8383,18 @@ function shopNoticeMsg(items, shop){
   try{ day = new Date().toLocaleDateString('ar-EG', { weekday:'long', year:'numeric', month:'long', day:'numeric' }); }
   catch(e){ day = new Date().toLocaleDateString('ar-EG'); }
   let bal = 0;
-  try{ const st = (typeof shopStats === 'function') ? shopStats()[shop] : null; bal = st ? st.balance : 0; }catch(e){}
+  try{
+    // آخر قيد في الرسالة (لو فيها كذا جهاز مع بعض) هو «اللحظة» بتاعتها
+    let ref = asOf && ledger.includes(asOf) ? asOf : null;
+    if(!ref){
+      items.forEach(x => {
+        if(!ledger.includes(x.entry)) return;
+        if(!ref || new Date(x.entry.date || 0) >= new Date(ref.date || 0)) ref = x.entry;
+      });
+    }
+    if(ref) bal = shopBalanceAt(shop, ref);
+    else { const st = (typeof shopStats === 'function') ? shopStats()[shop] : null; bal = st ? st.balance : 0; }
+  }catch(e){}
 
   const L = ['السلام عليكم 🌹'];
   L.push(items.length > 1
