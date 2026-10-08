@@ -3542,15 +3542,22 @@ let pzShowDone = false;  // نعرض اللي اتسعّر خلاص؟
 let pzShowDef  = false;  // 📒 درج الآجل مفتوح؟ (مقفول افتراضياً)
 
 /* عدّاد الخانة في قايمة التلت نقط — بيتحدّث لوحده */
+function pzSetBadge(count){
+  const b = $('pzBadge');
+  if(b){ b.textContent = count ? String(count) : ''; b.style.display = count ? '' : 'none'; }
+}
+
 async function pzRefreshBadge(){
   try{
     const { count, error } = await sb.from('devices_owner_pricing')
       .select('id', { count:'exact', head:true })
       .eq('status', 'delivered')          // 🆕 نفس فلتر الصندوق — المرفوض واللي في الورشة مايتعدّوش
+      // 🆕 اللي اتحصّل أو اتقيّد آجل خلاص مش «مستنيك» — مايتعدّش
+      //    (⚠️ لازم is.null كمان: في SQL «فاضي ≠ paid» مش بترجع صح، فالفاضي كان هيضيع)
+      .or('payment_status.is.null,payment_status.neq.paid')
       .is('data->ownerPriced', null);
     if(error) throw error;
-    const b = $('pzBadge');
-    if(b){ b.textContent = count ? String(count) : ''; b.style.display = count ? '' : 'none'; }
+    pzSetBadge(count);
   }catch(e){ /* مش مشكلة — العدّاد كمالة */ }
 }
 
@@ -3660,6 +3667,10 @@ function pzPaidAt(d, row){
 
 function pzExpired(r){
   if(r.payState !== 'paid') return false;
+  // 🆕 المحاسب العام قفله بنفسه (حصّله أو قيّده آجل) والمالك ماردّش؟
+  //    يبقى مالوش لازمة يقعد قدام المالك خالص → يختفي فوراً.
+  //    الـ ٢٤ ساعة دي بس للأجهزة اللي المالك نفسه ردّ عليها.
+  if(!r.answered) return true;
   const t = new Date(r.paidAt || 0).getTime();
   if(!t) return false;                     // مش عارفين إمتى؟ نسيبه ظاهر أحسن من ما يختفي غلط
   return (Date.now() - t) > PZ_KEEP_PAID_MS;
@@ -3671,6 +3682,7 @@ function pzRender(){
   if(!box) return;
 
   if(!pzRows.length){
+    pzSetBadge(0);
     box.innerHTML = '<div class="empty">📭 مفيش أجهزة في صندوقك لسه.<br>'
       + '<span style="font-size:12.5px;">المحاسب العام هو اللي بيبعت الأجهزة هنا '
       + 'بعد ما تتسلّم.</span></div>';
@@ -3681,16 +3693,24 @@ function pzRender(){
   //    وبعدين بيختفي من الصندوق خالص (حتى من «اللي جاوبت عليه»).
   const live = pzRows.filter(r => !pzExpired(r));
   if(!live.length){
+    pzSetBadge(0);
     box.innerHTML = '<div class="pz-ok">✅ مفيش أجهزة مستنياك دلوقتي.</div>';
     return;
   }
-  const todo = live.filter(r => !r.answered);
-  // 📒 درج الآجل: الجهاز اللي راح على حساب محل — بيقعد فيه ٢٤ ساعة
-  //    (pzExpired فوق هو اللي بيخفيه) ومايتلخبطش مع باقي الإجابات.
-  const isDef = r => r.payState === 'paid' && (r.payType === 'deferred'
+  // 🧠 التقسيم بيبص الأول: الجهاز اتقفل (paid) ولا لأ؟
+  //    ⚠️ قبل كده كنا بنسأل «المالك جاوب؟» بس — فالجهاز اللي المحاسب العام
+  //       قيّده آجل أو حصّله بنفسه (من غير ما المالك يرد) كان بيقع غلط
+  //       في «مستنية منك» وهو مقفول خلاص.
+  const isPaid = r => r.payState === 'paid';
+  // 📒 درج الآجل: اتقفل وراح على حساب محل — مين ما كان اللي قيّده
+  const isDef  = r => isPaid(r) && (r.payType === 'deferred'
                      || (r.answered && r.answered.pay === 'deferred'));
-  const def  = live.filter(r => r.answered && isDef(r));
-  const done = live.filter(r => r.answered && !isDef(r));
+  const todo = live.filter(r => !isPaid(r) && !r.answered);   // مستني منك فعلاً
+  const def  = live.filter(isDef);                             // بيقعد ٢٤ ساعة (pzExpired)
+  const done = live.filter(r => !isDef(r) && (isPaid(r) || r.answered));
+
+  // 🔢 العدّاد اللي في قايمة التلت نقط = عدد «مستنية منك» بالظبط
+  pzSetBadge(todo.length);
 
   let html = '';
 
