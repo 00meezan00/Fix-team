@@ -213,16 +213,25 @@ let ME = '', ROLES_MAP = {}, MY_ROLE = '';
   ME = (session.user.email || '').toLowerCase();
 
   // الاسم والدور — للعرض في الرأس بس
+  let rolesOk = false;
   try{
     const { data, error } = await sb.from('app_data')
       .select('value').eq('key','user-roles').maybeSingle();
     // ⚠️ Supabase مبيرميش خطأ — بيرجّعه في .error
     if(error) throw error;
     if(data && data.value) ROLES_MAP = JSON.parse(data.value) || {};
+    rolesOk = true;
   }catch(e){ console.error('user-roles failed:', e); }
 
   const mine = ROLES_MAP[ME];
   MY_ROLE = typeof mine === 'string' ? mine : (mine && mine.role) || '';
+
+  // 🔒 (٢٠٢٦-١٠-١١) إيميل مش متسجّل في لوحة الأدمن = مالوش دخول
+  if(rolesOk && !MY_ROLE){
+    try{ await sb.auth.signOut(); }catch(e){}
+    location.replace('index.html?nouser=1');
+    return;
+  }
 
   document.getElementById('whoLbl').textContent =
     nameOf(ME) + (MY_ROLE ? ' — ' + roleLabel(MY_ROLE) : '');

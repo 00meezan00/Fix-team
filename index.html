@@ -230,6 +230,23 @@ const ADMIN_EMAILS_BY_ENV = {
 };
 const ADMIN_EMAILS = (ADMIN_EMAILS_BY_ENV[APP_ENV] || []).map(e => e.toLowerCase());
 const landingFor = (email) => 'dashboard.html';
+// سبب رفض الدخول (لما landingByRole ترجّع null)
+let denyMsg = '';
+// بتروح للصفحة — أو بتطلّع الحساب وتكتب السبب لو مالوش دخول
+async function goByRole(email){
+  const dest = await landingByRole(email);
+  if(dest){ window.location.href = dest; return; }
+  try{ await sb.auth.signOut(); }catch(e){}
+  const el = document.getElementById('loginError');
+  if(el) el.textContent = denyMsg || 'مش مسموح بالدخول';
+}
+// جاي من شاشة تانية طردته لأنه مش متسجّل؟
+addEventListener('DOMContentLoaded', () => {
+  if(/[?&]nouser=1/.test(location.search)){
+    const el = document.getElementById('loginError');
+    if(el) el.textContent = '🔒 الحساب ده مش متسجّل في النظام — كلّم الإدارة تضيفك';
+  }
+});
 
 // 📱 فون ولا كمبيوتر؟ — نفس منطق commonIsPhone في common.js بالحرف.
 // ⚠️ متكرّرة هنا عن قصد: صفحة الدخول مش بتحمّل common.js (بتعرّف
@@ -287,10 +304,20 @@ async function landingByRole(email){
   }
   if(!ADMIN_EMAILS.length)     return 'dashboard.html';   // الإعداد لسه ماتعملش
 
-  let role = 'accountant';
+  // ============================================================
+  // 🔒 (٢٠٢٦-١٠-١١) مفيش دور افتراضي خلاص
+  // ------------------------------------------------------------
+  // 🧸 قبل كده أي إيميل مش متسجّل كان بيدخل كمحاسب. دلوقتي:
+  //    • متسجّل في لوحة الأدمن → يدخل صفحته
+  //    • مش متسجّل            → مايدخلش، ورسالة «كلّم الإدارة»
+  //    • مقدرناش نقرا القايمة (نت) → مايدخلش، ورسالة «جرّب تاني»
+  // landingByRole بترجّع null في الحالتين دول، والسبب في denyMsg.
+  // ============================================================
+  let role = null;
   try{
     const q = sb.from('app_data').select('value').eq('key', 'user-roles').maybeSingle();
     const res = await Promise.race([q, new Promise(r => setTimeout(() => r(null), 4000))]);
+    if(!res || res.error){ denyMsg = 'تعذّر التحقق من حسابك — اتأكد من النت وجرّب تاني'; return null; }
     if(res && res.data && res.data.value){
       const map = JSON.parse(res.data.value) || {};
       const v = map[e];
@@ -302,7 +329,13 @@ async function landingByRole(email){
       // 🛎️🏭 reception و production بيروحوا dashboard.html (الافتراضي تحت)
       if(['super_admin','accountant','dispatcher','technician','hr','staff','owner','reception','production'].includes(found)) role = found;
     }
-  }catch(err){ /* نكمّل بالافتراضي */ }
+  }catch(err){ denyMsg = 'تعذّر التحقق من حسابك — جرّب تاني'; return null; }
+
+  if(!role){
+    denyMsg = '🔒 الحساب ده مش متسجّل في النظام — كلّم الإدارة تضيفك';
+    try{ localStorage.removeItem('ifix-last-role'); }catch(err){}
+    return null;
+  }
 
   try{
     localStorage.setItem('ifix-last-role', role);
@@ -404,7 +437,7 @@ if(APP_ENV === "staging"){
 
             // 🔑 الأدمن بيعدّي دايماً — حتى لو الاشتراك منتهي.
             //    من غير كده بتتحبس بره ومش هتقدر تفعّل الاشتراك بعد الدفع.
-            if (isAdmin) { window.location.href = await landingByRole(email); return; }
+            if (isAdmin) { await goByRole(email); return; }
 
             const active = await shopActive();
 
@@ -415,7 +448,7 @@ if(APP_ENV === "staging"){
             }
 
             if (active) {
-                window.location.href = await landingByRole(email);
+                await goByRole(email);
             } else {
                 await sb.auth.signOut();
                 showRenewBox();
@@ -434,9 +467,9 @@ if(APP_ENV === "staging"){
         if (!session) return;
         const em = (session.user.email || '').toLowerCase();
         // الأدمن بيعدّي دايماً — حتى لو الاشتراك منتهي
-        if (ADMIN_EMAILS.includes(em)) { window.location.href = await landingByRole(em); return; }
+        if (ADMIN_EMAILS.includes(em)) { await goByRole(em); return; }
         const active = await shopActive();
-        if (active) window.location.href = await landingByRole(em);
+        if (active) await goByRole(em);
         else showRenewBox();          // يشوف سبب التوقف بدل صفحة صامتة
     });
 </script>

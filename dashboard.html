@@ -2006,11 +2006,17 @@ const ROLES_KEY = 'user-roles';
 const ROLES = ['super_admin', 'accountant', 'dispatcher', 'technician', 'hr', 'staff', 'owner', 'reception', 'production'];
 let userRoles = {};   // { "email": "super_admin" }  أو  { "email": {role, techName} }
 
+// rolesLoadOk = قدرنا نقرا الأدوار من السيرفر فعلاً؟
+// ⚠️ مهم: لو القراية فشلت (نت فصل)، مانقفلش على الموظف — بنرجع لآخر
+//    دور معروف ليه على الجهاز ده. القفل بيحصل بس لما نكون متأكدين
+//    إن الإيميل مش متسجّل.
+let rolesLoadOk = false;
 async function loadUserRoles(){
   try{
     const r = await window.storage.get(ROLES_KEY);
     if(r && r.value) userRoles = JSON.parse(r.value) || {};
-  }catch(e){ userRoles = {}; }
+    rolesLoadOk = true;
+  }catch(e){ userRoles = {}; rolesLoadOk = false; }
 }
 // 🔴 الاسم الظاهر من لوحة الأدمن بيعلى على اسم ملف الحساب.
 //    ليه؟ لأن ملف الحساب (profiles) المستخدم هو اللي بيملاه، ولوحة
@@ -2043,10 +2049,21 @@ function roleEntry(email){
 function roleOf(email){
   if(!ADMIN_EMAIL_SET) return 'super_admin';   // وضع آمن: الإعداد لسه ماتعملش
   const e = (email || '').toLowerCase();
-  if(!e) return 'accountant';
+  if(!e) return 'none';
   if(ADMIN_EMAILS.includes(e)) return 'super_admin';
   const en = roleEntry(e);
-  return (en && ROLES.includes(en.role)) ? en.role : 'accountant';
+  if(en && ROLES.includes(en.role)) return en.role;
+  // 🔒 (٢٠٢٦-١٠-١١) إيميل مش متسجّل في لوحة الأدمن = **مالوش دخول**.
+  //    قبل كده كان بيتعامل كمحاسب تلقائياً.
+  //    لو الأدوار لسه ما اتقرتش (أو النت فصل) → آخر دور معروف على الجهاز ده.
+  if(!rolesLoadOk){
+    try{
+      const lr = localStorage.getItem('ifix-last-role');
+      const le = (localStorage.getItem('ifix-last-email') || '').toLowerCase();
+      if(le === e && ROLES.includes(lr)) return lr;
+    }catch(_){}
+  }
+  return 'none';
 }
 
 function myRole(){ return roleOf(currentUser.email); }
@@ -2142,6 +2159,20 @@ function applyRoleVisibility(){
   //
   // replace مش href — عشان زرار الرجوع مايرجّعهمش لصفحة فاضية.
   // ============================================================
+  // 🔒 إيميل مش متسجّل في لوحة الأدمن → بره خالص
+  if(myRole() === 'none'){
+    if(rolesLoadOk){
+      (async () => {
+        try{ await clearDeviceCache(); }catch(e){}
+        try{ localStorage.removeItem('ifix-last-role'); }catch(e){}
+        try{ await sb.auth.signOut(); }catch(e){}
+        location.replace('index.html?nouser=1');
+      })();
+    } else {
+      showError('⚠️ مقدرناش نتأكد من صلاحية حسابك — اتأكد من النت وافتح التطبيق تاني');
+    }
+    return;
+  }
   if(isTechnician()){ location.replace('my-devices.html'); return; }
   if(isDispatcher()){ location.replace('dispatch.html');   return; }
   // ⚠️ شؤون العاملين مالهاش أي علاقة بالأجهزة ولا الفلوس.
