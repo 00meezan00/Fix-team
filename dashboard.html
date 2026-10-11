@@ -475,6 +475,66 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
     background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:7px 9px; margin-top:5px;
     font-family:inherit; font-size:12.5px; color:var(--ink-2); cursor:pointer; line-height:1.6;}
   .ph2-ch-row small{display:block; color:var(--muted); font-size:11.5px;}
+  /* ============================================================
+     🚀🚀🚀 المرحلة التالتة
+     ------------------------------------------------------------
+     ⏱️ وقت كل مرحلة (st3-) · 🧾 دفتر المراجعة (au3-) · 🔔 إشعارات الموبايل (ps3-)
+     🧸 مين يشوف إيه في القايمة:
+        ⏱️ المحاسب العام + مدير الإنتاج · 🧾 المحاسب العام بس ·
+        🔔 الاستقبال + مدير الإنتاج + أمين الخزنة + المحاسب العام
+     ⚠️ الحماية الحقيقية: الدوال نفسها بتسأل عن الدور — ده شكل بس.
+     ============================================================ */
+  body:not(.role-super_admin):not(.role-production) .stage-menu-item{display:none !important;}
+  body:not(.role-super_admin) .audit-menu-item{display:none !important;}
+  body:not(.role-super_admin):not(.role-production):not(.role-reception):not(.role-accountant) .push-menu-item{display:none !important;}
+  body:not(.push-on) .push-menu-item{display:none !important;}   /* 🔌 PUSH_ENABLED = false → مستخبي */
+  .st3-chips{display:flex; gap:6px; flex-wrap:wrap; margin:0 0 10px;}
+  .st3-chip{border:1px solid var(--border); background:var(--surface); color:var(--ink-2); border-radius:999px;
+    padding:8px 13px; font:800 13px/1.2 'Tajawal',sans-serif; cursor:pointer;}
+  .st3-chip.on{background:var(--ink); color:var(--surface); border-color:var(--ink);}
+  .st3-n{display:inline-block; background:var(--warn); color:#fff; border-radius:9px; padding:1px 6px; font-size:11px; margin-inline-start:3px;}
+  .st3-note{font-size:12.5px; color:var(--muted); line-height:1.9; margin:0 0 12px;}
+  .st3-journey{background:var(--info-bg); border:1px solid var(--info-border); border-radius:12px; padding:11px 14px;
+    margin:0 0 12px; font-size:14px; font-weight:800; color:var(--ink); line-height:1.8;}
+  .st3-journey small{font-weight:600; color:var(--muted); font-size:12px;}
+  .st3-card{background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:13px 14px; margin-bottom:10px;}
+  .st3-h{display:flex; align-items:center; gap:10px;}
+  .st3-ic{font-size:22px; flex:none;}
+  .st3-t{flex:1; min-width:0;}
+  .st3-t b{display:block; font-size:15px; color:var(--ink);}
+  .st3-t small{display:block; font-size:11.5px; color:var(--muted); line-height:1.6;}
+  .st3-med{flex:none; text-align:end; font-family:'Cairo',sans-serif; font-weight:900; font-size:18px; color:var(--ink); line-height:1.3;}
+  .st3-med small{display:block; font:700 10.5px/1.4 'Tajawal',sans-serif; color:var(--muted);}
+  .st3-bar{height:8px; background:var(--surface-3); border-radius:6px; margin:10px 0 8px; overflow:hidden;}
+  .st3-bar i{display:block; height:100%; border-radius:6px; background:var(--info);}
+  .st3-sub{font-size:12.5px; color:var(--ink-2); font-weight:700; line-height:1.8;}
+  .st3-btns{display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;}
+  .st3-btns:empty{display:none;}
+  .st3-btn{border:1px solid var(--border); background:var(--surface-2); color:var(--ink-2); border-radius:8px;
+    padding:8px 10px; font:800 12.5px/1.3 'Tajawal',sans-serif; cursor:pointer;}
+  .st3-btn.on{border-color:var(--info); color:var(--info);}
+  .st3-row{display:flex; justify-content:space-between; align-items:center; gap:8px; width:100%; text-align:start;
+    background:var(--surface-2); border:1px solid var(--border); border-radius:8px; padding:8px 10px; margin-top:6px;
+    font:600 13px/1.6 'Tajawal',sans-serif; color:var(--ink-2); cursor:pointer;}
+  .st3-row b{flex:none; color:var(--ink); font-family:'Cairo',sans-serif;}
+  .st3-row.late b{color:var(--danger);}
+  .au3-sum{display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:8px; margin:0 0 12px;}
+  .au3-box{background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:10px 12px;}
+  .au3-box small{display:block; font-size:11.5px; color:var(--muted); font-weight:700; line-height:1.5;}
+  .au3-box b{font-family:'Cairo',sans-serif; font-size:19px; color:var(--ink);}
+  #auditBody .appr-row{margin-bottom:8px;}
+  .ps3-row{display:flex; align-items:center; gap:10px; padding:11px 0; border-bottom:1px solid var(--border);}
+  .ps3-row:last-of-type{border-bottom:none;}
+  .ps3-ic{font-size:20px; flex:none;}
+  .ps3-t{flex:1; min-width:0; font-size:14px; color:var(--ink);}
+  .ps3-t small{display:block; font-size:11.5px; color:var(--muted); line-height:1.6;}
+  .ps3-sw{flex:none; width:46px; height:26px; border-radius:13px; border:none; background:var(--surface-3);
+    position:relative; cursor:pointer; transition:background .15s;}
+  .ps3-sw i{position:absolute; top:3px; inset-inline-start:3px; width:20px; height:20px; border-radius:50%;
+    background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.25); transition:inset-inline-start .15s;}
+  .ps3-sw.on{background:var(--success);}
+  .ps3-sw.on i{inset-inline-start:23px;}
+  .ps3-sw:disabled{opacity:.45; cursor:not-allowed;}
 
   /* ============================================================
      شريط البحث الرئيسي
@@ -1543,6 +1603,8 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
          ويظهّره على الموبايل بس ويحط عليه عدد الخصومات الجديدة. -->
     <button class="pay-menu-btn" style="display:none;" onclick="openPayroll()">💰 مرتبك</button>
     <button id="accountMenuBtn" class="hidden" onclick="openAccount()">👤 حسابي</button>
+    <!-- 🔔 (المرحلة ٣) للاستقبال · مدير الإنتاج · أمين الخزنة · المحاسب العام -->
+    <button class="push-menu-item" onclick="openPushSettings()">🔔 إشعارات الموبايل</button>
 
     <div class="mh mh-shop">🏪 المحل</div>
     <button class="money-menu-item" onclick="openAnalytics()">📊 الملخص المالي</button>
@@ -1551,6 +1613,9 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
     <button id="waHeldMenuBtn" style="display:none;" onclick="openWaHeld()">💬 مسدجات الواتساب المتوقفة <span id="waHeldCount" style="display:none;background:#DC2626;color:#fff;border-radius:10px;padding:1px 7px;font-size:11.5px;font-weight:800;margin-inline-start:4px;"></span></button>
     <button class="admin-menu-item inv-menu-item" onclick="openSummaries()">📋 الجرد</button>
     <button class="admin-menu-item eval-menu-item" onclick="openTechEval()">🏆 تقييم الفنيين</button>
+    <!-- 🚀🚀🚀 المرحلة التالتة -->
+    <button class="stage-menu-item" onclick="openStageTimes()">⏱️ وقت كل مرحلة</button>
+    <button class="audit-menu-item" onclick="openAudit()">🧾 دفتر المراجعة <span id="auditMenuCount" style="display:none;background:#D97706;color:#fff;border-radius:10px;padding:1px 7px;font-size:11.5px;font-weight:800;margin-inline-start:4px;"></span></button>
     <button class="money-menu-item" onclick="openStaff()">👥 الموظفين</button>
 
     <div class="mh mh-parts">🔩 قطع الغيار</div>
@@ -1932,6 +1997,28 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
   </div>
 </div>
 
+<!-- 🚀🚀🚀 ⏱️ وقت كل مرحلة (المحاسب العام + مدير الإنتاج) -->
+<div id="stageOverlay" class="overlay hidden" style="align-items:stretch; justify-content:stretch; padding:0; overflow-y:auto;">
+  <div class="summaries-page">
+    <div class="modal-head" style="padding:16px 20px;">
+      <h2>⏱️ وقت كل مرحلة</h2>
+      <button class="close-btn" onclick="closeStageTimes()">×</button>
+    </div>
+    <div id="stageBody" style="padding:12px 20px 40px;"></div>
+  </div>
+</div>
+
+<!-- 🚀🚀🚀 🧾 دفتر المراجعة (المحاسب العام) -->
+<div id="auditOverlay" class="overlay hidden" style="align-items:stretch; justify-content:stretch; padding:0; overflow-y:auto;">
+  <div class="summaries-page">
+    <div class="modal-head" style="padding:16px 20px;">
+      <h2>🧾 دفتر المراجعة</h2>
+      <button class="close-btn" onclick="closeAudit()">×</button>
+    </div>
+    <div id="auditBody" style="padding:12px 20px 40px;"></div>
+  </div>
+</div>
+
 <!-- صفحة أجهزة الفني (تفتح بالضغط على اسم الفني في التقييم) -->
 <div id="techDevOverlay" class="overlay hidden" style="z-index:40; align-items:stretch; justify-content:stretch; padding:0; overflow-y:auto;">
   <div class="summaries-page">
@@ -2189,6 +2276,7 @@ function applyRoleVisibility(){
   try{ loadPartsLog(); }catch(e){}   // 🧰 إشعار حركة الفنيين على المخزن (للمحاسب/الأدمن بس)
   try{ loadTrash(); }catch(e){}      // 🗑 المهملات + المسح التلقائي بعد ٣٠ يوم
   try{ loadClosings(); }catch(e){}   // 🔒 تقفيلات الخزنة (أمين الخزنة + المحاسب العام)
+  try{ document.body.classList.toggle('push-on', PUSH_ENABLED); pushAutoRefresh(); }catch(e){}   // 🔔 (المرحلة ٣) الموبايل المتفعّل بيتجدّد تسجيله في صمت
   // خانة "حسابي" — مستقلة تماماً عن الإشعارات، عشان تظهر حتى لو
   // ميزة الإشعارات مقفولة (ده كان بيمنعها من الظهور خالص).
   try{ syncAccountMenu(); }catch(e){}
@@ -3914,9 +4002,11 @@ function renderApprovalsPanel(){
   const host = document.getElementById('approvalsHost');
   // 📝 + التقارير (للمحاسب العام) · 🚀 المرحلة الأولى: إجمالي النهارده · الصندوق · تقاريري
   // 🚀🚀 المرحلة التانية: تقفيل الخزنة · التقفيلات (للمحاسب العام) · نايمين في الدرج · المتأخرين
-  if(host) host.innerHTML = cashierTodayHtml() + closingStripHtml() + approvalsPanelHtml() + reportsPanelHtml()
-                          + closingsPanelHtml() + inboxPanelHtml() + latePanelHtml() + sleepPanelHtml()
+  // 🚀🚀🚀 المرحلة التالتة: التقارير + التقفيلات بقوا لوحة واحدة «🧾 للمراجعة» (auditPanelHtml)
+  if(host) host.innerHTML = cashierTodayHtml() + closingStripHtml() + approvalsPanelHtml() + auditPanelHtml()
+                          + inboxPanelHtml() + latePanelHtml() + sleepPanelHtml()
                           + myReportsPanelHtml();
+  try{ syncAuditBadge(); }catch(e){}
 }
 
 // ============================================================
@@ -5570,35 +5660,8 @@ function submitReceptionReport(){
 // 🚀 (المرحلة الأولى) اللوحة بقت تجمع تقارير الاستقبال **و** أسباب أمين الخزنة
 //    (إلغاء تأكيد دفع بالغلط — cashierReports). src بيقول التقرير جه منين.
 const REPORT_SRC = { receptionReports: '🛎️', cashierReports: '💵' };
-function pendingReports(){
-  const out = [];
-  devices.forEach(d => Object.keys(REPORT_SRC).forEach(src =>
-    (d[src] || []).forEach(r => { if(r && !r.reviewed) out.push({ d, r, src }); })));
-  return out.sort((a,b) => new Date(b.r.at || 0) - new Date(a.r.at || 0));
-}
-function reportsPanelHtml(){
-  if(!isSuperAdmin()) return '';
-  const list = pendingReports();
-  if(!list.length) return '';
-  const lbl = k => { const s = statusInfo(k); return k === 'delivered' ? 'تم التسليم' : (s ? stLabel(s) : k); };
-  const kindTxt = r => r.kind === 'unpay' ? '💵 إلغاء تأكيد دفع بالغلط'
-                     : r.kind === 'money' ? '💰 تعديل فلوس بعد الدفع'
-                     : '📝 ' + esc(lbl(r.from)) + ' ← ' + esc(lbl(r.to));
-  const rows = list.map(({d, r, src}) => `<div class="appr-row">
-      <div class="appr-row-info" style="cursor:pointer;" onclick="openDetail('${d.id}')">
-        <div class="appr-row-dev"><span class="appr-row-kind" style="background:var(--warn-bg);color:var(--warn);">${kindTxt(r)}</span>📱 ${esc(d.deviceType)} ${esc(d.model)}${d.customerName ? ' — ' + esc(d.customerName) : ''}</div>
-        <div style="font-size:13.5px;line-height:1.7;margin-top:5px;white-space:pre-wrap;">${esc(r.text)}</div>
-        <div class="appr-row-meta">${REPORT_SRC[src]} ${esc(r.by || '')} · ${new Date(r.at).toLocaleString(getLocale())}</div>
-      </div>
-      <div class="appr-row-actions">
-        <button class="appr-btn-yes" onclick="markReportReviewed('${d.id}','${r.id}','${src}')">✓ راجعته</button>
-      </div>
-    </div>`).join('');
-  return `<div class="appr-panel">
-    <div class="appr-panel-head">📝 التقارير <span class="appr-count">${list.length}</span></div>
-    ${rows}
-  </div>`;
-}
+// 🚀🚀🚀 (المرحلة التالتة) لوحة «التقارير» اتجمعت مع «تقفيلات الخزنة» في «🧾 للمراجعة»
+//    — auditPanelHtml / دفتر المراجعة تحت. markReportReviewed لسه هنا.
 async function markReportReviewed(devId, repId, src){
   if(!isSuperAdmin()) return;
   const key = REPORT_SRC[src] ? src : 'receptionReports';
@@ -6436,12 +6499,14 @@ async function batchConfirm(){
 //    التقفيل بيتحفظ في جدول لوحده (cash_closings — ملف 86): مايتمسحش ولا يتعدّل،
 //    والمحاسب العام بس اللي بيعلّم عليه «راجعته».
 let closings = [], closingsErr = '', closingsTimer = null;
-async function loadClosings(){
+let closingsLimit = 60;   // 🚀🚀🚀 دفتر المراجعة بيطلب أكتر (loadClosings(500))
+async function loadClosings(lim){
   if(!(isCashier() || isSuperAdmin())) return;
+  if(lim) closingsLimit = Math.max(closingsLimit, lim);
   try{
     const { data, error } = await sb.from('cash_closings')
       .select('id,from_at,to_at,expected,counted,diff,items,note,by_name,created_at,reviewed,reviewed_by,reviewed_at')
-      .order('created_at', { ascending: false }).limit(60);
+      .order('created_at', { ascending: false }).limit(closingsLimit);
     if(error) throw error;
     closings = data || [];
     closingsErr = '';
@@ -6567,29 +6632,7 @@ async function submitClosing(){
   renderApprovalsPanel();
   ph1Toast('🔒 الخزنة اتقفلت — ' + (counted === sum ? '✅ مظبوط' : (counted < sum ? '🔻 عجز ' : '🔺 زيادة ') + Math.abs(counted - sum).toLocaleString('en-EG') + ' ج.م'));
 }
-// لوحة المحاسب العام: التقفيلات اللي لسه ماتراجعتش
-function closingsPanelHtml(){
-  if(!isSuperAdmin()) return '';
-  const list = closings.filter(c => !c.reviewed);
-  if(!list.length) return '';
-  const rows = list.map(c => {
-    const diff = Number(c.diff) || 0;
-    const col = diff === 0 ? 'success' : diff < 0 ? 'danger' : 'warn';
-    return `<div class="appr-row" style="background:var(--${col}-bg);border-color:var(--${col}-border, var(--border));">
-      <div class="appr-row-info">
-        <div class="appr-row-dev"><span class="appr-row-kind" style="background:var(--surface);color:var(--${col});">${diff === 0 ? '✅ مظبوط' : (diff < 0 ? '🔻 عجز ' : '🔺 زيادة ') + Math.abs(diff).toLocaleString('en-EG') + ' ج.م'}</span>
-          المفروض ${Number(c.expected).toLocaleString('en-EG')} · اتعدّ ${Number(c.counted).toLocaleString('en-EG')} ج.م</div>
-        ${c.note ? `<div style="font-size:13.5px;line-height:1.7;margin-top:5px;white-space:pre-wrap;">${esc(c.note)}</div>` : ''}
-        <div class="appr-row-meta">💵 ${esc(c.by_name || '')} · ${c.items} تحصيل · من ${new Date(c.from_at).toLocaleString(getLocale())} لـ ${new Date(c.to_at).toLocaleString(getLocale())}</div>
-      </div>
-      <div class="appr-row-actions"><button class="appr-btn-yes" onclick="reviewClosing('${c.id}')">✓ راجعته</button></div>
-    </div>`;
-  }).join('');
-  return `<div class="appr-panel">
-    <div class="appr-panel-head">🔒 تقفيلات الخزنة <span class="appr-count">${list.length}</span></div>
-    ${rows}
-  </div>`;
-}
+// 🚀🚀🚀 (المرحلة التالتة) لوحة التقفيلات اتنقلت جوه «🧾 للمراجعة» (auditPanelHtml)
 async function reviewClosing(id){
   if(!isSuperAdmin()) return;
   const now = new Date().toISOString();
@@ -6598,6 +6641,627 @@ async function reviewClosing(id){
   closings = closings.map(c => c.id === id ? { ...c, reviewed: true, reviewed_by: currentUser.name, reviewed_at: now } : c);
   renderApprovalsPanel();
 }
+
+
+// ############################################################
+// 🚀🚀🚀 المرحلة التالتة — أرقام وتقارير
+// ------------------------------------------------------------
+//   ١٧) ⏱️ وقت كل مرحلة (المحاسب العام + مدير الإنتاج)
+//   ١٩) 🧾 دفتر المراجعة: تصحيحات + تعديلات فلوس + إلغاء دفع + فروق الخزنة
+//       في مكان واحد (المحاسب العام)
+//   ٢٠) 🔔 إشعارات حقيقية على الموبايل حتى والتطبيق مقفول (Web Push)
+//       — السيرفر: ملف 87 + Edge Function اسمها notify-push
+//   ⏭️ ١٨ (مرتجعات/رفض كل فني) موجود خلاص في «🏆 تقييم الفنيين»
+// ############################################################
+
+// ============================================================
+// ١٧) ⏱️ وقت كل مرحلة
+// ------------------------------------------------------------
+// 🧸 زي ساعة إيقاف: سجل الجهاز (statusHistory) فيه كل مرة الجهاز
+//    اتنقل فيها ووقتها. فبنعرف دخل كل «محطة» إمتى وخرج منها إمتى،
+//    والفرق = قعد فيها قد إيه.
+//    • الحالات اللي جنب بعض في نفس المحطة (كشف ← صيانة ← تم الصيانة)
+//      = زيارة واحدة للورشة.
+//    • الجهاز اللي رجع الورشة مرتين = زيارتين.
+//    • الوقت بالساعة العادية (مش ساعات الشغل) — الليل بيتحسب.
+// ⚠️ الرقم الكبير = «الوسط»: نص الأجهزة خلصت في أقل منه.
+//    أحسن من المتوسط، لأن جهاز واحد نايم شهر بيبوّظ المتوسط.
+// ============================================================
+const STAGE_DEFS = [
+  { k:'intake',  icon:'🛎️', name:'عند الاستقبال', hint:'من التسجيل لحد «تم الإرسال للصيانة»' },
+  { k:'inbound', icon:'📥', name:'الوارد', hint:'من الإرسال للصيانة لحد ما مدير الإنتاج يستلم' },
+  { k:'shop',    icon:'🔧', name:'الورشة', hint:'من الاستلام لحد ما يتبعت للاستقبال (كشف · صيانة · تم الصيانة · المرفوض)' },
+  { k:'back',    icon:'📤', name:'صندوق استلام الاستقبال', hint:'من «تم الإرسال للاستقبال» لحد ما الاستقبال يوزّعه' },
+  { k:'drawer',  icon:'🗄️', name:'الدرج', hint:'درج الخالص / درج الرفض لحد ما العميل ياخد جهازه' },
+  { k:'pay',     icon:'💵', name:'لحد الدفع', hint:'من التسليم لحد ما أمين الخزنة يأكد الدفع (الآجل مش محسوب)', money:true },
+];
+const STAGE_SHOP = ['received_from_reception', 'diagnosing', 'repairing', 'done', 'workshop_rejected'];
+const STAGE_PAY_KEYS = ['hist.paidDelivered', 'hist.paidCash', 'hist.returnPaidCash'];
+const STAGE_INSTANT_MS = 2 * 60000;   // اتدفع في خلال دقيقتين من التسليم = «وقت التسليم»
+let stageDays = 30;
+let stageOpen = {};                    // { 'shop:slow': true, 'shop:open': true }
+
+function stageDurTxt(ms){
+  const m = Math.max(0, Math.round(ms / 60000));
+  if(m < 60) return m + ' د';
+  const h = Math.floor(m / 60), r = m % 60;
+  if(h < 48) return h + ' س' + (r ? ' و ' + r + ' د' : '');
+  const dd = Math.floor(h / 24), hh = h % 24;
+  return dd + ' يوم' + (hh ? ' و ' + hh + ' س' : '');
+}
+
+// جهاز واحد → زياراته للمحطات + وقت الدفع + الرحلة كلها
+function stageVisits(d){
+  const h = (d.statusHistory || [])
+    .filter(x => x && x.status && x.date)
+    .map(x => ({ st: x.status, t: Date.parse(x.date), lk: x.labelKey || '' }))
+    .filter(x => !isNaN(x.t))
+    .sort((a, b) => a.t - b.t);
+  const out = { visits: [], payInstant: 0, journey: null };
+  if(!h.length) return out;
+
+  // ١) قطع: كل تغيير حالة = قطعة جديدة
+  //    ⚠️ «اتسلّم من درج الرفض» (hist.rejPickedUp) نفس الحالة بس بيقفل الدرج
+  const segs = [];
+  let cur = null, lastSt = null;
+  for(const e of h){
+    const picked = e.lk === 'hist.rejPickedUp';
+    if(cur && e.st === cur.st && !picked) continue;
+    if(cur){ cur.to = e.t; cur.next = picked ? 'picked' : e.st; segs.push(cur); lastSt = cur.st; }
+    cur = picked ? null : { st: e.st, from: e.t, to: null, prev: lastSt, next: null };
+  }
+  if(cur) segs.push(cur);
+
+  // ٢) كل قطعة → محطة
+  const stageOf = s => {
+    if(s.st === 'waiting'){
+      // النظام القديم: قيد الانتظار ← كشف على طول = طابور الورشة مش الاستقبال
+      return (!s.next || ['sent_to_repair', 'delivered', 'rejected', 'picked'].includes(s.next)) ? 'intake' : 'shop';
+    }
+    if(s.st === 'returned') return (s.next === 'sent_to_repair' || (!s.next && d.returnInbound)) ? 'intake' : 'shop';
+    if(s.st === 'sent_to_repair') return 'inbound';
+    if(s.st === 'done' && s.next === 'delivered') return 'drawer';   // النظام القديم: تم الصيانة = جاهز للتسليم
+    if(STAGE_SHOP.includes(s.st)) return 'shop';
+    if(s.st === 'sent_to_reception') return 'back';
+    if(s.st === 'fixed_drawer' || s.st === 'rejected') return 'drawer';
+    return null;
+  };
+
+  // ٣) القطع اللي ورا بعض في نفس المحطة = زيارة واحدة
+  for(const s of segs){
+    const k = stageOf(s);
+    if(!k) continue;
+    const last = out.visits[out.visits.length - 1];
+    if(last && last.k === k && last.to === s.from){ last.to = s.to; continue; }
+    out.visits.push({ k, from: s.from, to: s.to, d });
+  }
+
+  // ٤) 💵 لحد الدفع (الآجل مش محسوب — ده بيتقيّد مش بيتدفع)
+  if(d.paymentType !== 'deferred'){
+    for(let i = 0; i < h.length; i++){
+      if(h[i].st !== 'delivered' || (i > 0 && h[i - 1].st === 'delivered')) continue;   // بداية تسليم
+      let j = i + 1, paidAt = null;
+      for(; j < h.length && h[j].st === 'delivered'; j++){
+        if(STAGE_PAY_KEYS.includes(h[j].lk)){ paidAt = h[j].t; break; }
+      }
+      const stillHere = j >= h.length;   // آخر تسليم ولسه ماخرجش منه
+      if(paidAt !== null){
+        if(paidAt - h[i].t <= STAGE_INSTANT_MS) out.payInstant++;
+        else out.visits.push({ k: 'pay', from: h[i].t, to: paidAt, d });
+      }else if(stillHere && d.status === 'delivered'){
+        if(isPaidDevice(d)) out.payInstant++;                      // اتدفع قبل التسليم
+        else out.visits.push({ k: 'pay', from: h[i].t, to: null, d });
+      }
+    }
+  }
+
+  // ٥) 🧭 الرحلة كلها: من التسجيل لحد أول تسليم
+  const firstDel = h.find(x => x.st === 'delivered');
+  if(firstDel) out.journey = { from: h[0].t, to: firstDel.t, d };
+  return out;
+}
+
+function stagePct(sorted, p){
+  if(!sorted.length) return 0;
+  return sorted[Math.min(sorted.length - 1, Math.floor(p * (sorted.length - 1) + 0.5))];
+}
+function stageStats(){
+  const since = Date.now() - stageDays * 86400000;
+  const by = {};
+  STAGE_DEFS.forEach(s => { by[s.k] = { done: [], open: [] }; });
+  let payInstant = 0;
+  const journeys = [];
+  devices.forEach(d => {
+    if(!d || d.status === 'trashed') return;
+    const r = stageVisits(d);
+    r.visits.forEach(v => {
+      if(!by[v.k]) return;
+      if(v.to == null) by[v.k].open.push(v);
+      else if(v.to >= since) by[v.k].done.push(v);
+    });
+    if(r.journey && r.journey.to >= since) journeys.push(r.journey);
+    if(r.payInstant && d.status === 'delivered' && Date.parse(d.lastModifiedAt || d.intakeDate || 0) >= since) payInstant += r.payInstant;
+  });
+  const sum = list => {
+    const ms = list.map(v => v.to - v.from).sort((a, b) => a - b);
+    return { n: ms.length, med: stagePct(ms, 0.5), p90: stagePct(ms, 0.9),
+             avg: ms.length ? ms.reduce((a, b) => a + b, 0) / ms.length : 0 };
+  };
+  STAGE_DEFS.forEach(s => {
+    by[s.k].stat = sum(by[s.k].done);
+    by[s.k].done.sort((a, b) => (b.to - b.from) - (a.to - a.from));
+    by[s.k].open.sort((a, b) => a.from - b.from);
+  });
+  return { by, journey: sum(journeys), payInstant };
+}
+
+function openStageTimes(){
+  if(!(isSuperAdmin() || isProduction())) return;
+  document.getElementById('stageOverlay').classList.remove('hidden');
+  renderStageTimes();
+  if(!devicesComplete) whenDevicesComplete().then(() => { if(stageIsOpen()) renderStageTimes(); });
+}
+function closeStageTimes(){ document.getElementById('stageOverlay').classList.add('hidden'); }
+function stageIsOpen(){ const o = document.getElementById('stageOverlay'); return !!(o && !o.classList.contains('hidden')); }
+function stageSetDays(n){ stageDays = n; renderStageTimes(); }
+function stageToggle(key){ stageOpen[key] = !stageOpen[key]; renderStageTimes(); }
+
+function stageRowHtml(v, now){
+  const d = v.d;
+  const ms = (v.to == null ? now : v.to) - v.from;
+  const late = v.to == null && ms > 24 * 3600000;
+  return `<button class="st3-row${late ? ' late' : ''}" onclick="openDetail('${d.id}')">
+    <span>📱 ${esc(d.deviceType)} ${esc(d.model)}${d.customerName ? ' — ' + esc(d.customerName) : ''}
+      ${d.technician ? `<small style="color:var(--muted);"> · 🔧 ${esc(d.technician)}</small>` : ''}</span>
+    <b>${v.to == null ? '⏳ ' : ''}${esc(stageDurTxt(ms))}</b></button>`;
+}
+function renderStageTimes(){
+  const body = document.getElementById('stageBody');
+  if(!body) return;
+  const now = Date.now();
+  const { by, journey, payInstant } = stageStats();
+  const defs = STAGE_DEFS.filter(s => !(s.money && !isSuperAdmin()));   // 🏭 مدير الإنتاج مالوش دعوة بالدفع
+  const maxMed = Math.max(1, ...defs.map(s => by[s.k].stat.med));
+  const chip = (n, txt) => `<button class="st3-chip${stageDays === n ? ' on' : ''}" onclick="stageSetDays(${n})">${txt}</button>`;
+
+  const cards = defs.map(s => {
+    const b = by[s.k], st = b.stat;
+    const slowKey = s.k + ':slow', openKey = s.k + ':open';
+    const lateOpen = b.open.filter(v => now - v.from > 24 * 3600000).length;
+    return `<div class="st3-card">
+      <div class="st3-h">
+        <span class="st3-ic">${s.icon}</span>
+        <div class="st3-t"><b>${esc(s.name)}</b><small>${esc(s.hint)}</small></div>
+        <div class="st3-med">${st.n ? esc(stageDurTxt(st.med)) : '—'}<small>${st.n ? 'نص الأجهزة أقل من كده' : 'مفيش أجهزة في المدة دي'}</small></div>
+      </div>
+      <div class="st3-bar"><i style="width:${st.n ? Math.max(3, Math.round(st.med / maxMed * 100)) : 0}%"></i></div>
+      <div class="st3-sub">${st.n
+        ? `${st.n.toLocaleString('en-EG')} مرة · المتوسط ${esc(stageDurTxt(st.avg))} · ٩ من كل ١٠ خلصوا في أقل من ${esc(stageDurTxt(st.p90))}`
+        : ''}${s.k === 'pay' && payInstant ? `${st.n ? '<br>' : ''}⚡ ${payInstant.toLocaleString('en-EG')} جهاز اتدفع وقت التسليم (مش داخلين في الحساب)` : ''}</div>
+      <div class="st3-btns">
+        ${st.n ? `<button class="st3-btn${stageOpen[slowKey] ? ' on' : ''}" onclick="stageToggle('${slowKey}')">🐢 الأبطأ ${stageOpen[slowKey] ? '▲' : '▼'}</button>` : ''}
+        ${b.open.length ? `<button class="st3-btn${stageOpen[openKey] ? ' on' : ''}" style="${lateOpen ? 'color:var(--danger);border-color:var(--danger-border);' : ''}" onclick="stageToggle('${openKey}')">⏳ واقفين دلوقتي ${b.open.length}${lateOpen ? ` · 🔴 ${lateOpen} أكتر من يوم` : ''} ${stageOpen[openKey] ? '▲' : '▼'}</button>` : ''}
+      </div>
+      ${stageOpen[slowKey] ? b.done.slice(0, 8).map(v => stageRowHtml(v, now)).join('') : ''}
+      ${stageOpen[openKey] ? b.open.slice(0, 12).map(v => stageRowHtml(v, now)).join('') : ''}
+    </div>`;
+  }).join('');
+
+  body.innerHTML = `
+    <div class="st3-chips">${chip(7, 'آخر ٧ أيام')}${chip(30, 'آخر ٣٠ يوم')}${chip(90, 'آخر ٣ شهور')}</div>
+    ${!devicesComplete ? `<div class="te-note">⏳ لسه بنحمّل باقي الأجهزة القديمة — الأرقام هتتظبط لوحدها بعد شوية.</div>` : ''}
+    <div class="st3-note">🧸 الساعة بتبدأ أول ما الجهاز يدخل المحطة وبتقف لما يخرج منها. الرقم الكبير = <b>نص الأجهزة خلصت في أقل منه</b>. «واقفين دلوقتي» = لسه جوه المحطة.</div>
+    ${journey.n ? `<div class="st3-journey">🧭 الرحلة كلها — من التسجيل لحد التسليم: <b>${esc(stageDurTxt(journey.med))}</b>
+       <small>(${journey.n.toLocaleString('en-EG')} جهاز · المتوسط ${esc(stageDurTxt(journey.avg))})</small></div>` : ''}
+    ${cards}`;
+}
+
+// ============================================================
+// ١٩) 🧾 دفتر المراجعة — للمحاسب العام
+// ------------------------------------------------------------
+// 🧸 كان فيه لوحتين على الشاشة (التقارير · تقفيلات الخزنة).
+//    دلوقتي «درج» واحد فيه كل الورق اللي محتاج عينك:
+//      📝 تصحيحات الحركة  — الاستقبال خرّج جهاز من غير مدير الإنتاج / تراجع عن غلطة
+//      💰 تعديل فلوس       — سعر اتغيّر بعد الدفع
+//      ↩️ إلغاء دفع        — أمين الخزنة لغى تأكيد دفع بالغلط
+//      🔒 الخزنة          — كل تقفيل بفرقه (عجز / زيادة / مظبوط)
+//    على الشاشة الرئيسية: لوحة صغيرة «للمراجعة» بآخر ٥ بس.
+//    والدرج كله (بالفلاتر والإجماليات) من ⋮ ← «🧾 دفتر المراجعة».
+// ⚠️ مفيش مصدر جديد للبيانات: نفس receptionReports · cashierReports · cash_closings.
+// ============================================================
+const AUDIT_TYPES = {
+  move:    { icon:'📝', label:'تصحيحات الحركة' },
+  money:   { icon:'💰', label:'تعديل فلوس' },
+  unpay:   { icon:'↩️', label:'إلغاء دفع' },
+  closing: { icon:'🔒', label:'الخزنة' },
+};
+let auditF = { type: 'all', state: 'pending', days: 30 };
+
+function auditItems(){
+  const out = [];
+  devices.forEach(d => Object.keys(REPORT_SRC).forEach(src => (d[src] || []).forEach(r => {
+    if(!r) return;
+    const type = src === 'cashierReports' ? 'unpay' : (r.kind === 'money' ? 'money' : 'move');
+    out.push({ type, at: r.at, reviewed: !!r.reviewed, d, r, src });
+  })));
+  closings.forEach(c => out.push({ type: 'closing', at: c.created_at || c.to_at, reviewed: !!c.reviewed, c }));
+  return out.sort((a, b) => (Date.parse(b.at) || 0) - (Date.parse(a.at) || 0));
+}
+
+function auditRowHtml(x){
+  const when = x.at ? new Date(x.at).toLocaleString(getLocale()) : '';
+  if(x.type === 'closing'){
+    const c = x.c, diff = Number(c.diff) || 0;
+    const col = diff === 0 ? 'success' : diff < 0 ? 'danger' : 'warn';
+    return `<div class="appr-row" style="${x.reviewed ? 'opacity:.75;' : `background:var(--${col}-bg);`}">
+      <div class="appr-row-info">
+        <div class="appr-row-dev"><span class="appr-row-kind" style="background:var(--surface);color:var(--${col});">🔒 ${diff === 0 ? '✅ مظبوط' : (diff < 0 ? '🔻 عجز ' : '🔺 زيادة ') + Math.abs(diff).toLocaleString('en-EG') + ' ج.م'}</span>
+          المفروض ${Number(c.expected).toLocaleString('en-EG')} · اتعدّ ${Number(c.counted).toLocaleString('en-EG')} ج.م</div>
+        ${c.note ? `<div style="font-size:13.5px;line-height:1.7;margin-top:5px;white-space:pre-wrap;">${esc(c.note)}</div>` : ''}
+        <div class="appr-row-meta">💵 ${esc(c.by_name || '')} · ${c.items} تحصيل · ${esc(when)}${x.reviewed ? ` · ✓ راجعه ${esc(c.reviewed_by || '')}` : ''}</div>
+      </div>
+      ${x.reviewed ? '' : `<div class="appr-row-actions"><button class="appr-btn-yes" onclick="auditReview('closing','${c.id}')">✓ راجعته</button></div>`}
+    </div>`;
+  }
+  const { d, r, src } = x;
+  const lbl = k => { const s = statusInfo(k); return k === 'delivered' ? 'تم التسليم' : (s ? stLabel(s) : k); };
+  const kind = x.type === 'unpay' ? '↩️ إلغاء تأكيد دفع بالغلط'
+             : x.type === 'money' ? '💰 تعديل فلوس بعد الدفع'
+             : '📝 ' + esc(lbl(r.from)) + ' ← ' + esc(lbl(r.to));
+  return `<div class="appr-row" style="${x.reviewed ? 'opacity:.75;' : ''}">
+    <div class="appr-row-info" style="cursor:pointer;" onclick="openDetail('${d.id}')">
+      <div class="appr-row-dev"><span class="appr-row-kind" style="background:var(--warn-bg);color:var(--warn);">${kind}</span>📱 ${esc(d.deviceType)} ${esc(d.model)}${d.customerName ? ' — ' + esc(d.customerName) : ''}</div>
+      <div style="font-size:13.5px;line-height:1.7;margin-top:5px;white-space:pre-wrap;">${esc(r.text)}</div>
+      <div class="appr-row-meta">${REPORT_SRC[src]} ${esc(r.by || '')} · ${esc(when)}${x.reviewed ? ` · ✓ راجعه ${esc(r.reviewedBy || '')}` : ''}</div>
+    </div>
+    ${x.reviewed ? '' : `<div class="appr-row-actions"><button class="appr-btn-yes" onclick="event.stopPropagation();auditReview('report','${d.id}','${r.id}','${src}')">✓ راجعته</button></div>`}
+  </div>`;
+}
+
+// 🏠 الشاشة الرئيسية: آخر ٥ مستنيين + زرار الدفتر كله
+const AUDIT_SHOW = 5;
+function auditPanelHtml(){
+  if(!isSuperAdmin()) return '';
+  const list = auditItems().filter(x => !x.reviewed);
+  if(!list.length) return '';
+  return `<div class="appr-panel">
+    <div class="appr-panel-head">🧾 للمراجعة <span class="appr-count">${list.length}</span>
+      <button class="spn-clear" style="margin-inline-start:auto;" onclick="openAudit()">📒 افتح الدفتر كله</button></div>
+    ${list.slice(0, AUDIT_SHOW).map(auditRowHtml).join('')}
+    ${list.length > AUDIT_SHOW ? `<button class="spn-ok" style="width:100%;margin-top:4px;" onclick="openAudit()">و ${list.length - AUDIT_SHOW} كمان — افتح الدفتر</button>` : ''}
+  </div>`;
+}
+function syncAuditBadge(){
+  const el = document.getElementById('auditMenuCount');
+  if(!el) return;
+  const n = isSuperAdmin() ? auditItems().filter(x => !x.reviewed).length : 0;
+  el.textContent = n;
+  el.style.display = n ? '' : 'none';
+}
+
+async function auditReview(type, a, b, c){
+  if(!isSuperAdmin()) return;
+  if(type === 'closing') await reviewClosing(a);
+  else await markReportReviewed(a, b, c);
+  if(auditIsOpen()) renderAudit();
+  syncAuditBadge();
+}
+
+async function openAudit(){
+  if(!isSuperAdmin()) return;
+  document.getElementById('auditOverlay').classList.remove('hidden');
+  renderAudit();
+  await loadClosings(500);   // الدفتر كله — مش آخر ٦٠ بس
+  if(auditIsOpen()) renderAudit();
+}
+function closeAudit(){ document.getElementById('auditOverlay').classList.add('hidden'); }
+function auditIsOpen(){ const o = document.getElementById('auditOverlay'); return !!(o && !o.classList.contains('hidden')); }
+function auditSet(k, v){ auditF[k] = v; renderAudit(); }
+
+function renderAudit(){
+  const body = document.getElementById('auditBody');
+  if(!body) return;
+  const all = auditItems();
+  const since = auditF.days ? Date.now() - auditF.days * 86400000 : 0;
+  const inPeriod = all.filter(x => !since || (Date.parse(x.at) || 0) >= since);
+  const pendAll = all.filter(x => !x.reviewed);
+
+  // 📊 إجماليات المدة
+  const cl = inPeriod.filter(x => x.type === 'closing');
+  const short = cl.reduce((a, x) => a + Math.min(0, Number(x.c.diff) || 0), 0);
+  const over  = cl.reduce((a, x) => a + Math.max(0, Number(x.c.diff) || 0), 0);
+  const un = inPeriod.filter(x => x.type === 'unpay');
+  const unAmt = un.reduce((a, x) => a + (parseInt(x.r.amount) || 0), 0);
+  const box = (lbl, val, col) => `<div class="au3-box"><small>${lbl}</small><b style="${col ? `color:var(--${col})` : ''}">${val}</b></div>`;
+
+  const shown = inPeriod.filter(x =>
+    (auditF.type === 'all' || x.type === auditF.type) &&
+    (auditF.state === 'all' || (auditF.state === 'pending' ? !x.reviewed : x.reviewed)));
+
+  const chip = (k, v, txt) => `<button class="st3-chip${auditF[k] === v ? ' on' : ''}" onclick="auditSet('${k}',${typeof v === 'string' ? `'${v}'` : v})">${txt}</button>`;
+  const typeChip = t => {
+    const n = pendAll.filter(x => x.type === t).length;
+    return chip('type', t, AUDIT_TYPES[t].icon + ' ' + AUDIT_TYPES[t].label + (n ? ` <b class="st3-n">${n}</b>` : ''));
+  };
+
+  body.innerHTML = `
+    <div class="st3-note">🧸 كل الورق اللي محتاج عينك في درج واحد. «✓ راجعته» بيقفل الورقة، وبيوصل لصاحبها إنك شفتها.</div>
+    <div class="au3-sum">
+      ${box('⏳ مستني مراجعة (الكل)', pendAll.length.toLocaleString('en-EG'), pendAll.length ? 'warn' : 'success')}
+      ${box('🔒 تقفيلات الخزنة', cl.length.toLocaleString('en-EG'))}
+      ${box('🔻 إجمالي العجز', Math.abs(short).toLocaleString('en-EG') + ' ج.م', short ? 'danger' : '')}
+      ${box('🔺 إجمالي الزيادة', over.toLocaleString('en-EG') + ' ج.م', over ? 'warn' : '')}
+      ${box('↩️ إلغاء دفع', un.length.toLocaleString('en-EG') + (unAmt ? ` <small style="display:inline;">(${unAmt.toLocaleString('en-EG')} ج.م)</small>` : ''))}
+      ${box('💰 تعديل فلوس · 📝 تصحيحات', inPeriod.filter(x => x.type === 'money').length + ' · ' + inPeriod.filter(x => x.type === 'move').length)}
+    </div>
+    <div class="st3-chips">${chip('days', 7, 'آخر ٧ أيام')}${chip('days', 30, 'آخر ٣٠ يوم')}${chip('days', 90, 'آخر ٣ شهور')}${chip('days', 0, 'من الأول')}</div>
+    <div class="st3-chips">${chip('type', 'all', 'الكل' + (pendAll.length ? ` <b class="st3-n">${pendAll.length}</b>` : ''))}${Object.keys(AUDIT_TYPES).map(typeChip).join('')}</div>
+    <div class="st3-chips">${chip('state', 'pending', '⏳ مستني')}${chip('state', 'done', '✓ اتراجع')}${chip('state', 'all', 'الاتنين')}</div>
+    ${closingsErr ? `<div class="te-note">⚠️ تقفيلات الخزنة ماتحمّلتش: ${esc(closingsErr)}</div>` : ''}
+    ${shown.length
+      ? shown.slice(0, 200).map(auditRowHtml).join('')
+        + (shown.length > 200 ? `<div class="st3-note" style="text-align:center;">و ${shown.length - 200} كمان أقدم — ضيّق المدة</div>` : '')
+      : `<div class="st3-note" style="text-align:center;padding:24px 0;">${auditF.state === 'pending' ? '✅ مفيش حاجة مستنية — كله اتراجع' : 'مفيش حاجة في المدة دي'}</div>`}`;
+}
+
+// ============================================================
+// ٢٠) 🔔 إشعارات حقيقية على الموبايل (Web Push)
+// ------------------------------------------------------------
+// 🧸 الفرق عن تنبيه المرحلة الأولى (ph1Toast):
+//    • التنبيه القديم = الصفحة نفسها بتدق → لازم التطبيق يكون مفتوح.
+//    • ده = السيرفر هو اللي بيدق على الموبايل → بيوصل والتطبيق مقفول،
+//      زي رسالة الواتساب بالظبط.
+//    الطريق: حاجة حصلت ← تريجر (ملف 87) بيكتب ورقة ← pg_net بيدق على
+//    notify-push ← بتبعت للموبايلات المسجّلة ← sw.js بيطلّع الإشعار.
+//
+// 🔴 الدور مابيتبعتش من هنا — السيرفر بيكتبه بنفسه (my_app_role).
+// ⚠️ الأيفون: لازم التطبيق يكون متضاف للشاشة الرئيسية (قاعدة آبل).
+// ⚠️ المفتاح ده «عام» عادي يتكتب هنا. المفتاح السري في أسرار notify-push بس.
+// ============================================================
+// 🔌 مفتاح التشغيل: false = الإشعارات مقفولة خالص (زرار القايمة مستخبي ومفيش أي نداء للسيرفر).
+//    اتأجّلت (١٢ أكتوبر) — لما نرجعلها: مفاتيح جديدة + ملف 87 + notify-push، وبعدين خليه true.
+const PUSH_ENABLED = false;
+const IFX_VAPID_PUBLIC = 'BCYetPSKxO6b3vTuWIi9UPx2hbXvCgXUsGmNfPqcKc-L_UgbWBrRrEQxu9fiqnUPp-l0kCXxQvyogJmg4X0nH80';
+const PUSH_KINDS = [
+  { k:'inbox',     icon:'📥', label:'وصلك جهاز',               hint:'مدير الإنتاج: وارد من الاستقبال · الاستقبال: راجع من الصيانة', roles:['reception', 'production'] },
+  { k:'await_pay', icon:'💵', label:'عميل جاي يدفع',            hint:'جهاز اتسلّم ومستني تأكيد الدفع',                               roles:['accountant'] },
+  { k:'paid',      icon:'✅', label:'جهاز اتدفع',               hint:'أمين الخزنة أكد الدفع',                                         roles:['reception'] },
+  { k:'report',    icon:'📝', label:'تقرير جديد محتاج مراجعة',  hint:'الاستقبال أو أمين الخزنة كتب تقرير',                           roles:['super_admin'] },
+  { k:'reviewed',  icon:'👀', label:'المحاسب العام راجع تقريرك', hint:'',                                                              roles:['reception', 'accountant'] },
+  { k:'closing',   icon:'🔒', label:'تقفيل الخزنة',             hint:'بالفرق — عجز أو زيادة',                                          roles:['super_admin'] },
+];
+const PUSH_ROLES = ['reception', 'production', 'accountant', 'super_admin'];
+let pushSt = { sub: null, state: null, err: '', busy: false, loaded: false };
+
+function pushCan(){
+  return !!(IFX_VAPID_PUBLIC && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window);
+}
+function pushIsIOS(){
+  const ua = navigator.userAgent || '';
+  return /iPad|iPhone|iPod/.test(ua) || (/Mac/.test(ua) && 'ontouchend' in document);
+}
+function pushStandalone(){
+  return (navigator.standalone === true) || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+}
+function pushKeyU8(s){
+  const pad = '='.repeat((4 - s.length % 4) % 4);
+  const raw = atob((s + pad).replace(/-/g, '+').replace(/_/g, '/'));
+  const out = new Uint8Array(raw.length);
+  for(let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+  return out;
+}
+// الاشتراك القديم معمول بنفس مفتاحنا؟ (لو لأ لازم يتعمل من جديد)
+function pushKeyMatches(sub){
+  try{
+    const k = sub && sub.options && sub.options.applicationServerKey;
+    if(!k) return true;
+    const a = new Uint8Array(k), b = pushKeyU8(IFX_VAPID_PUBLIC);
+    return a.length === b.length && a.every((x, i) => x === b[i]);
+  }catch(e){ return true; }
+}
+function pushErrTxt(e){
+  const t = (e && e.message) || String(e);
+  return /push_register|push_my_state|push_set_muted|push_test|push_unregister|does not exist|PGRST202|42883/i.test(t)
+    ? 'ملف SQL رقم 87 لسه ما اتشغّلش على السيرفر' : t;
+}
+// ⚠️ serviceWorker.ready مابيرجعش أبداً لو مفيش service worker — فبنحط مهلة
+function pushReg(){
+  return Promise.race([
+    navigator.serviceWorker.ready,
+    new Promise((_, rej) => setTimeout(() => rej(new Error('التطبيق لسه بيجهّز نفسه — اقفله وافتحه وجرّب تاني')), 6000))
+  ]);
+}
+async function pushCurrentSub(){
+  try{ const reg = await pushReg(); return await reg.pushManager.getSubscription(); }catch(e){ return null; }
+}
+async function pushRegister(sub){
+  const j = sub.toJSON();
+  const { data, error } = await sb.rpc('push_register', {
+    p_endpoint: sub.endpoint, p_p256dh: j.keys.p256dh, p_auth: j.keys.auth,
+    p_ua: (navigator.userAgent || '').slice(0, 300) });
+  if(error) throw error;
+  return data;
+}
+async function pushLoad(){
+  pushSt.err = '';
+  try{
+    pushSt.sub = pushCan() ? await pushCurrentSub() : null;
+    const { data, error } = await sb.rpc('push_my_state');
+    if(error) throw error;
+    pushSt.state = data || {};
+  }catch(e){
+    console.error('[الإشعارات] push_my_state:', e);
+    pushSt.err = pushErrTxt(e);
+  }
+  pushSt.loaded = true;
+}
+
+async function openPushSettings(){
+  if(!PUSH_ENABLED) return;
+  let o = document.getElementById('pushOverlay');
+  if(!o){
+    o = document.createElement('div');
+    o.id = 'pushOverlay';
+    o.className = 'overlay';
+    o.style.zIndex = '56';
+    o.addEventListener('click', e => { if(e.target === o) closePushSettings(); });
+    document.body.appendChild(o);
+  }
+  o.classList.remove('hidden');
+  pushSt.loaded = false;
+  renderPush();
+  await pushLoad();
+  renderPush();
+}
+function closePushSettings(){ const o = document.getElementById('pushOverlay'); if(o) o.remove(); }
+
+function renderPush(){
+  const o = document.getElementById('pushOverlay');
+  if(!o) return;
+  const role = myRole();
+  const head = `<div class="modal-head"><h2>🔔 إشعارات الموبايل</h2><button class="close-btn" onclick="closePushSettings()">×</button></div>
+    <div class="st3-note">🧸 الإشعار ده بيوصلك <b>حتى والتطبيق مقفول</b> — زي رسالة الواتساب. كل موبايل بيتفعّل لوحده.</div>`;
+  let body;
+  if(!PUSH_ROLES.includes(role)){
+    body = `<div class="te-note">الإشعارات دي للاستقبال ومدير الإنتاج وأمين الخزنة والمحاسب العام.</div>`;
+  }else if(pushIsIOS() && !pushStandalone()){
+    body = `<div class="te-note">📲 على الأيفون لازم تضيف التطبيق للشاشة الرئيسية الأول:<br>
+      دوس <b>مشاركة</b> ⬆️ ← <b>إضافة إلى الشاشة الرئيسية</b> ← افتحه من الأيقونة وارجع هنا.</div>`;
+  }else if(!pushCan()){
+    body = `<div class="te-note">⚠️ المتصفح ده مابيدعمش الإشعارات. جرّب كروم على أندرويد، أو التطبيق المتضاف للشاشة الرئيسية على الأيفون.</div>`;
+  }else if(Notification.permission === 'denied'){
+    body = `<div class="te-note">🔕 الإشعارات مقفولة من إعدادات الموبايل/المتصفح للموقع ده. افتحها من الإعدادات وارجع هنا.</div>`;
+  }else if(!pushSt.loaded){
+    body = `<div class="st3-note" style="text-align:center;">⏳ جاري التحميل…</div>`;
+  }else{
+    const on = !!(pushSt.sub && Notification.permission === 'granted');
+    const muted = (pushSt.state && pushSt.state.muted) || [];
+    const kinds = PUSH_KINDS.filter(k => k.roles.includes(role));
+    body = `
+      ${pushSt.err ? `<div class="te-note">⚠️ ${esc(pushSt.err)}</div>` : ''}
+      ${on
+        ? `<div class="rc-where" style="background:var(--success-bg);color:var(--success)">✅ شغّالة على الموبايل ده${pushSt.state && pushSt.state.devices > 1 ? ` · ومعاك ${pushSt.state.devices} أجهزة متسجّلة` : ''}</div>`
+        : `<button class="btn-primary" style="box-shadow:none;width:100%;justify-content:center;font-size:16px;padding:14px;margin-bottom:12px;" ${pushSt.busy ? 'disabled' : ''} onclick="pushEnable()">${pushSt.busy ? '⏳ لحظة…' : '🔔 فعّل الإشعارات على الموبايل ده'}</button>`}
+      <div style="font-weight:800;font-size:14px;margin:6px 0 2px;">يوصلّي إشعار لما:</div>
+      ${kinds.map(k => {
+        const off = muted.includes(k.k);
+        return `<div class="ps3-row">
+          <span class="ps3-ic">${k.icon}</span>
+          <span class="ps3-t"><b>${esc(k.label)}</b>${k.hint ? `<small>${esc(k.hint)}</small>` : ''}</span>
+          <button class="ps3-sw${off ? '' : ' on'}" ${on && !pushSt.busy ? '' : 'disabled'} onclick="pushToggle('${k.k}')" aria-label="${off ? 'مقفول' : 'شغّال'}"><i></i></button>
+        </div>`;
+      }).join('')}
+      ${on ? `<div class="pay-choice" style="margin-top:14px;">
+        <button type="button" class="pay-btn" style="border-color:var(--info);color:var(--info);background:var(--surface);" ${pushSt.busy ? 'disabled' : ''} onclick="pushTest()">📨 ابعتلي إشعار تجربة</button>
+        <button type="button" class="pay-btn" style="border-color:var(--border);color:var(--ink-2);background:var(--surface);" ${pushSt.busy ? 'disabled' : ''} onclick="pushDisable()">🔕 وقّفها هنا</button>
+      </div>` : ''}`;
+  }
+  o.innerHTML = `<div class="modal" style="max-width:460px;">${head}${body}</div>`;
+}
+
+// 🔴 لازم من ضغطة زرار مباشرة: طلب الإذن أول سطر قبل أي await (نفس درس الموقع على الأيفون)
+async function pushEnable(){
+  if(!pushCan()) return;
+  let perm = 'default';
+  try{ perm = await Notification.requestPermission(); }catch(e){ perm = 'denied'; }
+  if(perm !== 'granted'){
+    alert('الإشعارات اتقفلت. تقدر تفتحها من إعدادات الموبايل في أي وقت.');
+    renderPush(); return;
+  }
+  pushSt.busy = true; renderPush();
+  try{
+    const reg = await pushReg();
+    let sub = await reg.pushManager.getSubscription();
+    if(sub && !pushKeyMatches(sub)){ try{ await sub.unsubscribe(); }catch(e){} sub = null; }
+    if(!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: pushKeyU8(IFX_VAPID_PUBLIC) });
+    await pushRegister(sub);
+    await pushLoad();
+    pushSt.busy = false; renderPush();
+    ph1Toast('🔔 الإشعارات اتفعّلت على الموبايل ده — دوس «ابعتلي إشعار تجربة» تتأكد');
+  }catch(e){
+    console.error('[الإشعارات] التفعيل فشل:', e);
+    pushSt.busy = false; pushSt.err = pushErrTxt(e); renderPush();
+    alert('❌ الإشعارات ماتفعّلتش: ' + pushErrTxt(e));
+  }
+}
+async function pushToggle(k){
+  if(pushSt.busy || !pushSt.state) return;
+  const cur = new Set(pushSt.state.muted || []);
+  if(cur.has(k)) cur.delete(k); else cur.add(k);
+  pushSt.busy = true; renderPush();
+  const { error } = await sb.rpc('push_set_muted', { p_muted: [...cur] });
+  pushSt.busy = false;
+  if(error){ alert('⚠️ ماتحفظش: ' + pushErrTxt(error)); renderPush(); return; }
+  pushSt.state.muted = [...cur];
+  renderPush();
+}
+async function pushTest(){
+  if(pushSt.busy) return;
+  pushSt.busy = true; renderPush();
+  const { data, error } = await sb.rpc('push_test');
+  pushSt.busy = false; renderPush();
+  if(error){ alert('⚠️ ' + pushErrTxt(error)); return; }
+  if(data && data.configured === false){
+    alert('✅ الموبايل متسجّل، بس السيرفر لسه ما اتوصلش بالـ Edge Function (خطوة ٧ في ملف 87). كلّم المحاسب العام.');
+    return;
+  }
+  alert('📨 اتبعت! اقفل التطبيق (أو اطلع منه) واستنى ثواني — المفروض يوصلك إشعار «تجربة».');
+}
+async function pushDisable(){
+  if(!confirm('هتوقّف الإشعارات على الموبايل ده بس (أجهزتك التانية زي ما هي). متأكد؟')) return;
+  pushSt.busy = true; renderPush();
+  try{
+    const sub = pushSt.sub || await pushCurrentSub();
+    if(sub){
+      const { error } = await sb.rpc('push_unregister', { p_endpoint: sub.endpoint });
+      if(error) throw error;
+      try{ await sub.unsubscribe(); }catch(e){}
+    }
+    await pushLoad();
+  }catch(e){
+    alert('⚠️ ' + pushErrTxt(e));
+  }
+  pushSt.busy = false; renderPush();
+}
+
+// 🔄 كل مرة التطبيق يفتح: لو الموبايل متفعّل، بنجدّد تسجيله في صمت
+//    (عشان لو دوره اتغيّر، أو المتصفح غيّر عنوان الاشتراك).
+let _pushRefreshedFor = '';
+async function pushAutoRefresh(){
+  try{
+    const role = myRole();
+    if(!PUSH_ENABLED || !PUSH_ROLES.includes(role) || _pushRefreshedFor === role) return;
+    if(!pushCan() || Notification.permission !== 'granted') return;
+    _pushRefreshedFor = role;
+    const sub = await pushCurrentSub();
+    if(sub && pushKeyMatches(sub)) await pushRegister(sub);
+  }catch(e){ console.warn('[الإشعارات] تجديد التسجيل:', e); }
+}
+
+// 👆 الدوس على الإشعار بيفتح الجهاز نفسه:
+//    • التطبيق كان مفتوح في الخلفية → sw.js بيبعتلنا رسالة
+//    • التطبيق كان مقفول → بيفتح على dashboard.html?dev=…
+function pushOpenDev(id){
+  if(!id) return;
+  let n = 0;
+  const t = setInterval(() => {
+    n++;
+    if(devices.find(d => d.id === id)){ clearInterval(t); try{ openDetail(id); }catch(e){} }
+    else if(n > 40) clearInterval(t);
+  }, 500);
+}
+try{
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.addEventListener('message', e => {
+      if(e.data && e.data.type === 'ifx-open-dev') pushOpenDev(e.data.id);
+    });
+  }
+  const _qDev = new URLSearchParams(location.search).get('dev');
+  if(_qDev){
+    try{ history.replaceState(null, '', location.pathname); }catch(e){}
+    pushOpenDev(_qDev);
+  }
+}catch(e){}
 
 function renderDetail(){
   const modal = document.getElementById('detailModal');
@@ -9212,7 +9876,7 @@ function openScannedDevice(hit){
     el.blur();
   }
   ['columnSearch','invSearch','scanInput','accSearch'].forEach(clearSearchBox);
-  ['columnOverlay','summariesOverlay','analyticsOverlay','techEvalOverlay','accountsOverlay','printOverlay','addOverlay','staffOverlay']
+  ['columnOverlay','summariesOverlay','analyticsOverlay','techEvalOverlay','accountsOverlay','printOverlay','addOverlay','staffOverlay','stageOverlay','auditOverlay']
     .forEach(id => { const o = document.getElementById(id); if(o) o.classList.add('hidden'); });
   gScanBuf = '';
   openDetail(hit.id);

@@ -12,6 +12,7 @@
 //       شغّال بالكود القديم لحد ما الموظف يقفل التطبيق بإيده.
 //
 // ⚠️ لو ضفت صفحة أو ملف جديد للنظام: زوّده كمان في APP_SHELL تحت.
+// v117 — 🚀🚀🚀 المرحلة التالتة: ⏱️ وقت كل مرحلة · 🧾 دفتر المراجعة (تقارير + فلوس + فروق الخزنة في مكان واحد) (من غير SQL) · 🔔 إشعارات الموبايل جاهزة في الكود بس متأجّلة (PUSH_ENABLED = false في dashboard.html)
 // v116 — 🚀🚀 المرحلة التانية: 👤 تاريخ العميل وقت التسجيل · 😴 أجهزة نايمة في الدرج · 🧾 إيصال تسليم بالضمان · 📦 استلام دفعة بالباركود · ⏰ تنبيه التأخير · 🔩 «مستني قطعة» · 🔒 تقفيل الخزنة — محتاج ملف SQL رقم 86
 // v115 — 🚀 المرحلة الأولى: 📥 صندوق «وصلك جهاز» + تنبيه (الاستقبال ومدير الإنتاج) · 💬 واتساب درج الخالص/الرفض · 📝 «تقاريري» · 🚫 سبب الرفض إجباري (وبيظهر في صفحة المتابعة) · 💵 إجمالي النهارده + ↩️ إلغاء تأكيد دفع بالغلط بسبب — محتاج ملف SQL رقم 85
 // v114 — 🔒 صفحة الفني: الجهاز اللي لسه ماوصلش الورشة من غير أزرار (ملف SQL رقم 84 بيقفل الفني وأمين الخزنة على السيرفر)
@@ -46,7 +47,7 @@
 // v85 — حساب المرتجع بيتعدّل بعد التسليم (المبلغ + فوري/آجل) والدفتر بيتظبط معاه
 // v84 — كشف حساب المحل (PDF و Excel): عمود «تاريخ الدخول» + «تاريخ التسليم» بقى «تاريخ الخروج»
 // v83 — payroll.js: شاشة «🧾 كشف مرتبي» للمحاسب العام (ملف 68)
-const CACHE_NAME = 'ifixteam-v116';
+const CACHE_NAME = 'ifixteam-v117';
 
 const APP_SHELL = [
   './',
@@ -186,6 +187,9 @@ self.addEventListener('fetch', (event) => {
 //    وما طلّعناش إشعار، المتصفح بيلغي الاشتراك بعد كام مرة.
 //    عشان كده showNotification بتتنده **دايماً**، حتى لو البيانات
 //    جت بايظة — بنطلّع رسالة عامة بدل ما نسكت.
+//
+// 🚀🚀🚀 (المرحلة ٣ — notify-push) الرسالة فيها كمان dev = رقم الجهاز،
+//    عشان الدوس على الإشعار يفتح الجهاز نفسه.
 // ============================================================
 self.addEventListener('push', (event) => {
   let d = {};
@@ -199,9 +203,11 @@ self.addEventListener('push', (event) => {
     dir:   'rtl',
     lang:  'ar',
     // tag واحد = الإشعار الجديد بيستبدل القديم بدل ما يتكوّم ٢٠ إشعار
+    // (إشعارات الأجهزة: tag = ifx-<رقم الجهاز> — نفس تنبيه المرحلة الأولى
+    //  جوه التطبيق، فمايطلعوش الاتنين فوق بعض)
     tag:   d.tag || 'ifix-payroll',
     renotify: true,
-    data:  { url: d.url || 'index.html' }
+    data:  { url: d.url || 'index.html', dev: d.dev || null }
   };
   event.waitUntil(self.registration.showNotification(title, opts));
 });
@@ -213,14 +219,23 @@ self.addEventListener('push', (event) => {
 //    جديد. من غير الفحص ده الموظف بيلاقي نسختين من التطبيق
 //    مفتوحين — وفي وضع الشاشة الرئيسية النسخة الجديدة مالهاش
 //    زرار رجوع خالص.
+// 🚀🚀🚀 ولو الإشعار عن جهاز: بنقول للصفحة المفتوحة «افتحي الجهاز ده»
+//    (dashboard.html بتسمع على ifx-open-dev). التطبيق مقفول؟ بيفتح
+//    على dashboard.html?dev=… والصفحة بتفتحه لوحدها.
 // ============================================================
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const target = (event.notification.data && event.notification.data.url) || 'index.html';
+  const data   = event.notification.data || {};
+  const target = data.url || 'index.html';
+  const dev    = data.dev || null;
   event.waitUntil(
     self.clients.matchAll({ type:'window', includeUncontrolled:true }).then(list => {
-      for(const c of list){
-        if(c.url.indexOf(self.location.origin) === 0 && 'focus' in c) return c.focus();
+      // الأولوية لصفحة الداشبورد لو مفتوحة
+      const mine = list.filter(c => c.url.indexOf(self.location.origin) === 0);
+      const dash = mine.find(c => /dashboard\.html/.test(c.url)) || mine[0];
+      if(dash && 'focus' in dash){
+        if(dev){ try{ dash.postMessage({ type:'ifx-open-dev', id: dev }); }catch(e){} }
+        return dash.focus();
       }
       return self.clients.openWindow(target);
     })
