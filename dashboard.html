@@ -428,6 +428,7 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
   body.role-accountant #waHeldMenuBtn, body.role-accountant #purMenuBtn,
   body.role-accountant #invMenuBtn, body.role-accountant #partsReviewMenuBtn,
   body.role-accountant .new-dev-btn,
+  body.role-production .new-dev-btn,   /* 🏭 مدير الإنتاج مابيسجّلش أجهزة — الاستقبال بس */
   body.role-accountant #dpSection{display:none !important;}
   body.role-reception:not(.cap-inv) .inv-menu-item,
   body.role-production:not(.cap-inv) .inv-menu-item{display:none !important;}
@@ -4409,6 +4410,7 @@ async function markPaid(){
 
 // Add device modal
 function openAddModal(){
+  if(isProduction() || isCashier()) return;   // 🏭💵 التسجيل مش شغلهم (والسيرفر رافضه — ملف 82)
   ['customerName','shopName','broughtBy','registeredBy','customerPhone','deviceType','model','deviceColor','serialNumber','reportedIssue','conditionNotes','agreedPrice']
     .forEach(id => { const _e = document.getElementById('f_'+id); if(!_e) return; _e.value = ''; if(_e.dataset) _e.dataset.autoFill = ''; });
   document.getElementById('accountantList').innerHTML = accountantOptions();
@@ -5653,6 +5655,8 @@ function renderDetailNow(){
   const roRMB = '';
   const roI = isRet ? ' readonly' : '';   // مدخلات ونصوص التفاصيل القديمة
   const roB = isRet ? ' disabled' : '';   // أزرار وقوائم التفاصيل القديمة
+  // 🏭 بيانات العميل (الاسم · المحل · الرقم · المندوب) — الاستقبال بس اللي بيعدّلها، مدير الإنتاج يشوف بس
+  const roC = (isRet || isProduction()) ? ' readonly' : '';
   const rows = [
     [t('det.intakeAt'), formatDateTime(d.intakeDate)],
     d.deviceColor ? ['🎨 اللون', d.deviceColor] : null,
@@ -5701,20 +5705,20 @@ function renderDetailNow(){
     ${isReception() ? receptionWhereHtml(d) : ''}
 
     <div class="row2">
-      <label class="field"><span>${t('det.customerName')}</span><input value="${esc(d.customerName)}"${roI} onblur="editField('customerName', this.value)" /></label>
-      <label class="field"><span>${t('det.shopName')}</span><input value="${esc(d.shopName||'')}" list="shopNameListDetail" autocomplete="off" placeholder="${t('det.shopName')}"${roI} onblur="editField('shopName', this.value)" /></label>
+      <label class="field"><span>${t('det.customerName')}</span><input value="${esc(d.customerName)}"${roC} onblur="editField('customerName', this.value)" /></label>
+      <label class="field"><span>${t('det.shopName')}</span><input value="${esc(d.shopName||'')}" list="shopNameListDetail" autocomplete="off" placeholder="${t('det.shopName')}"${roC} onblur="editField('shopName', this.value)" /></label>
       <datalist id="shopNameListDetail">${shopNamesForDatalist()}</datalist>
     </div>
     <!-- ⚠️ رقم العميل كان **مش ظاهر خالص** في تفاصيل الداشبورد —
          موجود في شاشة الإضافة وفي الواتساب بس. فالمحاسب اللي عايز
          يكلّم عميل كان لازم يفتح الجهاز من صفحة تانية. -->
     <label class="field"><span>${t('det.customerPhone') || 'رقم العميل'}</span>
-      <input type="tel" inputmode="tel" dir="ltr" value="${esc(d.customerPhone||'')}"${roI}
+      <input type="tel" inputmode="tel" dir="ltr" value="${esc(d.customerPhone||'')}"${roC}
              onblur="editField('customerPhone', this.value)" placeholder="01xxxxxxxxx" /></label>
     <!-- 🛵 المندوب — يتعدّل من هنا لو اتكتب غلط وقت الاستلام -->
     <label class="field"><span>🛵 ${esc(ACC_BB_LABEL)}</span>
       <input value="${esc(d.broughtBy||'')}" list="broughtByListDetail" autocomplete="off"
-             placeholder="اللي جاب الجهاز — فاضي = صاحبه جابه"${roI}
+             placeholder="اللي جاب الجهاز — فاضي = صاحبه جابه"${roC}
              onblur="editField('broughtBy', this.value)" /></label>
     <datalist id="broughtByListDetail">${broughtByOptions()}</datalist>
     ${(isReception() || isProduction()) ? rolePriceHtml(d) : ''}
@@ -6238,6 +6242,8 @@ function applyPtsCalc(){
 
 async function editField(key, value){
   if(isCashier()) return;   // 💵 أمين الخزنة بيحصّل فلوس بس
+  // 🏭 بيانات العميل — الاستقبال بس اللي بيعدّلها (والسيرفر قافلها كمان — ملف 82)
+  if(isProduction() && ['customerName', 'shopName', 'customerPhone', 'broughtBy'].includes(key)){ renderDetail(); return; }
   let extra = {};
   // 🛎️ الاستقبال مابيحسبش نقط — النقط شغل المحاسب
   // ⭐ الحساب التلقائي للنقط من العطل شغّال لأي حد بيعدّل العطل (ما عدا الاستقبال)
