@@ -47,6 +47,10 @@
 
       /* حالات الأجهزة */
       'status.waiting': 'قيد الانتظار',
+      // 🆕 موظف الاستقبال (٢٠٢٦-١٠-١١)
+      'status.sent_to_repair': 'تم الإرسال للصيانة',
+      'status.received_from_reception': 'تم الاستلام من الاستقبال',
+      'status.sent_to_reception': 'تم الإرسال للاستقبال',
       'status.diagnosing': 'جاري الكشف',
       'status.repairing': 'جاري الصيانة',
       'status.done': 'تم الصيانة',
@@ -566,6 +570,8 @@
       'adm.roleTech': 'فني',
       'adm.roleHr': 'شؤون العاملين (HR)',
       'adm.roleStaff': 'موظف',
+      'adm.roleReception': 'موظف الاستقبال',
+      'adm.roleProduction': 'مدير الإنتاج',
       'adm.delete': 'حذف',
       /* ⚠️ المفاتيح دي كانت ناقصة خالص — يعني زرار «إضافة مستخدم»
          وكل خطواته كانت بتظهر بأسم المفتاح الخام (adm.addRole)،
@@ -669,6 +675,10 @@
       'hist.returnPaidCash': 'حساب المرتجع — تم الدفع (فوري) {amount} ج.م',
       'hist.rejToDrawer': 'رجع لدرج الرفض — لسه في المحل',
       'hist.rejPickedUp': 'اتسلّم — خرج من المحل',
+      'hist.toRecFixed': 'تم الإرسال للاستقبال — ✅ المشكلة اتحلّت',
+      'hist.toRecRejected': 'تم الإرسال للاستقبال — 🚫 الجهاز اترفض (درج الرفض)',
+      'hist.withReport': '📝 بتقرير للمحاسب العام',
+      'hist.deliveredByReception': 'تم التسليم — بانتظار الدفع (سلّمه الاستقبال)',
       'hist.lockUpdated': 'تم تحديث رمز قفل الجهاز ({kind})',
 
       /* نصوص واجهة متبقية */
@@ -737,6 +747,9 @@
       'menu.logout': 'Sign Out',
 
       'status.waiting': 'Pending',
+      'status.sent_to_repair': 'Sent to workshop',
+      'status.received_from_reception': 'Received from reception',
+      'status.sent_to_reception': 'Sent to reception',
       'status.diagnosing': 'Under Diagnosis',
       'status.repairing': 'In Progress',
       'status.done': 'Repaired',
@@ -1250,6 +1263,8 @@
       'adm.roleTech': 'Technician',
       'adm.roleHr': 'HR',
       'adm.roleStaff': 'Staff',
+      'adm.roleReception': 'Reception',
+      'adm.roleProduction': 'Production manager',
       'adm.delete': 'Delete',
       'adm.addRole':       'Add user',
       'adm.emailPrompt':   'User email:',
@@ -1349,6 +1364,10 @@
       'hist.returnPaidCash': 'Return charge — paid (immediate) {amount} EGP',
       'hist.rejToDrawer': 'Moved to rejection drawer — still in shop',
       'hist.rejPickedUp': 'Picked up — left the shop',
+      'hist.toRecFixed': 'Sent to reception — ✅ fixed',
+      'hist.toRecRejected': 'Sent to reception — 🚫 rejected (drawer)',
+      'hist.withReport': '📝 with a report to the head accountant',
+      'hist.deliveredByReception': 'Delivered — pending payment (by reception)',
       'hist.lockUpdated': 'Device lock code updated ({kind})',
 
       /* Remaining UI strings */

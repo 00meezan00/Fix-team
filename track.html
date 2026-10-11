@@ -261,7 +261,16 @@ function renderTrack(data){
   $('devRef').textContent = 'رقم المتابعة: ' + (data.ref || '');
   $('hello').textContent = data.customerName ? `أهلاً ${data.customerName} 👋 دي حالة جهازك لحظة بلحظة` : 'دي حالة جهازك لحظة بلحظة';
 
-  const st = data.status;
+  // ============================================================
+  // 🛎️ (٢٠٢٦-١٠-١١) حالتين جداد من موظف الاستقبال:
+  //   sent_to_repair / received_from_reception → «الجهاز في قسم الصيانة»
+  //   sent_to_reception → زي «تمت الصيانة» (جاهز للاستلام)
+  //   (لو الورشة رفضته الجهاز بيروح «تم الرفض» على طول)
+  //   🧸 العميل مالوش دعوة بالتفاصيل الداخلية — بنوريه المعنى بس.
+  // ============================================================
+  let st = data.status;
+  const sentToRepair = (st === 'sent_to_repair' || st === 'received_from_reception');
+  if(st === 'sent_to_reception') st = 'done';
   const special = $('specialBox');
   special.style.display = 'none';
 
@@ -283,6 +292,9 @@ function renderTrack(data){
     special.style.display = 'block';
     special.style.background = '#FFF7ED'; special.style.border = '1.5px solid #FED7AA'; special.style.color = '#C2410C';
     special.textContent = 'الجهاز رجع للمراجعة عندنا — هنتواصل معاك بالتفاصيل في أقرب وقت';
+  } else if(sentToRepair){
+    idx = 1; pct = 30; full = false;
+    statusText = '🔧 الجهاز في قسم الصيانة';
   } else {
     if(idx < 0) idx = 0;
     pct = STEPS[idx].pct;

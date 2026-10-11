@@ -456,6 +456,8 @@ function render(){
         <option value="accountant">💼 المحاسبين بس</option>
         <option value="technician">🔧 الفنيين بس</option>
         <option value="dispatcher">🚦 مسؤولي الحركة بس</option>
+        <option value="reception">🛎️ موظفين الاستقبال بس</option>
+        <option value="production">🏭 مديرين الإنتاج بس</option>
         <option value="user">👤 شخص بعينه…</option>
       </select>
       <select id="bcUser" style="display:none;">
@@ -752,18 +754,22 @@ async function toggleFlag(key){
 //    + فني في صفحة واحدة (owner.html)، وبيسعّر الأجهزة
 //    اللي السوبر أدمن بيشاركها معاه. مايقدرش يأكد دفع.
 //    ⚠️ الاسم الظاهر عنده **إجباري** — هو اللي بيربط أجهزته.
-const ROLES = ['super_admin', 'accountant', 'dispatcher', 'technician', 'hr', 'staff', 'owner'];
+// 🛎️ reception = موظف الاستقبال · 🏭 production = مدير الإنتاج (ملف 74)
+//    الاتنين على dashboard.html بمفتاح أصغر من المحاسب.
+const ROLES = ['super_admin', 'accountant', 'dispatcher', 'technician', 'hr', 'staff', 'owner', 'reception', 'production'];
 const ROLE_LABEL_KEYS = {
   super_admin: 'adm.roleSuper',
   accountant:  'adm.roleAcc',
   dispatcher:  'adm.roleDisp',
   technician:  'adm.roleTech',
   hr:          'adm.roleHr',
-  staff:       'adm.roleStaff'
+  staff:       'adm.roleStaff',
+  reception:   'adm.roleReception',
+  production:  'adm.roleProduction'
 };
 // الأدوار اللي لسه مالهاش مفتاح ترجمة — من غير ده بيظهر الاسم
 // الإنجليزي الخام (staff) قدّام الأدمن.
-const ROLE_LABEL_FALLBACK = { staff: 'موظف', owner: 'المالك' };
+const ROLE_LABEL_FALLBACK = { staff: 'موظف', owner: 'المالك', reception: 'موظف الاستقبال', production: 'مدير الإنتاج' };
 function roleLabel(r){
   const k = ROLE_LABEL_KEYS[r];
   try{ return k ? t(k) : (ROLE_LABEL_FALLBACK[r] || r); }
@@ -793,10 +799,10 @@ function normRole(v){
 const CAPS = [
   { key:'purchases', icon:'🧾', label:'فواتير المشتريات ومخزن قطع الغيار',
     hint:'قراءة الفواتير بالذكاء الاصطناعي + المخزن + ربط القطع بالأجهزة',
-    forRoles:['dispatcher','owner','hr'] },  // الديسباتشر بس — صفحة الفني مش موصّلة بالموديول
+    forRoles:['dispatcher','owner','hr','reception','production'] },  // الديسباتشر بس — صفحة الفني مش موصّلة بالموديول
   { key:'parts_review', icon:'🔩', label:'مراجعة قطع الغيار',
     hint:'يشوف كومنت قطع الغيار اللي الفني كتبه على كل جهاز، ويربط القطع بالأجهزة',
-    forRoles:['dispatcher','owner','hr'] },
+    forRoles:['dispatcher','owner','hr','reception','production'] },
   // ⚠️ قراءة فقط — عن قصد. تسجيل الدفعات والخصومات والرصيد الافتتاحي
   //    شغل المحاسب وحده. الديسباتشر بيشوف ويدوّر ويطبع PDF وبس.
   //    القفل ده مش في الواجهة بس: مفتاح accounts-ledger **الكتابة**
@@ -809,7 +815,7 @@ const CAPS = [
   //    "مدفوع/غير مدفوع" في الجرد بتاعه — الاتنين محتاجين بيانات فلوس مش موجودة أصلاً.
   { key:'inventory_view', icon:'📋', label:'الجرد (قراءة فقط)',
     hint:'كروت أعداد (استلام/قيد التنفيذ/تسليم/واقفة) + أداء الفنيين — من غير أسعار',
-    forRoles:['dispatcher','owner','hr'] }
+    forRoles:['dispatcher','owner','hr','reception','production'] }
 ];
 function hasCap(en, cap){ return (en.caps || []).includes(cap); }
 
@@ -911,7 +917,9 @@ const BC_AUDIENCE = {
   all:        'كل المستخدمين',
   accountant: 'المحاسبين بس',
   technician: 'الفنيين بس',
-  dispatcher: 'مسؤولي الحركة بس'
+  dispatcher: 'مسؤولي الحركة بس',
+  reception:  'موظفين الاستقبال بس',
+  production: 'مديرين الإنتاج بس'
 };
 
 // علامة إن المنشور اللي هيتبعت هو منشور خطط الاشتراك تحديداً.

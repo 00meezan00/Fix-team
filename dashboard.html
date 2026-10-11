@@ -93,7 +93,7 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
     // الأدمن والمحاسب بيفضلوا على الداشبورد → لوجو النظام صح، نعرضه فوراً.
     // الفني والديسباتشر (أو دور لسه مش معروف) → منعرضش حاجة، عشان
     // ماتظهرش لمحة لوجو غلط قبل التحويل.
-    if(last2 === 'super_admin' || last2 === 'accountant')
+    if(last2 === 'super_admin' || last2 === 'accountant' || last2 === 'reception' || last2 === 'production')
       document.documentElement.classList.add('bv-brand');
   }catch(e){}
   // شبكة أمان: لو حصل خطأ ومنعش شيل الستارة، ما نسيبش المستخدم مقفول
@@ -161,6 +161,10 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
     --info:#2563EB;   --info-bg:#EFF6FF;   --info-border:#BFDBFE;
     --violet:#7C3AED;
     --waiting:#96521A; --waiting-bg:#FBF2E9;
+    /* 🛎️ موظف الاستقبال — حالتين جداد */
+    --sent_to_repair:#0E7490; --sent_to_repair-bg:#E6F4F7;
+    --received_from_reception:#4338CA; --received_from_reception-bg:#EEF0FB;
+    --sent_to_reception:#4D7C0F; --sent_to_reception-bg:#EEF6E2;
     --diagnosing:#6E56CF; --diagnosing-bg:#F1EEFB;
     --repairing:#2B6CB0; --repairing-bg:#EAF1F8;
     --done:#15803D; --done-bg:#EAF6EE;
@@ -197,6 +201,9 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
     --violet:#A78BFA;
 
     --waiting:#E0A15C;          --waiting-bg:rgba(224,161,92,.15);
+    --sent_to_repair:#38BDF8;   --sent_to_repair-bg:rgba(56,189,248,.14);
+    --received_from_reception:#818CF8; --received_from_reception-bg:rgba(129,140,248,.15);
+    --sent_to_reception:#A3E635; --sent_to_reception-bg:rgba(163,230,53,.13);
     --diagnosing:#A78BFA;       --diagnosing-bg:rgba(167,139,250,.15);
     --repairing:#7BA9DC;        --repairing-bg:rgba(123,169,220,.15);
     --done:#4ADE80;             --done-bg:rgba(74,222,128,.14);
@@ -380,6 +387,41 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
   .no-money .money-menu-item{display:none !important;}
   /* بند "أجهزتي" للفني بس */
   body:not(.role-technician) .tech-only-menu{display:none !important;}
+  /* ============================================================
+     🛎️ موظف الاستقبال
+     ------------------------------------------------------------
+     🧸 بالبلدي: مالوش دعوة بالفلوس الكبيرة (الحسابات/الملخص المالي)
+        ولا بالجرد وتقييم الفنيين — بس **بيشوف السعر** على الكارت
+        عشان يقوله للعميل. فبنرجّع السعر بس فوق قاعدة no-money.
+     ⚠️ الحماية الحقيقية في قاعدة البيانات (ملف 74) — ده شكل بس.
+     ============================================================ */
+  body.no-money.role-reception .card-price,
+  body.no-money.role-production .card-price{display:block !important;}
+  /* ============================================================
+     🛎️🏭 قايمة ⋮ للاستقبال ومدير الإنتاج
+     ------------------------------------------------------------
+     🧸 الملخص المالي والحسابات والموظفين (money-menu-item) وتقييم
+        الفنيين → مقفولين دايماً.
+        الجرد وفواتير المشتريات والمخزن ومراجعة القطع → مستخبيين،
+        وبيظهروا بس لو الأدمن فتحلهم الصلاحية من لوحة الأدمن
+        (زي الديسباتشر بالظبط). الكلاسات cap-* بتتحط على body
+        في applyRoleVisibility من myCap().
+     ⚠️ الجرد بيستخبى فيه الفلوس لوحده (money-only) لأن الاتنين no-money.
+     ============================================================ */
+  body.role-reception .eval-menu-item, body.role-production .eval-menu-item{display:none !important;}
+  body.role-reception:not(.cap-inv) .inv-menu-item,
+  body.role-production:not(.cap-inv) .inv-menu-item{display:none !important;}
+  body.role-reception:not(.cap-pur) #purMenuBtn, body.role-reception:not(.cap-pur) #invMenuBtn,
+  body.role-production:not(.cap-pur) #purMenuBtn, body.role-production:not(.cap-pur) #invMenuBtn{display:none !important;}
+  /* قسم قطع الغيار جوه تفاصيل الجهاز (فيه تكلفة وصافي ربح) — بالصلاحية بس */
+  body.role-reception:not(.cap-pur):not(.cap-rev) #dpSection,
+  body.role-production:not(.cap-pur):not(.cap-rev) #dpSection{display:none !important;}
+  body.role-reception #backupWrap, body.role-production #backupWrap{display:none !important;}
+  .rc-chip{display:inline-block; margin-top:6px; font-size:11.5px; font-weight:800; border-radius:7px; padding:3px 8px;}
+  .rc-where{border-radius:10px; padding:10px 12px; margin:0 0 12px; font-size:13.5px; font-weight:800; line-height:1.7;}
+  .pill.pill-off{opacity:.35; cursor:not-allowed;}
+  .rfr-box{margin:0 0 14px; padding:11px 12px; border-radius:10px; background:var(--sent_to_reception-bg); border:1px solid var(--sent_to_reception);}
+  .rfr-box .rfr-q{font-size:13px; font-weight:800; color:var(--ink); margin-bottom:8px;}
 
   /* ============================================================
      شريط البحث الرئيسي
@@ -1454,8 +1496,8 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
     <button class="money-menu-item" onclick="openAccounts()">📒 الحسابات</button>
     <!-- 💬 للسوبر أدمن بس — syncWaHeldMenu بيظهّره ويحط عليه العدد -->
     <button id="waHeldMenuBtn" style="display:none;" onclick="openWaHeld()">💬 مسدجات الواتساب المتوقفة <span id="waHeldCount" style="display:none;background:#DC2626;color:#fff;border-radius:10px;padding:1px 7px;font-size:11.5px;font-weight:800;margin-inline-start:4px;"></span></button>
-    <button class="admin-menu-item" onclick="openSummaries()">📋 الجرد</button>
-    <button class="admin-menu-item" onclick="openTechEval()">🏆 تقييم الفنيين</button>
+    <button class="admin-menu-item inv-menu-item" onclick="openSummaries()">📋 الجرد</button>
+    <button class="admin-menu-item eval-menu-item" onclick="openTechEval()">🏆 تقييم الفنيين</button>
     <button class="money-menu-item" onclick="openStaff()">👥 الموظفين</button>
 
     <div class="mh">🔩 قطع الغيار</div>
@@ -1945,7 +1987,9 @@ function isAdmin(){ return isSuperAdmin(); }
 // لو إيميل الأدمن لسه ماتحطش، بنسيب الصلاحيات مفتوحة عشان محدش يتقفل بره النظام
 const ADMIN_EMAIL_SET = ADMIN_EMAILS.length > 0;
 const ROLES_KEY = 'user-roles';
-const ROLES = ['super_admin', 'accountant', 'dispatcher', 'technician', 'hr', 'staff', 'owner'];
+// 🛎️ reception = موظف الاستقبال — بيفضل على الداشبورد ده (مفيش تحويل لصفحة تانية)
+// 🏭 production = مدير الإنتاج — برضه على الداشبورد ده
+const ROLES = ['super_admin', 'accountant', 'dispatcher', 'technician', 'hr', 'staff', 'owner', 'reception', 'production'];
 let userRoles = {};   // { "email": "super_admin" }  أو  { "email": {role, techName} }
 
 async function loadUserRoles(){
@@ -2005,6 +2049,14 @@ function isSuperAdmin(){ return myRole() === 'super_admin'; }
 function isAccountant(){ return myRole() === 'accountant'; }
 function isDispatcher(){ return myRole() === 'dispatcher'; }
 function isTechnician(){ return myRole() === 'technician'; }
+// 🛎️ موظف الاستقبال — بيسجّل ويبعت للورشة ويستلم منها ويسلّم للعميل.
+//    مايقدرش: يختار فني · يأكد دفع · يحرّك الجهاز جوه الورشة · يمسح.
+function isReception(){ return myRole() === 'reception'; }
+// 🏭 مدير الإنتاج — شاشة المحاسب من غير التسليم والرفض والفلوس (بيشوف السعر بس).
+//    هو اللي بيستلم من الاستقبال، ويوزّع على الفنيين، ويقرر: اتحلّت ولا اترفض.
+function isProduction(){ return myRole() === 'production'; }
+// مين يقدر يعدّل السعر؟ المحاسب والأدمن والاستقبال (مدير الإنتاج بيشوف بس)
+function canEditPrice(){ return canSeeMoney() || isReception(); }
 
 // الأسعار والأرباح والملخص المالي
 function canSeeMoney(){ const r = myRole(); return r === 'super_admin' || r === 'accountant'; }
@@ -2021,11 +2073,13 @@ const ROLE_LABEL_KEYS = {
   super_admin: 'adm.roleSuper',
   accountant:  'adm.roleAcc',
   dispatcher:  'adm.roleDisp',
-  technician:  'adm.roleTech'
+  technician:  'adm.roleTech',
+  reception:   'adm.roleReception',
+  production:  'adm.roleProduction'
 };
 // دور HR اتضاف بعد ما الخريطة دي اتكتبت ومالوش مفتاح ترجمة،
 // فبيرجّع 'hr' خام. الخريطة دي بتغطّي أي دور مالوش مفتاح.
-const ROLE_LABEL_FALLBACK = { hr: 'موارد بشرية', staff: 'موظف', owner: 'المالك' };
+const ROLE_LABEL_FALLBACK = { hr: 'موارد بشرية', staff: 'موظف', owner: 'المالك', reception: 'موظف الاستقبال', production: 'مدير الإنتاج' };
 function roleLabel(r){
   // 🧾 حساب السوبر أدمن **هو** «المحاسب العام» — ولوحة الأدمن باب جواه.
   //    فاسمه في كل حاجة الناس بتشوفها (ملاحظات الأجهزة · حسابي ·
@@ -2047,6 +2101,10 @@ function applyRoleVisibility(){
     ROLES.forEach(r => document.body.classList.remove('role-' + r));
     document.body.classList.add('role-' + myRole());
     document.body.classList.toggle('no-money', !canSeeMoney());
+    // 🔑 الصلاحيات الإضافية من لوحة الأدمن → كلاسات (الـ CSS بيظهّر/يخبّي بيها)
+    document.body.classList.toggle('cap-pur', myCap('purchases'));
+    document.body.classList.toggle('cap-rev', myCap('parts_review'));
+    document.body.classList.toggle('cap-inv', myCap('inventory_view'));
   }catch(e){}
   injectAdminMenu();   // نعيد الفحص بعد ما الأدوار تتحمّل
   try{ prSyncMenu(); }catch(e){}   // زرار مراجعة قطع الغيار حسب الدور/الميزة
@@ -2086,6 +2144,9 @@ function applyRoleVisibility(){
     // فاللي بيوصل هنا محاسب أو أدمن — الستارة تتشال على طول.
     r.remove('app-booting');
   }catch(e){}
+  // 🛎️ الشاشة اترسمت أول مرة قبل ما نعرف الدور (كانت فاكراه محاسب) —
+  //    نعيد الرسم عشان خانات الورشة تختفي والأزرار تبقى بتاعته
+  try{ if(isReception() || isProduction()) render(); }catch(e){}
 
   // زرار اللغة جوه هيدر البوابة
   try{
@@ -2509,7 +2570,15 @@ function startRealtimeSync(){
 // حالات العرض/الفلترة — "تم التسليم" اتقسمت لحالتين حسب حالة الدفع
 // STATUSES اتنقلت لـ statuses.js
 // اسم الحالة حسب اللغة الحالية
-function stLabel(s){ return s ? (typeof t === 'function' && s.labelKey ? t(s.labelKey) : s.label) : ''; }
+function stLabel(s){
+  if(!s) return '';
+  // 🏷️ نفس الحالة باسم تاني حسب الدور (statuses.js → ROLE_STATUS_LABELS)
+  try{
+    const ov = (typeof ROLE_STATUS_LABELS !== 'undefined') && ROLE_STATUS_LABELS[myRole()];
+    if(ov && ov[s.key]) return ov[s.key];
+  }catch(e){}
+  return (typeof t === 'function' && s.labelKey) ? t(s.labelKey) : s.label;
+}
 
 // اسم الحالة في السجل: بيفضّل المفتاح المخزّن (الجديد)، وبيترجم النصوص العربية القديمة كمان
 const _AR_STATUS_BACKMAP = null;   // بيتبني عند أول استخدام
@@ -2531,6 +2600,19 @@ function histLabel(hEntry){
 function getLocale(){ return (typeof I18N!=='undefined' && I18N.getLang()==='en') ? 'en-GB' : 'ar-EG'; }
 function isPaidDevice(d){ return d && d.paymentStatus === 'paid'; }
 // الحالة الفعلية للعرض: بتقسم "تم التسليم" لمدفوع / بانتظار الدفع
+// ============================================================
+// 🛎️ الخانة اللي الجهاز بيتعدّ فيها في الشاشة الرئيسية
+// ------------------------------------------------------------
+// 🧸 للمحاسب: نفس effStatus بالظبط.
+//    للاستقبال: الكشف والصيانة وتم الصيانة مش خانات عنده — الجهاز
+//    لسه «في الورشة»، فبيتعدّ جوه «تم الإرسال للصيانة»، والكارت
+//    بيقوله هو فين بالظبط.
+// ============================================================
+function boardStatus(d){
+  const st = effStatus(d);
+  if(isReception() && RECEPTION_IN_WORKSHOP.includes(st)) return 'sent_to_repair';
+  return st;
+}
 function effStatus(d){
   if(!d) return '';
   if(d.status === 'delivered') return isPaidDevice(d) ? 'delivered_paid' : 'delivered_unpaid';
@@ -3398,6 +3480,7 @@ function intervalMsFor(freq){
 }
 
 async function checkAutoBackup(){
+  if(!canSeeMoney()) return;   // 🛎️🏭 النسخ الاحتياطي مش شغل الاستقبال ولا مدير الإنتاج
   const ms = intervalMsFor(backupSettings.frequency);
   if(!ms) return;
   // ⚠️ نسخة احتياطية من نص الأجهزة (والأرشيف لسه بيتحمّل) = نسخة بايظة
@@ -3704,7 +3787,7 @@ function render(){
 // لوحة الاعتمادات بتترسم في حاويتها فوق الأعمدة (بترجع فاضية لو مفيش طلبات أو المستخدم مش canApprove)
 function renderApprovalsPanel(){
   const host = document.getElementById('approvalsHost');
-  if(host) host.innerHTML = approvalsPanelHtml();
+  if(host) host.innerHTML = approvalsPanelHtml() + reportsPanelHtml();   // 📝 + تقارير الاستقبال (للمحاسب العام)
 }
 
 // ============================================================
@@ -3887,12 +3970,16 @@ function refreshOpenOverlays(){
 function renderBoard(){
   const board = document.getElementById('board');
   // خانة المهملات للمحاسب والأدمن بس — مش شغل مسؤول الحركة
-  board.innerHTML = STATUSES.filter(s => s.key !== 'trashed' || canSeeMoney()).map(s => {
+  // 🛎️ الاستقبال مابيشوفش خانات الورشة (كشف/صيانة/تم الصيانة) — أجهزتها
+  //    بتتعدّ عنده جوه «تم الإرسال للصيانة» (boardStatus)
+  board.innerHTML = STATUSES.filter(s => (s.key !== 'trashed' || canSeeMoney())
+                                      && !(isReception() && RECEPTION_HIDDEN.includes(s.key))
+                                      && !(isProduction() && PRODUCTION_HIDDEN.includes(s.key))).map(s => {
     // ⚠️ المهملات بتتعدّ من مصفوفتها هي — الأجهزة المحذوفة مش
     //    موجودة في `devices` أصلاً، فـ effStatus مش هيلاقيها.
     const count = (s.key === 'trashed')
       ? trashDevices.length
-      : devices.filter(d => effStatus(d) === s.key).length;
+      : devices.filter(d => boardStatus(d) === s.key).length;
     // --col = لون الخانة (للشريط الملوّن فوقها في الثيم الفاتح).
     // ⚠️ var(--…) مش accent(): كده لو المظهر اتغيّر، اللون بيتغيّر
     //    لوحده من غير ما الخانات تترسم تاني.
@@ -4075,7 +4162,7 @@ function renderColumn(keepPos){
   colFullList = isTrash
     ? trashDevices.filter(d => ifxMatch('columnSearch', d, q, matchesSearch))
                   .sort((a,b) => new Date(b.trashedAt||0) - new Date(a.trashedAt||0))
-    : devices.filter(d => effStatus(d) === currentColumn && ifxMatch('columnSearch', d, q, matchesSearch))
+    : devices.filter(d => boardStatus(d) === currentColumn && ifxMatch('columnSearch', d, q, matchesSearch))
              .sort((a,b) => touchedAt(b) - touchedAt(a));
   document.getElementById('columnTitle').textContent = `${stLabel(s)} (${colFullList.length.toLocaleString('en-EG')})`;
   document.getElementById('columnTitle').style.color = accent(s.varname);
@@ -4083,7 +4170,7 @@ function renderColumn(keepPos){
   const toolbar = document.getElementById('columnToolbar');
   if(toolbar){
     toolbar.innerHTML = (currentColumn === 'delivered_unpaid' ? ownerDeferredNotesHtml() : '')
-    + ((currentColumn === 'delivered_unpaid' && colFullList.length > 0) ? `
+    + ((currentColumn === 'delivered_unpaid' && colFullList.length > 0 && canSeeMoney()) ? `
       <div class="acc-toolbar" style="margin:0 0 12px;">
         <button class="btn-secondary" style="color:#166534;border-color:var(--success-border);" onclick="exportDeliveredUnpaidExcel(colFullList)">📊 Excel</button>
         <button class="btn-secondary" style="color:var(--danger-strong);border-color:var(--danger-border);" onclick="exportDeliveredUnpaidPdf(colFullList)">📄 PDF</button>
@@ -4158,6 +4245,27 @@ function attachColScrollOnce(){
   colScrollAttached = true;
 }
 
+// ============================================================
+// 🛎️ شارات صغيرة على الكارت
+// ------------------------------------------------------------
+// ١) الجهاز بيتعدّ في خانة غير حالته الحقيقية؟ (الاستقبال شايف
+//    «تم الإرسال للصيانة» والجهاز فعلياً «جاري الصيانة») → شارة
+//    بتقول هو فين بالظبط.
+// ٢) «تم الاستلام من الصيانة» → اتحلّت ولا اترفض؟
+// ============================================================
+function rcCardChips(d, s){
+  let h = '';
+  const real = effStatus(d);
+  if(s && real !== s.key){
+    const ri = statusInfo(real);
+    // 🛎️ «تم الصيانة» مابيبانش للاستقبال — لحد ما مدير الإنتاج يبعته «درج الخالص»
+    if(isReception() && real === 'done') h += `<span class="rc-chip" style="background:${accentBg('repairing')};color:${accent('repairing')}">📍 🔧 في الورشة</span> `;
+    else if(ri) h += `<span class="rc-chip" style="background:${accentBg(ri.varname)};color:${accent(ri.varname)}">📍 ${esc(stLabel(ri))}</span> `;
+  }
+  h += outcomeChip(d);
+  return h;
+}
+
 function cardHtml(d, s){
   return `<div class="card" style="border-top-color:${accent(s.varname)}" onclick="openDetail('${d.id}')">
     <div class="card-top">
@@ -4171,6 +4279,7 @@ function cardHtml(d, s){
     </div>
     ${d.reportedIssue ? `<div class="card-issue">${esc(d.reportedIssue)}</div>` : ''}
     ${d.technician ? `<div class="card-tech">${esc(d.technician)}</div>` : ''}
+    ${rcCardChips(d, s)}
     ${isPriced(d) ? `<div class="card-price">${esc(d.agreedPrice)} ج.م</div>` : ''}
     ${d.status === 'delivered' ? paymentBadge(d) : ''}
     ${pendingApprovalText(d) ? `<div class="pending-appr-chip">⏳ ${pendingApprovalText(d)}</div>` : ''}
@@ -4190,6 +4299,7 @@ function paymentBadge(d){
 // بلوك الدفع في التفاصيل + زرار "تم الدفع" للكاش
 // (اتشالت — بلوك الدفع الموحّد فوق بقى بيغطيها)
 async function markPaid(){
+  if(!canSeeMoney()) return;   // 🛎️ تأكيد الدفع للمحاسب بس
   const d = devices.find(x => x.id === selectedId);
   if(!d) return;
   // الصفر ينفع يتأكد دفعه — الجهاز اتسلّم واتحاسب، والمبلغ صفر.
@@ -5144,6 +5254,153 @@ function accountantOptions(){
 // ============================================================
 let _detailRenderPending = false;
 
+// ============================================================
+// 🛎️🏭 الاستقبال ومدير الإنتاج — أجزاء تفاصيل الجهاز
+// ============================================================
+let toRecAskId = null;   // بنسأل «اتحلّت ولا اترفض؟» قبل «تم الإرسال للاستقبال»
+let reportAsk  = null;   // { id, to } — الاستقبال لازم يكتب تقرير قبل الخروج ده
+
+// 📍 «الجهاز فين دلوقتي؟» — سطر واضح فوق التفاصيل (للاستقبال)
+function receptionWhereHtml(d){
+  let st = effStatus(d);
+  // 🛎️ «تم الصيانة» مابيبانش للاستقبال — بيشوفه «جاري الصيانة» لحد ما مدير الإنتاج يبعته
+  if(st === 'done') st = 'repairing';
+  const si = statusInfo(st);
+  if(!si) return '';
+  const inWs = RECEPTION_IN_WORKSHOP.includes(st);
+  const tech = (inWs && d.technician) ? ` — مع الفني <b>${esc(d.technician)}</b>` : '';
+  const hint = inWs ? '<div style="font-weight:600;font-size:12.5px;margin-top:2px;">🔧 الجهاز في الورشة — هيوصلك «درج الخالص» أو «درج الرفض» لما مدير الإنتاج يبعته</div>' : '';
+  return `<div class="rc-where" style="background:${accentBg(si.varname)};color:${accent(si.varname)}">
+    📍 الجهاز دلوقتي: ${esc(stLabel(si))}${tech} ${outcomeChip(d)}${hint}</div>`;
+}
+
+// 💰 السعر
+//   الاستقبال: يشوفه ويعدّله، ويحدد فوري/آجل قبل التسليم.
+//   مدير الإنتاج: يشوفه بس.
+//   ⚠️ «تأكيد الدفع» مش هنا لحد فيهم — ده شغل المحاسب.
+function rolePriceHtml(d){
+  const priced = isPriced(d);
+  if(isProduction()){
+    return `<div class="detail-row" style="margin-bottom:10px;"><span>💰 ${t('det.price')}</span>
+      <span style="font-weight:800;">${priced ? esc(d.agreedPrice) + ' ج.م' : '<span style="color:var(--muted)">لسه ماتسعّرش</span>'}</span></div>`;
+  }
+  const canPay = priced && d.status !== 'delivered';
+  return `<label class="field"><span>${t('det.price')}</span>
+      <input type="text" inputmode="numeric" value="${esc(d.agreedPrice||'')}" oninput="fixDigitsInput(this)" onblur="editPrice(this.value)" /></label>
+    ${canPay ? `<div style="margin-bottom:12px;">
+      <span style="font-size:13.5px; color:var(--muted); display:block; margin-bottom:6px;">${t('det.payMethod')}</span>
+      <div class="pay-choice">
+        <button type="button" class="pay-btn" style="border-color:var(--success);${d.paymentType!=='deferred'?'background:#16A34A;color:#fff;':'color:var(--success);background:var(--surface);'}" onclick="editPayType('cash')">${t('det.payCash')}</button>
+        <button type="button" class="pay-btn" style="border-color:var(--warn);${d.paymentType==='deferred'?'background:#B45309;color:#fff;':'color:var(--warn);background:var(--surface);'}" onclick="editPayType('deferred')">${t('det.payDeferred')}</button>
+      </div></div>` : ''}
+    ${d.status === 'delivered' ? `<div style="font-size:12.5px;color:var(--muted);margin:-4px 0 12px;">💵 تأكيد الدفع من عند المحاسب</div>` : ''}`;
+}
+
+// أزرار الحالة للاستقبال ومدير الإنتاج: نفس الترتيب، والزرار اللي مينفعش دلوقتي باهت
+function rolePillsHtml(d, actions, nextMap){
+  const next = nextMap[d.status] || [];
+  return actions.map(k => {
+    const st = statusInfo(k);
+    if(!st) return '';
+    const on = d.status === k;
+    const ok = next.includes(k);
+    const col = k === 'delivered' ? 'paid' : st.varname;
+    let lbl = k === 'delivered' ? 'تم التسليم — بانتظار الدفع' : stLabel(st);
+    if(isReception() && (RECEPTION_NEEDS_REPORT[d.status] || []).includes(k)) lbl += ' 📝';
+    return `<button class="pill${(!ok && !on) ? ' pill-off' : ''}" style="border-color:${accent(col)};
+      background:${on?accent(col):'var(--surface)'}; color:${on?'var(--surface)':accent(col)}"
+      ${ok ? `onclick="changeStatus('${k}')"` : 'disabled'}>${lbl}</button>`;
+  }).join('');
+}
+
+// شارة نتيجة الورشة
+function outcomeChip(d){
+  if(d.repairOutcome === 'fixed' && d.status === 'sent_to_reception')
+    return `<span class="rc-chip" style="background:var(--done-bg);color:var(--done)">✅ المشكلة اتحلّت</span>`;
+  if(d.repairOutcome === 'rejected' && d.status === 'rejected')
+    return `<span class="rc-chip" style="background:var(--rejected-bg);color:var(--rejected)">🚫 الورشة رفضته</span>`;
+  return '';
+}
+
+// «تم الإرسال للاستقبال» — مدير الإنتاج بيختار: اتحلّت ولا اترفض؟
+function toRecBoxHtml(d){
+  if(toRecAskId !== d.id) return '';
+  return `<div class="rfr-box">
+    <div class="rfr-q">📤 هتبعت الجهاز للاستقبال — إيه اللي حصل في الورشة؟</div>
+    <div class="pay-choice">
+      <button type="button" class="pay-btn" style="border-color:var(--done);color:var(--done);background:var(--surface);" onclick="changeStatus('sent_to_reception', undefined, undefined, {outcome:'fixed'})">✅ المشكلة اتحلّت → درج الخالص</button>
+      <button type="button" class="pay-btn" style="border-color:var(--rejected);color:var(--rejected);background:var(--surface);" onclick="changeStatus('sent_to_reception', undefined, undefined, {outcome:'rejected'})">🚫 الجهاز اترفض → درج الرفض</button>
+    </div>
+    <button class="acc-mini-btn" style="margin-top:8px;" onclick="toRecAskId=null;renderDetail();">إلغاء</button>
+  </div>`;
+}
+
+// 📝 تقرير الاستقبال — لما الجهاز يخرج من غير ما يعدّي على مدير الإنتاج
+function reportBoxHtml(d){
+  if(!reportAsk || reportAsk.id !== d.id) return '';
+  const to = statusInfo(reportAsk.to);
+  return `<div class="rfr-box" style="background:var(--warn-bg);border-color:var(--warn);">
+    <div class="rfr-q">📝 الجهاز هيخرج «${esc(to ? (reportAsk.to === 'delivered' ? 'تم التسليم' : stLabel(to)) : reportAsk.to)}» من غير ما يعدّي على مدير الإنتاج.
+      اكتب تقرير بالسبب — هيوصل للمحاسب العام يراجعه.</div>
+    <textarea id="recReportText" rows="3" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:14px;font-family:inherit;background:var(--surface);color:var(--ink);" placeholder="مثال: العميل رجع خد الجهاز قبل ما يتبعت للورشة لأنه مستعجل"></textarea>
+    <div class="pay-choice" style="margin-top:8px;">
+      <button type="button" class="pay-btn" style="border-color:var(--warn);background:var(--warn);color:#fff;" onclick="submitReceptionReport()">📤 ابعت التقرير وكمّل</button>
+      <button type="button" class="pay-btn" style="border-color:var(--border);color:var(--ink-2);background:var(--surface);" onclick="reportAsk=null;renderDetail();">إلغاء</button>
+    </div>
+  </div>`;
+}
+function submitReceptionReport(){
+  const el = document.getElementById('recReportText');
+  const text = ((el && el.value) || '').trim();
+  if(text.length < 5){ alert('اكتب التقرير الأول (سطر واحد على الأقل يوضح السبب)'); if(el) el.focus(); return; }
+  if(!reportAsk) return;
+  const to = reportAsk.to;
+  changeStatus(to, undefined, undefined, { report: text });
+}
+
+// ============================================================
+// 📝 لوحة «تقارير الاستقبال» — للمحاسب العام بس
+// ------------------------------------------------------------
+// 🧸 أي جهاز الاستقبال خرّجه (تسليم/رفض) من غير ما يعدّي على
+//    مدير الإنتاج، بيظهر هنا بالتقرير اللي اتكتب. «✓ راجعته» بيشيله.
+// ⚠️ التقرير متخزّن جوه الجهاز نفسه (receptionReports) — مستحيل يضيع.
+// ============================================================
+function pendingReports(){
+  const out = [];
+  devices.forEach(d => (d.receptionReports || []).forEach(r => { if(r && !r.reviewed) out.push({ d, r }); }));
+  return out.sort((a,b) => new Date(b.r.at || 0) - new Date(a.r.at || 0));
+}
+function reportsPanelHtml(){
+  if(!isSuperAdmin()) return '';
+  const list = pendingReports();
+  if(!list.length) return '';
+  const lbl = k => { const s = statusInfo(k); return k === 'delivered' ? 'تم التسليم' : (s ? stLabel(s) : k); };
+  const rows = list.map(({d, r}) => `<div class="appr-row">
+      <div class="appr-row-info" style="cursor:pointer;" onclick="openDetail('${d.id}')">
+        <div class="appr-row-dev"><span class="appr-row-kind" style="background:var(--warn-bg);color:var(--warn);">📝 ${esc(lbl(r.from))} ← ${esc(lbl(r.to))}</span>📱 ${esc(d.deviceType)} ${esc(d.model)}${d.customerName ? ' — ' + esc(d.customerName) : ''}</div>
+        <div style="font-size:13.5px;line-height:1.7;margin-top:5px;white-space:pre-wrap;">${esc(r.text)}</div>
+        <div class="appr-row-meta">🛎️ ${esc(r.by || '')} · ${new Date(r.at).toLocaleString(getLocale())}</div>
+      </div>
+      <div class="appr-row-actions">
+        <button class="appr-btn-yes" onclick="markReportReviewed('${d.id}','${r.id}')">✓ راجعته</button>
+      </div>
+    </div>`).join('');
+  return `<div class="appr-panel">
+    <div class="appr-panel-head">📝 تقارير الاستقبال <span class="appr-count">${list.length}</span></div>
+    ${rows}
+  </div>`;
+}
+async function markReportReviewed(devId, repId){
+  if(!isSuperAdmin()) return;
+  const now = new Date().toISOString();
+  devices = devices.map(x => x.id === devId
+    ? { ...x, receptionReports: (x.receptionReports || []).map(r => r.id === repId
+          ? { ...r, reviewed: true, reviewedBy: currentUser.name, reviewedAt: now } : r) }
+    : x);
+  render();
+  await persist();
+}
+
 function renderDetail(){
   const modal = document.getElementById('detailModal');
   const ae = document.activeElement;
@@ -5203,7 +5460,9 @@ function renderDetailNow(){
     d.lastModifiedAt ? [t('det.lastEdit'), formatDateTime(d.lastModifiedAt)] : null,
   ].filter(Boolean).map(([label,val,mono]) => `<div class="detail-row"><span>${esc(label)}</span><span ${mono?'style="font-family:monospace;color:var(--accent);font-weight:700"':''}>${esc(val)}</span></div>`).join('');
 
-  const pills = ACTION_STATUSES.map(st => {
+  const pills = isReception()  ? rolePillsHtml(d, RECEPTION_ACTIONS, RECEPTION_NEXT)
+              : isProduction() ? rolePillsHtml(d, PRODUCTION_ACTIONS, PRODUCTION_NEXT)
+              : ACTION_STATUSES.map(st => {
     if(st.key === 'delivered'){
       const active = d.status==='delivered';
       const priced = isPriced(d);
@@ -5226,7 +5485,8 @@ function renderDetailNow(){
   `;
   }).join('');
 
-  const history = (d.statusHistory||[]).map(h =>
+  // 🛎️ سجل الاستقبال من غير «تم الصيانة» — دي بتاعة مدير الإنتاج
+  const history = (d.statusHistory||[]).filter(h => !(isReception() && h && h.status === 'done')).map(h =>
     `<div class="hist-item">‹ ${esc(histLabel(h))} — ${new Date(h.date).toLocaleString('ar-EG')}${h.by ? ` — <b style="color:var(--accent);">${t('det.by')} ${esc(h.by)}</b>` : ''}</div>`
   ).join('');
 
@@ -5237,6 +5497,7 @@ function renderDetailNow(){
     </div>
     <h2 style="font-family:'Cairo',sans-serif;font-size:18px;margin:4px 0 10px;">${esc(d.deviceType)} ${esc(d.model)}</h2>
     ${pendingApprovalText(d) ? `<div class="pending-appr-banner">⏳ ${pendingApprovalText(d)} — ${t('appr.bannerHint')}</div>` : ''}
+    ${isReception() ? receptionWhereHtml(d) : ''}
 
     <div class="row2">
       <label class="field"><span>${t('det.customerName')}</span><input value="${esc(d.customerName)}"${roI} onblur="editField('customerName', this.value)" /></label>
@@ -5255,6 +5516,7 @@ function renderDetailNow(){
              placeholder="اللي جاب الجهاز — فاضي = صاحبه جابه"${roI}
              onblur="editField('broughtBy', this.value)" /></label>
     <datalist id="broughtByListDetail">${broughtByOptions()}</datalist>
+    ${(isReception() || isProduction()) ? rolePriceHtml(d) : ''}
     <div class="money-only">
     <label class="field"><span>${t('det.price')}</span><input type="text" inputmode="numeric" value="${esc(d.agreedPrice||'')}" oninput="fixDigitsInput(this)"${roI} onblur="editPrice(this.value)" /></label>
     ${isPriced(d) && d.priceConfirmation && d.priceConfirmation.requested ? `
@@ -5281,7 +5543,8 @@ function renderDetailNow(){
                </div>`
             : `<div style="background:var(--warn-bg);color:var(--warn);border-radius:8px;padding:9px 11px;font-size:13px;font-weight:700;margin-top:9px;">
                  🕐 ${t('det.deferredPending')}${d.billedShop?` "${esc(d.billedShop)}"`:''} — ${t('det.deferredPendingHint')}
-               </div>`)
+               </div>
+               ${(d.status === 'delivered' && canSeeMoney()) ? `<button class="btn-primary" style="box-shadow:none;background:var(--warn);margin-top:9px;" onclick="changeStatus('delivered')">📒 قيّده على حساب المحل دلوقتي</button>` : ''}`)
         : (isPaidDevice(d)
             ? `<div style="background:var(--paid-bg);color:var(--paid);border-radius:8px;padding:9px 11px;font-size:13px;font-weight:700;margin-top:9px;">✓ ${t('det.paidCash')}</div>`
             : `<button class="btn-primary" style="box-shadow:none;background:var(--paid);margin-top:9px;"${roB} onclick="markPaid()">💵 ${t('det.confirmPay')}</button>`)}
@@ -5346,7 +5609,7 @@ function renderDetailNow(){
     <div class="tech-row">
       <label class="field">
         <span>${t('det.technician')}</span>
-        ${techSelectHtml(d.technician, 'onTechPick(this, \'technician\')', { id:'techInput', disabled: isRet })}
+        ${techSelectHtml(d.technician, 'onTechPick(this, \'technician\')', { id:'techInput', disabled: isRet || isReception() })}
       </label>
       <label class="field">
         <span>${t('det.accountant')}</span>
@@ -5357,7 +5620,7 @@ function renderDetailNow(){
     ${/* ⚠️ hasRet مش isRet: التقييم شهري، والجهاز أكيد هيكون
          اتسلّم وقتها. فلو قفلنا الحقول دي بعد التسليم بتبقى
          مالهاش لازمة خالص — محدش هيقدر يصحح نقطة غلط. */ ''}
-    ${hasRet ? `<label class="field"><span style="color:var(--violet);font-weight:800;">${t('det.substituteTech')}</span>${techSelectHtml(d.substituteTechnician, "onTechPick(this, 'substituteTechnician')")}</label>
+    ${(hasRet && !isReception()) ? `<label class="field"><span style="color:var(--violet);font-weight:800;">${t('det.substituteTech')}</span>${techSelectHtml(d.substituteTechnician, "onTechPick(this, 'substituteTechnician')")}</label>
     <label class="field"><span style="color:var(--violet);font-weight:800;">⭐ ${t('det.returnPoints')}</span><input type="text" inputmode="numeric" value="${esc(d.returnPoints||'')}" oninput="fixDigitsInput(this)" onblur="editField('returnPoints', enDigits(this.value).replace(/[^0-9.]/g,''))" placeholder="${t('det.returnPointsPh')}" /></label>
     ${d.assistTechnician && (parseFloat(enDigits(d.assistPercent))||0) > 0 ? `
     <div style="margin-bottom:10px;">
@@ -5367,9 +5630,9 @@ function renderDetailNow(){
         <button type="button" style="border-color:var(--danger);${d.assistBlamed?'background:#DC2626;color:#fff;':'background:var(--surface);color:var(--danger);'}"${roB} onclick="setAssistBlamed(true)">${tdT('blameYes')}</button>
       </div>
     </div>` : ''}` : ''}
-    ${d.status==='waiting' && !d.technician ? `<div class="tech-warn">⚠ ${t('det.techWarn')}</div>` : ''}
+    ${(d.status==='waiting' && !d.technician && !isReception()) ? `<div class="tech-warn">⚠ ${t('det.techWarn')}</div>` : ''}
 
-    <button type="button" class="points-toggle" onclick="togglePointsBox()">
+    ${isReception() ? '' : `<button type="button" class="points-toggle" onclick="togglePointsBox()">
       <span>⭐ ${t('det.pointsToggle')}</span>
       <span id="pointsToggleArrow">${pointsBoxOpen ? '▲' : '▼'}</span>
     </button>
@@ -5397,7 +5660,7 @@ function renderDetailNow(){
           </label>
         </div>` : `<div style="font-size:12px;color:var(--muted-2);">${t('det.assistNeedMain')}</div>`}
       ` : `<div style="font-size:12px;color:var(--muted-2);">${t('det.wholesaleNote')}</div>`}
-    </div>
+    </div>`}
 
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
       <span style="font-size:12px;color:var(--muted);">${t('det.changeStatus')}</span>
@@ -5407,7 +5670,8 @@ function renderDetailNow(){
     </div>
     <div id="detailLabelArea" style="margin-bottom:10px;"></div>
     <div class="status-pills">${pills}</div>
-    ${d.status === 'rejected' ? `
+    ${toRecBoxHtml(d)}${reportBoxHtml(d)}
+    ${(d.status === 'rejected' && !isProduction()) ? `
     <div style="margin:0 0 14px; padding:10px 12px; background:var(--rejected_shop-bg); border-radius:10px;">
       <span style="font-size:12.5px; color:var(--ink-2); display:block; margin-bottom:7px; font-weight:700;">${t('det.rejLocation')}</span>
       <div class="pay-choice">
@@ -5427,7 +5691,7 @@ function renderDetailNow(){
     <textarea id="newActivityNote" rows="2" placeholder="${t('det.newNotePh')}" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;margin-bottom:6px;"></textarea>
     <button class="btn-secondary" style="width:100%;color:var(--info);border-color:var(--info-border);margin-bottom:10px;" onclick="addActivityNote()">➕ ${t('det.addNote')}</button>
     <button class="btn-secondary" style="width:100%;color:var(--ink);border-color:var(--border);margin-bottom:8px;" onclick="openTimeline()">⏱ ${t('det.timeline')}</button>
-    <button class="danger-btn" onclick="deleteDevice()">${t('det.delete')}</button>
+    ${canSeeMoney() ? `<button class="danger-btn" onclick="deleteDevice()">${t('det.delete')}</button>` : ''}
   `;
 }
 
@@ -5607,6 +5871,7 @@ function autoPointsNote(d){
 let _partsBusy = false;
 window.onDevicePartsChanged = function(deviceId){
   if(_partsBusy) return;
+  if(isReception()) return;   // 🛎️ النقط مش شغل الاستقبال
   if(deviceId !== selectedId) return;
   const d = devices.find(x => x.id === selectedId);
   if(!d || d.isWholesale) return;
@@ -5662,6 +5927,7 @@ async function runAiForDevice(deviceId){
 
 // يشغّل الـ AI بس لو الكيوردز عاجز (ملقاش/فيه غموض) ومفيش كاش لنفس النص
 function runAiIfNeeded(deviceId){
+  if(isReception()) return;   // 🛎️ النقط مش شغل الاستقبال
   const d = devices.find(x => x.id === deviceId);
   if(!d || d.isWholesale) return;
   const text = (d.reportedIssue||'').trim();
@@ -5769,7 +6035,8 @@ function applyPtsCalc(){
 
 async function editField(key, value){
   let extra = {};
-  if(key === 'reportedIssue'){
+  // 🛎️ الاستقبال مابيحسبش نقط — النقط شغل المحاسب
+  if(key === 'reportedIssue' && !isReception()){
     const cur = devices.find(x => x.id === selectedId);
     if(cur && !cur.isWholesale){
       delete _aiCache[selectedId];   // نص جديد → ألغي كاش الـ AI القديم
@@ -5786,7 +6053,7 @@ async function editField(key, value){
   await persist();
   const updTrack = devices.find(x => x.id === selectedId);
   if(updTrack){ if(!updTrack.trackToken){ await ensureTrackToken(updTrack.id); } syncTrack(devices.find(x => x.id === selectedId)); }
-  if(key === 'reportedIssue') runAiIfNeeded(selectedId);   // الذكاء الاصطناعي للحالات الصعبة (بعد الحفظ)
+  if(key === 'reportedIssue' && !isReception()) runAiIfNeeded(selectedId);   // الذكاء الاصطناعي للحالات الصعبة (بعد الحفظ)
 }
 
 // ===== ملاحظات إضافية (سجل بيتزاد وميتعدّلش) =====
@@ -5795,7 +6062,7 @@ async function addActivityNote(){
   if(!ta) return;
   const text = (ta.value||'').trim();
   if(!text) return;
-  const note = { text, at: new Date().toISOString(), by: currentUser.name, role: isAdmin() ? 'المحاسب العام' : 'موظف' };
+  const note = { text, at: new Date().toISOString(), by: currentUser.name, role: isAdmin() ? 'المحاسب العام' : ((isReception() || isProduction()) ? currentRoleLabel() : 'موظف') };
   devices = devices.map(d => d.id === selectedId ? { ...d, activityNotes: [...(d.activityNotes||[]), note] } : d);
   renderDetail();
   render();
@@ -6268,6 +6535,7 @@ async function rejectRequest(deviceId){
 
 // تبديل مكان الجهاز المرفوض: في درج الرفض (لسه بالمحل) ولا اتسلّم (خرج من المحل)
 async function markRejectedLocation(inShop){
+  if(isProduction()) return;   // 🏭 تسليم الجهاز المرفوض للعميل شغل الاستقبال/المحاسب
   const d = devices.find(x => x.id === selectedId);
   if(!d || d.status !== 'rejected') return;
   if(!!d.rejectedInShop === inShop) return;   // مفيش تغيير فعلي
@@ -6278,16 +6546,58 @@ async function markRejectedLocation(inShop){
   renderDetail(); render(); await persist();
 }
 
-async function changeStatus(newStatus, paymentChoice, rejectedInShopChoice){
+async function changeStatus(newStatus, paymentChoice, rejectedInShopChoice, opts){
   const d = devices.find(x => x.id === selectedId);
   if(!d) return;
+  opts = opts || {};
+  const fromStatus = d.status;
+
+  // ============================================================
+  // 🛎️🏭 الاستقبال ومدير الإنتاج: كل واحد يتحرك على طريقه بس
+  // ------------------------------------------------------------
+  // ⚠️ ده للشكل بس — نفس القواعد مكتوبة في قاعدة البيانات (ملف 74)،
+  //    فحتى لو حد لعب في الشاشة، السيرفر بيرجّع الحالة زي ما كانت.
+  // ============================================================
+  const roleNext = isReception() ? RECEPTION_NEXT : isProduction() ? PRODUCTION_NEXT : null;
+  if(roleNext && !(roleNext[d.status] || []).includes(newStatus)){
+    showError('⚠️ ' + currentRoleLabel() + ' مايقدرش ينقل الجهاز من «' + stLabel(statusInfo(effStatus(d))) + '» للحالة دي');
+    renderDetail();
+    return;
+  }
+
+  // 📝 الاستقبال خارج بالجهاز من غير ما يعدّي على مدير الإنتاج؟ → تقرير الأول
+  const needsReport = isReception() && (RECEPTION_NEEDS_REPORT[d.status] || []).includes(newStatus);
+  if(needsReport && !(opts.report && String(opts.report).trim())){
+    reportAsk = { id: d.id, to: newStatus };
+    toRecAskId = null;
+    renderDetail();
+    setTimeout(() => { const el = document.getElementById('recReportText'); if(el) el.focus(); }, 60);
+    return;
+  }
+  reportAsk = null;
+
+  // 📤 «تم الإرسال للاستقبال» لازم معاها إجابة: اتحلّت ولا اترفض؟
+  //    أول دوسة بتسأل بس (toRecBoxHtml) — والإجابة بترجع هنا تاني.
+  //    اترفض → الجهاز بيروح «درج الرفض» على طول (مش «درج الخالص»).
+  let outcome = null;
+  if(newStatus === 'sent_to_reception'){
+    if(opts.outcome !== 'fixed' && opts.outcome !== 'rejected'){
+      toRecAskId = d.id;
+      renderDetail();
+      return;
+    }
+    outcome = opts.outcome;
+    if(outcome === 'rejected'){ newStatus = 'rejected'; rejectedInShopChoice = true; }
+  }
+  toRecAskId = null;
 
   // مسؤول الحركة: التسليم/الإرجاع بيتحوّلوا لطلب معلّق بدل تنفيذ فوري
   if(isDispatcher() && APPROVAL_STATUSES.includes(newStatus)){
     return requestApproval(newStatus === 'delivered' ? 'handover' : 'return', newStatus, paymentChoice);
   }
 
-  if(d.status === 'waiting' && !['waiting','rejected','returned'].includes(newStatus) && !d.technician){
+  // 🛎️ «تم الإرسال للصيانة» مش محتاج فني — الاستقبال بيبعته والورشة بتختار مين يشتغل
+  if(d.status === 'waiting' && !['waiting','sent_to_repair','received_from_reception','rejected','returned'].includes(newStatus) && !d.technician){
     showError(t('msg.needTech'));
     renderDetail();
     return;
@@ -6297,7 +6607,14 @@ async function changeStatus(newStatus, paymentChoice, rejectedInShopChoice){
   let newPaymentStatus = null;
   let extra = {};
 
-  if(newStatus === 'delivered'){
+  if(newStatus === 'delivered' && isReception()){
+    // 🛎️ الاستقبال بيسلّم **بانتظار الدفع دايماً**:
+    //    • مايلمسش دفتر الحسابات (الآجل بيتقيّد لما المحاسب يدوس
+    //      «📒 قيّده على حساب المحل» من تفاصيل الجهاز)
+    //    • مايحسبش نقط الفني (المحاسب بيراجعها)
+    newPaymentStatus = isPaidDevice(d) ? 'paid' : 'unpaid';
+    historyKey = 'hist.deliveredByReception';
+  } else if(newStatus === 'delivered'){
     const price  = parseInt(d.agreedPrice) || 0;
     // ⚠️ الفرق بين "متسعّر بصفر" و"لسه ماتسعّرش":
     //   الأول قرار (الصيانة ببلاش) → يعدي على مسار الدفع العادي
@@ -6362,6 +6679,27 @@ async function changeStatus(newStatus, paymentChoice, rejectedInShopChoice){
   const dropOwnerHold    = leavingDelivered && newStatus === 'rejected' && !!(d.ownerShare || d.ownerPriced);
   const resetOwnerAnswer = leavingDelivered && newStatus !== 'rejected' && !!d.ownerPriced;
 
+  // 📤 نتيجة الورشة — بتتخزّن مع الجهاز، وبتتكتب في السجل
+  if(outcome){
+    extra.repairOutcome = outcome;
+    historyKey = outcome === 'fixed' ? 'hist.toRecFixed' : 'hist.toRecRejected';
+  }
+  // رجع للورشة تاني؟ النتيجة القديمة مابقاش ليها لازمة
+  if(['sent_to_repair','received_from_reception','diagnosing','repairing'].includes(newStatus)) extra.repairOutcome = null;
+
+  // 📝 تقرير الاستقبال — بيتخزّن جوه الجهاز ويظهر للمحاسب العام في «تقارير الاستقبال»
+  if(needsReport){
+    const nowR = new Date().toISOString();
+    extra.receptionReports = [...(d.receptionReports || []), {
+      id: 'rep_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
+      text: String(opts.report).trim(), from: fromStatus, to: newStatus,
+      by: currentUser.name, at: nowR, reviewed: false
+    }];
+    extra.activityNotes = [...(d.activityNotes || []), {
+      text: '📝 تقرير للمحاسب العام: ' + String(opts.report).trim(),
+      at: nowR, by: currentUser.name, role: currentRoleLabel() }];
+  }
+
   showError('');
   if(newStatus === 'rejected' && d.status !== 'rejected') extra.rejectedInShop = (rejectedInShopChoice !== undefined) ? !!rejectedInShopChoice : true;   // رفض جديد → درج الرفض افتراضياً (أو حسب اختيار الديسباتشر)
   devices = devices.map(x => {
@@ -6369,7 +6707,9 @@ async function changeStatus(newStatus, paymentChoice, rejectedInShopChoice){
     const nx = {
         ...x, ...extra,
         status:newStatus,
-        paymentStatus: newStatus === 'delivered' ? newPaymentStatus : null,
+        // 🛎️ الاستقبال مايقدرش يلغي دفع اتأكد — فبنسيب «مدفوع» زي ما هو
+        paymentStatus: newStatus === 'delivered' ? newPaymentStatus
+                     : ((!canSeeMoney() && x.paymentStatus === 'paid') ? 'paid' : null),
         statusHistory:[...(x.statusHistory||[]), {status:newStatus, label:historyLabel, labelKey:historyKey, labelVars:historyVars, date:new Date().toISOString(), by: currentUser.name}]
       };
     // ⚠️ delete مش «= null»: الحفظ بيبعت الجهاز كله، والمفتاح اللي
@@ -6396,6 +6736,7 @@ async function changeStatus(newStatus, paymentChoice, rejectedInShopChoice){
 //      ٢) purgeFromTrash — الأدمن بإيده
 // ============================================================
 async function deleteDevice(){
+  if(!canSeeMoney()){ alert('الحذف من عند المحاسب بس'); return; }
   const d = devices.find(x => x.id === selectedId);
   if(!d) return;
   const name = `${d.deviceType} ${d.model} — ${d.customerName}`;
@@ -6798,6 +7139,7 @@ document.addEventListener('click', (e) => {
 });
 
 function openSummaries(){
+  if(!myCap('inventory_view')) return;   // 🛎️🏭 الجرد بصلاحية من الأدمن
   invView = null;   // نفتح على القائمة دايماً، مش على آخر عرض
   document.getElementById('menuDropdown').classList.add('hidden');
   shieldGhostClick();
@@ -6917,7 +7259,7 @@ let techPortalAutoOpened = false;  // فتح تلقائي مرة واحدة بس
 // الحالات "النشطة" في البوابة: الشغل الجاري بس.
 // "تم الصيانة" و"تم التسليم" و"تم الرفض" و"المرتجعات" مخفيين تماماً عن الفني —
 // بمجرد ما يدوس "تم الإصلاح" الجهاز يخرج من قائمته (وبيظهر تنبيه إنه اتحرك).
-const TP_ACTIVE = ['waiting','diagnosing','repairing'];
+const TP_ACTIVE = ['waiting','sent_to_repair','received_from_reception','diagnosing','repairing'];
 
 function openTechPortal(name){
   // البوابة التشغيلية للفني بس. المحاسب عنده صفحة المراجعة (openTechDevices) بدالها،
@@ -7592,6 +7934,7 @@ async function syncTrack(d){
       deviceType: d.deviceType || '',
       model: d.model || '',
       status: d.status,
+      outcome: d.repairOutcome || '',   // 🛎️ نتيجة الورشة (fixed / rejected)
       issue: d.reportedIssue || '',
       price: parseInt(d.agreedPrice) || 0,
       returnPrice: parseInt(d.returnPrice) || 0,
@@ -7887,6 +8230,10 @@ function waStatusMsg(d, statusKey){
     waiting:    `أهلاً ${d.customerName} 👋\nتم استلام جهازك *${dev}* بنجاح في I Fix Team ✅\nرقم المتابعة: *${ref}*${priceLine}\nتقدر تتابع حالة جهازك لحظة بلحظة من اللينك ده:\n${trackUrl(d)}\nوهنبعتلك تحديثات أول بأول على الواتساب كمان.`,
     diagnosing: `تحديث جهازك *${dev}* (${ref}) 🔍\nبدأنا الكشف على الجهاز لتحديد العطل بدقة.\nهنوافيك بالتفاصيل أول ما الكشف يخلص.`,
     repairing:  `تحديث جهازك *${dev}* (${ref}) 🔧\nتم تحديد العطل وبدأنا الصيانة فعلياً.${priceLine}`,
+    sent_to_repair: `تحديث جهازك *${dev}* (${ref}) 📤\nالجهاز اتبعت لقسم الصيانة وهيتكشف عليه في أقرب وقت.`,
+    received_from_reception: `تحديث جهازك *${dev}* (${ref}) 🔧\nقسم الصيانة استلم الجهاز وهيبدأ الكشف عليه.`,
+    rejected:   `تحديث جهازك *${dev}* (${ref})\nللأسف تعذّرت صيانة الجهاز 🙏 تقدر تستلمه من المحل في أي وقت.`,
+    sent_to_reception: `خبر حلو! 🎉\nجهازك *${dev}* (${ref}) خلصت صيانته وجاهز للاستلام من المحل.${priceLine}\nمنتظرينك في I Fix Team 🙏`,
     done:       `خبر حلو! 🎉\nجهازك *${dev}* (${ref}) خلصت صيانته وجاهز للاستلام من المحل.${priceLine}\nمنتظرينك في I Fix Team 🙏`,
     delivered:  `تم تسليم جهازك *${dev}* (${ref}) ✅\nشكراً لثقتك في I Fix Team 🌟\nلو حصلت أي ملاحظة بعد الاستلام كلمنا فوراً.`,
     price:      `تحديث جهازك *${dev}* (${ref}) 💰\nتم تحديد تكلفة الصيانة: *${price.toLocaleString('en-EG')} ج.م*\nلو عندك أي استفسار كلمنا، ولو موافق هنكمل الصيانة على طول.`,
@@ -7983,6 +8330,9 @@ function setAddPayType(t){
 async function editPayType(t){
   const d = devices.find(x => x.id === selectedId);
   if(!d) return;
+  // 🛎️ الاستقبال يحدد فوري/آجل قبل التسليم بس — بعد التسليم الدفتر بيتلمس، وده شغل المحاسب
+  if(!canEditPrice()) return;   // 🏭 مدير الإنتاج بيشوف السعر بس
+  if(isReception() && d.status === 'delivered') return;
   const price = parseInt(d.agreedPrice) || 0;
   if(t === d.paymentType && (t !== 'deferred' || isPaidDevice(d))) return;   // مفيش تغيير
 
@@ -8030,6 +8380,7 @@ async function editPayType(t){
 
 // تعديل السعر: أرقام صحيحة — ولو الجهاز "متسلم بس مش متسعر" واتسعر دلوقتي يتحاسب تلقائياً
 async function editPrice(value){
+  if(!canEditPrice()) return;   // 🏭 مدير الإنتاج بيشوف السعر بس
   const price = intPrice(value);
   const d = devices.find(x => x.id === selectedId);
   if(!d) return;
@@ -8044,7 +8395,8 @@ async function editPrice(value){
 
   // تسعير جهاز متسلّم بالفعل ومحدد عليه آجل → يتقيّد على حساب المحل فوراً
   // (لو لسه في المحل، القيد بيستنى لحد التسليم)
-  if(price && d.paymentType === 'deferred' && d.status === 'delivered' && !isPaidDevice(d)){
+  // 🛎️ الاستقبال مايلمسش الدفتر — المحاسب بيقيّده بزرار «📒 قيّده على حساب المحل»
+  if(price && !isReception() && d.paymentType === 'deferred' && d.status === 'delivered' && !isPaidDevice(d)){
     const shop = (d.billedShop || d.shopName || '').trim();
     if(shop){
       extra.paymentStatus = 'paid';
@@ -9037,11 +9389,12 @@ function lastChangeOf(d){
   const h = d.statusHistory || [];
   return h.length ? h[h.length-1].date : d.intakeDate;
 }
-const ACTIVE_STATUSES = ['waiting','diagnosing','repairing','done'];
+// 🛎️ «تم الإرسال للصيانة» و«تم الاستلام من الصيانة» لسه جوه المحل — بيتعدّوا
+const ACTIVE_STATUSES = ['waiting','sent_to_repair','received_from_reception','diagnosing','repairing','done','sent_to_reception'];
 // أجهزة كارت "شغال عليه دلوقتي": اللي بيتشتغل عليها فعلاً — من غير "تم الصيانة" ولا "تم التسليم"، والمرتجع بيفضل
-const OPEN_STATUSES = ['waiting','diagnosing','repairing','returned'];
+const OPEN_STATUSES = ['waiting','sent_to_repair','received_from_reception','diagnosing','repairing','returned'];
 // أجهزة الفني النشطة: لسه ماخلصتش ولا اتسلّمت (بتشمل المرتجع، وبتستبعد "تم الصيانة" و"تم التسليم" و"المرفوض")
-const TECH_ACTIVE_STATUSES = ['waiting','diagnosing','repairing','returned'];
+const TECH_ACTIVE_STATUSES = ['waiting','sent_to_repair','received_from_reception','diagnosing','repairing','returned'];
 
 function stuckDevices(){
   const now = Date.now();
@@ -9335,6 +9688,7 @@ let staffRows = [];
 let staffErr  = '';
 
 function openStaff(){
+  if(!canSeeMoney()) return;   // 🛎️🏭
   document.getElementById('menuDropdown').classList.add('hidden');
   if(typeof shieldGhostClick === 'function') shieldGhostClick();
   const s = document.getElementById('staffSearch'); if(s) s.value = '';
@@ -9559,6 +9913,7 @@ function exportDeliveredUnpaidPdf(list){
 let anPeriod = { mode: 'month', from: '', to: '' };
 
 function openAnalytics(){
+  if(!canSeeMoney()) return;   // 🛎️🏭 الملخص المالي للمحاسب بس
   document.getElementById('menuDropdown').classList.add('hidden');
   shieldGhostClick();
   document.getElementById('analyticsOverlay').classList.remove('hidden');
@@ -9856,6 +10211,7 @@ let teOpenTech = null;
 let teRows = [];
 
 function openTechEval(){
+  if(!canSeeMoney()) return;   // 🛎️🏭 تقييم الفنيين للمحاسب بس
   document.getElementById('menuDropdown').classList.add('hidden');
   shieldGhostClick();
   document.getElementById('techEvalOverlay').classList.remove('hidden');
@@ -10062,6 +10418,7 @@ const BOARD_HEARTBEAT_MS = 5 * 60 * 1000;
 
 async function publishTechBoard(){
   try{
+    if(!canSeeMoney()) return;   // 🛎️ الاستقبال مايكتبش ترتيب الفنيين (ومش مسموحله أصلاً)
     if(!Array.isArray(devices) || !devices.length) return;
     // ⚠️ الترتيب محسوب على آخر ٣٠ يوم — لو الأرشيف لسه بيتحمّل
     //    هيتنشر ترتيب ناقص للفنيين. loadDevices بتنده دي تاني في الآخر.

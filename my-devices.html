@@ -705,6 +705,10 @@ function showLoadError(msg){
 /* ============================================================ */
 const ST = {
   waiting:   {label:t('rp.stWaiting'), c:'--waiting'},
+  // 🛎️🏭 (٢٠٢٦-١٠-١١) موظف الاستقبال + مدير الإنتاج
+  sent_to_repair:          {label:'اتبعت للورشة', c:'--waiting'},          // الاستقبال بعته — مدير الإنتاج لسه ما استلمش
+  received_from_reception: {label:'وصل الورشة', c:'--waiting'},            // مدير الإنتاج استلمه
+  sent_to_reception:       {label:'رجع للاستقبال', c:'--done'},           // خرج من الورشة — خلاص مش في إيد الفني
   diagnosing:{label:t('rp.stDiagnosing'),  c:'--diagnosing'},
   repairing: {label:t('rp.stRepairing'), c:'--repairing'},
   done:      {label:t('rp.stDone'),   c:'--done'},
@@ -713,9 +717,10 @@ const ST = {
   rejected:  {label:t('rp.stRejected'),    c:'--rejected'},
   rejected_shop: {label:'درج الرفض',       c:'--rejected'},
 };
-const ACTIVE = ['waiting','diagnosing','repairing'];   // اللي بيظهر للفني
+// 🛎️ «اتبعت للورشة» شغل جديد للفني — لازم يظهر عنده
+const ACTIVE = ['waiting','sent_to_repair','received_from_reception','diagnosing','repairing'];   // اللي بيظهر للفني
 // حالات "خلصت" — مش بتظهر في الشاشة الرئيسية، بتظهر في نافذة "قطع الغيار" بس
-const DONE_STATES = ['done','delivered','rejected','rejected_shop'];
+const DONE_STATES = ['done','sent_to_reception','delivered','rejected','rejected_shop'];
 // نافذة "قطع الغيار" بتعرض آخر ٤٠ جهاز اتلمسوا عند الفني (بدل آخر ٥ أيام).
 // ليه عدد مش أيام؟ لأن الفني اللي كان أجازة ٦ أيام كان بيفتح يلاقيها فاضية
 // ويضيع عليه يكتب قطع غيار أجهزة قديمة. العدد الثابت دايماً فيه شغل.

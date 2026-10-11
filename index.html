@@ -299,7 +299,8 @@ async function landingByRole(email){
       //    نسيت أزوّد 'hr' فيها، فحساب شؤون العاملين كان بيتحوّل
       //    لمحاسب ويفتح الداشبورد — الدور اتقرا صح، بس الحارس رماه.
       //    **أي دور جديد لازم يتضاف هنا كمان**، مش في ROLES بس.
-      if(['super_admin','accountant','dispatcher','technician','hr','staff','owner'].includes(found)) role = found;
+      // 🛎️🏭 reception و production بيروحوا dashboard.html (الافتراضي تحت)
+      if(['super_admin','accountant','dispatcher','technician','hr','staff','owner','reception','production'].includes(found)) role = found;
     }
   }catch(err){ /* نكمّل بالافتراضي */ }
 
