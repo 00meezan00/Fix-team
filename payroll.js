@@ -501,6 +501,20 @@ function paySlipOvertime(p){
     </div>`;
 }
 
+// ============================================================
+// 💵 سطر «إجازات ما اتاخدتش» (ملف 71)
+// ------------------------------------------------------------
+// الموظف خد إجازات أقل من المسموح → بياخد على كل يوم زيادة فلوس،
+// بعد ما HR تعتمدها. بالموجب وبالأخضر — دي فلوس ليه مش عليه.
+// ============================================================
+function payLeaveBonusLine(p){
+  const v = Number(p && p.leave_bonus || 0);
+  if(!v) return '';
+  return `<div><span>+ إجازات ما اتاخدتش
+      <small style="opacity:.75;">أيام إجازة ما خدتهاش</small></span>
+    <b style="color:var(--p-green)">${payMoney(v)}</b></div>`;
+}
+
 // big = الكشف الحالي: الرقم الكبير فوق. الباقي مضغوط.
 function paySlipCard(p, big){
   return `
@@ -535,6 +549,7 @@ function paySlipCard(p, big){
       <div><span>− إجمالي الخصومات</span><b class="minus">${
         payMoney(Number(p.manual_ded || 0) + Number(p.late_ded || 0))}</b></div>`}
       ${paySlipOvertime(p)}
+      ${payLeaveBonusLine(p)}
       <div class="eq"><span>= الصافي</span><b>${payMoney(p.net)}</b></div>
     </div>
 
@@ -566,6 +581,7 @@ function payPaidSlipCard(p){
         Number(p.overtime_amt) >= 0 ? '+ أوفر تايم' : '− عجز ساعات'}</span>
         <b style="color:${Number(p.overtime_amt) >= 0 ? 'var(--p-green)' : 'var(--p-red)'}">${
           payMoney(Math.abs(Number(p.overtime_amt)))}</b></div>` : ''}
+      ${payLeaveBonusLine(p)}
       <div class="eq"><span>= اللي قبضته</span><b>${payMoney(p.net)}</b></div>
     </div>
     <button class="pay-ok-btn" onclick="payAckSlip('${_payEsc(p.period)}')">👍 فهمت</button>
@@ -781,6 +797,7 @@ function _selfCard(p){
       <div><span>− المسحوبات</span><b class="minus">${payMoney(p.withdraw_ded)}</b></div>
       ${ded ? `<div><span>− الخصومات</span><b class="minus">${payMoney(ded)}</b></div>` : ''}
       ${paySlipOvertime(p)}
+      ${payLeaveBonusLine(p)}
       <div class="eq"><span>= الصافي</span><b${net < 0 ? ' style="color:var(--p-red)"' : ''}>${payMoney(net)}</b></div>
     </div>
 
