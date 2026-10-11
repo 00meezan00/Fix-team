@@ -2053,7 +2053,9 @@ function render(){
   const mine   = devices.filter(d => d.tech===ME   && ACTIVE.includes(d.status) && match(d));
   const assist = devices.filter(d => d.assist===ME && ACTIVE.includes(d.status) && match(d));
   // المرتجعات: أي جهاز رجع والفني ده شغّال عليه — أساسي أو بديل
-  const returns = devices.filter(d => d.status==='returned' && (d.tech===ME || d.assist===ME) && match(d));
+  // 🔁 المرتجع اللي لسه عند الاستقبال (returnInbound) مابيظهرش — لحد ما مدير الإنتاج يستلمه
+  const returns = devices.filter(d => d.status==='returned' && !(d._raw && d._raw.returnInbound)
+                                  && (d.tech===ME || d.assist===ME) && match(d));
   // ℹ️ خانة "شغلي آخر ٥ أيام" اتشالت من هنا خالص.
   //    بقت "🔩 قطع الغيار" جوه قايمة ⋮ فوق — عشان الشاشة الرئيسية
   //    تفضل للشغل اللي في إيد الفني دلوقتي بس.

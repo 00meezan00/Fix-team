@@ -121,14 +121,22 @@ const RECEPTION_NEXT = {
   // 📥 صندوق الاستلام: الاستقبال بيقرر الجهاز يروح فين
   sent_to_reception: ['fixed_drawer', 'delivered', 'rejected', 'sent_to_repair'],
   fixed_drawer:      ['delivered', 'rejected', 'sent_to_repair'],
-  delivered:         ['returned'],
+  // ↩️ (تصحيح الغلط) اتسلّم بالغلط → يرجع درج الخالص · اترفض بالغلط → درج الخالص أو الورشة
+  //    مسموح — بس بتقرير بيوصل للمحاسب العام (RECEPTION_NEEDS_REPORT تحت)
+  delivered:         ['returned', 'fixed_drawer'],
+  rejected:          ['fixed_drawer', 'sent_to_repair'],
   returned:          ['sent_to_repair', 'delivered', 'rejected'],
 };
 const RECEPTION_NEEDS_REPORT = {
   waiting:        ['delivered', 'rejected'],
   sent_to_repair: ['delivered', 'rejected'],
   returned:       ['delivered', 'rejected'],
+  // ↩️ تصحيح غلط — بيحصل عادي، بس بيتسجّل ويوصل للمحاسب العام
+  delivered:      ['fixed_drawer'],
+  rejected:       ['fixed_drawer', 'sent_to_repair'],
 };
+// الحركات اللي فوق دي «تصحيح» مش «خروج» — عشان صياغة خانة التقرير
+const RECEPTION_UNDO = { delivered: ['fixed_drawer'], rejected: ['fixed_drawer', 'sent_to_repair'] };
 const RECEPTION_ACTIONS = ['waiting', 'sent_to_repair', 'fixed_drawer', 'delivered', 'rejected', 'returned'];
 
 // ============================================================

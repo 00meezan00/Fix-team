@@ -5410,15 +5410,41 @@ function roleReturnPriceHtml(d){
     return `<div class="detail-row" style="margin-bottom:10px;">${lbl}
       <span style="font-weight:800;">${has ? esc(d.returnPrice) + ' ج.م' : '<span style="color:var(--muted)">لسه ماتسعّرش</span>'}</span></div>`;
   }
-  const locked = d.returnPaymentStatus === 'paid';
+  const locked = d.returnPaymentStatus === 'paid';   // مش مقفول — بس أي تعديل بيطلب سبب
   return `<label class="field">${lbl}
-      <input type="text" inputmode="numeric" value="${esc(d.returnPrice||'')}"${locked ? ' readonly' : ''}
+      <input type="text" inputmode="numeric" value="${esc(d.returnPrice||'')}"
              oninput="fixDigitsInput(this)" onblur="editReturnPrice(this.value)" placeholder="${t('det.returnPricePh')}" /></label>
     ${locked
-      ? `<div style="font-size:12.5px;color:var(--muted);margin:-4px 0 12px;">🔒 الحساب ده اتحصّل أو اتقيّد على حساب المحل — أي تعديل من عند المحاسب</div>`
+      ? `<div style="font-size:12.5px;color:var(--muted);margin:-4px 0 12px;">🔒 الحساب ده اتحصّل أو اتقيّد — لو عدّلته هيطلب منك سبب يوصل للمحاسب العام</div>`
       : (d.returnPaymentType === 'deferred'
           ? `<div style="font-size:12.5px;color:var(--muted);margin:-4px 0 12px;">📒 آجل — المحاسب هو اللي بيقيّده على حساب المحل</div>`
           : '')}`;
+}
+
+// ============================================================
+// 💰 تعديل فلوس بعد ما اتدفعت/اتقيّدت — مسموح، بس بسبب
+// ------------------------------------------------------------
+// 🧸 الاستقبال ممكن يكون كتب السعر غلط. مش هنمنعه يصلّح —
+//    بس بيكتب السبب، والتقرير بيوصل للمحاسب العام في «تقارير الاستقبال»
+//    عشان يظبط الخزنة أو كشف حساب المحل لو محتاج.
+//    ماكتبش سبب؟ → التعديل مابيحصلش. (والسيرفر بيرفضه كمان — ملف 83)
+// ============================================================
+function paidChangeReport(d, what, oldV, newV, ledgerHint){
+  const why = (prompt('💰 ' + what + ' ده اتدفع أو اتقيّد على حساب المحل.\n'
+    + 'هتغيّره من ' + (oldV || '—') + ' لـ ' + (newV || '—') + ' ج.م\n\n'
+    + 'اكتب السبب — هيوصل للمحاسب العام يراجعه:', '') || '').trim();
+  if(why.length < 3){ if(why) alert('اكتب السبب بوضوح'); return null; }
+  const now  = new Date().toISOString();
+  const text = '💰 تعديل ' + what + ' بعد الدفع: من ' + (oldV || '—') + ' إلى ' + (newV || '—') + ' ج.م'
+             + (ledgerHint ? '\n⚠️ متقيّد آجل على حساب المحل — كشف الحساب محتاج يتظبط' : '')
+             + '\nالسبب: ' + why;
+  return {
+    receptionReports: [...(d.receptionReports || []), {
+      id: 'rep_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
+      kind: 'money', text, from: d.status, to: d.status,
+      by: currentUser.name, at: now, reviewed: false }],
+    activityNotes: [...(d.activityNotes || []), { text: '📝 ' + text, at: now, by: currentUser.name, role: currentRoleLabel() }]
+  };
 }
 
 // أزرار الحالة للاستقبال ومدير الإنتاج: نفس الترتيب، والزرار اللي مينفعش دلوقتي باهت
@@ -5469,8 +5495,11 @@ function reportBoxHtml(d){
   if(!reportAsk || reportAsk.id !== d.id) return '';
   const to = statusInfo(reportAsk.to);
   return `<div class="rfr-box" style="background:var(--warn-bg);border-color:var(--warn);">
-    <div class="rfr-q">📝 الجهاز هيخرج «${esc(to ? (reportAsk.to === 'delivered' ? 'تم التسليم' : stLabel(to)) : reportAsk.to)}» من غير ما يعدّي على مدير الإنتاج.
-      اكتب تقرير بالسبب — هيوصل للمحاسب العام يراجعه.</div>
+    ${(typeof RECEPTION_UNDO !== 'undefined' && (RECEPTION_UNDO[d.status] || []).includes(reportAsk.to))
+      ? `<div class="rfr-q">↩️ بتصحّح حركة: «${esc(stLabel(statusInfo(effStatus(d))) || d.status)}» ← «${esc(to ? stLabel(to) : reportAsk.to)}».
+      اكتب حصل إيه (مثلاً: اتسلّم بالغلط) — هيوصل للمحاسب العام.</div>`
+      : `<div class="rfr-q">📝 الجهاز هيخرج «${esc(to ? (reportAsk.to === 'delivered' ? 'تم التسليم' : stLabel(to)) : reportAsk.to)}» من غير ما يعدّي على مدير الإنتاج.
+      اكتب تقرير بالسبب — هيوصل للمحاسب العام يراجعه.</div>`}
     <textarea id="recReportText" rows="3" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:14px;font-family:inherit;background:var(--surface);color:var(--ink);" placeholder="مثال: العميل رجع خد الجهاز قبل ما يتبعت للورشة لأنه مستعجل"></textarea>
     <div class="pay-choice" style="margin-top:8px;">
       <button type="button" class="pay-btn" style="border-color:var(--warn);background:var(--warn);color:#fff;" onclick="submitReceptionReport()">📤 ابعت التقرير وكمّل</button>
@@ -5506,7 +5535,7 @@ function reportsPanelHtml(){
   const lbl = k => { const s = statusInfo(k); return k === 'delivered' ? 'تم التسليم' : (s ? stLabel(s) : k); };
   const rows = list.map(({d, r}) => `<div class="appr-row">
       <div class="appr-row-info" style="cursor:pointer;" onclick="openDetail('${d.id}')">
-        <div class="appr-row-dev"><span class="appr-row-kind" style="background:var(--warn-bg);color:var(--warn);">📝 ${esc(lbl(r.from))} ← ${esc(lbl(r.to))}</span>📱 ${esc(d.deviceType)} ${esc(d.model)}${d.customerName ? ' — ' + esc(d.customerName) : ''}</div>
+        <div class="appr-row-dev"><span class="appr-row-kind" style="background:var(--warn-bg);color:var(--warn);">${r.kind === 'money' ? '💰 تعديل فلوس بعد الدفع' : '📝 ' + esc(lbl(r.from)) + ' ← ' + esc(lbl(r.to))}</span>📱 ${esc(d.deviceType)} ${esc(d.model)}${d.customerName ? ' — ' + esc(d.customerName) : ''}</div>
         <div style="font-size:13.5px;line-height:1.7;margin-top:5px;white-space:pre-wrap;">${esc(r.text)}</div>
         <div class="appr-row-meta">🛎️ ${esc(r.by || '')} · ${new Date(r.at).toLocaleString(getLocale())}</div>
       </div>
@@ -6826,6 +6855,17 @@ async function changeStatus(newStatus, paymentChoice, rejectedInShopChoice, opts
     }
   }
 
+  // 🚫 الاستقبال بيسلّم جهاز الورشة قالت عليه «مرفوض» — نسأل، ولو أكّد نسجّل
+  let deliverRejectedNote = null;
+  if(isReception() && newStatus === 'delivered' && d.repairOutcome === 'rejected'
+     && ['sent_to_reception', 'fixed_drawer'].includes(d.status)){
+    if(!confirm('⚠️ الورشة قالت الجهاز ده «مرفوض» 🚫\n\n'
+      + 'لو العميل هياخده من غير صيانة → دوس «إلغاء» واختار «درج الرفض».\n'
+      + 'لو اتصلّح فعلاً وهيتسلّم بسعره → دوس «OK».')){ renderDetail(); return; }
+    deliverRejectedNote = { text: '⚠️ اتسلّم بسعره رغم إن الورشة قالت «مرفوض» — الاستقبال أكّد إنه اتصلّح',
+      at: new Date().toISOString(), by: currentUser.name, role: currentRoleLabel() };
+  }
+
   // 📤 «تم الإرسال للاستقبال» لازم معاها إجابة: اتحلّت ولا اترفض؟
   //    أول دوسة بتسأل بس (toRecBoxHtml) — والإجابة بترجع هنا تاني.
   //    🆕 في الحالتين الجهاز بيقع في صندوق الاستلام عند الاستقبال
@@ -6982,6 +7022,8 @@ async function changeStatus(newStatus, paymentChoice, rejectedInShopChoice, opts
       extra.activityNotes = [...extra.activityNotes, approvalActivityNote({ ...pa, status:'approved', decidedBy: currentUser.name, decidedAt: nowR }, 'approved')];
     }
   }
+
+  if(deliverRejectedNote) extra.activityNotes = [...(extra.activityNotes || d.activityNotes || []), deliverRejectedNote];
 
   showError('');
   if(newStatus === 'rejected' && d.status !== 'rejected') extra.rejectedInShop = (rejectedInShopChoice !== undefined) ? !!rejectedInShopChoice : true;   // رفض جديد → درج الرفض افتراضياً (أو حسب اختيار الديسباتشر)
@@ -8676,6 +8718,13 @@ async function editPrice(value){
   let extra = { agreedPrice: price, lastModifiedAt: new Date().toISOString(), lastModifiedBy: currentUser.name };
   let histEntry = null;
 
+  // 💰 الاستقبال بيعدّل سعر اتدفع/اتقيّد → بسبب يوصل للمحاسب العام
+  if(isReception() && isPaidDevice(d) && String(price) !== String(d.agreedPrice || '')){
+    const rep = paidChangeReport(d, 'السعر', d.agreedPrice, price, d.paymentType === 'deferred');
+    if(!rep){ renderDetail(); return; }
+    Object.assign(extra, rep);
+  }
+
   // لو السعر اتغيّر فعلياً والجهاز لسه ما اتسلّمش، نطلب تأكيد العميل من جديد
   if(price !== '' && price !== d.agreedPrice && d.status !== 'delivered'){
     extra.priceConfirmation = { requested: true, requestedAt: new Date().toISOString() };
@@ -9116,17 +9165,18 @@ async function editReturnPrice(value){
   if(price === oldPrice) return;                       // مفيش تغيير
   // 🏭 مدير الإنتاج بيشوف بس · 🛎️ الاستقبال مايعدّلش حساب اتحصّل/اتقيّد
   if(isProduction() || isCashier()){ renderDetail(); return; }
-  if(isReception() && d.returnPaymentStatus === 'paid'){
-    alert('الحساب ده اتحصّل أو اتقيّد على حساب المحل — التعديل من عند المحاسب.');
-    renderDetail();
-    return;
-  }
   const isRetNow = d.status === 'returned';
   let extra = { returnPrice: price, lastModifiedAt: new Date().toISOString(), lastModifiedBy: currentUser.name };
   let histEntry = null;
   const entry = curReturnEntry(d);
+  // 💰 الاستقبال بيعدّل مرتجع اتدفع/اتقيّد → بسبب يوصل للمحاسب العام (ومابيلمسش الدفتر)
+  if(isReception() && d.returnPaymentStatus === 'paid'){
+    const rep = paidChangeReport(d, 'تكلفة الصيانة الجديدة', oldPrice, price, !!entry);
+    if(!rep){ renderDetail(); return; }
+    Object.assign(extra, rep);
+  }
 
-  if(entry){
+  if(entry && !isReception()){
     // ============================================================
     // ✏️ المرتجع متقيّد آجل على حساب المحل بالفعل → نعدّل القيد نفسه
     // ------------------------------------------------------------
