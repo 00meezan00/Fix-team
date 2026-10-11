@@ -165,6 +165,8 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
     --sent_to_repair:#0E7490; --sent_to_repair-bg:#E6F4F7;
     --received_from_reception:#4338CA; --received_from_reception-bg:#EEF0FB;
     --sent_to_reception:#4D7C0F; --sent_to_reception-bg:#EEF6E2;
+    /* 🔴 «المرفوض» — الفني رفضه وهو لسه جوه الورشة */
+    --workshop_rejected:#B91C1C; --workshop_rejected-bg:#FDECEC;
     --diagnosing:#6E56CF; --diagnosing-bg:#F1EEFB;
     --repairing:#2B6CB0; --repairing-bg:#EAF1F8;
     --done:#15803D; --done-bg:#EAF6EE;
@@ -204,6 +206,7 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
     --sent_to_repair:#38BDF8;   --sent_to_repair-bg:rgba(56,189,248,.14);
     --received_from_reception:#818CF8; --received_from_reception-bg:rgba(129,140,248,.15);
     --sent_to_reception:#A3E635; --sent_to_reception-bg:rgba(163,230,53,.13);
+    --workshop_rejected:#FB7185; --workshop_rejected-bg:rgba(251,113,133,.15);
     --diagnosing:#A78BFA;       --diagnosing-bg:rgba(167,139,250,.15);
     --repairing:#7BA9DC;        --repairing-bg:rgba(123,169,220,.15);
     --done:#4ADE80;             --done-bg:rgba(74,222,128,.14);
@@ -4314,7 +4317,7 @@ function rcCardChips(d, s){
   if(s && real !== s.key){
     const ri = statusInfo(real);
     // 🛎️ «تم الصيانة» مابيبانش للاستقبال — لحد ما مدير الإنتاج يبعته «درج الخالص»
-    if(isReception() && real === 'done') h += `<span class="rc-chip" style="background:${accentBg('repairing')};color:${accent('repairing')}">📍 🔧 في الورشة</span> `;
+    if(isReception() && (real === 'done' || real === 'workshop_rejected')) h += `<span class="rc-chip" style="background:${accentBg('repairing')};color:${accent('repairing')}">📍 🔧 في الورشة</span> `;
     else if(ri) h += `<span class="rc-chip" style="background:${accentBg(ri.varname)};color:${accent(ri.varname)}">📍 ${esc(stLabel(ri))}</span> `;
   }
   h += outcomeChip(d);
@@ -5321,7 +5324,8 @@ let reportAsk  = null;   // { id, to } — الاستقبال لازم يكتب 
 function receptionWhereHtml(d){
   let st = effStatus(d);
   // 🛎️ «تم الصيانة» مابيبانش للاستقبال — بيشوفه «جاري الصيانة» لحد ما مدير الإنتاج يبعته
-  if(st === 'done') st = 'repairing';
+  // 🔴 ونفس الكلام لـ«المرفوض» — الاستقبال مايعرفش إنه اترفض لحد ما مدير الإنتاج يقرر
+  if(st === 'done' || st === 'workshop_rejected') st = 'repairing';
   const si = statusInfo(st);
   if(!si) return '';
   const inWs = RECEPTION_IN_WORKSHOP.includes(st);
@@ -6731,6 +6735,13 @@ async function changeStatus(newStatus, paymentChoice, rejectedInShopChoice, opts
   //    اترفض → الجهاز بيروح «درج الرفض» على طول (مش «درج الخالص»).
   let outcome = null;
   if(newStatus === 'sent_to_reception'){
+    // 🧸 الصندوق اللي الجهاز واقف فيه هو اللي بيقول الإجابة:
+    //    🟢 «تم الصيانة» → اتحلّت · 🔴 «المرفوض» → اترفض — من غير سؤال.
+    //    أي خانة قبلهم (كشف / صيانة / استلام) → بنسأل زي الأول.
+    if(opts.outcome !== 'fixed' && opts.outcome !== 'rejected'){
+      if(d.status === 'done')              opts.outcome = 'fixed';
+      else if(d.status === 'workshop_rejected') opts.outcome = 'rejected';
+    }
     if(opts.outcome !== 'fixed' && opts.outcome !== 'rejected'){
       toRecAskId = d.id;
       renderDetail();
@@ -6835,7 +6846,7 @@ async function changeStatus(newStatus, paymentChoice, rejectedInShopChoice, opts
     historyKey = outcome === 'fixed' ? 'hist.toRecFixed' : 'hist.toRecRejected';
   }
   // رجع للورشة تاني؟ النتيجة القديمة مابقاش ليها لازمة
-  if(['sent_to_repair','received_from_reception','diagnosing','repairing'].includes(newStatus)) extra.repairOutcome = null;
+  if(['sent_to_repair','received_from_reception','diagnosing','repairing','done','workshop_rejected'].includes(newStatus)) extra.repairOutcome = null;
 
   // 📝 تقرير الاستقبال — بيتخزّن جوه الجهاز ويظهر للمحاسب العام في «تقارير الاستقبال»
   if(needsReport){
@@ -9550,7 +9561,7 @@ function lastChangeOf(d){
   return h.length ? h[h.length-1].date : d.intakeDate;
 }
 // 🛎️ «تم الإرسال للصيانة» و«تم الاستلام من الصيانة» لسه جوه المحل — بيتعدّوا
-const ACTIVE_STATUSES = ['waiting','sent_to_repair','received_from_reception','diagnosing','repairing','done','sent_to_reception'];
+const ACTIVE_STATUSES = ['waiting','sent_to_repair','received_from_reception','diagnosing','repairing','done','workshop_rejected','sent_to_reception'];
 // أجهزة كارت "شغال عليه دلوقتي": اللي بيتشتغل عليها فعلاً — من غير "تم الصيانة" ولا "تم التسليم"، والمرتجع بيفضل
 const OPEN_STATUSES = ['waiting','sent_to_repair','received_from_reception','diagnosing','repairing','returned'];
 // أجهزة الفني النشطة: لسه ماخلصتش ولا اتسلّمت (بتشمل المرتجع، وبتستبعد "تم الصيانة" و"تم التسليم" و"المرفوض")

@@ -716,11 +716,13 @@ const ST = {
   returned:  {label:t('rp.stReturned'),    c:'--returned'},
   rejected:  {label:t('rp.stRejected'),    c:'--rejected'},
   rejected_shop: {label:'درج الرفض',       c:'--rejected'},
+  // 🔴 (٢٠٢٦-١٠-١١) الفني رفضه — مستني مدير الإنتاج يبعته للاستقبال
+  workshop_rejected: {label:'المرفوض',     c:'--rejected'},
 };
 // 🛎️ «اتبعت للورشة» شغل جديد للفني — لازم يظهر عنده
 const ACTIVE = ['waiting','sent_to_repair','received_from_reception','diagnosing','repairing'];   // اللي بيظهر للفني
 // حالات "خلصت" — مش بتظهر في الشاشة الرئيسية، بتظهر في نافذة "قطع الغيار" بس
-const DONE_STATES = ['done','sent_to_reception','delivered','rejected','rejected_shop'];
+const DONE_STATES = ['done','workshop_rejected','sent_to_reception','delivered','rejected','rejected_shop'];
 // نافذة "قطع الغيار" بتعرض آخر ٤٠ جهاز اتلمسوا عند الفني (بدل آخر ٥ أيام).
 // ليه عدد مش أيام؟ لأن الفني اللي كان أجازة ٦ أيام كان بيفتح يلاقيها فاضية
 // ويضيع عليه يكتب قطع غيار أجهزة قديمة. العدد الثابت دايماً فيه شغل.
@@ -1208,7 +1210,7 @@ function ticketHtml(d, canAct){
       ${(!isRet && d.status!=='repairing') ? `<button class="act act-work" onclick="event.stopPropagation();setStatus('${d.id}','repairing')" data-i18n="tp.working">🔧 جاري العمل</button>` : ''}
       ${(d.status!=='done') ? `<button class="act act-done" onclick="event.stopPropagation();setStatus('${d.id}','done')" data-i18n="tp.fixed">✅ تم الإصلاح</button>` : ''}
       <button class="act act-prob" onclick="event.stopPropagation();editIssue('${d.id}')" data-i18n="tp.editIssue">🛠️ تعديل العطل</button>
-      <button class="act act-rej" onclick="event.stopPropagation();rejectDevice('${d.id}')" data-i18n="tp.reject">🗄️ درج الرفض</button>
+      <button class="act act-rej" onclick="event.stopPropagation();rejectDevice('${d.id}')" data-i18n="tp.reject">🚫 المرفوض</button>
     </div>`;
   return `<div class="ticket ${canAct?'':'assist'}" style="--sp:var(${s.c});" onclick="openSheet('${d.id}')">
     <div class="tk-top">
@@ -1255,7 +1257,8 @@ let RW = { open: false, needAtOpen: 0 };
 
 // الجهاز المرفوض — «درج الرفض» مش حالة متخزّنة، هو rejected + علامة
 // rejectedInShop. بنحط الاتنين احتياطي لو اتخزّنت في يوم.
-function rwIsRejected(d){ return d.status === 'rejected' || d.status === 'rejected_shop'; }
+// 🔴 «المرفوض» (الفني رفضه وهو لسه في الورشة) — نفس السؤال: القطع رجعت؟
+function rwIsRejected(d){ return d.status === 'rejected' || d.status === 'rejected_shop' || d.status === 'workshop_rejected'; }
 
 // الجملة اللي بتتكتب في خانة قطع الغيار لما الفني يدوس زرار
 // «الجهاز خلص ومحتاجش قطع غيار». بنخزّنها كلام عادي في نفس الخانة
@@ -2074,9 +2077,12 @@ function render(){
 
 /* ===== أكشنز ===== */
 // الرفض بيخرّج الجهاز من قايمة الفني نهائياً، فبيتأكد الأول
+// 🔴 (٢٠٢٦-١٠-١١) الجهاز بيروح «المرفوض» جوه الورشة — مش «درج الرفض».
+//    🧸 مدير الإنتاج هو اللي بيبعته للاستقبال بعد كده، والاستقبال
+//       مابيشوفوش غير لما يوصل «درج الرفض» عنده.
 async function rejectDevice(id){
   if(!confirm(t('tp.rejectConfirm'))) return;
-  await setStatus(id, 'rejected');
+  await setStatus(id, 'workshop_rejected');
 }
 
 async function setStatus(id, st){

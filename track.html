@@ -269,7 +269,8 @@ function renderTrack(data){
   //   🧸 العميل مالوش دعوة بالتفاصيل الداخلية — بنوريه المعنى بس.
   // ============================================================
   let st = data.status;
-  const sentToRepair = (st === 'sent_to_repair' || st === 'received_from_reception');
+  // 🔴 «المرفوض» كمان — العميل مايعرفش إنه اترفض لحد ما مدير الإنتاج يقرر ويبعته
+  const sentToRepair = (st === 'sent_to_repair' || st === 'received_from_reception' || st === 'workshop_rejected');
   if(st === 'sent_to_reception') st = 'done';
   const special = $('specialBox');
   special.style.display = 'none';
