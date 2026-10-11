@@ -464,6 +464,20 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
   .ph1-today-n{font-family:'Cairo',sans-serif; font-weight:900; font-size:28px; color:var(--success); line-height:1.1;}
   .ph1-today-n small{font-size:14px; font-weight:800;}
   .ph1-today-s{font-size:12.5px; color:var(--muted); font-weight:700; margin-inline-start:auto;}
+  /* 🔔 (٢٠٢٦-١٠-١٢) أوض الإشعارات — الشريط بنفس شكل شريط «مرتبك» (payroll.js) */
+  .ntf-banner{display:flex; align-items:center; gap:9px; cursor:pointer;
+    background:#B45309; color:#fff; padding:11px 14px; border-bottom:1px solid rgba(255,255,255,.18);
+    font:800 13px/1.6 'Tajawal',system-ui,sans-serif; text-align:start;}
+  .ntf-banner .ntf-bell{font-size:16px; animation:ntfRing 2.2s ease-in-out infinite;}
+  .ntf-banner .ntf-bn-txt{flex:1; min-width:0;}
+  .ntf-banner .ntf-bn-go{flex:none; background:rgba(255,255,255,.2); border-radius:8px; padding:5px 10px; font-size:12px; white-space:nowrap;}
+  @keyframes ntfRing{0%,88%,100%{transform:rotate(0)} 91%{transform:rotate(14deg)} 95%{transform:rotate(-14deg)}}
+  @media (prefers-reduced-motion:reduce){ .ntf-banner .ntf-bell{animation:none;} }
+  .ntf-dot{position:absolute; top:5px; inset-inline-start:5px; width:9px; height:9px; border-radius:50%;
+    background:#DC2626; box-shadow:0 0 0 2px rgba(255,255,255,.75); pointer-events:none;}
+  .ntf-n{display:inline-block; background:#DC2626; color:#fff; border-radius:10px; padding:1px 7px;
+    font-size:11.5px; font-weight:800; margin-inline-start:4px;}
+  .ntf-page .spn-panel, .ntf-page .appr-panel{margin:0 0 12px;}
   /* 🚀🚀 المرحلة التانية */
   .ph2-close-row{display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;
     margin:8px 22px 0; padding:10px 14px; background:var(--surface); border:1px solid var(--border);
@@ -1606,6 +1620,16 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
     <!-- 🔔 (المرحلة ٣) للاستقبال · مدير الإنتاج · أمين الخزنة · المحاسب العام -->
     <button class="push-menu-item" onclick="openPushSettings()">🔔 إشعارات الموبايل</button>
 
+    <!-- 🔔 (٢٠٢٦-١٠-١٢) أوض الإشعارات — للاستقبال · مدير الإنتاج · أمين الخزنة.
+         syncNtf بيظهّر بتاعة كل دور وبيحط العدد. العنوان بيستخبى لوحده لو كلهم مستخبيين. -->
+    <div class="mh mh-ntf">🔔 الإشعارات</div>
+    <button id="ntfBtn_inbox"   style="display:none;" onclick="openNtf('inbox')">📥 الوارد</button>
+    <button id="ntfBtn_late"    style="display:none;" onclick="openNtf('late')">⏰ المتأخرين</button>
+    <button id="ntfBtn_sleep"   style="display:none;" onclick="openNtf('sleep')">😴 نايمين في الدرج</button>
+    <button id="ntfBtn_appr"    style="display:none;" onclick="openNtf('appr')">✅ طلبات مسؤول الحركة</button>
+    <button id="ntfBtn_deposit" style="display:none;" onclick="openNtf('deposit')">💰 العرابين</button>
+    <button id="ntfBtn_reports" style="display:none;" onclick="openNtf('reports')">📝 تقاريري</button>
+
     <div class="mh mh-shop">🏪 المحل</div>
     <button class="money-menu-item" onclick="openAnalytics()">📊 الملخص المالي</button>
     <button class="money-menu-item" onclick="openAccounts()">📒 الحسابات</button>
@@ -1638,6 +1662,8 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
 
 <div id="sysBanner" class="sys-banner hidden"></div>
 <div id="errorBar" class="error-bar hidden"></div>
+<!-- 🔔 شرايط «حصل تحديث في شاشة …» — للاستقبال ومدير الإنتاج وأمين الخزنة (syncNtf) -->
+<div id="ntfBanners"></div>
 <div id="approvalsHost"></div>
 <!-- ⏸️ أجهزة المالك قال إنها لسه في الصيانة — للسوبر أدمن بس -->
 <div id="ownerHoldHost"></div>
@@ -2002,6 +2028,18 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
       <button class="close-btn" onclick="closeStageTimes()">×</button>
     </div>
     <div id="stageBody" style="padding:12px 20px 40px;"></div>
+  </div>
+</div>
+
+<!-- 🔔 أوضة الإشعارات (واحدة لكل الأنواع — العنوان والمحتوى بيتغيّروا) -->
+<!-- ⚠️ z-index 29: «افتح الخانة كلها» (30) وتفاصيل الجهاز (50) لازم يطلعوا فوقها -->
+<div id="ntfOverlay" class="overlay hidden" style="align-items:stretch; justify-content:stretch; padding:0; overflow-y:auto; z-index:29;">
+  <div class="summaries-page">
+    <div class="modal-head" style="padding:16px 20px;">
+      <h2 id="ntfTitle">🔔</h2>
+      <button class="close-btn" onclick="closeNtf()">×</button>
+    </div>
+    <div id="ntfBody" style="padding:12px 20px 40px;"></div>
   </div>
 </div>
 
@@ -3994,17 +4032,161 @@ function render(){
   refreshOpenOverlays();
 }
 
+// ############################################################
+// 🔔 صفحات الإشعارات — الاستقبال · مدير الإنتاج · أمين الخزنة (٢٠٢٦-١٠-١٢)
+// ------------------------------------------------------------
+// 🧸 بالبلدي: اللوحات اللي كانت بتتكوّم فوق الشاشة الرئيسية بقت
+//    «أوض» في القايمة ⋮ تحت عنوان «🔔 الإشعارات». كل أوضة ليها خانة.
+//    لما يجي حاجة جديدة — بالظبط زي «💰 مرتبك»:
+//      ١) جنب اسم الخانة رقم: «📥 وصلك من الصيانة (3)»
+//      ٢) نقطة حمرا على زرار ⋮ (القايمة مقفولة — لازم تعرف إن فيه حاجة)
+//      ٣) شريط برتقاني فوق: «🔔 حصل تحديث في شاشة … — افتح ›»
+//         الدوسة عليه بتدخلك الأوضة على طول.
+//    الشريط والنقطة بيختفوا أول ما تفتح الأوضة (شفتها)، ويرجعوا لو جه
+//    حاجة **جديدة**. الرقم جنب الخانة بيفضل طول ما فيه شغل مستنيك.
+//
+// ⚠️ «شفتها» محفوظة على الموبايل نفسه (localStorage) — زي «تمام» في
+//    إشعار المخزن. ده تنبيه بس؛ الشغل نفسه متخزّن جوه الأجهزة.
+// ⚠️ المحاسب العام مالوش دعوة — شاشته زي ما هي (اللوحات فوق).
+// ⚠️ شريط «اتحصّل النهارده» و«قفّل الخزنة» عند أمين الخزنة فاضلين
+//    مكانهم — دول أدوات شغل مش إشعارات.
+// ############################################################
+function ntfOn(){ return isReception() || isProduction() || isCashier(); }
+
+// كل أوضة: مين يشوفها · بتعدّ إيه · كل حاجة جواها ليها «بصمة» (عشان نعرف الجديد)
+const NTF_PAGES = [
+  { k:'inbox',   label: () => isReception() ? '📥 وصلك من الصيانة' : '📥 وارد من الاستقبال',
+    on: () => isReception() || isProduction(),
+    keys: () => inboxList().map(x => x.d.id + '@' + x.at),
+    html: () => inboxPanelHtml() },
+  { k:'late',    label: () => '⏰ أجهزة متأخرة في الورشة',
+    on: () => isProduction(),
+    keys: () => devices.filter(d => lateInfo(d)).map(d => d.id + '@' + d.status),
+    html: () => { lateOpen = true; return latePanelHtml(); } },
+  { k:'sleep',   label: () => '😴 أجهزة نايمة في الدرج',
+    on: () => isReception(),
+    keys: () => sleepList().map(x => x.d.id + '@' + x.at),
+    html: () => { sleepOpen = true; return sleepPanelHtml(); } },
+  { k:'appr',    label: () => '✅ طلبات مسؤول الحركة',
+    on: () => isReception() && canApprove(),
+    keys: () => pendingApprovals().map(d => d.id + '@' + ((d.pendingApproval || {}).requestedAt || '')),
+    html: () => approvalsPanelHtml() },
+  { k:'deposit', label: () => '💰 العرابين',
+    on: () => isCashier() || isReception(),
+    keys: () => devices.filter(d => isCashier()
+                  ? ((d.depositStatus === 'pending' && depAmt(d) > 0) || depRefundStep(d) === 'cash')
+                  : depRefundStep(d) === 'rec')
+                .map(d => d.id + '@' + (d.depositStatus || '') + '@' + (depRefundStep(d) || '')),
+    html: () => isCashier() ? depositPanelHtml() : depositRecPanelHtml() },
+  { k:'reports', label: () => '📝 تقاريري',
+    on: () => isReception() || isCashier(),
+    // 🧸 «الجديد» هنا = تقرير المحاسب العام راجعه — والرقم = اللي لسه مستني مراجعة
+    keys: () => myReports().filter(x => x.r.reviewed).map(x => x.r.id + '@ok'),
+    count: () => myReports().filter(x => !x.r.reviewed).length,
+    html: () => { myRepOpen = true; return myReportsPanelHtml(); } },
+];
+const NTF_SEEN_KEY = 'ifix_ntf_seen';
+let ntfOpenK = null;
+
+function ntfSeenAll(){ try{ return JSON.parse(localStorage.getItem(NTF_SEEN_KEY) || '{}') || {}; }catch(e){ return {}; } }
+function ntfMarkSeen(k){
+  const p = NTF_PAGES.find(x => x.k === k);
+  if(!p) return;
+  const all = ntfSeenAll();
+  all[k] = p.keys();   // اللي موجود دلوقتي بس — القايمة مبتكبرش للأبد
+  try{ localStorage.setItem(NTF_SEEN_KEY, JSON.stringify(all)); }catch(e){}
+}
+// فيه حاجة في الأوضة دي ماشفتهاش؟
+function ntfHasNew(p){
+  const seen = new Set(ntfSeenAll()[p.k] || []);
+  return p.keys().some(x => !seen.has(x));
+}
+function ntfCount(p){ try{ return p.count ? p.count() : p.keys().length; }catch(e){ return 0; } }
+
+// ---------- المزامنة: الخانات + النقطة + الشريط ----------
+function syncNtf(){
+  const on = ntfOn();
+  let anyNew = false;
+  const fresh = [];
+  NTF_PAGES.forEach(p => {
+    const b = document.getElementById('ntfBtn_' + p.k);
+    const vis = on && p.on();
+    if(b){
+      b.style.display = vis ? '' : 'none';
+      if(vis){
+        const n = ntfCount(p);
+        b.innerHTML = esc(p.label()) + (n ? ` <span class="ntf-n">${n}</span>` : '');
+      }
+    }
+    if(vis && ntfHasNew(p) && ntfOpenK !== p.k){ anyNew = true; fresh.push(p); }
+  });
+  // (٢) النقطة الحمرا على ⋮ — كلاس لوحده عشان مرتبك مايشيلهاش
+  const kebab = document.querySelector('.menu-btn');
+  if(kebab){
+    let dot = kebab.querySelector('.ntf-dot');
+    if(anyNew){
+      if(!dot){ kebab.style.position = kebab.style.position || 'relative'; dot = document.createElement('span'); dot.className = 'ntf-dot'; kebab.appendChild(dot); }
+    } else if(dot) dot.remove();
+  }
+  // (٣) الشرايط — واحد لكل أوضة فيها جديد
+  const host = document.getElementById('ntfBanners');
+  if(host){
+    host.innerHTML = fresh.map(p => `<div class="ntf-banner" onclick="openNtf('${p.k}')">
+        <span class="ntf-bell">🔔</span>
+        <span class="ntf-bn-txt">حصل تحديث في شاشة <b>${esc(p.label())}</b> — يرجى الاطلاع عليه</span>
+        <span class="ntf-bn-go">افتح ›</span></div>`).join('');
+  }
+}
+
+// ---------- الأوضة نفسها ----------
+function openNtf(k){
+  const p = NTF_PAGES.find(x => x.k === k);
+  if(!p || !ntfOn() || !p.on()) return;
+  const dd = document.getElementById('menuDropdown');
+  if(dd) dd.classList.add('hidden');
+  try{ shieldGhostClick(); }catch(e){}
+  ntfOpenK = k;
+  document.getElementById('ntfOverlay').classList.remove('hidden');
+  renderNtf();
+}
+function closeNtf(){
+  if(ntfOpenK) ntfMarkSeen(ntfOpenK);
+  ntfOpenK = null;
+  document.getElementById('ntfOverlay').classList.add('hidden');
+  syncNtf();
+}
+function renderNtf(){
+  if(!ntfOpenK) return;
+  const p = NTF_PAGES.find(x => x.k === ntfOpenK);
+  if(!p) return;
+  const t1 = document.getElementById('ntfTitle'), body = document.getElementById('ntfBody');
+  if(t1) t1.textContent = p.label();
+  let h = '';
+  try{ h = p.html() || ''; }catch(e){ console.error('ntf:', e); h = ''; }
+  // اللوحات متصممة تبقى فوق الشاشة (هوامش جانبية) — جوه الأوضة من غير هوامش
+  if(body) body.innerHTML = h
+    ? `<div class="ntf-page">${h}</div>`
+    : `<div class="st3-note" style="text-align:center;padding:30px 0;">✅ مفيش حاجة مستنياك هنا دلوقتي</div>`;
+  ntfMarkSeen(ntfOpenK);   // إنت شايفها دلوقتي
+  syncNtf();
+}
+
 // لوحة الاعتمادات بتترسم في حاويتها فوق الأعمدة (بترجع فاضية لو مفيش طلبات أو المستخدم مش canApprove)
 function renderApprovalsPanel(){
   const host = document.getElementById('approvalsHost');
   // 📝 + التقارير (للمحاسب العام) · 🚀 المرحلة الأولى: إجمالي النهارده · الصندوق · تقاريري
   // 🚀🚀 المرحلة التانية: تقفيل الخزنة · التقفيلات (للمحاسب العام) · نايمين في الدرج · المتأخرين
   // 🚀🚀🚀 المرحلة التالتة: التقارير + التقفيلات بقوا لوحة واحدة «🧾 للمراجعة» (auditPanelHtml)
-  if(host) host.innerHTML = cashierTodayHtml() + closingStripHtml() + depositPanelHtml() + depositRecPanelHtml()
-                          + approvalsPanelHtml() + auditPanelHtml()
-                          + inboxPanelHtml() + latePanelHtml() + sleepPanelHtml()
-                          + myReportsPanelHtml();
+  // 🔔 (٢٠٢٦-١٠-١٢) الاستقبال · مدير الإنتاج · أمين الخزنة: اللوحات بقت أوض في القايمة ⋮
+  //    (ntf — فوق) — فوق الشاشة فاضل أدوات الخزنة بس + شريط «حصل تحديث».
+  if(host) host.innerHTML = ntfOn()
+    ? cashierTodayHtml() + closingStripHtml()
+    : cashierTodayHtml() + closingStripHtml() + depositPanelHtml() + depositRecPanelHtml()
+      + approvalsPanelHtml() + auditPanelHtml()
+      + inboxPanelHtml() + latePanelHtml() + sleepPanelHtml()
+      + myReportsPanelHtml();
   try{ syncAuditBadge(); }catch(e){}
+  try{ if(ntfOpenK) renderNtf(); else syncNtf(); }catch(e){ console.warn('ntf:', e); }
 }
 
 // ============================================================
