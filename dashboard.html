@@ -2670,9 +2670,39 @@ function boardStatus(d){
   if(isReception() && RECEPTION_IN_WORKSHOP.includes(st)) return 'sent_to_repair';
   return st;
 }
+// ============================================================
+// 🔁 تسليم مرتجع = لازم يعدّي على «بانتظار الدفع»
+// ------------------------------------------------------------
+// 🧸 الجهاز رجع مرتجع واتسلّم تاني؟ ليه «تكلفة صيانة جديدة» لوحدها.
+//    فبيقع في «تم التسليم بانتظار الدفع» لحد ما تتأكد أو تتحوّل آجل —
+//    **مهما كان** حساب الصيانة الأولى اتدفع أو اتقيّد ولا لأ.
+//
+// ⚠️ RETURN_DUE_FROM: المرتجعات اللي اتسلّمت **قبل** التاريخ ده مابتتأثرش.
+//    ليه؟ أجهزة قديمة كتير رجعت ببلاش ومحدش أكّد دفع مرتجعها — من غير
+//    التاريخ ده كانوا هيقعوا كلهم فجأة في «بانتظار الدفع».
+//    🔧 غيّره ليوم ما ترفع على الإنتاج.
+// ============================================================
+const RETURN_DUE_FROM = '2026-10-11';
+// التسليم الأخير ده كان تسليم مرتجع؟ (فيه «المرتجعات» بين آخر تسليمين)
+function lastDeliveryIsReturn(d){
+  const h = (d && d.statusHistory) || [];
+  let last = -1, prev = -1;
+  for(let i = 0; i < h.length; i++){
+    if(h[i].status === 'delivered'){ prev = last; last = i; }
+  }
+  if(last === -1 || prev === -1) return false;
+  for(let i = prev + 1; i < last; i++) if(h[i].status === 'returned') return true;
+  return false;
+}
+function returnPaymentDue(d){
+  if(!d || d.status !== 'delivered' || d.returnPaymentStatus === 'paid') return false;
+  if(!lastDeliveryIsReturn(d)) return false;
+  const at = deliveredDateOf(d);
+  return !!at && String(at).slice(0, 10) >= RETURN_DUE_FROM;
+}
 function effStatus(d){
   if(!d) return '';
-  if(d.status === 'delivered') return isPaidDevice(d) ? 'delivered_paid' : 'delivered_unpaid';
+  if(d.status === 'delivered') return (isPaidDevice(d) && !returnPaymentDue(d)) ? 'delivered_paid' : 'delivered_unpaid';
   if(d.status === 'rejected') return d.rejectedInShop ? 'rejected_shop' : 'rejected';
   return d.status;
 }
@@ -5547,7 +5577,10 @@ function cashierDetailHtml(d){
 
   // المرتجع ليه فلوسه لوحده
   let ret = '';
-  if(typeof isReturnPriced === 'function' && isReturnPriced(d)){
+  // 🔁 تسليم مرتجع ولسه «تكلفة الصيانة الجديدة» ماتكتبتش
+  if(returnPaymentDue(d) && !isReturnPriced(d)){
+    ret = box('--warn-bg', '--warn', '↩️ تسليم مرتجع — «تكلفة الصيانة الجديدة» لسه ماتكتبتش. كلّم الاستقبال يكتبها (ولو ببلاش يكتب ٠)');
+  } else if(typeof isReturnPriced === 'function' && isReturnPriced(d)){
     const rp = parseInt(d.returnPrice) || 0;
     if(d.returnPaymentType === 'deferred')      ret = box('--warn-bg', '--warn', '↩️ المرتجع آجل — ' + rp.toLocaleString('en-EG') + ' ج.م (المحاسب العام بيقيّده)');
     else if(d.returnPaymentStatus === 'paid')   ret = box('--paid-bg', '--paid', '↩️ المرتجع اتدفع — ' + rp.toLocaleString('en-EG') + ' ج.م');
@@ -10029,7 +10062,8 @@ function renderStaff(){
 // تصدير "تم التسليم بانتظار الدفع": Excel حقيقي + PDF ملون
 // ============================================================
 function deliveredUnpaidRows(list){
-  const src = list || devices.filter(d => d.status === 'delivered' && !isPaidDevice(d));
+  // 🔁 بيشمل تسليم المرتجع اللي حسابه الجديد لسه ماتأكدش
+  const src = list || devices.filter(d => effStatus(d) === 'delivered_unpaid');
   return src
     .map(d => ({
       device: `${d.deviceType||''} ${d.model||''}`.trim(),
@@ -10040,7 +10074,9 @@ function deliveredUnpaidRows(list){
       phone: d.customerPhone || '',
       technician: d.technician || '',
       deliveredDate: deliveredDateOf(d),
-      amount: parseInt(d.agreedPrice) || 0
+      // المبلغ اللي لسه مستني: الأصلي (لو ماتدفعش) + المرتجع (لو مستني)
+      amount: (isPaidDevice(d) ? 0 : (parseInt(d.agreedPrice) || 0))
+            + (returnPaymentDue(d) ? (parseInt(d.returnPrice) || 0) : 0)
     }))
     .sort((a,b) => new Date(b.deliveredDate||0) - new Date(a.deliveredDate||0));
 }
