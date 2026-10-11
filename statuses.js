@@ -109,8 +109,12 @@ const ROLE_STATUS_LABELS = {
 // 💵 «تم التسليم والدفع» مش خانة الاستقبال — الدفع كله شغل المحاسب
 // 🚫 «تم الرفض» (العميل خد الجهاز المرفوض) كمان — الجهاز خرج خلاص.
 //    الاتنين بيلاقيهم بالبحث اللي فوق لو العميل رجع.
-const RECEPTION_HIDDEN      = ['received_from_reception', 'diagnosing', 'repairing', 'done', 'workshop_rejected', 'delivered_paid', 'rejected', 'trashed'];
-const RECEPTION_IN_WORKSHOP = ['sent_to_repair', 'received_from_reception', 'diagnosing', 'repairing', 'done', 'workshop_rejected'];
+// 🔁 (٢٠٢٦-١٠-١١) «المرتجعات» مابقتش خانة عند الاستقبال — بس لسه زرار في تفاصيل الجهاز.
+//    🧸 العميل جاب جهاز مرتجع → الاستقبال يدوّر عليه بالبحث → «المرتجعات» →
+//       «تم الإرسال للصيانة» → مدير الإنتاج يستلمه → ينزل «المرتجعات» عنده على طول.
+//    والجهاز المرتجع وهو في الورشة بيتعدّ عند الاستقبال جوه «تم الإرسال للصيانة».
+const RECEPTION_HIDDEN      = ['received_from_reception', 'diagnosing', 'repairing', 'done', 'workshop_rejected', 'delivered_paid', 'rejected', 'returned', 'trashed'];
+const RECEPTION_IN_WORKSHOP = ['sent_to_repair', 'received_from_reception', 'diagnosing', 'repairing', 'done', 'workshop_rejected', 'returned'];
 const RECEPTION_NEXT = {
   waiting:           ['sent_to_repair', 'delivered', 'rejected'],
   sent_to_repair:    ['waiting', 'delivered', 'rejected'],
@@ -139,10 +143,13 @@ const RECEPTION_ACTIONS = ['waiting', 'sent_to_repair', 'fixed_drawer', 'deliver
 // وفي الحالتين الجهاز بيقع في صندوق الاستلام عند الاستقبال — مش في درج.
 // ============================================================
 const PRODUCTION_HIDDEN = ['fixed_drawer', 'delivered_paid', 'delivered_unpaid', 'rejected_shop', 'rejected', 'trashed'];
+// 🔁 جهاز مرتجع جاي من الاستقبال (علامة returnInbound): «تم الاستلام من الاستقبال»
+//    بتنزّله «المرتجعات» على طول بدل خانة الاستلام — والشغل بيكمّل من هناك.
+//    وطول ما العلامة موجودة والجهاز في «المرتجعات» = لسه عند الاستقبال → مايتحرّكش.
 const PRODUCTION_NEXT = {
   waiting:                 ['received_from_reception'],
   sent_to_repair:          ['received_from_reception'],
-  returned:                ['received_from_reception'],
+  returned:                ['diagnosing', 'repairing', 'done', 'workshop_rejected', 'sent_to_reception'],
   received_from_reception: ['diagnosing', 'repairing', 'done', 'workshop_rejected', 'sent_to_reception'],
   diagnosing:              ['received_from_reception', 'repairing', 'done', 'workshop_rejected', 'sent_to_reception'],
   repairing:               ['received_from_reception', 'diagnosing', 'done', 'workshop_rejected', 'sent_to_reception'],

@@ -5331,7 +5331,8 @@ function receptionWhereHtml(d){
   if(st === 'done' || st === 'workshop_rejected') st = 'repairing';
   const si = statusInfo(st);
   if(!si) return '';
-  const inWs = RECEPTION_IN_WORKSHOP.includes(st);
+  // 🔁 مرتجع لسه عند الاستقبال (ما اتبعتش) مش «في الورشة»
+  const inWs = RECEPTION_IN_WORKSHOP.includes(st) && !(st === 'returned' && d.returnInbound);
   const tech = (inWs && d.technician) ? ` — مع الفني <b>${esc(d.technician)}</b>` : '';
   const hint = inWs ? '<div style="font-weight:600;font-size:12.5px;margin-top:2px;">🔧 الجهاز في الورشة — هيوصلك في «تم الاستلام من الصيانة» لما مدير الإنتاج يبعته</div>' : '';
   return `<div class="rc-where" style="background:${accentBg(si.varname)};color:${accent(si.varname)}">
@@ -6748,6 +6749,12 @@ async function changeStatus(newStatus, paymentChoice, rejectedInShopChoice, opts
   // ⚠️ ده للشكل بس — نفس القواعد مكتوبة في قاعدة البيانات (ملف 74)،
   //    فحتى لو حد لعب في الشاشة، السيرفر بيرجّع الحالة زي ما كانت.
   // ============================================================
+  // 🔁 جهاز مرتجع لسه عند الاستقبال (ما اتبعتش للصيانة) → مدير الإنتاج مايلمسوش
+  if(isProduction() && d.status === 'returned' && d.returnInbound){
+    showError('⏳ الجهاز ده لسه عند الاستقبال — استنى لما يبعته «تم الإرسال للصيانة»');
+    renderDetail();
+    return;
+  }
   const roleNext = isReception() ? RECEPTION_NEXT : isProduction() ? PRODUCTION_NEXT : null;
   if(roleNext && !(roleNext[d.status] || []).includes(newStatus)){
     showError('⚠️ ' + currentRoleLabel() + ' مايقدرش ينقل الجهاز من «' + stLabel(statusInfo(effStatus(d))) + '» للحالة دي');
@@ -6799,6 +6806,15 @@ async function changeStatus(newStatus, paymentChoice, rejectedInShopChoice, opts
     outcome = opts.outcome;
   }
   toRecAskId = null;
+
+  // 🔁 مدير الإنتاج بيستلم جهاز مرتجع (الاستقبال حوّله للمرتجعات وبعته) →
+  //    بدل «تم الاستلام من الاستقبال» بينزل «المرتجعات» على طول
+  let inboundReturn = false;
+  if(isProduction() && newStatus === 'received_from_reception'
+     && d.status === 'sent_to_repair' && d.returnInbound){
+    newStatus = 'returned';
+    inboundReturn = true;
+  }
 
   // مسؤول الحركة: التسليم/الإرجاع بيتحوّلوا لطلب معلّق بدل تنفيذ فوري
   if(isDispatcher() && APPROVAL_STATUSES.includes(newStatus)){
@@ -6860,7 +6876,9 @@ async function changeStatus(newStatus, paymentChoice, rejectedInShopChoice, opts
   //    نأرشفها الأول ونفضّي الحقول للجولة الجديدة.
   //    من غير كده الرجوع التاني بيدهس على الأول وبياناته
   //    بتضيع خالص — سعره ونقاطه وفنيه.
-  if(newStatus === 'returned' && d.status !== 'returned' && curRoundHasData(d)){
+  // ⚠️ !inboundReturn: الجولة اتفتحت خلاص لما الاستقبال حوّله للمرتجعات —
+  //    الاستلام مايأرشفهاش تاني (وإلا الشكوى والسعر اللي الاستقبال كتبهم يتمسحوا)
+  if(newStatus === 'returned' && d.status !== 'returned' && !inboundReturn && curRoundHasData(d)){
     extra.returnRounds = (Array.isArray(d.returnRounds) ? d.returnRounds : []).concat([curRound(d)]);
     RET_FIELDS.forEach(k => extra[k] = '');
     extra.assistBlamed = false;
@@ -6887,6 +6905,14 @@ async function changeStatus(newStatus, paymentChoice, rejectedInShopChoice, opts
   const leavingDelivered = d.status === 'delivered' && newStatus !== 'delivered';
   const dropOwnerHold    = leavingDelivered && newStatus === 'rejected' && !!(d.ownerShare || d.ownerPriced);
   const resetOwnerAnswer = leavingDelivered && newStatus !== 'rejected' && !!d.ownerPriced;
+
+  // 🔁 علامة «مرتجع جاي من الاستقبال»
+  //    🧸 الاستقبال حوّله للمرتجعات → العلامة تتحط (الجهاز لسه عنده)
+  //       مدير الإنتاج استلمه → العلامة تتشال (الجهاز بقى في الورشة)
+  //       الجهاز خرج لأي حتة تانية → العلامة تتشال
+  if(isReception() && newStatus === 'returned' && d.status !== 'returned') extra.returnInbound = true;
+  else if(inboundReturn) extra.returnInbound = false;
+  else if(d.returnInbound && !['returned', 'sent_to_repair', 'waiting'].includes(newStatus)) extra.returnInbound = false;
 
   // 📤 نتيجة الورشة — بتتخزّن مع الجهاز، وبتتكتب في السجل
   if(outcome){
