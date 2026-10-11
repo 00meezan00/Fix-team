@@ -290,6 +290,20 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
   .ded-mid span{font-size:11px; color:var(--muted);}
   .ded-del{flex:none; border:none; background:none; color:var(--muted);
     font-size:17px; cursor:pointer; padding:2px 4px;}
+  /* 🗄️ درج المسحوبات جوه سجل الموظف */
+  .hidden{display:none !important;}
+  .wd-drawer{margin-top:18px; border:1px solid var(--border); border-radius:13px;
+    background:var(--surface); overflow:hidden;}
+  .wd-head{display:flex; align-items:center; gap:10px; width:100%; border:none;
+    background:var(--surface-2); color:var(--ink); padding:13px 14px; cursor:pointer;
+    font-family:inherit; text-align:right;}
+  .wd-ttl{flex:1; min-width:0; font-weight:800; font-size:14px;}
+  .wd-ttl small{font-weight:500; font-size:11.5px; color:var(--muted);}
+  .wd-sum{flex:none; font-size:12px; color:var(--muted);}
+  .wd-sum b{color:var(--red); font-size:13.5px;}
+  .wd-arw{flex:none; font-size:15px; color:var(--muted);}
+  .wd-body{padding:10px 10px 4px;}
+  .wd-note{text-align:center; color:var(--muted); font-size:12.5px; line-height:1.9; padding:10px 6px 12px;}
   .hintbox{background:var(--waiting-bg); color:var(--waiting); border-radius:11px;
     padding:12px 14px; font-size:12.5px; line-height:1.9; margin-bottom:16px;}
 
@@ -1131,7 +1145,7 @@ function openEmpLog(email){
   renderEmpSheet(email, daysOf(email));
   openSheet('empSheet');
 }
-function closeEmpLog(){ OPEN_EMP = null; closeSheet('empSheet'); }
+function closeEmpLog(){ OPEN_EMP = null; WD_DRAWER_OPEN = false; closeSheet('empSheet'); }
 
 function renderEmpSheet(email, days){
   const box = document.getElementById('empSheetBody');
@@ -2363,18 +2377,95 @@ function dedRowHtml(r){
     </div>`;
 }
 
-function dedSectionHtml(email){
-  const m = manualDed(email);
-  if(!m.count) return '';
+// ============================================================
+// 🗄️ درج المسحوبات — جوه سجل الموظف
+// ------------------------------------------------------------
+// 🧠 بالبلدي: المسحوبات اللي جاية من الإكسل كتير (سحبة كل يوم تقريباً)،
+//    وكانت بتتفرد كلها في السجل — من **كل الشهور** — فتغطّي الصفحة
+//    والواحد يتوه قبل ما يوصل لأيام الحضور.
+//
+// ✅ دلوقتي:
+//    • المسحوبات مبقتش في القايمة خالص — اتلمّت في «درج» مقفول.
+//    • الدرج فيه مسحوبات **الشهر المختار من الشاشة الرئيسية بس**
+//      (MONTH). تغيّر الشهر من فوق → الدرج يتغيّر معاه.
+//    • على الدرج من برا: العدد والمجموع — من غير ما تفتحه.
+//    • الخصومات اليدوية (💸) زي ما هي، مظاهرة عادي.
+//
+// ⚠️ الشهر بيتحدد من work_date (يوم السحبة نفسه)، ولو فاضي من
+//    created_at — نفس اللي كشف الراتب بيعمله، عشان الرقم اللي في
+//    الدرج يطلع نفس رقم «المسحوبات» في الكشف.
+// ============================================================
+let WD_DRAWER_OPEN = false;   // الدرج مفتوح ولا مقفول — بيفضل زي ما سبته لحد ما تقفل السجل
+
+function wdMonthOf(r){
+  return String(r.work_date || r.created_at || '').slice(0,7);
+}
+
+// مسحوبات موظف في الشهر المعروض — من الأحدث للأقدم
+function wdListFor(email, ym){
+  const all = DEDS[(email||'').toLowerCase()] || [];
+  return all
+    .filter(r => r.kind === 'withdrawal' && wdMonthOf(r) === ym)
+    .sort((a,b) => String(b.work_date || b.created_at).localeCompare(String(a.work_date || a.created_at)));
+}
+
+function toggleWdDrawer(){
+  WD_DRAWER_OPEN = !WD_DRAWER_OPEN;
+  const box = document.getElementById('wdDrawerBody');
+  const arw = document.getElementById('wdDrawerArrow');
+  if(box) box.classList.toggle('hidden', !WD_DRAWER_OPEN);
+  if(arw) arw.textContent = WD_DRAWER_OPEN ? '▴' : '▾';
+}
+
+function wdDrawerHtml(email){
+  const list = wdListFor(email, MONTH);
+  // المجموع من غير اللي اتشال — زي باقي المجاميع في الصفحة
+  let total = 0, waived = 0;
+  list.forEach(r => { if(r.waived_at) waived++; else total += Number(r.amount || 0); });
+  total = Math.round(total * 100) / 100;
   return `
+    <div class="wd-drawer">
+      <button class="wd-head" onclick="toggleWdDrawer()">
+        <span class="wd-ttl">🗄️ درج المسحوبات <small>— ${esc(monthLabel())}</small></span>
+        <span class="wd-sum">${list.length
+          ? `${list.length} سحبة · <b>${total.toLocaleString('en-US')}</b> ج.م`
+          : 'فاضي'}</span>
+        <span id="wdDrawerArrow" class="wd-arw">${WD_DRAWER_OPEN ? '▴' : '▾'}</span>
+      </button>
+      <div id="wdDrawerBody" class="wd-body${WD_DRAWER_OPEN ? '' : ' hidden'}">
+        ${list.length
+          ? list.map(dedRowHtml).join('') +
+            (waived ? `<div class="wd-note">✋ ${waived} سحبة متشالة — مش داخلة في المجموع</div>` : '')
+          : `<div class="wd-note">مفيش مسحوبات في ${esc(monthLabel())}.<br>
+               غيّر الشهر من فوق في الشاشة الرئيسية عشان تشوف شهر تاني.</div>`}
+      </div>
+    </div>`;
+}
+
+function dedSectionHtml(email){
+  const all = DEDS[(email||'').toLowerCase()] || [];
+  // 💸 الخصومات اليدوية بس — المسحوبات راحت الدرج
+  const manual = all.filter(r => r.kind !== 'withdrawal');
+  let mTotal = 0, unseen = 0;
+  manual.forEach(r => {
+    if(!r.seen_at) unseen++;
+    if(!r.waived_at) mTotal += Number(r.amount || 0);
+  });
+  mTotal = Math.round(mTotal * 100) / 100;
+  const hasWd = all.some(r => r.kind === 'withdrawal');
+  if(!manual.length && !hasWd) return '';
+
+  return `
+    ${hasWd ? wdDrawerHtml(email) : ''}
+    ${manual.length ? `
     <div style="margin-top:18px;">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:9px;">
-        <b style="flex:1;font-size:14px;">💸 الخصومات اليدوية والمسحوبات</b>
+        <b style="flex:1;font-size:14px;">💸 الخصومات اليدوية</b>
         <span style="font-size:12.5px;font-weight:800;color:var(--red);">
-          ${m.total} ج.م${m.wd ? ` · 🔩 ${m.wd} مسحوبات` : ''}${m.unseen ? ` · ${m.unseen} لسه ما اتقراش` : ''}</span>
+          ${mTotal} ج.م${unseen ? ` · ${unseen} لسه ما اتقراش` : ''}</span>
       </div>
-      ${m.list.map(dedRowHtml).join('')}
-    </div>`;
+      ${manual.map(dedRowHtml).join('')}
+    </div>` : ''}`;
 }
 
 // ===== شاشة إضافة خصم =====
@@ -2417,11 +2508,11 @@ function renderDeduction(){
     <button class="save" id="dedSave" style="background:var(--red);"
             onclick="saveDeduction()">💸 اعمل الخصم</button>
 
-    ${m.count ? `<div style="margin-top:22px;">
+    ${m.list.some(r => r.kind !== 'withdrawal') ? `<div style="margin-top:22px;">
       <b style="font-size:13.5px;">آخر خصومات ${esc(nameOf(DED_EMAIL))}</b>
       <div style="font-size:12px;color:var(--muted);margin:4px 0 10px;">
         الإجمالي: <b style="color:var(--red)">${m.total} ج.م</b></div>
-      ${m.list.slice(0, 5).map(dedRowHtml).join('')}
+      ${m.list.filter(r => r.kind !== 'withdrawal').slice(0, 5).map(dedRowHtml).join('')}
     </div>` : ''}`;
 }
 
@@ -4544,34 +4635,10 @@ function ivxIsLegacy(d){
   return false;
 }
 
-// ============================================================
-// 🔁 مين ماسك الجهاز دلوقتي؟ (نفس invHolderOf في dashboard.html)
-// ------------------------------------------------------------
-// 🐞 اتصلّح (أكتوبر ٢٠٢٦): الجهاز اللي بيرجع ويتسجّل عليه «فني
-//    بديل» كان بيفضل في الجرد على الفني القديم — لأن d.tech هو
-//    technician بس، والبديل في خانة تانية (substituteTechnician).
-//
-// الترتيب: بديل الجولة الحالية ← آخر بديل في returnRounds ← الفني الأصلي.
-// ⚠️ ده للجرد بس. d.tech نفسه مبيتغيّرش — عشان «تغيير الفني»
-//    وباقي الصفحة يفضلوا شغالين على الفني الأصلي زي ما هما.
-// ============================================================
-function ivxHolder(d){
-  if(!d) return '';
-  const r = d._raw || {};
-  const cur = String(r.substituteTechnician || '').trim();
-  if(cur) return cur;
-  const past = Array.isArray(r.returnRounds) ? r.returnRounds : [];
-  for(let i = past.length - 1; i >= 0; i--){
-    const s = String((past[i] && past[i].substituteTechnician) || '').trim();
-    if(s) return s;
-  }
-  return (d.tech || '').trim();
-}
-
 // اسم الكارت اللي الجهاز ده المفروض يقف فيه
 function ivxKey(d){
-  const tech = ivxHolder(d);
-  if(tech) return tech;                 // عليه فني → كارت اللي ماسكه دلوقتي
+  const tech = (d.tech || '').trim();
+  if(tech) return tech;                 // عليه فني → كارت الفني، مبنلمسوش
   return ivxIsLegacy(d) ? ivxLegacyName() : ivxNoTechName();
 }
 
@@ -4630,7 +4697,7 @@ function invStuckDevices(){
 }
 
 function invMatchesSearch(d, q){
-  const hay = [d.customer, d.shop, d.tech, ivxHolder(d), d.type, d.model, d.phone, d.issue].join(' ').toLowerCase();   // 🔁 البحث باسم الفني البديل كمان
+  const hay = [d.customer, d.shop, d.tech, d.type, d.model, d.phone, d.issue].join(' ').toLowerCase();
   return hay.includes(q.toLowerCase());
 }
 
