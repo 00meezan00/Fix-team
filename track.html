@@ -288,7 +288,10 @@ function renderTrack(data){
     statusText = 'تم الاعتذار عن الصيانة';
     special.style.display = 'block';
     special.style.background = '#FEF2F2'; special.style.border = '1.5px solid #FECACA'; special.style.color = '#B91C1C';
-    special.textContent = 'للأسف تعذّرت صيانة الجهاز — تقدر تستلمه من المحل، وكلمنا لأي استفسار 🙏';
+    // 🚫 (المرحلة الأولى) سبب الرفض اللي مدير الإنتاج اختاره — لو موجود
+    special.textContent = 'للأسف تعذّرت صيانة الجهاز'
+      + (data.rejectReason ? ' — السبب: ' + data.rejectReason : '')
+      + '. تقدر تستلمه من المحل، وكلمنا لأي استفسار 🙏';
   } else if(st === 'returned'){
     idx = -1; pct = 100; full = false;
     statusText = 'الجهاز في المرتجعات';

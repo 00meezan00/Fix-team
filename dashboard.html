@@ -443,6 +443,27 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
   .pill.pill-off{opacity:.35; cursor:not-allowed;}
   .rfr-box{margin:0 0 14px; padding:11px 12px; border-radius:10px; background:var(--sent_to_reception-bg); border:1px solid var(--sent_to_reception);}
   .rfr-box .rfr-q{font-size:13px; font-weight:800; color:var(--ink); margin-bottom:8px;}
+  /* ============================================================
+     🚀 المرحلة الأولى
+     ------------------------------------------------------------
+     🔔 التنبيه اللي بيطلع فوق لما جهاز يوصلك أو تقريرك يتراجع.
+     💵 شريط «اتحصّل النهارده» فوق شاشة أمين الخزنة.
+     ⚠️ كل الألوان متغيّرات ثيم — عشان الغامق والفاتح الاتنين.
+     ============================================================ */
+  #ph1Toasts{position:fixed; top:calc(10px + env(safe-area-inset-top)); inset-inline:12px; z-index:400;
+    display:flex; flex-direction:column; align-items:center; gap:8px; pointer-events:none;}
+  .ph1-toast{pointer-events:auto; max-width:520px; width:100%; text-align:start; border:1px solid var(--info-border);
+    background:var(--surface); color:var(--ink); border-inline-start:5px solid var(--info); border-radius:12px;
+    padding:12px 14px; font-family:'Tajawal',sans-serif; font-weight:800; font-size:14px; line-height:1.6;
+    box-shadow:0 10px 30px var(--shadow-lg); cursor:pointer; animation:waPop .3s ease both;}
+  .ph1-today{display:flex; align-items:center; gap:8px 16px; flex-wrap:wrap; background:var(--surface);
+    border:1px solid var(--success-border); border-inline-start:5px solid var(--success); border-radius:16px;
+    margin:14px 22px 0; padding:14px 18px; box-shadow:0 4px 16px var(--shadow);}
+  .ph1-today-l{font-weight:800; font-size:14px; color:var(--ink-2);}
+  .ph1-today-l small{font-weight:600; font-size:11.5px; color:var(--muted);}
+  .ph1-today-n{font-family:'Cairo',sans-serif; font-weight:900; font-size:28px; color:var(--success); line-height:1.1;}
+  .ph1-today-n small{font-size:14px; font-weight:800;}
+  .ph1-today-s{font-size:12.5px; color:var(--muted); font-weight:700; margin-inline-start:auto;}
 
   /* ============================================================
      شريط البحث الرئيسي
@@ -2562,11 +2583,13 @@ function startRealtimeSync(){
         const j = JSON.stringify(row.data);
         if(lastSynced[row.id] === j) return;   // التغيير أصلاً من عندنا
         _freshIds.add(row.id);                 // أحدث من أي نسخة في الدرج
+        const _prevDev = devices.find(d => d.id === row.id);   // 🚀 عشان نعرف «وصلك جهاز»
         devices = [row.data, ...devices.filter(d => d.id !== row.id)];
         devices.sort((a,b) => new Date(b.intakeDate||0) - new Date(a.intakeDate||0));
         lastSynced[row.id] = j;
         splitTrash();          // حد تاني نقله للمهملات؟ يتفرز فوراً
         writeCache(); render();
+        ph1OnRemote(_prevDev, row.data);   // 🚀 📥 وصلك جهاز · ✅ تقريرك اتراجع
         // الفني علّم "تم الصيانة" من صفحته → الترتيب اتغيّر → ننشره.
         // مؤجّل ٣ ثواني: التغييرات بتيجي ورا بعض، فمانكتبش مع كل واحد.
         publishTechBoardSoon();
@@ -3875,7 +3898,9 @@ function render(){
 // لوحة الاعتمادات بتترسم في حاويتها فوق الأعمدة (بترجع فاضية لو مفيش طلبات أو المستخدم مش canApprove)
 function renderApprovalsPanel(){
   const host = document.getElementById('approvalsHost');
-  if(host) host.innerHTML = approvalsPanelHtml() + reportsPanelHtml();   // 📝 + تقارير الاستقبال (للمحاسب العام)
+  // 📝 + التقارير (للمحاسب العام) · 🚀 المرحلة الأولى: إجمالي النهارده · الصندوق · تقاريري
+  if(host) host.innerHTML = cashierTodayHtml() + approvalsPanelHtml() + reportsPanelHtml()
+                          + inboxPanelHtml() + myReportsPanelHtml();
 }
 
 // ============================================================
@@ -4355,6 +4380,7 @@ function rcCardChips(d, s){
     else if(ri) h += `<span class="rc-chip" style="background:${accentBg(ri.varname)};color:${accent(ri.varname)}">📍 ${esc(stLabel(ri))}</span> `;
   }
   h += outcomeChip(d);
+  h += ph1CardChips(d);   // 🚀 ⏳ مستني من إمتى · 🚫 سبب الرفض · 💬 لسه ماتبلّغش
   return h;
 }
 
@@ -5442,7 +5468,7 @@ function paidChangeReport(d, what, oldV, newV, ledgerHint){
     receptionReports: [...(d.receptionReports || []), {
       id: 'rep_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
       kind: 'money', text, from: d.status, to: d.status,
-      by: currentUser.name, at: now, reviewed: false }],
+      by: currentUser.name, byEmail: currentUser.email || '', at: now, reviewed: false }],
     activityNotes: [...(d.activityNotes || []), { text: '📝 ' + text, at: now, by: currentUser.name, role: currentRoleLabel() }]
   };
 }
@@ -5473,7 +5499,7 @@ function outcomeChip(d){
   if(d.repairOutcome === 'fixed' && fixedHere)
     return `<span class="rc-chip" style="background:var(--done-bg);color:var(--done)">✅ المشكلة اتحلّت</span>`;
   if(d.repairOutcome === 'rejected' && rejHere)
-    return `<span class="rc-chip" style="background:var(--rejected-bg);color:var(--rejected)">🚫 مرفوض</span>`;
+    return `<span class="rc-chip" style="background:var(--rejected-bg);color:var(--rejected)">🚫 مرفوض${d.rejectReason ? ' — ' + esc(d.rejectReason) : ''}</span>`;
   return '';
 }
 
@@ -5523,9 +5549,13 @@ function submitReceptionReport(){
 //    مدير الإنتاج، بيظهر هنا بالتقرير اللي اتكتب. «✓ راجعته» بيشيله.
 // ⚠️ التقرير متخزّن جوه الجهاز نفسه (receptionReports) — مستحيل يضيع.
 // ============================================================
+// 🚀 (المرحلة الأولى) اللوحة بقت تجمع تقارير الاستقبال **و** أسباب أمين الخزنة
+//    (إلغاء تأكيد دفع بالغلط — cashierReports). src بيقول التقرير جه منين.
+const REPORT_SRC = { receptionReports: '🛎️', cashierReports: '💵' };
 function pendingReports(){
   const out = [];
-  devices.forEach(d => (d.receptionReports || []).forEach(r => { if(r && !r.reviewed) out.push({ d, r }); }));
+  devices.forEach(d => Object.keys(REPORT_SRC).forEach(src =>
+    (d[src] || []).forEach(r => { if(r && !r.reviewed) out.push({ d, r, src }); })));
   return out.sort((a,b) => new Date(b.r.at || 0) - new Date(a.r.at || 0));
 }
 function reportsPanelHtml(){
@@ -5533,30 +5563,407 @@ function reportsPanelHtml(){
   const list = pendingReports();
   if(!list.length) return '';
   const lbl = k => { const s = statusInfo(k); return k === 'delivered' ? 'تم التسليم' : (s ? stLabel(s) : k); };
-  const rows = list.map(({d, r}) => `<div class="appr-row">
+  const kindTxt = r => r.kind === 'unpay' ? '💵 إلغاء تأكيد دفع بالغلط'
+                     : r.kind === 'money' ? '💰 تعديل فلوس بعد الدفع'
+                     : '📝 ' + esc(lbl(r.from)) + ' ← ' + esc(lbl(r.to));
+  const rows = list.map(({d, r, src}) => `<div class="appr-row">
       <div class="appr-row-info" style="cursor:pointer;" onclick="openDetail('${d.id}')">
-        <div class="appr-row-dev"><span class="appr-row-kind" style="background:var(--warn-bg);color:var(--warn);">${r.kind === 'money' ? '💰 تعديل فلوس بعد الدفع' : '📝 ' + esc(lbl(r.from)) + ' ← ' + esc(lbl(r.to))}</span>📱 ${esc(d.deviceType)} ${esc(d.model)}${d.customerName ? ' — ' + esc(d.customerName) : ''}</div>
+        <div class="appr-row-dev"><span class="appr-row-kind" style="background:var(--warn-bg);color:var(--warn);">${kindTxt(r)}</span>📱 ${esc(d.deviceType)} ${esc(d.model)}${d.customerName ? ' — ' + esc(d.customerName) : ''}</div>
         <div style="font-size:13.5px;line-height:1.7;margin-top:5px;white-space:pre-wrap;">${esc(r.text)}</div>
-        <div class="appr-row-meta">🛎️ ${esc(r.by || '')} · ${new Date(r.at).toLocaleString(getLocale())}</div>
+        <div class="appr-row-meta">${REPORT_SRC[src]} ${esc(r.by || '')} · ${new Date(r.at).toLocaleString(getLocale())}</div>
       </div>
       <div class="appr-row-actions">
-        <button class="appr-btn-yes" onclick="markReportReviewed('${d.id}','${r.id}')">✓ راجعته</button>
+        <button class="appr-btn-yes" onclick="markReportReviewed('${d.id}','${r.id}','${src}')">✓ راجعته</button>
       </div>
     </div>`).join('');
   return `<div class="appr-panel">
-    <div class="appr-panel-head">📝 تقارير الاستقبال <span class="appr-count">${list.length}</span></div>
+    <div class="appr-panel-head">📝 التقارير <span class="appr-count">${list.length}</span></div>
     ${rows}
   </div>`;
 }
-async function markReportReviewed(devId, repId){
+async function markReportReviewed(devId, repId, src){
   if(!isSuperAdmin()) return;
+  const key = REPORT_SRC[src] ? src : 'receptionReports';
   const now = new Date().toISOString();
   devices = devices.map(x => x.id === devId
-    ? { ...x, receptionReports: (x.receptionReports || []).map(r => r.id === repId
+    ? { ...x, [key]: (x[key] || []).map(r => r.id === repId
           ? { ...r, reviewed: true, reviewedBy: currentUser.name, reviewedAt: now } : r) }
     : x);
   render();
   await persist();
+}
+
+// ############################################################
+// 🚀 المرحلة الأولى — الاستقبال · مدير الإنتاج · أمين الخزنة
+// ------------------------------------------------------------
+// 🧸 كل الجديد في مكان واحد هنا، والأماكن القديمة بتنده عليه بس:
+//   ١) 📥 صندوق «وصلك جهاز» + تنبيه لحظي (الاستقبال)
+//   ٢) 💬 زرار واتساب جاهز في درج الخالص / درج الرفض (الاستقبال)
+//   ٣) 📝 «تقاريري» — المحاسب العام راجعها ولا لأ (الاستقبال + أمين الخزنة)
+//   ٤) 🚫 سبب الرفض إجباري (مدير الإنتاج)
+//   ٥) 📥 عدّاد «وارد من الاستقبال» + من إمتى مستني (مدير الإنتاج)
+//   ٦) 💵 إجمالي النهارده (أمين الخزنة)
+//   ٧) ↩️ إلغاء تأكيد دفع بالغلط بسبب (أمين الخزنة) — السيرفر: ملف 85
+// ############################################################
+
+// ---------- أدوات صغيرة ----------
+// آخر مرة الجهاز دخل الحالة دي (من السجل) — «من إمتى مستني»
+function enteredAt(d, st){
+  const h = (d && d.statusHistory) || [];
+  for(let i = h.length - 1; i >= 0; i--) if(h[i] && h[i].status === st && h[i].date) return h[i].date;
+  return (d && (d.lastModifiedAt || d.intakeDate)) || new Date().toISOString();
+}
+const INBOX_LATE_H = 2;   // مستني أكتر من ساعتين → لونه يتغيّر
+function hoursSince(iso){ return (Date.now() - Date.parse(iso)) / 3600000; }
+function waitChip(iso){
+  const late = hoursSince(iso) >= INBOX_LATE_H;
+  return `<span class="rc-chip" style="background:var(${late ? '--danger-bg' : '--surface-3'});color:var(${late ? '--danger' : '--ink-2'})">⏳ مستني ${esc(splAgoTxt(iso))}</span>`;
+}
+// نفس الشخص؟ بالإيميل لو موجود (التقارير الجديدة)، وإلا بالاسم (القديمة)
+function isMine(r){
+  if(!r) return false;
+  if(r.byEmail) return String(r.byEmail).toLowerCase() === String(currentUser.email || '').toLowerCase();
+  return !!r.by && r.by === currentUser.name;
+}
+
+// ---------- 🔔 تنبيه على الشاشة ----------
+// 🧸 شريط صغير بيطلع فوق + صوت «تِن» + هزّة. لو الموظف فعّل
+//    تنبيهات المتصفح، بيطلع كمان إشعار للموبايل والتطبيق مفتوح.
+function ph1Toast(msg, devId){
+  let box = document.getElementById('ph1Toasts');
+  if(!box){ box = document.createElement('div'); box.id = 'ph1Toasts'; document.body.appendChild(box); }
+  const el = document.createElement('button');
+  el.className = 'ph1-toast';
+  el.textContent = msg;
+  el.onclick = () => { el.remove(); if(devId) openDetail(devId); };
+  box.appendChild(el);
+  setTimeout(() => { try{ el.remove(); }catch(e){} }, 9000);
+  try{ if(navigator.vibrate) navigator.vibrate([120, 60, 120]); }catch(e){}
+  try{
+    const A = window.AudioContext || window.webkitAudioContext;
+    if(A){
+      const c = ph1Toast._ctx || (ph1Toast._ctx = new A());
+      const o = c.createOscillator(), g = c.createGain();
+      o.frequency.value = 880; g.gain.value = 0.08;
+      o.connect(g); g.connect(c.destination);
+      o.start(); o.stop(c.currentTime + 0.18);
+    }
+  }catch(e){}
+  // ⚠️ الأيفون (التطبيق المثبّت) مابيقبلش new Notification من الصفحة —
+  //    لازم يعدّي على الـ service worker. فبنجرّبه الأول، والتاني احتياطي.
+  try{
+    if('Notification' in window && Notification.permission === 'granted' && document.hidden){
+      const o = { body: msg, icon: 'icon-192.png', dir: 'rtl', lang: 'ar', tag: 'ifx-' + (devId || Date.now()), data: { url: 'dashboard.html' } };
+      if(navigator.serviceWorker && navigator.serviceWorker.ready)
+        navigator.serviceWorker.ready.then(r => r.showNotification('I Fix Team', o))
+          .catch(() => { try{ new Notification('I Fix Team', o); }catch(e){} });
+      else new Notification('I Fix Team', o);
+    }
+  }catch(e){}
+}
+function ph1AskNotify(){
+  try{
+    if(!('Notification' in window)){ alert('الموبايل ده مابيدعمش تنبيهات المتصفح — التنبيه هيطلع على الشاشة بس'); return; }
+    Notification.requestPermission().then(() => render());
+  }catch(e){}
+}
+function ph1NotifyBtn(){
+  try{
+    if(!('Notification' in window) || Notification.permission !== 'default') return '';
+  }catch(e){ return ''; }
+  return `<button class="spn-clear" onclick="event.stopPropagation();ph1AskNotify()">🔔 فعّل التنبيهات</button>`;
+}
+
+// ---------- ١ + ٥) 📥 الصندوق اللي مستني الموظف ----------
+// 🛎️ الاستقبال: «تم الاستلام من الصيانة» (sent_to_reception)
+// 🏭 مدير الإنتاج: «وارد من الاستقبال» = اتبعت للصيانة ولسه ما استلمهوش (sent_to_repair)
+function myInboxKey(){
+  if(isReception())  return 'sent_to_reception';
+  if(isProduction()) return 'sent_to_repair';
+  return null;
+}
+function inboxList(){
+  const k = myInboxKey();
+  if(!k) return [];
+  return devices.filter(d => d.status === k)
+    .map(d => ({ d, at: enteredAt(d, k) }))
+    .sort((a, b) => Date.parse(a.at) - Date.parse(b.at));   // الأقدم الأول — هو اللي اتأخر
+}
+const INBOX_SHOW = 6;
+function inboxPanelHtml(){
+  const k = myInboxKey();
+  if(!k) return '';
+  const list = inboxList();
+  if(!list.length) return '';
+  const late = list.filter(x => hoursSince(x.at) >= INBOX_LATE_H).length;
+  const title = isReception() ? '📥 وصلك من الصيانة' : '📥 وارد من الاستقبال';
+  const rows = list.slice(0, INBOX_SHOW).map(({d, at}) => `<div class="spn-row" style="cursor:pointer;" onclick="openDetail('${d.id}')">
+      <div class="spn-info">
+        <div class="spn-t">📱 ${esc(d.deviceType)} ${esc(d.model)}${d.customerName ? ' — ' + esc(d.customerName) : ''}</div>
+        <div class="spn-m">${waitChip(at)} ${isReception() ? outcomeChip(d) : ''}${(isProduction() && d.returnInbound) ? '<span class="rc-chip" style="background:var(--returned-bg);color:var(--returned)">🔁 مرتجع</span>' : ''}</div>
+      </div>
+    </div>`).join('');
+  const more = list.length > INBOX_SHOW
+    ? `<button class="spn-ok" style="width:100%;margin-top:4px;" onclick="openColumn('${k}')">و ${list.length - INBOX_SHOW} كمان — افتح الخانة كلها</button>` : '';
+  return `<div class="spn-panel" style="border-color:var(--${statusInfo(k) ? statusInfo(k).varname : 'info'});">
+    <div class="spn-head" style="color:var(--${statusInfo(k) ? statusInfo(k).varname : 'info'});">${title}
+      <span class="spn-count" style="background:var(--${statusInfo(k) ? statusInfo(k).varname : 'info'});">${list.length}</span>
+      ${late ? `<span style="font-size:12px;color:var(--danger);font-weight:800;">🔴 ${late} مستني أكتر من ${INBOX_LATE_H} ساعة</span>` : ''}
+      ${ph1NotifyBtn()}</div>
+    ${rows}${more}
+  </div>`;
+}
+
+// ---------- ٣) 📝 تقاريري ----------
+// 🧸 الموظف بيشوف التقارير اللي هو كتبها: لسه مستنية ولا المحاسب العام راجعها.
+let myRepOpen = false;
+function myReportsKey(){ return isReception() ? 'receptionReports' : isCashier() ? 'cashierReports' : null; }
+function myReports(){
+  const key = myReportsKey();
+  if(!key) return [];
+  const out = [];
+  devices.forEach(d => (d[key] || []).forEach(r => { if(isMine(r)) out.push({ d, r }); }));
+  return out.sort((a, b) => new Date(b.r.at || 0) - new Date(a.r.at || 0));
+}
+function myReportsPanelHtml(){
+  const list = myReports();
+  if(!list.length) return '';
+  const waiting = list.filter(x => !x.r.reviewed).length;
+  // بيبان لو فيه تقرير مستني، أو اتراجع في آخر ٣ أيام — غير كده بيختفي
+  const recent = list.filter(x => x.r.reviewed && x.r.reviewedAt && hoursSince(x.r.reviewedAt) < 72).length;
+  if(!waiting && !recent && !myRepOpen) return '';
+  const done = list.length - waiting;
+  const rows = myRepOpen ? list.slice(0, 20).map(({d, r}) => `<div class="spn-row" style="cursor:pointer;" onclick="openDetail('${d.id}')">
+      <div class="spn-info">
+        <div class="spn-t">${r.reviewed
+            ? `<span class="spn-kind" style="color:var(--success);">✅ اتراجع</span>`
+            : `<span class="spn-kind" style="color:var(--warn);">⏳ مستني</span>`}📱 ${esc(d.deviceType)} ${esc(d.model)}${d.customerName ? ' — ' + esc(d.customerName) : ''}</div>
+        <div style="font-size:13px;line-height:1.6;margin-top:4px;white-space:pre-wrap;">${esc(r.text)}</div>
+        <div class="spn-m">كتبته ${esc(splAgoTxt(r.at))}${r.reviewed ? ` · راجعه ${esc(r.reviewedBy || 'المحاسب العام')} ${r.reviewedAt ? esc(splAgoTxt(r.reviewedAt)) : ''}` : ''}</div>
+      </div>
+    </div>`).join('') : '';
+  return `<div class="spn-panel">
+    <div class="spn-head" style="cursor:pointer;" onclick="myRepOpen=!myRepOpen;renderApprovalsPanel();">📝 تقاريري
+      ${waiting ? `<span class="spn-count" style="background:var(--warn);">${waiting} مستني</span>` : ''}
+      ${done ? `<span class="spn-count" style="background:var(--success);">${done} اتراجع</span>` : ''}
+      <span class="spn-clear">${myRepOpen ? 'اقفل ▲' : 'افتح ▼'}</span></div>
+    ${rows}
+  </div>`;
+}
+
+// ---------- ٦) 💵 إجمالي النهارده ----------
+// 🧸 بنعدّ كل «تأكيد دفع» اتعمل من الساعة ١٠ الصبح (بداية يوم المحل)،
+//    وبنطرح أي «إلغاء تأكيد دفع». يعني الرقم = الفلوس اللي المفروض في الخزنة.
+//    ⚠️ الآجل مش هنا — مادخلش الخزنة.
+const PAY_IN_KEYS = ['hist.paidDelivered', 'hist.paidCash'];
+function shopDayStart(){
+  const n = new Date(), s = new Date(n);
+  s.setHours(10, 0, 0, 0);
+  if(n < s) s.setDate(s.getDate() - 1);
+  return s.getTime();
+}
+function cashierToday(){
+  const from = shopDayStart();
+  let sum = 0, n = 0, mine = 0;
+  devices.forEach(d => (d.statusHistory || []).forEach(h => {
+    if(!h || !h.date || Date.parse(h.date) < from) return;
+    let amt = null, cnt = 0;
+    if(PAY_IN_KEYS.includes(h.labelKey)){ amt = parseInt(d.agreedPrice) || 0; cnt = 1; }
+    else if(h.labelKey === 'hist.returnPaidCash'){ amt = parseInt(String((h.labelVars || {}).amount || '').replace(/[^0-9]/g, '')) || 0; cnt = 1; }
+    else if(h.payUndo){ amt = -(parseInt(h.payUndo.amount) || 0); cnt = -1; }
+    if(amt === null) return;
+    sum += amt; n += cnt;
+    if(h.by && h.by === currentUser.name) mine += amt;
+  }));
+  return { sum, n, mine };
+}
+function cashierTodayHtml(){
+  if(!isCashier()) return '';
+  const { sum, n, mine } = cashierToday();
+  const since = new Date(shopDayStart());
+  return `<div class="ph1-today">
+    <div class="ph1-today-l">💵 اتحصّل النهارده <small>(من ${since.toLocaleDateString('ar-EG', { weekday:'long' })} ١٠ الصبح)</small></div>
+    <div class="ph1-today-n">${sum.toLocaleString('en-EG')} <small>ج.م</small></div>
+    <div class="ph1-today-s">${Math.max(0, n).toLocaleString('en-EG')} تحصيل${mine !== sum ? ` · منهم إنت ${mine.toLocaleString('en-EG')} ج.م` : ''}</div>
+  </div>`;
+}
+
+// ---------- ٤) 🚫 سبب الرفض ----------
+const REJECT_REASONS = ['مفيش قطعة غيار', 'العميل رفض السعر', 'الجهاز مايتصلّحش', 'العطل مش بيظهر / مش بيتكرر', 'تاني'];
+let rejAsk = null;    // { id, to, outcome } — مدير الإنتاج لازم يختار سبب قبل الحركة دي
+let rejPick = '';
+let rejTxt = '';
+function rejectReasonBoxHtml(d){
+  if(!rejAsk || rejAsk.id !== d.id) return '';
+  const btns = REJECT_REASONS.map(r => {
+    const on = rejPick === r;
+    return `<button type="button" class="pill" style="border-color:var(--rejected);background:${on ? 'var(--rejected)' : 'var(--surface)'};color:${on ? '#fff' : 'var(--rejected)'}"
+      onclick="rejKeepTxt();rejPick=${esc(JSON.stringify(r))};renderDetail();">${esc(r)}</button>`;
+  }).join('');
+  return `<div class="rfr-box" style="background:var(--rejected-bg);border-color:var(--rejected);">
+    <div class="rfr-q">🚫 الجهاز ده اترفض ليه؟ — السبب هيوصل للاستقبال عشان يقوله للعميل، ويظهر في صفحة المتابعة</div>
+    <div class="status-pills" style="margin:4px 0 8px;">${btns}</div>
+    <textarea id="rejReasonTxt" rows="2" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:14px;font-family:inherit;background:var(--surface);color:var(--ink);"
+      placeholder="${rejPick === 'تاني' ? 'اكتب السبب (إجباري)' : 'تفاصيل زيادة (اختياري) — مثلاً: البوردة فيها قصر'}">${esc(rejTxt)}</textarea>
+    <div class="pay-choice" style="margin-top:8px;">
+      <button type="button" class="pay-btn" style="border-color:var(--rejected);background:var(--rejected);color:#fff;" onclick="submitRejectReason()">🚫 تأكيد الرفض</button>
+      <button type="button" class="pay-btn" style="border-color:var(--border);color:var(--ink-2);background:var(--surface);" onclick="rejAsk=null;rejPick='';rejTxt='';renderDetail();">إلغاء</button>
+    </div>
+  </div>`;
+}
+function rejKeepTxt(){ const el = document.getElementById('rejReasonTxt'); if(el) rejTxt = el.value; }
+function submitRejectReason(){
+  rejKeepTxt();
+  const txt = (rejTxt || '').trim();
+  if(!rejPick){ alert('اختار السبب الأول'); return; }
+  if(rejPick === 'تاني' && txt.length < 3){ alert('اكتب السبب'); const el = document.getElementById('rejReasonTxt'); if(el) el.focus(); return; }
+  if(!rejAsk) return;
+  const reason = rejPick === 'تاني' ? txt : (txt ? rejPick + ' — ' + txt : rejPick);
+  const a = rejAsk;
+  rejAsk = null; rejPick = ''; rejTxt = '';
+  changeStatus(a.to, undefined, undefined, { outcome: a.outcome || undefined, rejectReason: reason });
+}
+// سطر «سبب الرفض» في التفاصيل (للي مش استقبال — الاستقبال بيشوفه في «الجهاز فين»)
+function rejectReasonShowHtml(d){
+  if(!d.rejectReason || isReception()) return '';
+  if(!['workshop_rejected', 'sent_to_reception', 'rejected'].includes(d.status)) return '';
+  if(d.status === 'sent_to_reception' && d.repairOutcome !== 'rejected') return '';
+  return `<div class="rc-where" style="background:var(--rejected-bg);color:var(--rejected)">🚫 سبب الرفض: ${esc(d.rejectReason)}</div>`;
+}
+
+// ---------- ٢) 💬 واتساب درج الخالص / درج الرفض ----------
+// 🧸 الجهاز اتحط في الدرج → زرار أخضر كبير: الرسالة جاهزة، دوسة وتتبعت.
+//    بعد ما تتبعت بنكتب على الجهاز «اتبعتت» عشان محدش يبعتها مرتين.
+function drawerWaSent(d){ return !!(d.drawerWa && d.drawerWa.status === d.status); }
+function drawerWaHtml(d){
+  if(!isReception() || !['fixed_drawer', 'rejected'].includes(d.status)) return '';
+  const ready = d.status === 'fixed_drawer';
+  if(!d.customerPhone) return `<div class="rc-where" style="background:var(--warn-bg);color:var(--warn)">⚠️ مفيش رقم للعميل — اكتبه فوق عشان تبعتله ${ready ? '«جهازك جاهز»' : '«تعذّرت الصيانة»'}</div>`;
+  const sent = drawerWaSent(d);
+  const lbl = ready ? '💬 ابعت للعميل: جهازك جاهز 🎉' : '💬 ابعت للعميل: تعذّرت الصيانة';
+  return `<button class="btn-primary" style="box-shadow:none;background:${sent ? 'var(--surface)' : '#16A34A'};color:${sent ? 'var(--success)' : '#fff'};border:${sent ? '1.5px solid var(--success-border)' : 'none'};width:100%;justify-content:center;font-size:${sent ? '14' : '16'}px;padding:${sent ? '10' : '14'}px;margin-bottom:12px;"
+      onclick="sendDrawerWa('${d.id}')">${sent ? '✓ الرسالة اتبعتت ' + esc(splAgoTxt(d.drawerWa.at)) + ' — ابعتها تاني' : lbl}</button>`;
+}
+async function sendDrawerWa(id){
+  const d = devices.find(x => x.id === id);
+  if(!d || !d.customerPhone) return;
+  if(!d.trackToken){ await ensureTrackToken(id); }
+  const dev = devices.find(x => x.id === id);
+  // ⚠️ الحفظ **قبل** الواتساب: الموبايل بيقلب على الواتس والصفحة بتنام،
+  //    فلو فتحناه الأول العلامة ممكن متتحفظش (نفس درس flushShopNotices).
+  const now = new Date().toISOString();
+  const what = dev.status === 'fixed_drawer' ? '«جهازك جاهز»' : '«تعذّرت الصيانة»';
+  devices = devices.map(x => x.id === id ? { ...x,
+    drawerWa: { status: x.status, at: now, by: currentUser.name },
+    activityNotes: [...(x.activityNotes || []), { text: '💬 اتبعت للعميل على الواتساب: ' + what, at: now, by: currentUser.name, role: currentRoleLabel() }] } : x);
+  renderDetail(); render();
+  await persist();
+  const fresh = devices.find(x => x.id === id);
+  openWa(fresh.customerPhone, waStatusMsg(fresh, fresh.status));
+}
+
+// ---------- شارات الكارت ----------
+function ph1CardChips(d){
+  let h = '';
+  const k = myInboxKey();
+  if(k && d.status === k) h += waitChip(enteredAt(d, k)) + ' ';
+  if(d.status === 'workshop_rejected' && d.rejectReason && !isReception())
+    h += `<span class="rc-chip" style="background:var(--rejected-bg);color:var(--rejected)">🚫 ${esc(d.rejectReason)}</span> `;
+  if(isReception() && ['fixed_drawer', 'rejected'].includes(d.status) && d.customerPhone && !drawerWaSent(d))
+    h += `<span class="rc-chip" style="background:var(--warn-bg);color:var(--warn)">💬 العميل لسه ماتبلّغش</span> `;
+  return h;
+}
+
+// ---------- ٧) ↩️ إلغاء تأكيد دفع بالغلط ----------
+// 🧸 أمين الخزنة داس «تأكيد الدفع» على الجهاز الغلط؟ يرجّعه «بانتظار الدفع»
+//    بس **لازم** يكتب السبب — والسبب بيوصل للمحاسب العام في «التقارير».
+//    السيرفر (ملف 85) بيرفض أي إلغاء من غير سبب جديد في نفس الحفظة.
+//    ⚠️ الآجل لأ — المحاسب العام هو اللي بيقيّده وبيلغيه.
+let payUndoAsk = null;   // { id, what: 'main' | 'return' }
+function canUndoPay(d, what){
+  if(!isCashier() || !d || d.status !== 'delivered') return false;
+  if(what === 'return') return d.returnPaymentStatus === 'paid' && d.returnPaymentType !== 'deferred';
+  return isPaidDevice(d) && d.paymentType !== 'deferred';
+}
+function payUndoBtnHtml(d, what){
+  if(!canUndoPay(d, what) || (payUndoAsk && payUndoAsk.id === d.id)) return '';
+  return `<button class="acc-mini-btn" style="width:100%;margin:-4px 0 12px;padding:9px;color:var(--danger);border-color:var(--danger-border);"
+    onclick="payUndoAsk={id:'${d.id}',what:'${what}'};renderDetail();setTimeout(()=>{const e=document.getElementById('payUndoTxt');if(e)e.focus();},60);">↩️ دوست تأكيد ${what === 'return' ? 'دفع المرتجع' : 'الدفع'} بالغلط؟ ألغيه</button>`;
+}
+function payUndoBoxHtml(d){
+  if(!payUndoAsk || payUndoAsk.id !== d.id) return '';
+  const ret = payUndoAsk.what === 'return';
+  const amt = parseInt(ret ? d.returnPrice : d.agreedPrice) || 0;
+  return `<div class="rfr-box" style="background:var(--danger-bg);border-color:var(--danger);">
+    <div class="rfr-q">↩️ هترجّع ${ret ? 'دفع المرتجع' : 'الجهاز'} «بانتظار الدفع» (${amt.toLocaleString('en-EG')} ج.م هتتشال من إجمالي النهارده).
+      اكتب حصل إيه — هيوصل للمحاسب العام.</div>
+    <textarea id="payUndoTxt" rows="2" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:14px;font-family:inherit;background:var(--surface);color:var(--ink);" placeholder="مثال: دوست على الجهاز اللي جنبه — العميل لسه مادفعش"></textarea>
+    <div class="pay-choice" style="margin-top:8px;">
+      <button type="button" class="pay-btn" style="border-color:var(--danger);background:var(--danger);color:#fff;" onclick="submitPayUndo()">↩️ ألغي التأكيد وابعت السبب</button>
+      <button type="button" class="pay-btn" style="border-color:var(--border);color:var(--ink-2);background:var(--surface);" onclick="payUndoAsk=null;renderDetail();">رجوع</button>
+    </div>
+  </div>`;
+}
+async function submitPayUndo(){
+  if(!payUndoAsk) return;
+  const el = document.getElementById('payUndoTxt');
+  const why = ((el && el.value) || '').trim();
+  if(why.length < 5){ alert('اكتب السبب الأول (سطر واحد على الأقل يوضح حصل إيه)'); if(el) el.focus(); return; }
+  const { id, what } = payUndoAsk;
+  const d = devices.find(x => x.id === id);
+  if(!canUndoPay(d, what)){ payUndoAsk = null; renderDetail(); return; }
+  const ret = what === 'return';
+  const amt = parseInt(ret ? d.returnPrice : d.agreedPrice) || 0;
+  const now = new Date().toISOString();
+  const text = '↩️ اتلغى تأكيد ' + (ret ? 'دفع المرتجع' : 'الدفع') + ' (' + amt.toLocaleString('en-EG') + ' ج.م) — اتأكد بالغلط\nالسبب: ' + why;
+  payUndoAsk = null;
+  devices = devices.map(x => {
+    if(x.id !== id) return x;
+    const nx = { ...x,
+      lastModifiedAt: now, lastModifiedBy: currentUser.name,
+      statusHistory: [...(x.statusHistory || []), { status: x.status,
+        label: '↩️ اتلغى تأكيد ' + (ret ? 'دفع المرتجع' : 'الدفع') + ' بالغلط — ' + amt.toLocaleString('en-EG') + ' ج.م',
+        payUndo: { what, amount: amt }, date: now, by: currentUser.name }],
+      activityNotes: [...(x.activityNotes || []), { text: '📝 ' + text, at: now, by: currentUser.name, role: currentRoleLabel() }],
+      cashierReports: [...(x.cashierReports || []), {
+        id: 'crep_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+        kind: 'unpay', what, amount: amt, text,
+        by: currentUser.name, byEmail: currentUser.email || '', at: now, reviewed: false }]
+    };
+    if(ret) nx.returnPaymentStatus = null; else nx.paymentStatus = 'unpaid';
+    return nx;
+  });
+  renderDetail(); render();
+  await persist();
+  const t2 = devices.find(x => x.id === id);
+  if(t2) syncTrack(t2);
+}
+
+// ---------- 🔔 اللي جاي من التانيين لحظياً ----------
+// 🧸 بتتنده من المزامنة اللحظية بالنسخة القديمة والجديدة من الجهاز:
+//    • جهاز دخل صندوقي → «📥 وصلك جهاز»
+//    • تقرير كتبته اتراجع → «✅ المحاسب العام راجع تقريرك»
+function ph1OnRemote(prev, next){
+  try{
+    if(!next || !next.id) return;
+    const k = myInboxKey();
+    if(k && next.status === k && (!prev || prev.status !== k)){
+      const dev = `${next.deviceType || ''} ${next.model || ''}`.trim();
+      const extra = isReception()
+        ? (next.repairOutcome === 'rejected' ? ' — 🚫 مرفوض' + (next.rejectReason ? ' (' + next.rejectReason + ')' : '') : ' — ✅ اتصلّح')
+        : (next.returnInbound ? ' — 🔁 مرتجع' : '');
+      ph1Toast('📥 وصلك جهاز: ' + dev + (next.customerName ? ' — ' + next.customerName : '') + extra, next.id);
+    }
+    const key = myReportsKey();
+    if(key){
+      const old = new Map(((prev && prev[key]) || []).map(r => [r && r.id, r]));
+      (next[key] || []).forEach(r => {
+        if(!r || !r.reviewed || !isMine(r)) return;
+        const o = old.get(r.id);
+        if(o && !o.reviewed) ph1Toast('✅ ' + (r.reviewedBy || 'المحاسب العام') + ' راجع تقريرك على ' + `${next.deviceType || ''} ${next.model || ''}`.trim(), next.id);
+      });
+    }
+  }catch(e){ console.warn('تنبيهات المرحلة الأولى:', e); }
 }
 
 function renderDetail(){
@@ -5631,7 +6038,10 @@ function cashierDetailHtml(d){
     <h2 style="font-family:'Cairo',sans-serif;font-size:18px;margin:4px 0 10px;">${esc(d.deviceType)} ${esc(d.model)}</h2>
     <div class="rc-where" style="background:${accentBg(s.varname)};color:${accent(s.varname)}">📍 ${esc(stLabel(s))}</div>
     ${pay}
+    ${payUndoBtnHtml(d, 'main')}
     ${ret}
+    ${payUndoBtnHtml(d, 'return')}
+    ${payUndoBoxHtml(d)}
     <div style="margin-bottom:14px;">
       ${row(t('det.customerName'), d.customerName)}
       ${row(t('det.shopName'), d.shopName)}
@@ -5732,6 +6142,7 @@ function renderDetailNow(){
     <h2 style="font-family:'Cairo',sans-serif;font-size:18px;margin:4px 0 10px;">${esc(d.deviceType)} ${esc(d.model)}</h2>
     ${pendingApprovalText(d) ? `<div class="pending-appr-banner">⏳ ${pendingApprovalText(d)} — ${t('appr.bannerHint')}</div>` : ''}
     ${isReception() ? receptionWhereHtml(d) : ''}
+    ${drawerWaHtml(d)}${rejectReasonShowHtml(d)}
 
     <div class="row2">
       <label class="field"><span>${t('det.customerName')}</span><input value="${esc(d.customerName)}"${roC} onblur="editField('customerName', this.value)" /></label>
@@ -5906,7 +6317,7 @@ function renderDetailNow(){
     </div>
     <div id="detailLabelArea" style="margin-bottom:10px;"></div>
     <div class="status-pills">${pills}</div>
-    ${toRecBoxHtml(d)}${reportBoxHtml(d)}
+    ${toRecBoxHtml(d)}${reportBoxHtml(d)}${rejectReasonBoxHtml(d)}
     ${(d.status === 'rejected' && !isProduction()) ? `
     <div style="margin:0 0 14px; padding:10px 12px; background:var(--rejected_shop-bg); border-radius:10px;">
       <span style="font-size:12.5px; color:var(--ink-2); display:block; margin-bottom:7px; font-weight:700;">${t('det.rejLocation')}</span>
@@ -6889,6 +7300,19 @@ async function changeStatus(newStatus, paymentChoice, rejectedInShopChoice, opts
   }
   toRecAskId = null;
 
+  // 🚫 (المرحلة الأولى) مدير الإنتاج بيرفض → لازم يختار السبب الأول.
+  //    🧸 بيتسأل لما الجهاز يروح «المرفوض»، أو لما يتبعت للاستقبال «مرفوض»
+  //       ومفيش سبب متكتب (الفني رفضه من صفحته من غير سبب مثلاً).
+  if(isProduction() && !(opts.rejectReason && String(opts.rejectReason).trim())
+     && (newStatus === 'workshop_rejected'
+         || (newStatus === 'sent_to_reception' && outcome === 'rejected' && !d.rejectReason))){
+    rejAsk = { id: d.id, to: newStatus, outcome };
+    rejPick = ''; rejTxt = '';
+    renderDetail();
+    return;
+  }
+  rejAsk = null;
+
   // 🔁 مدير الإنتاج بيستلم جهاز مرتجع (الاستقبال حوّله للمرتجعات وبعته) →
   //    بدل «تم الاستلام من الاستقبال» بينزل «المرتجعات» على طول
   let inboundReturn = false;
@@ -7004,13 +7428,26 @@ async function changeStatus(newStatus, paymentChoice, rejectedInShopChoice, opts
   // رجع للورشة تاني؟ النتيجة القديمة مابقاش ليها لازمة
   if(['sent_to_repair','received_from_reception','diagnosing','repairing','done','workshop_rejected'].includes(newStatus)) extra.repairOutcome = null;
 
+  // 🚫 (المرحلة الأولى) سبب الرفض — بيتخزّن مع الجهاز وبيتكتب في الملاحظات.
+  //    رجع يتشغّل عليه تاني أو اتحلّ؟ السبب القديم مابقاش ليه لازمة.
+  //    ⚠️ الاستقبال مايلمسوش (السيرفر قافله عليه — ملف 85)، فمدير الإنتاج بس.
+  if(opts.rejectReason && String(opts.rejectReason).trim()){
+    extra.rejectReason = String(opts.rejectReason).trim();
+    extra.activityNotes = [...(extra.activityNotes || d.activityNotes || []), {
+      text: '🚫 سبب الرفض: ' + extra.rejectReason,
+      at: new Date().toISOString(), by: currentUser.name, role: currentRoleLabel() }];
+  } else if(isProduction() && d.rejectReason
+            && (outcome === 'fixed' || ['received_from_reception','diagnosing','repairing','done'].includes(newStatus))){
+    extra.rejectReason = null;
+  }
+
   // 📝 تقرير الاستقبال — بيتخزّن جوه الجهاز ويظهر للمحاسب العام في «تقارير الاستقبال»
   if(needsReport){
     const nowR = new Date().toISOString();
     extra.receptionReports = [...(d.receptionReports || []), {
       id: 'rep_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
       text: String(opts.report).trim(), from: fromStatus, to: newStatus,
-      by: currentUser.name, at: nowR, reviewed: false
+      by: currentUser.name, byEmail: currentUser.email || '', at: nowR, reviewed: false
     }];
     extra.activityNotes = [...(d.activityNotes || []), {
       text: '📝 تقرير للمحاسب العام: ' + String(opts.report).trim(),
@@ -8261,6 +8698,7 @@ async function syncTrack(d){
       model: d.model || '',
       status: d.status,
       outcome: d.repairOutcome || '',   // 🛎️ نتيجة الورشة (fixed / rejected)
+      rejectReason: d.rejectReason || '',   // 🚫 (المرحلة الأولى) سبب الرفض — بيظهر للعميل
       issue: d.reportedIssue || '',
       price: parseInt(d.agreedPrice) || 0,
       returnPrice: parseInt(d.returnPrice) || 0,
@@ -8558,7 +8996,7 @@ function waStatusMsg(d, statusKey){
     repairing:  `تحديث جهازك *${dev}* (${ref}) 🔧\nتم تحديد العطل وبدأنا الصيانة فعلياً.${priceLine}`,
     sent_to_repair: `تحديث جهازك *${dev}* (${ref}) 📤\nالجهاز اتبعت لقسم الصيانة وهيتكشف عليه في أقرب وقت.`,
     received_from_reception: `تحديث جهازك *${dev}* (${ref}) 🔧\nقسم الصيانة استلم الجهاز وهيبدأ الكشف عليه.`,
-    rejected:   `تحديث جهازك *${dev}* (${ref})\nللأسف تعذّرت صيانة الجهاز 🙏 تقدر تستلمه من المحل في أي وقت.`,
+    rejected:   `تحديث جهازك *${dev}* (${ref})\nللأسف تعذّرت صيانة الجهاز 🙏${d.rejectReason ? `\nالسبب: ${d.rejectReason}` : ''}\nتقدر تستلمه من المحل في أي وقت.`,
     sent_to_reception: `خبر حلو! 🎉\nجهازك *${dev}* (${ref}) خلصت صيانته وجاهز للاستلام من المحل.${priceLine}\nمنتظرينك في I Fix Team 🙏`,
     done:       `خبر حلو! 🎉\nجهازك *${dev}* (${ref}) خلصت صيانته وجاهز للاستلام من المحل.${priceLine}\nمنتظرينك في I Fix Team 🙏`,
     delivered:  `تم تسليم جهازك *${dev}* (${ref}) ✅\nشكراً لثقتك في I Fix Team 🌟\nلو حصلت أي ملاحظة بعد الاستلام كلمنا فوراً.`,
