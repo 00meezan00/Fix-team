@@ -84,7 +84,8 @@ const ROLE_STATUS_LABELS = {
 // NEEDS_REPORT = خروج من غير ما يعدّي على مدير الإنتاج → لازم تقرير
 //                بيوصل للمحاسب العام.
 // ============================================================
-const RECEPTION_HIDDEN      = ['received_from_reception', 'diagnosing', 'repairing', 'done', 'trashed'];
+// 💵 «تم التسليم والدفع» مش خانة الاستقبال — الدفع كله شغل المحاسب
+const RECEPTION_HIDDEN      = ['received_from_reception', 'diagnosing', 'repairing', 'done', 'delivered_paid', 'trashed'];
 const RECEPTION_IN_WORKSHOP = ['sent_to_repair', 'received_from_reception', 'diagnosing', 'repairing', 'done'];
 const RECEPTION_NEXT = {
   waiting:           ['sent_to_repair', 'delivered', 'rejected'],

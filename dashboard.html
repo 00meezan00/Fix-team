@@ -8930,6 +8930,7 @@ async function editReturnPayType(pt){
 
 // تأكيد دفع حساب المرتجع فوري (زي markPaid — الفوري مبيتقيّدش على الدفتر)
 async function markReturnPaid(){
+  if(!canSeeMoney()) return;   // 💵 تأكيد الدفع للمحاسب بس
   const d = devices.find(x => x.id === selectedId);
   if(!d) return;
   if(!isReturnPriced(d)){ alert(t('msg.needPriceFirst')); return; }
