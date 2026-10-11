@@ -47,6 +47,7 @@ let _payRows   = [];   // الخصومات اليدوية
 let _payLate   = [];   // خصومات التأخير (محسوبة في السيرفر)
 let _payWaiv   = [];   // رسايل «الخصم اتشال»
 let _paySlips  = [];   // كشوف الرواتب — شهر بشهر
+let _payBons   = [];   // 🎁 الحوافز (ملف 72) — عشان نكتب أسبابها تحت سطر الكشف
 // 🗄️ الدرجين: الشهر اللي بيعرضوه + مفتوحين ولا لأ
 //    (بيفضلوا زي ما هم لو الشاشة اترسمت تاني بعد «فهمت»)
 let _payPeriod = null;               // { from:'YYYY-MM-01', to:'YYYY-MM-DD' }
@@ -142,6 +143,13 @@ async function payLoad(){
     const sl = await sb.rpc('hr_payroll_periods', { p_email: me });
     if(sl.error) throw sl.error;
     _paySlips = sl.data || [];
+
+    // 🎁 أسباب الحوافز — المجموع نفسه جاي من الكشف فوق (bonus).
+    //    لو الجدول لسه ماتعملش، مش بنوقّع الشاشة: السطر بيظهر من غير تفاصيل.
+    const bn = await sb.from('hr_bonuses').select('amount,reason,work_date')
+      .ilike('user_email', me).order('work_date', { ascending:false }).limit(300);
+    if(bn.error){ console.warn('hr_bonuses:', bn.error); _payBons = []; }
+    else _payBons = bn.data || [];
 
     // ============================================================
     // 🗄️ شهر الدرجين = أقدم شهر **لسه ماتصرفش**
@@ -508,6 +516,22 @@ function paySlipOvertime(p){
 // بعد ما HR تعتمدها. بالموجب وبالأخضر — دي فلوس ليه مش عليه.
 // ============================================================
 function payLeaveBonusLine(p){
+  return payBonusLine(p) + _payLeaveLine(p);
+}
+
+// 🎁 سطر الحوافز + أسبابها تحته (ملف 72)
+function payBonusLine(p){
+  const v = Number(p && p.bonus || 0);
+  if(!v) return '';
+  const ym = String(p.period || '').slice(0, 7);
+  const why = _payBons.filter(b => String(b.work_date || '').slice(0, 7) === ym);
+  return `<div><span>+ 🎁 حوافز ومكافآت</span>
+    <b style="color:var(--p-green)">${payMoney(v)}</b></div>
+    ${why.map(b => `<div style="font-size:12px;padding:0 10px 2px 0;color:var(--p-mut);">
+      <span>• ${_payEsc(b.reason || '')}</span><span>+${payMoney(b.amount)}</span></div>`).join('')}`;
+}
+
+function _payLeaveLine(p){
   const v = Number(p && p.leave_bonus || 0);
   if(!v) return '';
   return `<div><span>+ إجازات ما اتاخدتش

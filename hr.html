@@ -677,6 +677,16 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
   <div class="sheet-body" id="dedBody"></div>
 </div>
 
+<!-- ===== 🎁 حافز / مكافأة ===== -->
+<div class="sheet" id="bonSheet">
+  <div class="sheet-head">
+    <h2 id="bonTitle">🎁 حافز جديد</h2>
+    <button class="icon-btn" style="background:var(--surface-2); color:var(--ink);"
+            onclick="closeSheet('bonSheet')">×</button>
+  </div>
+  <div class="sheet-body" id="bonBody"></div>
+</div>
+
 <!-- ===== 🔩 مسحوبات الإكسل ===== -->
 <!-- ⚠️ الشاشة دي **مبتسجّلش خصومات**. هي بتربط الأسماء بس.
      التسجيل بيحصل لما الإكسل يبعت — عشان يفضل فيه طريق واحد
@@ -908,6 +918,7 @@ async function loadMonth(){
     await loadPenalties(from, to);  // 🔴 خصم التأخير — من السيرفر
     await loadOvertime(from, to);   // 🔴 والأوفر تايم كمان
     await loadDeductions();    // والخصومات اليدوية كمان
+    await loadBonuses();       // 🎁 والحوافز (ملف 72)
     await loadAbsences(from, to);   // 🏖️ الغياب المقترح خصمه
     await loadLeaveBonus();         // 💵 الإجازات اللي ما اتاخدتش (ملف 71)
     await loadNoBreak(from, to);    // ☕🚫 مين قال إنه مطلعش بريك
@@ -1122,8 +1133,10 @@ function cardHtml(e, days){
       //    والأوفر تايم). قبل كده كان مجموع كل الشهور جنب أرقام
       //    شهر واحد، والمسحوبات متجمعة معاه كمان.
       const m = manualDed(e, MONTH);
-      if(!m.total && !m.wd && !m.unseen) return '';
+      const bn = bonusSum(e, MONTH);
+      if(!m.total && !m.wd && !m.unseen && !bn.total) return '';
       const bits = [];
+      if(bn.total) bits.push(`<span style="color:var(--done)">🎁 حوافز: <b>+${bn.total}</b> ج.م</span>`);
       if(m.total) bits.push(`💸 خصم يدوي: <b>${m.total}</b> ج.م`);
       if(m.wd)    bits.push(`🔩 مسحوبات: <b>${m.wd}</b> ج.م`);
       if(m.unseen) bits.push(`<i>${m.unseen} لسه ما اتقراش</i>`);
@@ -1133,6 +1146,7 @@ function cardHtml(e, days){
     <div class="card-foot">
       <button onclick="openEmpLog('${esc(e)}')">📋 السجل</button>
       <button onclick="openDeduction('${esc(e)}')" title="خصم">💸</button>
+      <button onclick="openBonus('${esc(e)}')" title="حافز">🎁</button>
       <button onclick="openHrSettings('${esc(e)}')" title="نظام العمل">⚙️</button>
       <button onclick="exportEmpPdf('${esc(e)}')">📄</button>
       <button onclick="exportEmpExcel('${esc(e)}')">📊</button>
@@ -1194,12 +1208,14 @@ function renderEmpSheet(email, days){
 
     <div class="emp-acts">
       <button onclick="openDeduction('${esc(email)}')" style="background:var(--red);color:#fff;border-color:var(--red);">💸 خصم</button>
+      <button onclick="openBonus('${esc(email)}')" style="background:var(--done);color:#fff;border-color:var(--done);">🎁 حافز</button>
       <button onclick="openPunch('${esc(email)}')">✍️ تسجيل يدوي</button>
       <button onclick="openHrSettings('${esc(email)}')">⚙️ نظام العمل</button>
       <button onclick="exportEmpPdf('${esc(email)}')">📄 PDF</button>
       <button onclick="exportEmpExcel('${esc(email)}')">📊 Excel</button>
     </div>
 
+    ${bonusSectionHtml(email)}
     ${dedSectionHtml(email)}
 
     ${flags ? `<div class="hintbox" style="margin-top:14px;">⚠️ فيه ${flags} يوم ناقص انصراف —
@@ -2684,6 +2700,174 @@ function dedSectionHtml(email){
     </div>` : ''}`;
 }
 
+// ============================================================
+// 🎁 الحوافز والمكافآت (ملف 72)
+// ------------------------------------------------------------
+// 🧸 بالبلدي: HR بتكتب حافز (مبلغ + سبب + شهر) → بيتزاد على صافي
+//    مرتب الشهر ده على طول، والموظف بيشوفه في «مرتبك» بسطر أخضر.
+//
+// 🔴 الحوافز في جدول لوحدها (hr_bonuses) مش مع الخصومات — عشان
+//    مفيش أي مكان بيجمع «الخصومات» يخصمها بالغلط من الموظف.
+// 🔴 الكتابة من السيرفر بس (hr_add_bonus / hr_delete_bonus).
+//    والشهر اللي اتصرف متقفل — السيرفر بيرفض.
+// ============================================================
+let BONS = {};          // إيميل → [حوافز] (كل الشهور)
+let BON_EMAIL = '';
+let BONS_ERR = '';
+
+async function loadBonuses(){
+  BONS_ERR = '';
+  try{
+    const data = await hrAll(() => sb.from('hr_bonuses')
+      .select('id,user_email,amount,reason,work_date,created_by,created_at')
+      .order('work_date', { ascending:false })
+      .order('id', { ascending:true }), 'الحوافز');
+    BONS = {};
+    data.forEach(r => {
+      const e = (r.user_email || '').toLowerCase();
+      (BONS[e] = BONS[e] || []).push(r);
+    });
+  }catch(e){
+    // ⚠️ بنقول بصوت عالي — السكوت هنا = HR تفتكر إن مفيش حوافز
+    console.error('loadBonuses failed:', e);
+    BONS = {};
+    const t = (e && e.message) ? e.message : String(e);
+    BONS_ERR = /does not exist|42P01|PGRST205/i.test(t)
+      ? 'ميزة الحوافز لسه ماتركبتش — شغّل ملف 72-bonuses.sql' : t;
+  }
+}
+
+// مجموع حوافز موظف في شهر ('YYYY-MM')
+function bonusSum(email, ym){
+  const list = (BONS[(email||'').toLowerCase()] || [])
+    .filter(r => String(r.work_date || '').slice(0,7) === ym);
+  const total = Math.round(list.reduce((a, r) => a + Number(r.amount || 0), 0) * 100) / 100;
+  return { total, list };
+}
+
+function bonusRowHtml(r){
+  const d = new Date(r.work_date).toLocaleDateString('ar-EG',
+    { day:'numeric', month:'long', year:'numeric' });
+  return `
+    <div class="ded-row" style="border-color:var(--done);">
+      <div class="ded-amt" style="color:var(--done);">+${Number(r.amount)}</div>
+      <div class="ded-mid">
+        <b>🎁 ${esc(r.reason)}</b>
+        <span>${esc(d)} · ${esc(nameOf(r.created_by || ''))}</span>
+      </div>
+      <button class="ded-del" title="مسح" onclick="deleteBonus('${esc(r.id)}')">🗑️</button>
+    </div>`;
+}
+
+// قسم الحوافز جوه سجل الموظف — الشهر المختار من الشاشة الرئيسية
+function bonusSectionHtml(email){
+  const b = bonusSum(email, MONTH);
+  if(!b.list.length) return '';
+  return `
+    <div style="margin-top:18px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:9px;">
+        <b style="flex:1;font-size:14px;">🎁 الحوافز والمكافآت — ${esc(monthLabel())}</b>
+        <span style="font-size:12.5px;font-weight:800;color:var(--done);">+${b.total} ج.م</span>
+      </div>
+      ${b.list.map(bonusRowHtml).join('')}
+    </div>`;
+}
+
+function openBonus(email){
+  BON_EMAIL = (email || '').toLowerCase();
+  const list = allPeople();
+  if(!list.length){ alert('مفيش موظفين متسجّلين — ضيفهم من لوحة الأدمن الأول'); return; }
+  if(list.indexOf(BON_EMAIL) < 0) BON_EMAIL = list[0];
+  renderBonus();
+  openSheet('bonSheet');
+}
+
+function renderBonus(){
+  const list = allPeople();
+  // الشهر الافتراضي = الشهر المعروض في الشاشة الرئيسية (لو هو الحالي → النهاردة)
+  const today = todayCairo();
+  const defDate = today.slice(0,7) === MONTH ? today : MONTH + '-01';
+  const recent = (BONS[BON_EMAIL] || []).slice(0, 5);
+  document.getElementById('bonTitle').textContent = '🎁 حافز — ' + nameOf(BON_EMAIL);
+  document.getElementById('bonBody').innerHTML = `
+    ${BONS_ERR ? `<div class="hintbox" style="background:var(--rejected-bg,#FEF2F2);color:var(--red);">❌ ${esc(BONS_ERR)}</div>` : ''}
+    <label class="fld"><span>👤 الموظف</span>
+      <select onchange="BON_EMAIL=this.value; renderBonus()">
+        ${list.map(e => `<option value="${esc(e)}"${e===BON_EMAIL?' selected':''}>${esc(nameOf(e))}</option>`).join('')}
+      </select>
+    </label>
+
+    <label class="fld"><span>💰 المبلغ (بالجنيه)</span>
+      <input type="number" id="bonAmt" min="1" step="5" inputmode="decimal" placeholder="500">
+    </label>
+
+    <label class="fld"><span>📝 السبب</span>
+      <small>الموظف هيشوفه زي ما هو في «مرتبك».</small>
+      <textarea id="bonWhy" rows="2" placeholder="مثال: حافز تارجت الشهر"></textarea>
+    </label>
+
+    <label class="fld"><span>🗓️ على مرتب شهر</span>
+      <small>الحافز بيتزاد على مرتب الشهر بتاع التاريخ ده.</small>
+      <input type="date" id="bonDate" value="${esc(defDate)}">
+    </label>
+
+    <button class="save" id="bonSave" onclick="saveBonus()">🎁 اعمل الحافز</button>
+
+    ${recent.length ? `<div style="margin-top:22px;">
+      <b style="font-size:13.5px;">آخر حوافز ${esc(nameOf(BON_EMAIL))}</b>
+      <div style="margin-top:10px;">${recent.map(bonusRowHtml).join('')}</div>
+    </div>` : ''}`;
+}
+
+async function saveBonus(){
+  const btn = document.getElementById('bonSave');
+  const amt = parseFloat((document.getElementById('bonAmt') || {}).value);
+  const why = ((document.getElementById('bonWhy') || {}).value || '').trim();
+  const day = ((document.getElementById('bonDate') || {}).value || '').trim();
+  // ⚠️ الفحص هنا مجاملة بس — الحقيقي جوه hr_add_bonus في السيرفر
+  if(!amt || amt <= 0){ alert('اكتب مبلغ أكبر من صفر'); return; }
+  if(!why){ alert('لازم تكتب سبب الحافز'); return; }
+  if(!day){ alert('اختار الشهر'); return; }
+  const mon = new Date(day).toLocaleDateString('ar-EG', { month:'long', year:'numeric' });
+  if(!confirm(`تأكيد الحافز\n\nالموظف: ${nameOf(BON_EMAIL)}\nالمبلغ: +${amt} ج.م\nعلى مرتب: ${mon}\nالسبب: ${why}`)) return;
+
+  if(btn){ btn.disabled = true; btn.textContent = '⏳ جاري الحفظ…'; }
+  try{
+    const { error } = await sb.rpc('hr_add_bonus',
+      { p_email: BON_EMAIL, p_amount: amt, p_reason: why, p_date: day });
+    // ⚠️ Supabase مبيرميش خطأ — بيرجّعه في .error
+    if(error) throw error;
+    await notifyPay(BON_EMAIL, `🎁 حافز ${amt} ج.م على مرتب ${mon} — ${why}`);
+    await loadBonuses();
+    render();
+    renderBonus();
+    await payAdminReload();
+    alert('✅ اتسجّل الحافز — هيظهر في كشف مرتب ' + mon);
+  }catch(e){
+    console.error('saveBonus failed:', e);
+    const t = (e && e.message) ? e.message : String(e);
+    alert(/does not exist|42883|PGRST202/i.test(t)
+      ? '❌ الميزة لسه ماتركبتش — شغّل ملف 72-bonuses.sql' : '❌ ' + t);
+  }finally{
+    if(btn){ btn.disabled = false; btn.textContent = '🎁 اعمل الحافز'; }
+  }
+}
+
+async function deleteBonus(id){
+  if(!confirm('تمسح الحافز ده؟\nهيتشال من صافي المرتب.')) return;
+  try{
+    const { error } = await sb.rpc('hr_delete_bonus', { p_id: id });
+    if(error) throw error;
+    await loadBonuses();
+    render();
+    if(document.getElementById('bonSheet').classList.contains('open')) renderBonus();
+    await payAdminReload();
+  }catch(e){
+    console.error('deleteBonus failed:', e);
+    alert('❌ ' + (e.message || e));
+  }
+}
+
 // ===== شاشة إضافة خصم =====
 function openDeduction(email){
   DED_EMAIL = (email || '').toLowerCase();
@@ -2960,6 +3144,8 @@ function slipCard(r){
         <b class="minus">${n(r.withdraw_ded)}</b></div>` : ''}
       <div><span>− خصومات تأخير</span><b class="minus">${n(r.late_ded)}</b></div>
       ${slipOvertimeLines(r)}
+      ${Number(r.bonus) ? `<div><span>+ 🎁 حوافز ومكافآت</span>
+        <b style="color:var(--done)">${n(r.bonus)}</b></div>` : ''}
       ${Number(r.leave_bonus) ? `<div><span>+ إجازات ما اتاخدتش</span>
         <b style="color:var(--done)">${n(r.leave_bonus)}</b></div>` : ''}
       <div class="eq"><span>= الصافي</span><b>${n(r.net)} ج.م</b></div>
@@ -3705,6 +3891,7 @@ async function openPayrollAdmin(){
   //    والصفحة مفتوحة من ساعة
   await loadSalaries();
   await loadDeductions();
+  await loadBonuses();
   await loadPayRows();
   renderPayrollAdmin();
 }
@@ -3822,6 +4009,7 @@ function prCardHtml(e){
         <span style="opacity:.75;font-weight:400;">(زيادة ${fmtDur(om)} · ناقص ${fmtDur(sm)})</span>
       </div>`;
     })()}
+    ${r && Number(r.bonus) ? `<div class="pr-bell" style="color:var(--done);">🎁 حوافز: +${money(r.bonus)} ج.م</div>` : ''}
     ${r && Number(r.leave_bonus) ? `<div class="pr-bell" style="color:var(--done);">💵 إجازات ما اتاخدتش: +${money(r.leave_bonus)} ج.م</div>` : ''}
     ${r && r.paid ? `<div class="pr-bell" style="color:var(--done);">🔒 مرتب الشهر ده اتصرف — الأرقام متقفلة</div>` : ''}
     ${!r && has ? `<div class="pr-bell" style="color:var(--muted);">مفيش كشف للشهر ده (مفيش حضور ولا خصومات فيه)</div>` : ''}
@@ -3832,6 +4020,8 @@ function prCardHtml(e){
     <div style="display:flex;gap:8px;margin-top:10px;">
       <button class="pr-ded-btn" style="margin:0;flex:1;"
               onclick="openDeduction('${esc(e)}')">💸 خصم</button>
+      <button class="pr-slip-btn" style="flex:none;background:var(--done);color:#fff;border-color:var(--done);"
+              onclick="openBonus('${esc(e)}')">🎁</button>
       <button class="pr-slip-btn" onclick="openPayslips('${esc(e)}')">🧾 الكشوف</button>
     </div>
   </div>`;
