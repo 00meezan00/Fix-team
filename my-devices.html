@@ -1204,8 +1204,11 @@ function ticketHtml(d, canAct){
   // الخام للفني — ده اللي كان بيخلّي "delivered" تبان زي ما هي.
   const _stLabel = s => (ST[s] && ST[s].label) || t('rp.status') || 'الحالة';
   const isDone = DONE_STATES.includes(d.status);
+  // ⏳ اتبعت للورشة ومدير الإنتاج لسه ما استلمهوش — الفني مايقدرش يبدأ (السيرفر رافض — ملف 84)
+  const notYet = d.status === 'sent_to_repair';
   const actions = isDone
     ? `<div class="assist-tag">${_stLabel(d.status)}</div>`
+    : notYet ? `<div class="assist-tag">⏳ مستني مدير الإنتاج يستلمه</div>`
     : !canAct ? `<div class="assist-tag">🤝 ${t('tp.assistTag')} ${esc(d.tech)}</div>` : `
     <div class="tk-actions">
       ${(!isRet && d.status!=='repairing') ? `<button class="act act-work" onclick="event.stopPropagation();setStatus('${d.id}','repairing')" data-i18n="tp.working">🔧 جاري العمل</button>` : ''}
