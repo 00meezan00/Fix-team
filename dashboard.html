@@ -5360,6 +5360,34 @@ function rolePriceHtml(d){
     ${d.status === 'delivered' ? `<div style="font-size:12.5px;color:var(--muted);margin:-4px 0 12px;">💵 تأكيد الدفع من عند المحاسب</div>` : ''}`;
 }
 
+// ============================================================
+// 🔁 تكلفة الصيانة الجديدة (سعر المرتجع) — للاستقبال ومدير الإنتاج
+// ------------------------------------------------------------
+// 🧸 الجهاز اللي رجع مرتجع بيبان عليه سطر «تكلفة الصيانة الجديدة»
+//    في أي خانة يكون فيها — مش بس وهو في المرتجعات.
+//    🛎️ الاستقبال: يكتبه ويعدّله · 🏭 مدير الإنتاج: يشوفه بس.
+// ⚠️ بعد ما الفلوس تتحصّل أو تتقيّد على حساب محل → بيتقفل
+//    (التعديل ساعتها من عند المحاسب عشان الدفتر يتظبط معاه).
+//    نفس القاعدة على السيرفر (ملف 79).
+// ============================================================
+function roleReturnPriceHtml(d){
+  const lbl = `<span style="color:var(--violet);font-weight:800;">🔁 ${t('det.returnPrice')}</span>`;
+  const has = isReturnPriced(d);
+  if(isProduction()){
+    return `<div class="detail-row" style="margin-bottom:10px;">${lbl}
+      <span style="font-weight:800;">${has ? esc(d.returnPrice) + ' ج.م' : '<span style="color:var(--muted)">لسه ماتسعّرش</span>'}</span></div>`;
+  }
+  const locked = d.returnPaymentStatus === 'paid';
+  return `<label class="field">${lbl}
+      <input type="text" inputmode="numeric" value="${esc(d.returnPrice||'')}"${locked ? ' readonly' : ''}
+             oninput="fixDigitsInput(this)" onblur="editReturnPrice(this.value)" placeholder="${t('det.returnPricePh')}" /></label>
+    ${locked
+      ? `<div style="font-size:12.5px;color:var(--muted);margin:-4px 0 12px;">🔒 الحساب ده اتحصّل أو اتقيّد على حساب المحل — أي تعديل من عند المحاسب</div>`
+      : (d.returnPaymentType === 'deferred'
+          ? `<div style="font-size:12.5px;color:var(--muted);margin:-4px 0 12px;">📒 آجل — المحاسب هو اللي بيقيّده على حساب المحل</div>`
+          : '')}`;
+}
+
 // أزرار الحالة للاستقبال ومدير الإنتاج: نفس الترتيب، والزرار اللي مينفعش دلوقتي باهت
 function rolePillsHtml(d, actions, nextMap){
   const next = nextMap[d.status] || [];
@@ -5656,6 +5684,7 @@ function renderDetailNow(){
              onblur="editField('broughtBy', this.value)" /></label>
     <datalist id="broughtByListDetail">${broughtByOptions()}</datalist>
     ${(isReception() || isProduction()) ? rolePriceHtml(d) : ''}
+    ${(isReception() || isProduction()) && hasRet ? roleReturnPriceHtml(d) : ''}
     <div class="money-only">
     <label class="field"><span>${t('det.price')}</span><input type="text" inputmode="numeric" value="${esc(d.agreedPrice||'')}" oninput="fixDigitsInput(this)"${roI} onblur="editPrice(this.value)" /></label>
     ${isPriced(d) && d.priceConfirmation && d.priceConfirmation.requested ? `
@@ -5724,7 +5753,7 @@ function renderDetailNow(){
     <label class="field"><span>${t('det.issue')}</span><textarea rows="2"${roI} onblur="editField('reportedIssue', this.value)">${esc(d.reportedIssue||'')}</textarea></label>
     ${hasRet ? `
     <label class="field"><span style="color:var(--violet);font-weight:800;">${t('det.returnComplaint')}</span><textarea rows="2"${roR} placeholder="${t('det.returnComplaintPh')}" onblur="editField('returnComplaint', this.value)">${esc(d.returnComplaint||'')}</textarea></label>
-    <label class="field"><span style="color:var(--violet);font-weight:800;">${t('det.discoveredFault')}</span><textarea rows="2"${roR} placeholder="${t('det.discoveredFaultPh')}" onblur="editField('discoveredFault', this.value)">${esc(d.discoveredFault||'')}</textarea></label>` : ''}
+    <label class="field"><span style="color:var(--violet);font-weight:800;">${t('det.discoveredFault')}</span><textarea rows="2" placeholder="${t('det.discoveredFaultPh')}" onblur="editField('discoveredFault', this.value)">${esc(d.discoveredFault||'')}</textarea></label>` : ''}
 
     <div class="approval-box">
       ${!d.deepInspection || !d.deepInspection.requested ? `
@@ -9017,6 +9046,13 @@ async function editReturnPrice(value){
   if(!d) return;
   const oldPrice = (d.returnPrice === undefined || d.returnPrice === null) ? '' : String(d.returnPrice);
   if(price === oldPrice) return;                       // مفيش تغيير
+  // 🏭 مدير الإنتاج بيشوف بس · 🛎️ الاستقبال مايعدّلش حساب اتحصّل/اتقيّد
+  if(isProduction() || isCashier()){ renderDetail(); return; }
+  if(isReception() && d.returnPaymentStatus === 'paid'){
+    alert('الحساب ده اتحصّل أو اتقيّد على حساب المحل — التعديل من عند المحاسب.');
+    renderDetail();
+    return;
+  }
   const isRetNow = d.status === 'returned';
   let extra = { returnPrice: price, lastModifiedAt: new Date().toISOString(), lastModifiedBy: currentUser.name };
   let histEntry = null;
@@ -9046,7 +9082,8 @@ async function editReturnPrice(value){
     histEntry = { status:d.status,
       label: '✏️ تعديل حساب المرتجع (آجل): من ' + before.toLocaleString('en-EG') + ' إلى ' + parseInt(price).toLocaleString('en-EG') + ' ج.م — على حساب "' + (entry.shop || '') + '"',
       date:new Date().toISOString(), by: currentUser.name };
-  } else if(price && d.returnPaymentType === 'deferred' && d.returnPaymentStatus !== 'paid'){
+  } else if(price && d.returnPaymentType === 'deferred' && d.returnPaymentStatus !== 'paid' && !isReception()){
+    // ⚠️ !isReception: القيد على حساب المحل شغل المحاسب — الاستقبال بيكتب الرقم بس
     // محدد عليه آجل بالفعل واتسعّر دلوقتي → يتقيّد على حساب المحل فوراً
     const shop = (d.returnBilledShop || d.billedShop || d.shopName || '').trim();
     if(shop){
