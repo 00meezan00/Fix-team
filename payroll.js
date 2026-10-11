@@ -48,6 +48,8 @@ let _payLate   = [];   // خصومات التأخير (محسوبة في الس�
 let _payWaiv   = [];   // رسايل «الخصم اتشال»
 let _paySlips  = [];   // كشوف الرواتب — شهر بشهر
 let _payBons   = [];   // 🎁 الحوافز (ملف 72) — عشان نكتب أسبابها تحت سطر الكشف
+let _payDebts  = [];   // 💳 الديون بباقيها (ملف 73) — للتذكير
+let _payDebtPays = []; // 💳 السدادات — أسبابها تحت سطر «سداد ديون»
 // 🗄️ الدرجين: الشهر اللي بيعرضوه + مفتوحين ولا لأ
 //    (بيفضلوا زي ما هم لو الشاشة اترسمت تاني بعد «فهمت»)
 let _payPeriod = null;               // { from:'YYYY-MM-01', to:'YYYY-MM-DD' }
@@ -150,6 +152,18 @@ async function payLoad(){
       .ilike('user_email', me).order('work_date', { ascending:false }).limit(300);
     if(bn.error){ console.warn('hr_bonuses:', bn.error); _payBons = []; }
     else _payBons = bn.data || [];
+
+    // 💳 الديون — تذكير بس. اللي بيتخصم فعلاً جاي من الكشف (debt_ded).
+    //    p_email = إيميلنا صراحةً (لو الحساب HR، السيرفر كان هيرجّع الكل)
+    const [dl, dp] = await Promise.all([
+      sb.rpc('hr_debt_list', { p_email: me }),
+      sb.from('hr_debt_payments').select('debt_id,period,amount')
+        .ilike('user_email', me).order('created_at', { ascending:false }).limit(500)
+    ]);
+    if(dl.error){ console.warn('hr_debt_list:', dl.error); _payDebts = []; }
+    else _payDebts = dl.data || [];
+    if(dp.error){ console.warn('hr_debt_payments:', dp.error); _payDebtPays = []; }
+    else _payDebtPays = dp.data || [];
 
     // ============================================================
     // 🗄️ شهر الدرجين = أقدم شهر **لسه ماتصرفش**
@@ -516,7 +530,31 @@ function paySlipOvertime(p){
 // بعد ما HR تعتمدها. بالموجب وبالأخضر — دي فلوس ليه مش عليه.
 // ============================================================
 function payLeaveBonusLine(p){
-  return payBonusLine(p) + _payLeaveLine(p);
+  return payDebtLine(p) + payBonusLine(p) + _payLeaveLine(p);
+}
+
+// 💳 سطر «سداد ديون» + كل سداد على أنهي دين (ملف 73)
+function payDebtLine(p){
+  const v = Number(p && p.debt_ded || 0);
+  if(!v) return '';
+  const ym = String(p.period || '').slice(0, 7);
+  const title = id => ((_payDebts.find(d => d.id === id) || {}).title || 'دين');
+  const rows = _payDebtPays.filter(x => String(x.period || '').slice(0, 7) === ym);
+  return `<div><span>− 💳 سداد ديون</span><b class="minus">${payMoney(v)}</b></div>
+    ${rows.map(x => `<div style="font-size:12px;padding:0 10px 2px 0;color:var(--p-mut);">
+      <span>• ${_payEsc(title(x.debt_id))}</span><span>−${payMoney(x.amount)}</span></div>`).join('')}`;
+}
+
+// 💳 تذكير الديون — على الكشف اللي لسه ماتصرفش بس
+//    ⚠️ ده **مش** خصم: الصافي اللي فوقه مش متخصوم منه الباقي ده.
+function payDebtReminder(p){
+  if(!p || p.paid) return '';
+  const open = _payDebts.filter(d => Number(d.remaining) > 0);
+  if(!open.length) return '';
+  const tot = open.reduce((a, d) => a + Number(d.remaining || 0), 0);
+  return `<div class="pay-debt-note">💳 عليك ديون باقي منها <b>${payMoney(tot)}</b> ج.م
+    <small>(${open.map(d => _payEsc(d.title) + ' ' + payMoney(d.remaining)).join(' · ')})</small><br>
+    ⚠️ لسه ما اتخصمتش من الصافي المعروض.</div>`;
 }
 
 // 🎁 سطر الحوافز + أسبابها تحته (ملف 72)
@@ -576,6 +614,8 @@ function paySlipCard(p, big){
       ${payLeaveBonusLine(p)}
       <div class="eq"><span>= الصافي</span><b>${payMoney(p.net)}</b></div>
     </div>
+
+    ${payDebtReminder(p)}
 
     ${p.paid ? `<div class="pay-slip-meta">🔒 اتصرف
       ${_payEsc(new Date(p.paid_at).toLocaleDateString('ar-EG',
@@ -1709,6 +1749,13 @@ function payUrlB64ToU8(s){
     font:900 13px/1 'Tajawal',system-ui,sans-serif;}
   .pay-exw-x{flex:none; border:none; background:none; color:var(--p-mut);
     font-size:17px; cursor:pointer; padding:4px 6px;}
+
+  /* 💳 تذكير الديون */
+  .pay-debt-note{margin-top:11px; background:rgba(180,83,9,.12); color:#B45309;
+    border:1px solid rgba(180,83,9,.3); border-radius:11px; padding:10px 12px;
+    font-size:12.5px; font-weight:700; line-height:1.9; text-align:start;}
+  .pay-debt-note small{font-weight:500; opacity:.85;}
+  html[data-theme="dark"] .pay-debt-note{color:#FBBF24;}
 
   .pay-note{margin-top:18px; font-size:12px; line-height:2; color:var(--p-mut);
     text-align:center;}`;

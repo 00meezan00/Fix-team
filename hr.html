@@ -277,6 +277,26 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
     font-size:12.5px; font-weight:800; line-height:1.7;}
   .adj-line{background:var(--waiting-bg,#FFF7ED); border-radius:8px; padding:6px 9px; margin-top:6px;}
   .abs-acts{display:flex; gap:7px; margin-top:8px;}
+  /* 💳 الديون */
+  .debt-card{background:var(--surface); border:1px solid var(--border); border-radius:13px;
+    padding:12px 13px; margin-bottom:10px;}
+  .debt-card.done{opacity:.7;}
+  .debt-h{display:flex; align-items:flex-start; gap:10px;}
+  .debt-h b{flex:1; min-width:0; font-size:14px; line-height:1.7; word-break:break-word;}
+  .debt-kind{flex:none; font-size:11px; font-weight:800; border-radius:7px; padding:3px 8px;
+    background:var(--surface-2); color:var(--ink-2);}
+  .debt-nums{display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-top:9px; text-align:center;}
+  .debt-nums b{display:block; font-family:'Cairo',sans-serif; font-weight:900; font-size:15px;}
+  .debt-nums span{font-size:11px; color:var(--muted);}
+  .debt-pay{display:flex; gap:7px; margin-top:10px;}
+  .debt-pay input{flex:1; min-width:0; border:1px solid var(--border); background:var(--surface-2);
+    color:var(--ink); border-radius:10px; padding:10px; font-family:inherit; font-size:15px; text-align:center;}
+  .debt-pay button{flex:none; border:none; border-radius:10px; padding:10px 12px; background:var(--red);
+    color:#fff; font-family:inherit; font-size:13px; font-weight:800; cursor:pointer;}
+  .debt-hist{margin-top:8px; font-size:12px; color:var(--muted); line-height:1.9;}
+  .debt-hist div{display:flex; justify-content:space-between; gap:8px; align-items:center;}
+  .debt-note{margin-top:10px; background:var(--waiting-bg); color:var(--waiting);
+    border-radius:10px; padding:9px 11px; font-size:12.5px; font-weight:700; line-height:1.8;}
   /* 💵 فلوس الإجازة + عناوين أقسام شاشة الغياب والإجازات */
   .abs-sec{font-weight:900; font-size:13.5px; color:var(--ink-2); margin:18px 2px 10px;}
   .lb-box{background:var(--surface); border:1px solid var(--done); border-radius:13px;
@@ -677,6 +697,16 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
   <div class="sheet-body" id="dedBody"></div>
 </div>
 
+<!-- ===== 💳 ديون الموظف ===== -->
+<div class="sheet" id="debtSheet">
+  <div class="sheet-head">
+    <h2 id="debtTitle">💳 الديون</h2>
+    <button class="icon-btn" style="background:var(--surface-2); color:var(--ink);"
+            onclick="closeSheet('debtSheet')">×</button>
+  </div>
+  <div class="sheet-body" id="debtBody"></div>
+</div>
+
 <!-- ===== 🎁 حافز / مكافأة ===== -->
 <div class="sheet" id="bonSheet">
   <div class="sheet-head">
@@ -919,6 +949,7 @@ async function loadMonth(){
     await loadOvertime(from, to);   // 🔴 والأوفر تايم كمان
     await loadDeductions();    // والخصومات اليدوية كمان
     await loadBonuses();       // 🎁 والحوافز (ملف 72)
+    await loadDebts();         // 💳 والديون (ملف 73)
     await loadAbsences(from, to);   // 🏖️ الغياب المقترح خصمه
     await loadLeaveBonus();         // 💵 الإجازات اللي ما اتاخدتش (ملف 71)
     await loadNoBreak(from, to);    // ☕🚫 مين قال إنه مطلعش بريك
@@ -1134,9 +1165,11 @@ function cardHtml(e, days){
       //    شهر واحد، والمسحوبات متجمعة معاه كمان.
       const m = manualDed(e, MONTH);
       const bn = bonusSum(e, MONTH);
-      if(!m.total && !m.wd && !m.unseen && !bn.total) return '';
+      const dr = debtRemaining(e);
+      if(!m.total && !m.wd && !m.unseen && !bn.total && !dr) return '';
       const bits = [];
       if(bn.total) bits.push(`<span style="color:var(--done)">🎁 حوافز: <b>+${bn.total}</b> ج.م</span>`);
+      if(dr) bits.push(`💳 ديون باقية: <b>${lbMoney(dr)}</b> ج.م`);
       if(m.total) bits.push(`💸 خصم يدوي: <b>${m.total}</b> ج.م`);
       if(m.wd)    bits.push(`🔩 مسحوبات: <b>${m.wd}</b> ج.م`);
       if(m.unseen) bits.push(`<i>${m.unseen} لسه ما اتقراش</i>`);
@@ -1209,12 +1242,14 @@ function renderEmpSheet(email, days){
     <div class="emp-acts">
       <button onclick="openDeduction('${esc(email)}')" style="background:var(--red);color:#fff;border-color:var(--red);">💸 خصم</button>
       <button onclick="openBonus('${esc(email)}')" style="background:var(--done);color:#fff;border-color:var(--done);">🎁 حافز</button>
+      <button onclick="openDebts('${esc(email)}')">💳 الديون</button>
       <button onclick="openPunch('${esc(email)}')">✍️ تسجيل يدوي</button>
       <button onclick="openHrSettings('${esc(email)}')">⚙️ نظام العمل</button>
       <button onclick="exportEmpPdf('${esc(email)}')">📄 PDF</button>
       <button onclick="exportEmpExcel('${esc(email)}')">📊 Excel</button>
     </div>
 
+    ${debtSectionHtml(email)}
     ${bonusSectionHtml(email)}
     ${dedSectionHtml(email)}
 
@@ -2868,6 +2903,296 @@ async function deleteBonus(id){
   }
 }
 
+// ============================================================
+// 💳 ديون الموظف (ملف 73)
+// ------------------------------------------------------------
+// 🧸 بالبلدي: الدين «كشكول» لوحده. ممكن الموظف يبقى عليه كذا كشكول
+//    (دين قديم · قسط بنك · مشتريات · صيانة · لبوس…).
+//    • تسجيل الدين **مبيخصمش** — بيظهر كتذكير بس.
+//    • HR بتختار كل شهر هتخصم كام من أنهي دين → ده بس اللي بينزل
+//      من الصافي، والباقي بيترحّل لوحده.
+//    • الصافي طلع بالسالب يوم الصرف؟ السيرفر بيسجّل الفرق دين
+//      «عجز مرتب» ويترحّل مع الباقي.
+//
+// 🔴 كل الحسابات والحواجز في السيرفر (hr_debt_*). الصفحة بتعرض بس.
+// ============================================================
+const DEBT_KINDS = {
+  old:       { t:'مديونية قديمة',        i:'📜' },
+  external:  { t:'دين خارجي بضمان المرتب', i:'🏦' },
+  purchase:  { t:'مشتريات من المحل',     i:'🛒' },
+  repair:    { t:'صيانة',                i:'🔧' },
+  damage:    { t:'لبوس',                 i:'💥' },
+  carryover: { t:'عجز مرتب مترحّل',      i:'↪️' },
+  other:     { t:'أخرى',                 i:'📌' }
+};
+let DEBTS = {};       // إيميل → [ديون بباقيها] من hr_debt_list
+let DEBT_PAYS = {};   // رقم الدين → [سدادات]
+let DEBT_ERR = '';
+let DEBT_EMAIL = '';
+let DEBT_SHOW_DONE = false;
+
+async function loadDebts(){
+  DEBT_ERR = '';
+  try{
+    const [l, p] = await Promise.all([
+      hrAll(() => sb.rpc('hr_debt_list', { p_email: null }).order('id'), 'الديون'),
+      hrAll(() => sb.from('hr_debt_payments')
+        .select('id,debt_id,user_email,period,amount,note,created_by,created_at')
+        .order('created_at', { ascending:false }).order('id'), 'سداد الديون')
+    ]);
+    DEBTS = {}; DEBT_PAYS = {};
+    l.forEach(r => { const e = (r.user_email||'').toLowerCase(); (DEBTS[e] = DEBTS[e] || []).push(r); });
+    Object.keys(DEBTS).forEach(e => DEBTS[e].sort((a,b) =>
+      (Number(b.remaining) > 0) - (Number(a.remaining) > 0) ||
+      String(b.debt_date).localeCompare(String(a.debt_date))));
+    p.forEach(r => { (DEBT_PAYS[r.debt_id] = DEBT_PAYS[r.debt_id] || []).push(r); });
+  }catch(e){
+    // ⚠️ بنقول بصوت عالي — السكوت هنا = HR تفتكر إن الموظف مالوش ديون
+    console.error('loadDebts failed:', e);
+    DEBTS = {}; DEBT_PAYS = {};
+    const t = (e && e.message) ? e.message : String(e);
+    DEBT_ERR = /does not exist|42883|42P01|PGRST202|PGRST205/i.test(t)
+      ? 'ميزة الديون لسه ماتركبتش — شغّل ملف 73-debts.sql' : t;
+  }
+}
+
+function debtRemaining(email){
+  const t = (DEBTS[(email||'').toLowerCase()] || [])
+    .reduce((a, d) => a + Math.max(0, Number(d.remaining || 0)), 0);
+  return Math.round(t * 100) / 100;
+}
+
+// تذكير تحت كشف الراتب: «عليه ديون — لسه ما اتخصمتش» + ترحيل السالب
+function slipDebtNoteHtml(r){
+  const bits = [];
+  if(r.paid && Number(r.net) < 0){
+    bits.push(`↪️ الصافي كان بالسالب — اترحّل <b>${lbMoney(-Number(r.net))}</b> ج.م دين على الشهر الجاي.`);
+  }
+  const rem = debtRemaining(SLIP.email);
+  if(!r.paid && rem){
+    bits.push(`💳 عليه ديون باقي منها <b>${lbMoney(rem)}</b> ج.م — <u>لسه ما اتخصمتش</u> من الصافي اللي فوق.`);
+  }
+  return bits.length ? `<div class="debt-note">${bits.join('<br>')}</div>` : '';
+}
+
+// ملخص صغير جوه سجل الموظف
+function debtSectionHtml(email){
+  const list = (DEBTS[(email||'').toLowerCase()] || []).filter(d => Number(d.remaining) > 0);
+  if(!list.length) return '';
+  return `
+    <div style="margin-top:18px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:9px;">
+        <b style="flex:1;font-size:14px;">💳 الديون الباقية</b>
+        <span style="font-size:12.5px;font-weight:800;color:var(--red);">${lbMoney(debtRemaining(email))} ج.م</span>
+      </div>
+      ${list.map(d => `<div class="ded-row">
+        <div class="ded-amt">${lbMoney(d.remaining)}</div>
+        <div class="ded-mid"><b>${(DEBT_KINDS[d.kind]||{}).i || ''} ${esc(d.title)}</b>
+          <span>${esc((DEBT_KINDS[d.kind]||{}).t || d.kind)} · من ${lbMoney(d.amount)}${
+            d.monthly_installment ? ' · قسط ' + lbMoney(d.monthly_installment) : ''}</span></div>
+      </div>`).join('')}
+      <button class="mini-btn" style="width:100%;margin-top:4px;padding:10px;" onclick="openDebts('${esc(email)}')">💳 افتح الديون واخصم</button>
+    </div>`;
+}
+
+async function openDebts(email){
+  DEBT_EMAIL = (email || '').toLowerCase();
+  DEBT_SHOW_DONE = false;
+  const list = allPeople();
+  if(!list.length){ alert('مفيش موظفين متسجّلين — ضيفهم من لوحة الأدمن الأول'); return; }
+  if(list.indexOf(DEBT_EMAIL) < 0) DEBT_EMAIL = list[0];
+  document.getElementById('debtBody').innerHTML = '<div class="empty">جاري التحميل…</div>';
+  openSheet('debtSheet');
+  await loadDebts();          // ⚠️ طازة — ممكن حد تاني سدّد من موبايل تاني
+  renderDebts();
+}
+
+function debtCardHtml(d){
+  const k = DEBT_KINDS[d.kind] || { t:d.kind, i:'📌' };
+  const rem = Number(d.remaining || 0);
+  const pays = DEBT_PAYS[d.id] || [];
+  const thisMonth = pays.filter(p => String(p.period).slice(0,7) === MONTH);
+  const def = rem > 0 ? Math.min(rem, Number(d.monthly_installment || 0) || rem) : 0;
+  return `
+    <div class="debt-card${rem > 0 ? '' : ' done'}">
+      <div class="debt-h">
+        <b>${k.i} ${esc(d.title)}</b>
+        <span class="debt-kind">${esc(k.t)}</span>
+      </div>
+      <div class="debt-nums">
+        <div><b>${lbMoney(d.amount)}</b><span>الدين</span></div>
+        <div><b style="color:var(--done)">${lbMoney(d.paid_total)}</b><span>اتسدّد</span></div>
+        <div><b style="color:${rem > 0 ? 'var(--red)' : 'var(--done)'}">${lbMoney(rem)}</b><span>الباقي</span></div>
+      </div>
+      <div class="debt-hist">
+        ${new Date(d.debt_date).toLocaleDateString('ar-EG', { day:'numeric', month:'long', year:'numeric' })}${
+        d.monthly_installment ? ' · القسط الشهري ' + lbMoney(d.monthly_installment) + ' ج.م' : ''}${
+        d.note ? ' · ' + esc(d.note) : ''}
+        ${pays.map(p => `<div><span>✔️ ${lbMoney(p.amount)} من مرتب ${esc(new Date(p.period).toLocaleDateString('ar-EG', { month:'long', year:'numeric' }))}</span>
+          <button class="ded-del" title="إلغاء السداد ده" onclick="debtUnpay('${esc(p.id)}')">↩️</button></div>`).join('')}
+      </div>
+      ${rem > 0 ? `
+        <div class="debt-pay">
+          <input type="number" id="dp_${esc(d.id)}" min="1" step="50" inputmode="decimal"
+                 placeholder="المبلغ" value="${thisMonth.length ? '' : (def || '')}">
+          <button onclick="debtPay('${esc(d.id)}')">💸 اخصم من مرتب ${esc(monthLabel())}</button>
+        </div>` : ''}
+      ${(!pays.length && d.kind !== 'carryover') ? `<button class="mini-btn danger" style="margin-top:8px;"
+          onclick="debtDelete('${esc(d.id)}')">🗑️ امسح الدين (اتسجّل غلط)</button>` : ''}
+    </div>`;
+}
+
+function renderDebts(){
+  const list = allPeople();
+  const all = DEBTS[DEBT_EMAIL] || [];
+  const open = all.filter(d => Number(d.remaining) > 0);
+  const done = all.filter(d => Number(d.remaining) <= 0);
+  const rem = debtRemaining(DEBT_EMAIL);
+  const paidMonth = (PAYROWS[DEBT_EMAIL] || {})[MONTH + '-01'];
+  document.getElementById('debtTitle').textContent = '💳 ديون — ' + nameOf(DEBT_EMAIL);
+  document.getElementById('debtBody').innerHTML = `
+    ${DEBT_ERR ? `<div class="hintbox" style="background:var(--rejected-bg,#FEF2F2);color:var(--red);">❌ ${esc(DEBT_ERR)}</div>` : ''}
+    <label class="fld"><span>👤 الموظف</span>
+      <select onchange="DEBT_EMAIL=this.value; renderDebts()">
+        ${list.map(e => `<option value="${esc(e)}"${e===DEBT_EMAIL?' selected':''}>${esc(nameOf(e))}</option>`).join('')}
+      </select>
+    </label>
+
+    <div class="kpis" style="margin:4px 0 12px;">
+      <div class="kpi"><div class="v" style="color:${rem ? 'var(--red)' : 'inherit'}">${lbMoney(rem)}</div><div class="l">إجمالي الباقي ج.م</div></div>
+      <div class="kpi"><div class="v">${open.length}</div><div class="l">دين مفتوح</div></div>
+    </div>
+    <div class="hintbox">
+      الخصم بيتحسب على مرتب <b>${esc(monthLabel())}</b> — غيّر الشهر من الشاشة الرئيسية.
+      ${paidMonth && paidMonth.paid ? '<br>⚠️ مرتب الشهر ده <b>اتصرف</b> — اختار الشهر الجاي عشان تخصم.' : ''}
+    </div>
+
+    ${open.length ? open.map(debtCardHtml).join('') : '<div class="empty" style="padding:16px;">مفيش ديون مفتوحة ✅</div>'}
+
+    ${done.length ? `<button class="mini-btn" style="width:100%;padding:10px;margin-bottom:10px;"
+        onclick="DEBT_SHOW_DONE=!DEBT_SHOW_DONE; renderDebts()">
+        ${DEBT_SHOW_DONE ? '▴' : '▾'} ✅ ديون اتسددت (${done.length})</button>
+      ${DEBT_SHOW_DONE ? done.map(debtCardHtml).join('') : ''}` : ''}
+
+    <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);">
+      <b style="display:block;font-size:14px;margin-bottom:10px;">➕ دين جديد</b>
+      <label class="fld"><span>📂 النوع</span>
+        <select id="dbKind">
+          ${Object.keys(DEBT_KINDS).filter(k => k !== 'carryover')
+            .map(k => `<option value="${k}">${DEBT_KINDS[k].i} ${DEBT_KINDS[k].t}</option>`).join('')}
+        </select>
+      </label>
+      <label class="fld"><span>📝 التفاصيل</span>
+        <input type="text" id="dbTitle" placeholder="مثال: لبوس شاشة · قرض بنك مصر · شاحن من المحل">
+      </label>
+      <label class="fld"><span>💰 المبلغ كله (بالجنيه)</span>
+        <input type="number" id="dbAmt" min="1" step="50" inputmode="decimal">
+      </label>
+      <label class="fld"><span>🗓️ القسط الشهري (اختياري)</span>
+        <small>لو متفقين على مبلغ ثابت كل شهر. بيتكتب مقترح في خانة الخصم — والقرار في الآخر ليك.</small>
+        <input type="number" id="dbInst" min="1" step="50" inputmode="decimal" placeholder="من غير قسط ثابت">
+      </label>
+      <label class="fld"><span>📅 تاريخ الدين</span>
+        <input type="date" id="dbDate" value="${esc(todayCairo())}">
+      </label>
+      <label class="fld"><span>📌 ملاحظة (اختياري)</span>
+        <input type="text" id="dbNote">
+      </label>
+      <label class="fld"><span>💸 اخصم منه دلوقتي من مرتب ${esc(monthLabel())} (اختياري)</span>
+        <small>سيبه فاضي = الدين يتسجّل تذكير بس، والصافي ميتأثرش.</small>
+        <input type="number" id="dbNow" min="1" step="50" inputmode="decimal" placeholder="ما تخصمش دلوقتي">
+      </label>
+      <button class="save" id="dbSave" style="background:var(--red);" onclick="debtAdd()">💳 سجّل الدين</button>
+    </div>`;
+}
+
+async function debtAfterChange(){
+  await loadDebts();
+  await payAdminReload();
+  render();
+  renderDebts();
+  if(document.getElementById('slipSheet').classList.contains('open') && SLIP.email){
+    await loadPayslips(); renderPayslips();
+  }
+}
+
+async function debtAdd(){
+  const g = id => ((document.getElementById(id) || {}).value || '').trim();
+  const kind = g('dbKind'), title = g('dbTitle'), note = g('dbNote'), day = g('dbDate');
+  const amt = parseFloat(g('dbAmt')), inst = g('dbInst') === '' ? null : parseFloat(g('dbInst'));
+  const now = g('dbNow') === '' ? 0 : parseFloat(g('dbNow'));
+  if(!title){ alert('اكتب تفاصيل الدين'); return; }
+  if(!amt || amt <= 0){ alert('اكتب المبلغ'); return; }
+  if(inst !== null && !(inst > 0)){ alert('القسط لازم يكون أكبر من صفر أو فاضي'); return; }
+  if(now && now > amt){ alert('اللي هيتخصم دلوقتي أكبر من الدين نفسه'); return; }
+  const k = DEBT_KINDS[kind] || {};
+  if(!confirm(`تسجيل دين\n\nالموظف: ${nameOf(DEBT_EMAIL)}\nالنوع: ${k.t}\nالتفاصيل: ${title}\nالمبلغ: ${amt} ج.م` +
+              (inst ? `\nالقسط: ${inst} ج.م/شهر` : '') +
+              (now ? `\n\n💸 هيتخصم دلوقتي ${now} ج.م من مرتب ${monthLabel()}` : '\n\n(تذكير بس — مش هيتخصم من الصافي)'))) return;
+  const btn = document.getElementById('dbSave');
+  if(btn){ btn.disabled = true; btn.textContent = '⏳ جاري الحفظ…'; }
+  try{
+    const { error } = await sb.rpc('hr_add_debt', {
+      p_email: DEBT_EMAIL, p_kind: kind, p_title: title, p_amount: amt,
+      p_installment: inst, p_date: day || null, p_note: note || null,
+      p_pay_now: now || null, p_pay_period: now ? MONTH + '-01' : null });
+    // ⚠️ Supabase مبيرميش خطأ — بيرجّعه في .error
+    if(error) throw error;
+    await notifyPay(DEBT_EMAIL, now
+      ? `💳 اتسجّل عليك دين ${amt} ج.م (${title}) — واتخصم منه ${now} ج.م من مرتب ${monthLabel()}`
+      : `💳 اتسجّل عليك دين ${amt} ج.م (${title}) — لسه ما اتخصمش من مرتبك`);
+    await debtAfterChange();
+    alert('✅ اتسجّل');
+  }catch(e){
+    console.error('debtAdd failed:', e);
+    alert('❌ ' + (e.message || e));
+  }finally{
+    if(btn){ btn.disabled = false; btn.textContent = '💳 سجّل الدين'; }
+  }
+}
+
+async function debtPay(id){
+  const d = (DEBTS[DEBT_EMAIL] || []).find(x => x.id === id);
+  const el = document.getElementById('dp_' + id);
+  const amt = parseFloat((el && el.value) || '');
+  if(!d) return;
+  if(!amt || amt <= 0){ alert('اكتب المبلغ'); return; }
+  if(amt > Number(d.remaining)){ alert('المبلغ أكبر من الباقي (' + lbMoney(d.remaining) + ')'); return; }
+  // ⚠️ تحذير لو الخصم هيخلّي الصافي بالسالب — مش منع، بس لازم تعرف
+  const row = (PAYROWS[DEBT_EMAIL] || {})[MONTH + '-01'];
+  const warn = (row && Number(row.net) - amt < 0)
+    ? `\n\n⚠️ الصافي هيبقى بالسالب (${lbMoney(Number(row.net) - amt)}) — والفرق هيترحّل دين يوم الصرف.` : '';
+  if(!confirm(`خصم ${amt} ج.م من مرتب ${monthLabel()}\nسداد: ${d.title}\nالباقي بعده: ${lbMoney(Number(d.remaining) - amt)}${warn}`)) return;
+  try{
+    const { error } = await sb.rpc('hr_debt_pay',
+      { p_debt_id: id, p_amount: amt, p_period: MONTH + '-01', p_note: null });
+    if(error) throw error;
+    await notifyPay(DEBT_EMAIL, `💳 اتخصم ${amt} ج.م من مرتب ${monthLabel()} — سداد: ${d.title}`);
+    await debtAfterChange();
+  }catch(e){
+    console.error('debtPay failed:', e);
+    alert('❌ ' + (e.message || e));
+  }
+}
+
+async function debtUnpay(payId){
+  if(!confirm('تلغي السداد ده؟\nالمبلغ هيرجع على الدين، وهيتشال من خصم المرتب.')) return;
+  try{
+    const { error } = await sb.rpc('hr_debt_unpay', { p_payment_id: payId });
+    if(error) throw error;
+    await debtAfterChange();
+  }catch(e){ alert('❌ ' + (e.message || e)); }
+}
+
+async function debtDelete(id){
+  if(!confirm('تمسح الدين ده خالص؟ (للدين اللي اتسجّل غلط بس)')) return;
+  try{
+    const { error } = await sb.rpc('hr_delete_debt', { p_id: id });
+    if(error) throw error;
+    await debtAfterChange();
+  }catch(e){ alert('❌ ' + (e.message || e)); }
+}
+
 // ===== شاشة إضافة خصم =====
 function openDeduction(email){
   DED_EMAIL = (email || '').toLowerCase();
@@ -3026,6 +3351,7 @@ async function openPayslips(email){
   document.getElementById('slipTitle').textContent = '🧾 كشوف — ' + nameOf(SLIP.email);
   document.getElementById('slipBody').innerHTML = '<div class="empty">جاري التحميل…</div>';
   openSheet('slipSheet');
+  await loadDebts();       // 💳 عشان تذكير «لسه ما اتخصمتش» يبقى طازة
   await loadPayslips();
   renderPayslips();
 }
@@ -3144,12 +3470,15 @@ function slipCard(r){
         <b class="minus">${n(r.withdraw_ded)}</b></div>` : ''}
       <div><span>− خصومات تأخير</span><b class="minus">${n(r.late_ded)}</b></div>
       ${slipOvertimeLines(r)}
+      ${Number(r.debt_ded) ? `<div><span>− 💳 سداد ديون</span>
+        <b class="minus">${n(r.debt_ded)}</b></div>` : ''}
       ${Number(r.bonus) ? `<div><span>+ 🎁 حوافز ومكافآت</span>
         <b style="color:var(--done)">${n(r.bonus)}</b></div>` : ''}
       ${Number(r.leave_bonus) ? `<div><span>+ إجازات ما اتاخدتش</span>
         <b style="color:var(--done)">${n(r.leave_bonus)}</b></div>` : ''}
       <div class="eq"><span>= الصافي</span><b>${n(r.net)} ج.م</b></div>
     </div>
+    ${slipDebtNoteHtml(r)}
 
     ${r.paid ? `
       <div class="slip-meta">
@@ -3892,6 +4221,7 @@ async function openPayrollAdmin(){
   await loadSalaries();
   await loadDeductions();
   await loadBonuses();
+  await loadDebts();
   await loadPayRows();
   renderPayrollAdmin();
 }
@@ -4009,6 +4339,8 @@ function prCardHtml(e){
         <span style="opacity:.75;font-weight:400;">(زيادة ${fmtDur(om)} · ناقص ${fmtDur(sm)})</span>
       </div>`;
     })()}
+    ${r && Number(r.debt_ded) ? `<div class="pr-bell">💳 سداد ديون الشهر ده: −${money(r.debt_ded)} ج.م</div>` : ''}
+    ${debtRemaining(e) ? `<div class="pr-bell" style="color:var(--waiting);">💳 ديون باقية: ${money(debtRemaining(e))} ج.م — لسه ما اتخصمتش من الصافي</div>` : ''}
     ${r && Number(r.bonus) ? `<div class="pr-bell" style="color:var(--done);">🎁 حوافز: +${money(r.bonus)} ج.م</div>` : ''}
     ${r && Number(r.leave_bonus) ? `<div class="pr-bell" style="color:var(--done);">💵 إجازات ما اتاخدتش: +${money(r.leave_bonus)} ج.م</div>` : ''}
     ${r && r.paid ? `<div class="pr-bell" style="color:var(--done);">🔒 مرتب الشهر ده اتصرف — الأرقام متقفلة</div>` : ''}
@@ -4022,6 +4354,7 @@ function prCardHtml(e){
               onclick="openDeduction('${esc(e)}')">💸 خصم</button>
       <button class="pr-slip-btn" style="flex:none;background:var(--done);color:#fff;border-color:var(--done);"
               onclick="openBonus('${esc(e)}')">🎁</button>
+      <button class="pr-slip-btn" style="flex:none;" onclick="openDebts('${esc(e)}')">💳</button>
       <button class="pr-slip-btn" onclick="openPayslips('${esc(e)}')">🧾 الكشوف</button>
     </div>
   </div>`;
