@@ -4003,7 +4003,8 @@ function renderApprovalsPanel(){
   // 📝 + التقارير (للمحاسب العام) · 🚀 المرحلة الأولى: إجمالي النهارده · الصندوق · تقاريري
   // 🚀🚀 المرحلة التانية: تقفيل الخزنة · التقفيلات (للمحاسب العام) · نايمين في الدرج · المتأخرين
   // 🚀🚀🚀 المرحلة التالتة: التقارير + التقفيلات بقوا لوحة واحدة «🧾 للمراجعة» (auditPanelHtml)
-  if(host) host.innerHTML = cashierTodayHtml() + closingStripHtml() + approvalsPanelHtml() + auditPanelHtml()
+  if(host) host.innerHTML = cashierTodayHtml() + closingStripHtml() + depositPanelHtml() + depositRecPanelHtml()
+                          + approvalsPanelHtml() + auditPanelHtml()
                           + inboxPanelHtml() + latePanelHtml() + sleepPanelHtml()
                           + myReportsPanelHtml();
   try{ syncAuditBadge(); }catch(e){}
@@ -4486,6 +4487,7 @@ function rcCardChips(d, s){
     else if(ri) h += `<span class="rc-chip" style="background:${accentBg(ri.varname)};color:${accent(ri.varname)}">📍 ${esc(stLabel(ri))}</span> `;
   }
   h += outcomeChip(d);
+  h += depCardChip(d);    // 💰 (ملف 88) العربون
   h += ph1CardChips(d);   // 🚀 ⏳ مستني من إمتى · 🚫 سبب الرفض · 💬 لسه ماتبلّغش
   h += ph2CardChips(d);   // 🚀🚀 🔩 مستني قطعة · ⏰ متأخر · 😴 نايم في الدرج
   return h;
@@ -4532,9 +4534,11 @@ async function markPaid(){
   // 💵 أمين الخزنة بيحصّل بعد التسليم بس — والآجل المحاسب العام هو اللي بيقيّده
   if(isCashier() && (d.status !== 'delivered' || d.paymentType === 'deferred')) return;
   const labelKey = d.status === 'delivered' ? 'hist.paidDelivered' : 'hist.paidCash';
+  // 💰 (ملف 88) payAmt = اللي دخل الخزنة فعلاً دلوقتي = السعر − العربون المدفوع
+  const payAmt = depositDue(d);
   devices = devices.map(x => x.id === selectedId
     ? { ...x, paymentStatus:'paid', lastModifiedAt:new Date().toISOString(), lastModifiedBy:currentUser.name,
-        statusHistory:[...(x.statusHistory||[]), {status:x.status, labelKey, date:new Date().toISOString(), by:currentUser.name}] }
+        statusHistory:[...(x.statusHistory||[]), {status:x.status, labelKey, payAmt, date:new Date().toISOString(), by:currentUser.name}] }
     : x);
   renderDetail(); render(); await persist();
   const t = devices.find(x=>x.id===selectedId);
@@ -5513,11 +5517,13 @@ function rolePriceHtml(d){
   const priced = isPriced(d);
   if(isProduction()){
     return `<div class="detail-row" style="margin-bottom:10px;"><span>💰 ${t('det.price')}</span>
-      <span style="font-weight:800;">${priced ? esc(d.agreedPrice) + ' ج.م' : '<span style="color:var(--muted)">لسه ماتسعّرش</span>'}</span></div>`;
+      <span style="font-weight:800;">${priced ? esc(d.agreedPrice) + ' ج.م' : '<span style="color:var(--muted)">لسه ماتسعّرش</span>'}</span></div>
+      ${depositFieldHtml(d)}`;
   }
   const canPay = priced && d.status !== 'delivered';
   return `<label class="field"><span>${t('det.price')}</span>
       <input type="text" inputmode="numeric" value="${esc(d.agreedPrice||'')}" oninput="fixDigitsInput(this)" onblur="editPrice(this.value)" /></label>
+    ${depositFieldHtml(d)}
     ${canPay ? `<div style="margin-bottom:12px;">
       <span style="font-size:13.5px; color:var(--muted); display:block; margin-bottom:6px;">${t('det.payMethod')}</span>
       <div class="pay-choice">
@@ -5850,9 +5856,11 @@ function cashierToday(){
   devices.forEach(d => (d.statusHistory || []).forEach(h => {
     if(!h || !h.date || Date.parse(h.date) < from) return;
     let amt = null, cnt = 0;
-    if(PAY_IN_KEYS.includes(h.labelKey)){ amt = parseInt(d.agreedPrice) || 0; cnt = 1; }
+    if(PAY_IN_KEYS.includes(h.labelKey)){ amt = payInAmt(d, h); cnt = 1; }
     else if(h.labelKey === 'hist.returnPaidCash'){ amt = parseInt(String((h.labelVars || {}).amount || '').replace(/[^0-9]/g, '')) || 0; cnt = 1; }
     else if(h.payUndo){ amt = -(parseInt(h.payUndo.amount) || 0); cnt = -1; }
+    else if(h.depositIn){ amt = parseInt(h.depositIn.amount) || 0; cnt = 1; }      // 💰 عربون دخل
+    else if(h.depositOut){ amt = -(parseInt(h.depositOut.amount) || 0); cnt = 0; } // ↩️ عربون رجع للعميل
     if(amt === null) return;
     sum += amt; n += cnt;
     if(h.by && h.by === currentUser.name) mine += amt;
@@ -5967,17 +5975,33 @@ function canUndoPay(d, what){
   if(what === 'return') return d.returnPaymentStatus === 'paid' && d.returnPaymentType !== 'deferred';
   return isPaidDevice(d) && d.paymentType !== 'deferred';
 }
+// 💰 (ملف 88) العربون اتأكد بالغلط؟ يرجع «مستني» بسبب — طالما لسه مافيش سؤال رجوع شغّال
+function canUndoDeposit(d){
+  return isCashier() && !!d && d.depositStatus === 'paid' && !d.depositRefund
+      && !(isPaidDevice(d) && d.status === 'delivered');
+}
+// المبلغ اللي هيتشال من الخزنة لو التأكيد اتلغى
+function undoAmt(d, what){
+  if(what === 'return')  return parseInt(d.returnPrice) || 0;
+  if(what === 'deposit') return depAmt(d);
+  // آخر «تأكيد دفع» اتسجّل — بالمبلغ اللي دخل فعلاً (الباقي بعد العربون)
+  const h = (d.statusHistory || []).slice().reverse().find(x => x && PAY_IN_KEYS.includes(x.labelKey));
+  return h ? payInAmt(d, h) : depositDue(d);
+}
 function payUndoBtnHtml(d, what){
-  if(!canUndoPay(d, what) || (payUndoAsk && payUndoAsk.id === d.id)) return '';
+  if(what === 'deposit'){
+    if(!canUndoDeposit(d) || (payUndoAsk && payUndoAsk.id === d.id)) return '';
+  } else if(!canUndoPay(d, what) || (payUndoAsk && payUndoAsk.id === d.id)) return '';
   return `<button class="acc-mini-btn" style="width:100%;margin:-4px 0 12px;padding:9px;color:var(--danger);border-color:var(--danger-border);"
-    onclick="payUndoAsk={id:'${d.id}',what:'${what}'};renderDetail();setTimeout(()=>{const e=document.getElementById('payUndoTxt');if(e)e.focus();},60);">↩️ دوست تأكيد ${what === 'return' ? 'دفع المرتجع' : 'الدفع'} بالغلط؟ ألغيه</button>`;
+    onclick="payUndoAsk={id:'${d.id}',what:'${what}'};renderDetail();setTimeout(()=>{const e=document.getElementById('payUndoTxt');if(e)e.focus();},60);">↩️ دوست تأكيد ${what === 'return' ? 'دفع المرتجع' : what === 'deposit' ? 'استلام العربون' : 'الدفع'} بالغلط؟ ألغيه</button>`;
 }
 function payUndoBoxHtml(d){
   if(!payUndoAsk || payUndoAsk.id !== d.id) return '';
   const ret = payUndoAsk.what === 'return';
-  const amt = parseInt(ret ? d.returnPrice : d.agreedPrice) || 0;
+  const dep = payUndoAsk.what === 'deposit';
+  const amt = undoAmt(d, payUndoAsk.what);
   return `<div class="rfr-box" style="background:var(--danger-bg);border-color:var(--danger);">
-    <div class="rfr-q">↩️ هترجّع ${ret ? 'دفع المرتجع' : 'الجهاز'} «بانتظار الدفع» (${amt.toLocaleString('en-EG')} ج.م هتتشال من إجمالي النهارده).
+    <div class="rfr-q">↩️ هترجّع ${dep ? 'العربون «مستني التأكيد»' : (ret ? 'دفع المرتجع' : 'الجهاز') + ' «بانتظار الدفع»'} (${amt.toLocaleString('en-EG')} ج.م هتتشال من إجمالي النهارده).
       اكتب حصل إيه — هيوصل للمحاسب العام.</div>
     <textarea id="payUndoTxt" rows="2" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:14px;font-family:inherit;background:var(--surface);color:var(--ink);" placeholder="مثال: دوست على الجهاز اللي جنبه — العميل لسه مادفعش"></textarea>
     <div class="pay-choice" style="margin-top:8px;">
@@ -5993,18 +6017,20 @@ async function submitPayUndo(){
   if(why.length < 5){ alert('اكتب السبب الأول (سطر واحد على الأقل يوضح حصل إيه)'); if(el) el.focus(); return; }
   const { id, what } = payUndoAsk;
   const d = devices.find(x => x.id === id);
-  if(!canUndoPay(d, what)){ payUndoAsk = null; renderDetail(); return; }
+  const dep = what === 'deposit';
+  if(dep ? !canUndoDeposit(d) : !canUndoPay(d, what)){ payUndoAsk = null; renderDetail(); return; }
   const ret = what === 'return';
-  const amt = parseInt(ret ? d.returnPrice : d.agreedPrice) || 0;
+  const amt = undoAmt(d, what);
   const now = new Date().toISOString();
-  const text = '↩️ اتلغى تأكيد ' + (ret ? 'دفع المرتجع' : 'الدفع') + ' (' + amt.toLocaleString('en-EG') + ' ج.م) — اتأكد بالغلط\nالسبب: ' + why;
+  const wTxt = dep ? 'استلام العربون' : (ret ? 'دفع المرتجع' : 'الدفع');
+  const text = '↩️ اتلغى تأكيد ' + wTxt + ' (' + amt.toLocaleString('en-EG') + ' ج.م) — اتأكد بالغلط\nالسبب: ' + why;
   payUndoAsk = null;
   devices = devices.map(x => {
     if(x.id !== id) return x;
     const nx = { ...x,
       lastModifiedAt: now, lastModifiedBy: currentUser.name,
       statusHistory: [...(x.statusHistory || []), { status: x.status,
-        label: '↩️ اتلغى تأكيد ' + (ret ? 'دفع المرتجع' : 'الدفع') + ' بالغلط — ' + amt.toLocaleString('en-EG') + ' ج.م',
+        label: '↩️ اتلغى تأكيد ' + wTxt + ' بالغلط — ' + amt.toLocaleString('en-EG') + ' ج.م',
         payUndo: { what, amount: amt }, date: now, by: currentUser.name }],
       activityNotes: [...(x.activityNotes || []), { text: '📝 ' + text, at: now, by: currentUser.name, role: currentRoleLabel() }],
       cashierReports: [...(x.cashierReports || []), {
@@ -6012,7 +6038,8 @@ async function submitPayUndo(){
         kind: 'unpay', what, amount: amt, text,
         by: currentUser.name, byEmail: currentUser.email || '', at: now, reviewed: false }]
     };
-    if(ret) nx.returnPaymentStatus = null; else nx.paymentStatus = 'unpaid';
+    if(dep){ nx.depositStatus = 'pending'; nx.depositPaidAt = null; nx.depositPaidBy = null; }
+    else if(ret) nx.returnPaymentStatus = null; else nx.paymentStatus = 'unpaid';
     return nx;
   });
   renderDetail(); render();
@@ -6035,6 +6062,14 @@ function ph1OnRemote(prev, next){
         ? (next.repairOutcome === 'rejected' ? ' — 🚫 مرفوض' + (next.rejectReason ? ' (' + next.rejectReason + ')' : '') : ' — ✅ اتصلّح')
         : (next.returnInbound ? ' — 🔁 مرتجع' : '');
       ph1Toast('📥 وصلك جهاز: ' + dev + (next.customerName ? ' — ' + next.customerName : '') + extra, next.id);
+    }
+    // 💰 (ملف 88) أمين الخزنة: عربون جديد مستنيه · جهاز مرفوض مستني إجابته
+    if(isCashier()){
+      const dev2 = `${next.deviceType || ''} ${next.model || ''}`.trim();
+      if(next.depositStatus === 'pending' && depAmt(next) && (!prev || prev.depositStatus !== 'pending' || depAmt(prev) !== depAmt(next)))
+        ph1Toast('💰 عربون ' + depAmt(next).toLocaleString('en-EG') + ' ج.م مستني تأكيدك: ' + dev2, next.id);
+      if(depRefundStep(next) === 'cash' && !(prev && depRefundStep(prev) === 'cash'))
+        ph1Toast('💰 جهاز مرفوض — العربون رجع للعميل ولا لأ؟ ' + dev2, next.id);
     }
     const key = myReportsKey();
     if(key){
@@ -6236,7 +6271,8 @@ function receiptData(d){
     issue: d.repairIssue || d.discoveredIssue || d.reportedIssue || '',
     intake: d.intakeDate ? new Date(d.intakeDate).toLocaleDateString('ar-EG') : '',
     out: deliveredDateOf(d) ? new Date(deliveredDateOf(d)).toLocaleString('ar-EG') : new Date().toLocaleString('ar-EG'),
-    price, rp, pay, warranty: warrantyLine(d), track: trackUrl(d)
+    price, rp, pay, warranty: warrantyLine(d), track: trackUrl(d),
+    dep: depPaid(d), due: depositDue(d)   // 💰 (ملف 88)
   };
 }
 function ph2PrintReceipt(id){
@@ -6253,7 +6289,7 @@ function ph2PrintReceipt(id){
     <body><h1>I Fix Team</h1><div class="c">🧾 إيصال تسليم جهاز</div><div class="c"><b>${esc(r.ref)}</b></div>
     <table>${row('العميل', r.cust)}${row('المحل', r.shop)}${row('التليفون', r.phone)}${row('الجهاز', r.dev)}${row('العطل', r.issue)}
     ${row('تاريخ الاستلام', r.intake)}${row('تاريخ التسليم', r.out)}${row('الدفع', r.pay)}</table>
-    <div class="tot">تكلفة الصيانة: ${r.price.toLocaleString('en-EG')} ج.م${r.rp !== null ? `<br>صيانة المرتجع: ${r.rp.toLocaleString('en-EG')} ج.م` : ''}</div>
+    <div class="tot">تكلفة الصيانة: ${r.price.toLocaleString('en-EG')} ج.م${r.dep ? `<br><span style="font-size:13px;">عربون مدفوع: ${r.dep.toLocaleString('en-EG')} · الباقي: ${r.due.toLocaleString('en-EG')} ج.م</span>` : ''}${r.rp !== null ? `<br>صيانة المرتجع: ${r.rp.toLocaleString('en-EG')} ج.م` : ''}</div>
     ${r.warranty ? `<div class="w">🛡️ ${esc(r.warranty)}</div>` : ''}
     <div class="s">الضمان على نفس العطل بس، ومايشملش الكسر أو المياه أو فتح الجهاز برّه المحل.</div>
     <div class="s" style="margin-top:6px;">شكراً لثقتك في I Fix Team 🌟</div></body></html>`;
@@ -6276,7 +6312,7 @@ function ph2WaReceipt(id){
   if(!d || !d.customerPhone) return;
   const r = receiptData(d);
   const msg = `🧾 *إيصال تسليم — I Fix Team*\nرقم الجهاز: *${r.ref}*\nالجهاز: ${r.dev}${r.issue ? `\nالعطل: ${r.issue}` : ''}\nتاريخ التسليم: ${r.out}\n`
-    + `تكلفة الصيانة: *${r.price.toLocaleString('en-EG')} ج.م*${r.rp !== null ? `\nصيانة المرتجع: *${r.rp.toLocaleString('en-EG')} ج.م*` : ''}\nالدفع: ${r.pay}`
+    + `تكلفة الصيانة: *${r.price.toLocaleString('en-EG')} ج.م*${r.dep ? `\nعربون مدفوع: ${r.dep.toLocaleString('en-EG')} ج.م · الباقي: *${r.due.toLocaleString('en-EG')} ج.م*` : ''}${r.rp !== null ? `\nصيانة المرتجع: *${r.rp.toLocaleString('en-EG')} ج.م*` : ''}\nالدفع: ${r.pay}`
     + (r.warranty ? `\n🛡️ ${r.warranty}` : '') + `\n\nشكراً لثقتك فينا 🌟`;
   openWa(d.customerPhone, msg);
 }
@@ -6524,9 +6560,11 @@ function collectedSince(fromMs){
     if(!h || !h.date) return;
     const t = Date.parse(h.date);
     if(!(t > fromMs)) return;
-    if(PAY_IN_KEYS.includes(h.labelKey)){ sum += parseInt(d.agreedPrice) || 0; n++; }
+    if(PAY_IN_KEYS.includes(h.labelKey)){ sum += payInAmt(d, h); n++; }
     else if(h.labelKey === 'hist.returnPaidCash'){ sum += parseInt(String((h.labelVars || {}).amount || '').replace(/[^0-9]/g, '')) || 0; n++; }
     else if(h.payUndo){ sum -= parseInt(h.payUndo.amount) || 0; n--; }
+    else if(h.depositIn){ sum += parseInt(h.depositIn.amount) || 0; n++; }    // 💰 عربون دخل
+    else if(h.depositOut){ sum -= parseInt(h.depositOut.amount) || 0; }       // ↩️ عربون رجع للعميل
   }));
   return { sum, n: Math.max(0, n) };
 }
@@ -6874,6 +6912,7 @@ const AUDIT_TYPES = {
   money:   { icon:'💰', label:'تعديل فلوس' },
   unpay:   { icon:'↩️', label:'إلغاء دفع' },
   closing: { icon:'🔒', label:'الخزنة' },
+  deposit: { icon:'💰', label:'العربون' },   // (ملف 88) رجع ولا لأ — جهاز مرفوض
 };
 let auditF = { type: 'all', state: 'pending', days: 30 };
 
@@ -6885,10 +6924,12 @@ function auditItems(){
     out.push({ type, at: r.at, reviewed: !!r.reviewed, d, r, src });
   })));
   closings.forEach(c => out.push({ type: 'closing', at: c.created_at || c.to_at, reviewed: !!c.reviewed, c }));
+  depositAuditItems().forEach(x => out.push(x));   // 💰 (ملف 88)
   return out.sort((a, b) => (Date.parse(b.at) || 0) - (Date.parse(a.at) || 0));
 }
 
 function auditRowHtml(x){
+  if(x.type === 'deposit') return depositAuditRowHtml(x);   // 💰 (ملف 88)
   const when = x.at ? new Date(x.at).toLocaleString(getLocale()) : '';
   if(x.type === 'closing'){
     const c = x.c, diff = Number(c.diff) || 0;
@@ -6942,6 +6983,7 @@ function syncAuditBadge(){
 async function auditReview(type, a, b, c){
   if(!isSuperAdmin()) return;
   if(type === 'closing') await reviewClosing(a);
+  else if(type === 'deposit') await reviewDepRefund(a);   // 💰 (ملف 88)
   else await markReportReviewed(a, b, c);
   if(auditIsOpen()) renderAudit();
   syncAuditBadge();
@@ -7263,6 +7305,363 @@ try{
   }
 }catch(e){}
 
+// ############################################################
+// 💰 العربون (ملف 88)
+// ------------------------------------------------------------
+// 🧸 بالبلدي: العربون = حصّالة صغيرة جوه الجهاز.
+//   ١) 🛎️ الاستقبال بيكتب المبلغ (تحت السعر) — كاش دايماً، مفيش آجل.
+//      الحصّالة تقف «⏳ مستني الخزنة».
+//   ٢) 💵 أمين الخزنة بيدوس «استلمت العربون» → الفلوس تدخل حسبة
+//      «اتحصّل النهارده» والتقفيل في نفس اللحظة.
+//   ٣) ➖ وقت الدفع: الزرار بيقول «الباقي» (السعر − العربون).
+//      يعني ٣٠٠ عربون + ٧٠٠ باقي = ١٠٠٠ = السعر المكتوب. مش ١٣٠٠.
+//      ولو الباقي آجل → اللي يتقيّد على حساب المحل هو الباقي بس.
+//   ٤) 🚫 الجهاز اترفض وعليه عربون اتدفع؟ سؤالين لوحدهم:
+//      الاستقبال: «العربون رجع للعميل؟» ← بعدين أمين الخزنة نفس السؤال
+//      (من غير ما يشوف إجابة الاستقبال).
+//        • الإجابتين زي بعض → السيستم بينفّذ لوحده، وبيوصل للمحاسب العام يراجع.
+//        • مختلفين → كله بيقف لحد ما المحاسب العام يقرر.
+//
+// 📦 الحاجات اللي بتتخزّن جوه الجهاز:
+//   deposit          المبلغ (نص بأرقام إنجليزي، زي agreedPrice)
+//   depositStatus    null · 'pending' (مستني الخزنة) · 'paid' · 'refunded' (رجع للعميل)
+//   depositPaidAt/By مين أكّد وإمتى
+//   depositRefund    { rec, recBy, recAt, cash, cashBy, cashAt,
+//                      state: 'wait_cash' | 'mismatch' | 'done',
+//                      result: 'refunded' | 'kept', auto, reviewed, decidedBy … }
+//
+// ⚠️ الحماية الحقيقية على السيرفر (ملف 88) — ده شكل بس.
+// ############################################################
+
+// ---------- أرقام ----------
+function depAmt(d){
+  const n = parseInt(enDigits(String((d && d.deposit) ?? '')).replace(/[^\d]/g, ''));
+  return n > 0 ? n : 0;
+}
+// العربون اللي **دخل الخزنة فعلاً** ولسه مارجعش
+function depPaid(d){ return (d && d.depositStatus === 'paid') ? depAmt(d) : 0; }
+// الباقي على العميل = السعر − العربون المدفوع (عمره ما بيقل عن صفر)
+function depositDue(d){ return Math.max(0, (parseInt(d && d.agreedPrice) || 0) - depPaid(d)); }
+// المبلغ اللي سطر «تأكيد دفع» في السجل دخّله الخزنة.
+// ⚠️ السطور القديمة (قبل العربون) مالهاش payAmt → السعر كله زي الأول بالظبط.
+function payInAmt(d, h){
+  return (h && h.payAmt !== undefined && h.payAmt !== null && isFinite(Number(h.payAmt)))
+    ? Number(h.payAmt) : (parseInt(d && d.agreedPrice) || 0);
+}
+
+// ---------- مين يعمل إيه ----------
+// ✏️ كتابة المبلغ: الاستقبال + المحاسب العام. بعد ما يتأكد → المحاسب العام بس.
+function canEditDeposit(d){
+  if(!d || d.status === 'trashed') return false;
+  if(isSuperAdmin()) return true;
+  return isReception() && !['paid', 'refunded'].includes(d.depositStatus);
+}
+// 💵 تأكيد الاستلام: أمين الخزنة + المحاسب العام
+function canConfirmDeposit(d){
+  return !!d && (isCashier() || isSuperAdmin()) && d.depositStatus === 'pending' && depAmt(d) > 0;
+}
+
+// ---------- الخانة نفسها (تحت السعر) ----------
+function depositFieldHtml(d){
+  const amt = depAmt(d);
+  const st  = d.depositStatus;
+  // 🏭 مدير الإنتاج: يشوف بس
+  if(isProduction()){
+    if(!amt) return '';
+    return `<div class="detail-row" style="margin-bottom:10px;"><span>💰 العربون</span>
+      <span style="font-weight:800;">${amt.toLocaleString('en-EG')} ج.م ${depStatusChip(d)}</span></div>`;
+  }
+  const can = canEditDeposit(d);
+  const due = isPriced(d) ? depositDue(d) : null;
+  let note = '';
+  if(st === 'pending' && amt)       note = `⏳ مستني أمين الخزنة يأكّد إنه استلمه — لحد ما يتأكد مش بيتخصم من السعر`;
+  else if(st === 'paid')            note = `✅ اتأكد${d.depositPaidBy ? ' — ' + esc(d.depositPaidBy) : ''}${d.depositPaidAt ? ' ' + esc(splAgoTxt(d.depositPaidAt)) : ''}${due !== null ? ` · الباقي على العميل: <b>${due.toLocaleString('en-EG')} ج.م</b>` : ''}`;
+  else if(st === 'refunded')        note = `↩️ العربون رجع للعميل`;
+  if(st === 'paid' && !isSuperAdmin()) note += ` · 🔒 التعديل من عند المحاسب العام`;
+  return `<label class="field"><span>💰 العربون <small style="color:var(--muted);font-weight:600;">(كاش دايماً — مفيش آجل)</small></span>
+      <input type="text" inputmode="numeric" value="${esc(d.deposit || '')}" placeholder="مفيش عربون — سيبها فاضية"
+             oninput="fixDigitsInput(this)" onblur="editDeposit(this.value)"${can ? '' : ' readonly'} /></label>
+    ${note ? `<div style="font-size:12.5px;color:var(--${st === 'paid' ? 'success' : st === 'pending' ? 'warn' : 'muted'});font-weight:700;margin:-4px 0 12px;line-height:1.7;">${note}</div>` : ''}
+    ${(canConfirmDeposit(d) && isSuperAdmin()) ? `<button class="btn-primary" style="box-shadow:none;background:var(--paid);margin:-4px 0 12px;" onclick="markDepositPaid('${d.id}')">💵 استلمت العربون — ${amt.toLocaleString('en-EG')} ج.م</button>` : ''}`;
+}
+function depStatusChip(d){
+  const st = d && d.depositStatus;
+  if(st === 'paid')     return `<span class="rc-chip" style="background:var(--paid-bg);color:var(--paid)">✅ اتدفع</span>`;
+  if(st === 'refunded') return `<span class="rc-chip" style="background:var(--surface-3);color:var(--muted)">↩️ رجع</span>`;
+  if(st === 'pending')  return `<span class="rc-chip" style="background:var(--warn-bg);color:var(--warn)">⏳ مستني الخزنة</span>`;
+  return '';
+}
+// شارة صغيرة على الكارت
+function depCardChip(d){
+  const amt = depAmt(d);
+  if(!amt || isTechnician()) return '';
+  const st = d.depositStatus;
+  const col = st === 'paid' ? 'paid' : st === 'pending' ? 'warn' : 'muted';
+  const txt = st === 'paid' ? '✅' : st === 'pending' ? '⏳' : st === 'refunded' ? '↩️ رجع' : '';
+  let h = `<span class="rc-chip" style="background:var(--${col === 'muted' ? 'surface-3' : col + '-bg'});color:var(--${col})">💰 عربون ${amt.toLocaleString('en-EG')} ${txt}</span> `;
+  const rf = d.depositRefund;
+  if(rf && rf.state === 'mismatch' && isSuperAdmin()) h += `<span class="rc-chip" style="background:var(--danger-bg);color:var(--danger)">⚠️ العربون محتاج قرارك</span> `;
+  return h;
+}
+
+// ---------- ✏️ كتابة / تعديل المبلغ ----------
+async function editDeposit(value){
+  const d = devices.find(x => x.id === selectedId);
+  if(!d) return;
+  if(!canEditDeposit(d)){ renderDetail(); return; }
+  const v = intPrice(value);
+  const n = v === '' ? 0 : parseInt(v);
+  const old = depAmt(d);
+  if(n === old && (n > 0 || !d.deposit)) return;   // مفيش تغيير
+  // 🚫 العربون أكبر من السعر؟ مينفعش
+  if(n > 0 && isPriced(d) && n > (parseInt(d.agreedPrice) || 0)){
+    alert('⚠️ العربون (' + n.toLocaleString('en-EG') + ') أكبر من السعر (' + (parseInt(d.agreedPrice) || 0).toLocaleString('en-EG') + ') — مينفعش');
+    renderDetail(); return;
+  }
+  // 🚫 جهاز اتدفع خلاص → العربون مالوش معنى دلوقتي
+  if(isPaidDevice(d) && d.status === 'delivered' && d.depositStatus !== 'paid'){
+    alert('⚠️ الجهاز اتدفع حسابه خلاص — مينفعش تضيف عربون دلوقتي');
+    renderDetail(); return;
+  }
+  const now = new Date().toISOString();
+  const paid = d.depositStatus === 'paid';
+  let note;
+  if(paid){
+    // 🧾 المحاسب العام بيعدّل عربون اتأكد — بنسجّل، والحسبة تتظبط من الدفتر
+    if(n === 0){ alert('العربون اتأكد — لو رجع للعميل استخدم سؤال «العربون رجع؟» أو «إلغاء التأكيد بالغلط» من عند أمين الخزنة'); renderDetail(); return; }
+    if(!confirm('💰 العربون ده اتأكد استلامه (' + old.toLocaleString('en-EG') + ' ج.م).\nهتغيّره لـ ' + n.toLocaleString('en-EG') + ' ج.م؟\n\n⚠️ حسبة الخزنة القديمة مش هتتغيّر — الفرق لازم يتظبط يدوي.')){ renderDetail(); return; }
+    note = '💰 العربون اتعدّل بعد التأكيد: من ' + old.toLocaleString('en-EG') + ' لـ ' + n.toLocaleString('en-EG') + ' ج.م';
+  } else {
+    note = n ? (old ? '💰 العربون اتعدّل: من ' + old.toLocaleString('en-EG') + ' لـ ' + n.toLocaleString('en-EG') + ' ج.م — مستني أمين الخزنة'
+                    : '💰 اتكتب عربون ' + n.toLocaleString('en-EG') + ' ج.م — مستني أمين الخزنة يأكّد')
+             : '💰 العربون اتشال';
+  }
+  devices = devices.map(x => {
+    if(x.id !== selectedId) return x;
+    const nx = { ...x, deposit: n ? String(n) : '',
+      depositStatus: paid ? 'paid' : (n ? 'pending' : null),
+      lastModifiedAt: now, lastModifiedBy: currentUser.name,
+      activityNotes: [...(x.activityNotes || []), { text: note, at: now, by: currentUser.name, role: currentRoleLabel() }] };
+    return nx;
+  });
+  renderDetail(); render();
+  await persist();
+}
+
+// ---------- 💵 «استلمت العربون» ----------
+async function markDepositPaid(id){
+  const d = devices.find(x => x.id === (id || selectedId));
+  if(!canConfirmDeposit(d)) return;
+  const amt = depAmt(d);
+  if(isPriced(d) && amt > (parseInt(d.agreedPrice) || 0)){ alert('⚠️ العربون أكبر من السعر — كلّم الاستقبال يصلّحه الأول'); return; }
+  if(!confirm('💵 استلمت عربون ' + amt.toLocaleString('en-EG') + ' ج.م\nعلى ' + (d.deviceType || '') + ' ' + (d.model || '') + (d.customerName ? ' — ' + d.customerName : '') + '؟')) return;
+  const now = new Date().toISOString();
+  devices = devices.map(x => x.id === d.id ? { ...x,
+    depositStatus: 'paid', depositPaidAt: now, depositPaidBy: currentUser.name,
+    lastModifiedAt: now, lastModifiedBy: currentUser.name,
+    statusHistory: [...(x.statusHistory || []), { status: x.status,
+      label: '💰 اتأكد استلام العربون — ' + amt.toLocaleString('en-EG') + ' ج.م',
+      depositIn: { amount: amt }, date: now, by: currentUser.name }] } : x);
+  if(selectedId === d.id) renderDetail();
+  render();
+  await persist();
+}
+
+// ---------- 🚫 جهاز مرفوض وعليه عربون: رجع ولا لأ؟ ----------
+// 🧸 الدور: الاستقبال الأول ← أمين الخزنة ← (اختلفوا؟) المحاسب العام
+function depRefundNeeded(d){
+  return !!d && d.status === 'rejected' && d.depositStatus === 'paid' && depAmt(d) > 0
+      && !(d.depositRefund && d.depositRefund.state === 'done');
+}
+function depRefundStep(d){
+  if(!depRefundNeeded(d)) return null;
+  const rf = d.depositRefund || {};
+  if(!rf.rec) return 'rec';
+  if(rf.state === 'wait_cash') return 'cash';
+  if(rf.state === 'mismatch') return 'boss';
+  return null;
+}
+function depRefundBoxHtml(d){
+  const step = depRefundStep(d);
+  const rf = d.depositRefund || {};
+  const amt = depAmt(d);
+  const yn = (who) => `<div class="pay-choice" style="margin-top:8px;">
+      <button type="button" class="pay-btn" style="border-color:var(--returned);background:var(--surface);color:var(--returned);" onclick="answerDepRefund('${d.id}','${who}','yes')">↩️ أيوه، رجع للعميل</button>
+      <button type="button" class="pay-btn" style="border-color:var(--paid);background:var(--surface);color:var(--paid);" onclick="answerDepRefund('${d.id}','${who}','no')">🏦 لأ، مارجعش</button>
+    </div>`;
+  // اتقفلت خلاص → سطر بالنتيجة لأي حد بيشوف فلوس
+  if(rf.state === 'done'){
+    if(isTechnician() || isProduction()) return '';
+    return `<div class="rc-where" style="background:var(--surface-2);color:var(--ink-2)">💰 العربون (${amt.toLocaleString('en-EG')} ج.م): ${rf.result === 'refunded' ? '↩️ رجع للعميل' : '🏦 المحل احتفظ بيه'}
+      <div style="font-weight:600;font-size:12px;margin-top:2px;">${rf.auto ? '✅ الاستقبال وأمين الخزنة قالوا نفس الكلام' : '🧾 بقرار المحاسب العام' + (rf.decidedBy ? ' (' + esc(rf.decidedBy) + ')' : '')}</div></div>`;
+  }
+  if(!step) return '';
+  if(step === 'rec' && isReception()){
+    return `<div class="rfr-box" style="background:var(--returned-bg);border-color:var(--returned);">
+      <div class="rfr-q">💰 الجهاز ده اترفض وعليه عربون <b>${amt.toLocaleString('en-EG')} ج.م</b> — العربون رجع للعميل؟</div>
+      <div style="font-size:12.5px;color:var(--ink-2);line-height:1.7;">🧸 إجابتك هتروح لأمين الخزنة يتسأل نفس السؤال، ولو اتفقتوا السيستم بينفّذ. لو اختلفتوا المحاسب العام هو اللي يقرر.</div>
+      ${yn('rec')}
+    </div>`;
+  }
+  if(step === 'cash' && isCashier()){
+    return `<div class="rfr-box" style="background:var(--returned-bg);border-color:var(--returned);">
+      <div class="rfr-q">💰 جهاز مرفوض عليه عربون <b>${amt.toLocaleString('en-EG')} ج.م</b> — الفلوس دي رجعت للعميل من الخزنة؟</div>
+      ${yn('cash')}
+    </div>`;
+  }
+  if(step === 'boss' && isSuperAdmin()){
+    return `<div class="rfr-box" style="background:var(--danger-bg);border-color:var(--danger);">
+      <div class="rfr-q">⚠️ العربون (${amt.toLocaleString('en-EG')} ج.م) — الإجابتين مختلفين، محتاج قرارك:</div>
+      <div style="font-size:13px;line-height:1.9;">🛎️ ${esc(rf.recBy || 'الاستقبال')}: <b>${rf.rec === 'yes' ? '↩️ رجع' : '🏦 مارجعش'}</b><br>💵 ${esc(rf.cashBy || 'أمين الخزنة')}: <b>${rf.cash === 'yes' ? '↩️ رجع' : '🏦 مارجعش'}</b></div>
+      ${depBossBtns(d)}
+    </div>`;
+  }
+  // اللي مستني دور حد تاني
+  if(isTechnician() || isProduction()) return '';
+  const who = step === 'rec' ? 'الاستقبال' : step === 'cash' ? 'أمين الخزنة' : 'المحاسب العام';
+  return `<div class="rc-where" style="background:var(--returned-bg);color:var(--returned)">💰 عربون ${amt.toLocaleString('en-EG')} ج.م على جهاز مرفوض — ⏳ مستني ${who} يقول رجع ولا لأ
+    ${(isSuperAdmin() && step !== 'boss') ? `<div style="font-weight:600;font-size:12px;margin-top:4px;">تقدر تقرر بنفسك من غير ما تستنى:</div>${depBossBtns(d)}` : ''}</div>`;
+}
+function depBossBtns(d){
+  return `<div class="pay-choice" style="margin-top:8px;">
+      <button type="button" class="pay-btn" style="border-color:var(--returned);background:var(--returned);color:#fff;" onclick="decideDepRefund('${d.id}','refunded')">↩️ رجع للعميل (يتخصم من الخزنة)</button>
+      <button type="button" class="pay-btn" style="border-color:var(--paid);background:var(--paid);color:#fff;" onclick="decideDepRefund('${d.id}','kept')">🏦 المحل احتفظ بيه</button>
+    </div>`;
+}
+// 🧸 بيبني الجهاز بعد التنفيذ: رجع → الحصّالة تفضى وسطر «طلع من الخزنة»
+function depApplyResult(x, result, now, extraNote){
+  const amt = depAmt(x);
+  const nx = { ...x, lastModifiedAt: now, lastModifiedBy: currentUser.name };
+  if(result === 'refunded'){
+    nx.depositStatus = 'refunded';
+    nx.statusHistory = [...(x.statusHistory || []), { status: x.status,
+      label: '↩️ العربون رجع للعميل — ' + amt.toLocaleString('en-EG') + ' ج.م (طلع من الخزنة)',
+      depositOut: { amount: amt }, date: now, by: currentUser.name }];
+  }
+  nx.activityNotes = [...(x.activityNotes || []), { text: (result === 'refunded' ? '↩️ العربون رجع للعميل' : '🏦 المحل احتفظ بالعربون')
+    + ' (' + amt.toLocaleString('en-EG') + ' ج.م)' + (extraNote ? ' — ' + extraNote : ''), at: now, by: currentUser.name, role: currentRoleLabel() }];
+  return nx;
+}
+async function answerDepRefund(id, who, ans){
+  const d = devices.find(x => x.id === id);
+  if(!d || !['yes', 'no'].includes(ans)) return;
+  const step = depRefundStep(d);
+  if(who === 'rec' && !(step === 'rec' && isReception())) return;
+  if(who === 'cash' && !(step === 'cash' && isCashier())) return;
+  const amt = depAmt(d);
+  if(!confirm((ans === 'yes' ? '↩️ متأكد إن العربون (' : '🏦 متأكد إن العربون (') + amt.toLocaleString('en-EG') + ' ج.م) ' + (ans === 'yes' ? 'رجع للعميل' : 'مارجعش للعميل') + '؟')) return;
+  const now = new Date().toISOString();
+  devices = devices.map(x => {
+    if(x.id !== id) return x;
+    if(who === 'rec'){
+      return { ...x, lastModifiedAt: now, lastModifiedBy: currentUser.name,
+        depositRefund: { rec: ans, recBy: currentUser.name, recEmail: currentUser.email || '', recAt: now, state: 'wait_cash' },
+        activityNotes: [...(x.activityNotes || []), { text: '💰 الاستقبال قال: العربون ' + (ans === 'yes' ? 'رجع للعميل' : 'مارجعش') + ' — مستني أمين الخزنة', at: now, by: currentUser.name, role: currentRoleLabel() }] };
+    }
+    const rf = x.depositRefund || {};
+    const same = rf.rec === ans;
+    const nrf = { ...rf, cash: ans, cashBy: currentUser.name, cashEmail: currentUser.email || '', cashAt: now };
+    if(same){
+      nrf.state = 'done'; nrf.result = ans === 'yes' ? 'refunded' : 'kept'; nrf.auto = true; nrf.reviewed = false;
+      return depApplyResult({ ...x, depositRefund: nrf }, nrf.result, now, 'الاستقبال وأمين الخزنة قالوا نفس الكلام');
+    }
+    nrf.state = 'mismatch';
+    return { ...x, depositRefund: nrf, lastModifiedAt: now, lastModifiedBy: currentUser.name,
+      activityNotes: [...(x.activityNotes || []), { text: '⚠️ العربون: الاستقبال وأمين الخزنة قالوا كلام مختلف — مستني قرار المحاسب العام', at: now, by: currentUser.name, role: currentRoleLabel() }] };
+  });
+  if(selectedId === id) renderDetail();
+  render();
+  await persist();
+}
+async function decideDepRefund(id, result){
+  if(!isSuperAdmin()) return;
+  const d = devices.find(x => x.id === id);
+  if(!depRefundNeeded(d) || !['refunded', 'kept'].includes(result)) return;
+  if(!confirm(result === 'refunded' ? '↩️ هتسجّل إن العربون رجع للعميل — والمبلغ يتخصم من الخزنة. متأكد؟' : '🏦 هتسجّل إن المحل احتفظ بالعربون. متأكد؟')) return;
+  const now = new Date().toISOString();
+  devices = devices.map(x => {
+    if(x.id !== id) return x;
+    const nrf = { ...(x.depositRefund || {}), state: 'done', result, auto: false,
+      decidedBy: currentUser.name, decidedAt: now, reviewed: true, reviewedBy: currentUser.name, reviewedAt: now };
+    return depApplyResult({ ...x, depositRefund: nrf }, result, now, 'بقرار المحاسب العام');
+  });
+  if(selectedId === id) renderDetail();
+  render();
+  if(auditIsOpen()) renderAudit();
+  await persist();
+}
+async function reviewDepRefund(id){
+  if(!isSuperAdmin()) return;
+  const now = new Date().toISOString();
+  devices = devices.map(x => (x.id === id && x.depositRefund)
+    ? { ...x, depositRefund: { ...x.depositRefund, reviewed: true, reviewedBy: currentUser.name, reviewedAt: now } } : x);
+  render();
+  await persist();
+}
+
+// ---------- 💵 لوحة أمين الخزنة: «عرابين مستنياك» ----------
+function depositPanelHtml(){
+  if(!isCashier()) return '';
+  const toConfirm = devices.filter(d => d.depositStatus === 'pending' && depAmt(d) > 0);
+  const toAnswer  = devices.filter(d => depRefundStep(d) === 'cash');
+  if(!toConfirm.length && !toAnswer.length) return '';
+  const row = (d, act) => `<div class="spn-row" style="cursor:pointer;" onclick="openDetail('${d.id}')">
+      <div class="spn-info">
+        <div class="spn-t">📱 ${esc(d.deviceType)} ${esc(d.model)}${d.customerName ? ' — ' + esc(d.customerName) : ''}</div>
+        <div class="spn-m">💰 ${depAmt(d).toLocaleString('en-EG')} ج.م${isPriced(d) ? ' · السعر ' + (parseInt(d.agreedPrice) || 0).toLocaleString('en-EG') : ''}</div>
+      </div>${act(d)}
+    </div>`;
+  return `<div class="spn-panel" style="border-color:var(--paid);">
+    <div class="spn-head" style="color:var(--paid);">💰 عرابين مستنياك <span class="spn-count" style="background:var(--paid);">${toConfirm.length + toAnswer.length}</span></div>
+    ${toConfirm.map(d => row(d, x => `<button class="spn-ok" style="color:var(--paid);border-color:var(--paid);" onclick="event.stopPropagation();markDepositPaid('${x.id}')">💵 استلمته</button>`)).join('')}
+    ${toAnswer.map(d => row(d, () => `<span class="rc-chip" style="background:var(--returned-bg);color:var(--returned)">🚫 مرفوض — رجع ولا لأ؟</span>`)).join('')}
+  </div>`;
+}
+// 🛎️ لوحة الاستقبال: أجهزة مرفوضة عليها عربون ولسه ماقالش رجع ولا لأ
+function depositRecPanelHtml(){
+  if(!isReception()) return '';
+  const list = devices.filter(d => depRefundStep(d) === 'rec');
+  if(!list.length) return '';
+  return `<div class="spn-panel" style="border-color:var(--returned);">
+    <div class="spn-head" style="color:var(--returned);">💰 عرابين على أجهزة مرفوضة — رجعت ولا لأ؟ <span class="spn-count" style="background:var(--returned);">${list.length}</span></div>
+    ${list.map(d => `<div class="spn-row" style="cursor:pointer;" onclick="openDetail('${d.id}')"><div class="spn-info">
+      <div class="spn-t">📱 ${esc(d.deviceType)} ${esc(d.model)}${d.customerName ? ' — ' + esc(d.customerName) : ''}</div>
+      <div class="spn-m">💰 ${depAmt(d).toLocaleString('en-EG')} ج.م</div></div></div>`).join('')}
+  </div>`;
+}
+
+// ---------- 🧾 دفتر المراجعة (المحاسب العام) ----------
+function depositAuditItems(){
+  const out = [];
+  devices.forEach(d => {
+    const rf = d.depositRefund;
+    if(!rf || !(rf.state === 'mismatch' || rf.state === 'done')) return;
+    out.push({ type: 'deposit', at: rf.decidedAt || rf.cashAt || rf.recAt, reviewed: rf.state === 'done' && !!rf.reviewed, d, rf });
+  });
+  return out;
+}
+function depositAuditRowHtml(x){
+  const { d, rf } = x;
+  const amt = depAmt(d);
+  const when = x.at ? new Date(x.at).toLocaleString(getLocale()) : '';
+  const ans = v => v === 'yes' ? '↩️ رجع' : v === 'no' ? '🏦 مارجعش' : '—';
+  const head = rf.state === 'mismatch' ? '⚠️ العربون — إجابتين مختلفين'
+             : (rf.result === 'refunded' ? '↩️ العربون رجع للعميل' : '🏦 المحل احتفظ بالعربون');
+  return `<div class="appr-row" style="${x.reviewed ? 'opacity:.75;' : (rf.state === 'mismatch' ? 'background:var(--danger-bg);' : '')}">
+    <div class="appr-row-info" style="cursor:pointer;" onclick="openDetail('${d.id}')">
+      <div class="appr-row-dev"><span class="appr-row-kind" style="background:var(--surface);color:var(--${rf.state === 'mismatch' ? 'danger' : 'returned'});">💰 ${head} — ${amt.toLocaleString('en-EG')} ج.م</span>📱 ${esc(d.deviceType)} ${esc(d.model)}${d.customerName ? ' — ' + esc(d.customerName) : ''}</div>
+      <div style="font-size:13px;line-height:1.8;margin-top:5px;">🛎️ ${esc(rf.recBy || '—')}: <b>${ans(rf.rec)}</b> · 💵 ${esc(rf.cashBy || '—')}: <b>${ans(rf.cash)}</b>${rf.state === 'done' ? (rf.auto ? ' · ✅ اتفقوا — اتنفّذ لوحده' : ' · 🧾 قرارك') : ''}</div>
+      <div class="appr-row-meta">${esc(when)}${x.reviewed ? ` · ✓ راجعه ${esc(rf.reviewedBy || '')}` : ''}</div>
+    </div>
+    ${rf.state === 'mismatch'
+      ? `<div class="appr-row-actions" style="flex-direction:column;">
+          <button class="appr-btn-yes" style="background:var(--returned);" onclick="event.stopPropagation();decideDepRefund('${d.id}','refunded')">↩️ رجع</button>
+          <button class="appr-btn-yes" onclick="event.stopPropagation();decideDepRefund('${d.id}','kept')">🏦 المحل خده</button></div>`
+      : (x.reviewed ? '' : `<div class="appr-row-actions"><button class="appr-btn-yes" onclick="event.stopPropagation();auditReview('deposit','${d.id}')">✓ راجعته</button></div>`)}
+  </div>`;
+}
+
+
 function renderDetail(){
   const modal = document.getElementById('detailModal');
   const ae = document.activeElement;
@@ -7297,6 +7696,14 @@ function renderDetail(){
 //    تغيير حالة ولا فني ولا حذف. الملاحظات بس مسموحة.
 // ⚠️ الآجل: المحاسب العام هو اللي بيقيّده على حساب المحل.
 // ============================================================
+// 💰 (ملف 88) العربون عند أمين الخزنة: زرار «استلمته» أو سطر بالحالة
+function cashierDepositHtml(d){
+  const amt = depAmt(d);
+  if(!amt) return '';
+  if(canConfirmDeposit(d)) return `<button class="btn-primary" style="box-shadow:none;background:var(--paid);width:100%;justify-content:center;font-size:16px;padding:13px;margin-bottom:12px;" onclick="markDepositPaid('${d.id}')">💵 استلمت العربون — ${amt.toLocaleString('en-EG')} ج.م</button>`;
+  if(d.depositStatus === 'paid') return `<div class="rc-where" style="background:var(--paid-bg);color:var(--paid)">💰 العربون اتدفع — ${amt.toLocaleString('en-EG')} ج.م${isPriced(d) && !isPaidDevice(d) ? ' · الباقي ' + depositDue(d).toLocaleString('en-EG') + ' ج.م' : ''}</div>`;
+  return '';
+}
 function cashierDetailHtml(d){
   const s = statusInfo(effStatus(d)) || statusInfo(d.status) || { varname:'waiting', label:d.status };
   const priced = isPriced(d);
@@ -7305,9 +7712,15 @@ function cashierDetailHtml(d){
 
   let pay;
   if(!priced)                         pay = box('--warn-bg', '--warn', '⚠️ الجهاز لسه ماتسعّرش — كلّم الاستقبال يحدد السعر الأول');
-  else if(isPaidDevice(d))            pay = box('--paid-bg', '--paid', '✓ اتدفع — ' + price.toLocaleString('en-EG') + ' ج.م');
-  else if(d.paymentType === 'deferred') pay = box('--warn-bg', '--warn', '🕐 آجل على حساب «' + esc(d.billedShop || d.shopName || '—') + '» — المحاسب العام هو اللي بيقيّده');
-  else if(d.status === 'delivered')   pay = `<button class="btn-primary" style="box-shadow:none;background:var(--paid);width:100%;justify-content:center;font-size:17px;padding:15px;margin-bottom:12px;" onclick="markPaid()">💵 ${t('det.confirmPay')} — ${price.toLocaleString('en-EG')} ج.م</button>`;
+  else if(isPaidDevice(d))            pay = box('--paid-bg', '--paid', '✓ اتدفع — ' + price.toLocaleString('en-EG') + ' ج.م' + (depPaid(d) ? ' (عربون ' + depPaid(d).toLocaleString('en-EG') + ' + الباقي ' + depositDue(d).toLocaleString('en-EG') + ')' : ''));
+  else if(d.paymentType === 'deferred') pay = box('--warn-bg', '--warn', '🕐 آجل على حساب «' + esc(d.billedShop || d.shopName || '—') + '» — المحاسب العام هو اللي بيقيّده' + (depPaid(d) ? ' (الباقي بس: ' + depositDue(d).toLocaleString('en-EG') + ' ج.م)' : ''));
+  else if(d.status === 'delivered'){
+    // 💰 (ملف 88) العربون لسه مستني تأكيدك؟ أكّده الأول عشان الباقي يطلع صح
+    pay = (d.depositStatus === 'pending' && depAmt(d))
+      ? box('--warn-bg', '--warn', '💰 الجهاز عليه عربون ' + depAmt(d).toLocaleString('en-EG') + ' ج.م لسه ماتأكدش — لو العميل دفعه، أكّد استلامه تحت الأول')
+      : '';
+    pay += `<button class="btn-primary" style="box-shadow:none;background:var(--paid);width:100%;justify-content:center;font-size:17px;padding:15px;margin-bottom:12px;" onclick="markPaid()">💵 ${t('det.confirmPay')} — ${depositDue(d).toLocaleString('en-EG')} ج.م${depPaid(d) ? ' (الباقي بعد العربون)' : ''}</button>`;
+  }
   else                                pay = box('--surface-2', '--muted', '💵 الدفع بيتأكد بعد ما الجهاز يتسلّم');
 
   // المرتجع ليه فلوسه لوحده
@@ -7336,6 +7749,9 @@ function cashierDetailHtml(d){
     <div class="rc-where" style="background:${accentBg(s.varname)};color:${accent(s.varname)}">📍 ${esc(stLabel(s))}</div>
     ${pay}
     ${payUndoBtnHtml(d, 'main')}
+    ${cashierDepositHtml(d)}
+    ${payUndoBtnHtml(d, 'deposit')}
+    ${depRefundBoxHtml(d)}
     ${ret}
     ${payUndoBtnHtml(d, 'return')}
     ${payUndoBoxHtml(d)}
@@ -7346,6 +7762,7 @@ function cashierDetailHtml(d){
       ${row('📞 رقم العميل', d.customerPhone)}
       ${row('🛵 ' + (typeof ACC_BB_LABEL !== 'undefined' ? ACC_BB_LABEL : 'المندوب'), d.broughtBy)}
       ${row('💰 ' + t('det.price'), priced ? price.toLocaleString('en-EG') + ' ج.م' : '')}
+      ${row('💰 العربون', depAmt(d) ? depAmt(d).toLocaleString('en-EG') + ' ج.م — ' + ({ paid: 'اتدفع', pending: 'مستني التأكيد', refunded: 'رجع للعميل' }[d.depositStatus] || '') : '')}
       ${row(t('det.payMethod'), priced ? (d.paymentType === 'deferred' ? t('det.payDeferred') : t('det.payCash')) : '')}
       ${row(t('det.issue'), d.reportedIssue)}
       ${row(t('det.technician'), d.technician)}
@@ -7463,6 +7880,7 @@ function renderDetailNow(){
     ${(isReception() || isProduction()) && hasRet ? roleReturnPriceHtml(d) : ''}
     <div class="money-only">
     <label class="field"><span>${t('det.price')}</span><input type="text" inputmode="numeric" value="${esc(d.agreedPrice||'')}" oninput="fixDigitsInput(this)"${roI} onblur="editPrice(this.value)" /></label>
+    ${depositFieldHtml(d)}
     ${isPriced(d) && d.priceConfirmation && d.priceConfirmation.requested ? `
       <div class="approval-box">
         ${!trackResponses.price_response ? `
@@ -7491,7 +7909,7 @@ function renderDetailNow(){
                ${(d.status === 'delivered' && canSeeMoney()) ? `<button class="btn-primary" style="box-shadow:none;background:var(--warn);margin-top:9px;" onclick="changeStatus('delivered')">📒 قيّده على حساب المحل دلوقتي</button>` : ''}`)
         : (isPaidDevice(d)
             ? `<div style="background:var(--paid-bg);color:var(--paid);border-radius:8px;padding:9px 11px;font-size:13px;font-weight:700;margin-top:9px;">✓ ${t('det.paidCash')}</div>`
-            : `<button class="btn-primary" style="box-shadow:none;background:var(--paid);margin-top:9px;"${roB} onclick="markPaid()">💵 ${t('det.confirmPay')}</button>`)}
+            : `<button class="btn-primary" style="box-shadow:none;background:var(--paid);margin-top:9px;"${roB} onclick="markPaid()">💵 ${t('det.confirmPay')}${depPaid(d) ? ' — الباقي ' + depositDue(d).toLocaleString('en-EG') + ' ج.م' : ''}</button>`)}
     </div>` : ''}
     ${hasRet ? `
     ${retRoundsHtml(d)}
@@ -7616,6 +8034,7 @@ function renderDetailNow(){
     <div id="detailLabelArea" style="margin-bottom:10px;"></div>
     <div class="status-pills">${pills}</div>
     ${toRecBoxHtml(d)}${reportBoxHtml(d)}${rejectReasonBoxHtml(d)}
+    ${depRefundBoxHtml(d)}
     ${(d.status === 'rejected' && !isProduction()) ? `
     <div style="margin:0 0 14px; padding:10px 12px; background:var(--rejected_shop-bg); border-radius:10px;">
       <span style="font-size:12.5px; color:var(--ink-2); display:block; margin-bottom:7px; font-weight:700;">${t('det.rejLocation')}</span>
@@ -8509,6 +8928,11 @@ async function markRejectedLocation(inShop){
   const d = devices.find(x => x.id === selectedId);
   if(!d || d.status !== 'rejected') return;
   if(!!d.rejectedInShop === inShop) return;   // مفيش تغيير فعلي
+  // 💰 (ملف 88) عليه عربون اتدفع؟ الاستقبال لازم يقول رجع ولا لأ قبل ما الجهاز يخرج
+  if(!inShop && isReception() && depRefundStep(d) === 'rec'){
+    alert('💰 الجهاز ده عليه عربون ' + depAmt(d).toLocaleString('en-EG') + ' ج.م — جاوب الأول: العربون رجع للعميل ولا لأ؟ (تحت)');
+    renderDetail(); return;
+  }
   devices = devices.map(x => x.id === selectedId
     ? { ...x, rejectedInShop: inShop, lastModifiedAt:new Date().toISOString(), lastModifiedBy:currentUser.name,
         statusHistory:[...(x.statusHistory||[]), { status:'rejected', labelKey: inShop ? 'hist.rejToDrawer' : 'hist.rejPickedUp', date:new Date().toISOString(), by:currentUser.name }] }
@@ -8644,7 +9068,8 @@ async function changeStatus(newStatus, paymentChoice, rejectedInShopChoice, opts
     newPaymentStatus = isPaidDevice(d) ? 'paid' : 'unpaid';
     historyKey = 'hist.deliveredByReception';
   } else if(newStatus === 'delivered'){
-    const price  = parseInt(d.agreedPrice) || 0;
+    // 💰 (ملف 88) اللي يتقيّد على حساب المحل = الباقي بعد العربون المدفوع
+    const price  = depositDue(d);
     // ⚠️ الفرق بين "متسعّر بصفر" و"لسه ماتسعّرش":
     //   الأول قرار (الصيانة ببلاش) → يعدي على مسار الدفع العادي
     //   التاني نقص بيانات → يفضل "بانتظار الدفع"
@@ -8654,7 +9079,8 @@ async function changeStatus(newStatus, paymentChoice, rejectedInShopChoice, opts
       newPaymentStatus = 'paid';
       const shop = (d.billedShop || d.shopName || 'بدون محل').trim() || 'بدون محل';
       extra.billedShop = shop;
-      if(!ledger.some(e => e.type === 'debit' && e.deviceId === d.id && !e.kind)){
+      // 💰 (ملف 88) العربون غطّى السعر كله → مفيش قيد بصفر
+      if(price > 0 && !ledger.some(e => e.type === 'debit' && e.deviceId === d.id && !e.kind)){
         addLedgerDebit({...d, billedShop: shop}, price);
         historyKey = 'hist.deliveredDeferred'; historyVars = { amount: price.toLocaleString('en-EG'), shop };
       } else {
@@ -10423,16 +10849,20 @@ async function editPayType(t){
   if(t === 'deferred'){
     // الآجل بيتقيّد على حساب المحل، وقيد بصفر مالوش معنى محاسبي
     if(!isPriced(d) || price <= 0){ alert(t('msg.needPriceForCredit')); return; }
+    // 💰 (ملف 88) العربون غطّى السعر كله؟ مفيش حاجة تتقيّد
+    if(depositDue(d) <= 0){ alert('💰 العربون غطّى السعر كله — مفيش باقي يتقيّد على حساب المحل'); return; }
     const shop = (d.billedShop || d.shopName || '').trim();
     if(!shop){ alert(t('msg.needShopForCredit')); return; }
     extra.billedShop = shop;
     if(d.status === 'delivered'){
       // اتسلّم خلاص → يتقيّد على حساب المحل دلوقتي ويعتبر متسوّى
+      // 💰 (ملف 88) الباقي بعد العربون بس
+      const due = depositDue(d);
       if(!ledger.some(e => e.type === 'debit' && e.deviceId === d.id && !e.kind)){
-        addLedgerDebit({ ...d, billedShop: shop }, price);
+        addLedgerDebit({ ...d, billedShop: shop }, due);
       }
       extra.paymentStatus = 'paid';
-      note = null; noteKey = 'hist.toDeferred'; noteVars = { amount: price.toLocaleString('en-EG'), shop };
+      note = null; noteKey = 'hist.toDeferred'; noteVars = { amount: due.toLocaleString('en-EG'), shop };
     } else {
       // لسه في المحل → مجرد تحديد طريقة الدفع، والقيد بيتعمل أول ما يتسلّم
       extra.paymentStatus = 'unpaid';
@@ -10466,6 +10896,11 @@ async function editPrice(value){
   const price = intPrice(value);
   const d = devices.find(x => x.id === selectedId);
   if(!d) return;
+  // 💰 (ملف 88) السعر مينفعش يبقى أقل من العربون
+  if(price !== '' && depAmt(d) && parseInt(price) < depAmt(d) && d.depositStatus !== 'refunded'){
+    alert('⚠️ السعر (' + parseInt(price).toLocaleString('en-EG') + ') أقل من العربون (' + depAmt(d).toLocaleString('en-EG') + ') — عدّل العربون الأول');
+    renderDetail(); return;
+  }
   let extra = { agreedPrice: price, lastModifiedAt: new Date().toISOString(), lastModifiedBy: currentUser.name };
   let histEntry = null;
 
@@ -10490,10 +10925,12 @@ async function editPrice(value){
     if(shop){
       extra.paymentStatus = 'paid';
       extra.billedShop = shop;
+      // 💰 (ملف 88) الباقي بعد العربون المدفوع
+      const due = Math.max(0, parseInt(price) - depPaid(d));
       if(!ledger.some(e => e.type === 'debit' && e.deviceId === d.id && !e.kind)){
-        addLedgerDebit({...d, billedShop: shop}, parseInt(price));
+        addLedgerDebit({...d, billedShop: shop}, due);
       }
-      histEntry = { status:d.status, labelKey:'hist.pricedDeferred', labelVars:{ amount: parseInt(price).toLocaleString('en-EG'), shop }, date:new Date().toISOString(), by: currentUser.name };
+      histEntry = { status:d.status, labelKey:'hist.pricedDeferred', labelVars:{ amount: due.toLocaleString('en-EG'), shop }, date:new Date().toISOString(), by: currentUser.name };
     }
   }
   // فوري: بنحدّث السعر بس، وبيفضل "بانتظار الدفع" لحد ما يتدوس "تأكيد الدفع"
