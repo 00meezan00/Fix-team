@@ -1745,13 +1745,14 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
       <label class="field"><span data-i18n="add.customerName">اسم العميل</span><input id="f_customerName" list="custNameList" autocomplete="off" oninput="onCustomerNameInput(); ph2CustHistory();" /></label>
       <datalist id="custNameList"></datalist>
       <label class="field"><span data-i18n="add.shopName">اسم المحل</span><input id="f_shopName" list="shopNameList" autocomplete="off" oninput="autoWholesaleCheck()" /></label>
-      <div id="wsAutoHint" style="display:none;background:var(--violet-bg,#F5F3FF);color:var(--violet);border:1px solid var(--violet);border-radius:9px;padding:8px 11px;font-size:12.5px;font-weight:800;margin-bottom:10px;">🏷️ عميل جملة معروف — اتظبط تلقائي (تقدر تغيّره تحت)</div>
       <datalist id="shopNameList"></datalist>
       <!-- 🛵 المندوب = اللي جاب الجهاز للمحل (مش صاحبه). اختياري.
            اسم الخانة متعرّف في مكان واحد: ACC_BB_LABEL في accounts.js -->
       <label class="field"><span>🛵 اسم المندوب (اللي جاب الجهاز)</span><input id="f_broughtBy" list="broughtByList" autocomplete="off" placeholder="سيبه فاضي لو صاحب الجهاز جابه بنفسه" /></label>
       <datalist id="broughtByList"></datalist>
-      <label class="field"><span data-i18n="add.registeredBy">اسم المحاسب اللي بيسجل الجهاز</span><input id="f_registeredBy" list="accountantList" /></label>
+      <!-- 👤 (٢٠٢٦-١٠-١٢) «اسم الموظف» بدل «اسم المحاسب» — من غير data-i18n عن قصد:
+           ملف الترجمة لسه فيه الكلمة القديمة وكان هيكتب فوق الكلام ده. -->
+      <label class="field"><span>اسم الموظف اللي بيسجل الجهاز</span><input id="f_registeredBy" list="accountantList" /></label>
       <datalist id="accountantList"></datalist>
       <label class="field"><span data-i18n="add.phone">رقم التليفون</span><input id="f_customerPhone" list="phoneHistory" autocomplete="off" inputmode="tel" oninput="fixDigitsInput(this); this.dataset.autoFill=''; ph2CustHistory();" onchange="ph2CustHistory()" /></label>
       <!-- 👤 (المرحلة التانية) تاريخ العميل — بيظهر لوحده لما الرقم يطابق أجهزة قديمة -->
@@ -1763,7 +1764,7 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
       </div>
       <!-- 🎨 لون الجهاز — كتابة حرة (مش قايمة) وإجباري -->
       <label class="field"><span>🎨 لون الجهاز <b style="color:var(--danger)">*</b></span><input id="f_deviceColor" autocomplete="off" placeholder="أسود، أبيض، أزرق فاتح…" /></label>
-      <label class="field"><span data-i18n="add.serial">الرقم التسلسلي (IMEI/SN)</span><input id="f_serialNumber" style="font-family:monospace" /></label>
+      <label class="field"><span>الرقم التسلسلي (IMEI/SN) <b style="color:var(--danger)">*</b></span><input id="f_serialNumber" style="font-family:monospace" /></label>
       <div id="lockHostAdd"></div>
       <div class="field" id="lockSection" style="display:block;">
         <span data-i18n="lock.title">🔒 رمز قفل الجهاز (اختياري)</span>
@@ -1797,14 +1798,10 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
           <div id="lockImgPreview"></div>
         </div>
       </div>
-      <div style="margin-bottom:12px;">
-        <span style="font-size:13.5px; color:var(--muted); display:block; margin-bottom:6px;" data-i18n="add.dealType">نوع التعامل</span>
-        <div class="pay-choice">
-          <button type="button" id="whRetail" class="pay-btn" data-i18n="add.retail" onclick="setAddWholesale(false)">قطاعي</button>
-          <button type="button" id="whBulk" class="pay-btn" data-i18n="add.wholesale" onclick="setAddWholesale(true)">جملة (بدون نقاط للفني)</button>
-        </div>
-      </div>
-      <label class="field"><span data-i18n="add.issue">العطل حسب كلام العميل</span><textarea id="f_reportedIssue" rows="2"></textarea></label>
+      <!-- ✂️ (٢٠٢٦-١٠-١٢) «نوع التعامل» (قطاعي/جملة) اتشال من هنا — بقى عند المحاسب العام
+           بس (تفاصيل الجهاز ← ⭐ النقاط). عميل الجملة المعروف لسه بيتعلّم لوحده في صمت
+           (autoWholesaleCheck)، والمحاسب العام يقدر يغيّره. -->
+      <label class="field"><span>العطل حسب كلام العميل <b style="color:var(--danger)">*</b></span><textarea id="f_reportedIssue" rows="2"></textarea></label>
       <label class="field"><span data-i18n="add.condition">حالة الجهاز الشكلية عند الاستلام</span><textarea id="f_conditionNotes" rows="2" data-i18n-ph="add.condition.ph" placeholder="خدوش، كسور، حالة الشاشة..."></textarea></label>
       <label class="field"><span data-i18n="add.price">السعر المبدئي (اختياري) — أرقام صحيحة بالجنيه، و٠ يعني ببلاش</span><input id="f_agreedPrice" type="text" inputmode="numeric" oninput="fixDigitsInput(this); togglePayTypeVisibility()" /></label>
       <div id="payTypeWrap" style="margin-bottom:12px; display:none;">
@@ -4550,9 +4547,9 @@ function openAddModal(){
   if(isProduction() || isCashier()) return;   // 🏭💵 التسجيل مش شغلهم (والسيرفر رافضه — ملف 82)
   ['customerName','shopName','broughtBy','registeredBy','customerPhone','deviceType','model','deviceColor','serialNumber','reportedIssue','conditionNotes','agreedPrice']
     .forEach(id => { const _e = document.getElementById('f_'+id); if(!_e) return; _e.value = ''; if(_e.dataset) _e.dataset.autoFill = ''; });
-  document.getElementById('accountantList').innerHTML = accountantOptions();
   const _sec = document.getElementById('lockSection'), _back = document.getElementById('lockHostAdd');
   if(_sec && _back && _sec.parentElement !== _back) _back.appendChild(_sec);   // نضمن رجوعه لمكانه
+  document.getElementById('accountantList').innerHTML = accountantOptions();
   resetLock();
   buildCustPhoneMap();
   const _shopDl = document.getElementById('shopNameList');
@@ -4833,14 +4830,17 @@ async function submitAdd(){
   const deviceColor = get('deviceColor');
   // ⚠️ كان `return;` ساكت — الزرار يتداس وميحصلش حاجة والمحاسب مش فاهم ليه.
   //    دلوقتي بنقول الناقص إيه وبنوديه على الخانة.
-  const missing = [];
-  if(!customerName) missing.push('اسم العميل');
-  if(!deviceType)   missing.push('نوع الجهاز');
-  if(!deviceColor)  missing.push('لون الجهاز');
-  if(missing.length){
-    alert('لازم تكتب: ' + missing.join('، '));
-    const first = !customerName ? 'f_customerName' : (!deviceType ? 'f_deviceType' : 'f_deviceColor');
-    const el = document.getElementById(first); if(el) el.focus();
+  // 🆕 (٢٠٢٦-١٠-١٢) العطل والسريال بقوا إجباري كمان
+  const need = [
+    ['f_customerName',  'اسم العميل'],
+    ['f_deviceType',    'نوع الجهاز'],
+    ['f_deviceColor',   'لون الجهاز'],
+    ['f_serialNumber',  'الرقم التسلسلي (IMEI/SN)'],
+    ['f_reportedIssue', 'العطل'],
+  ].filter(([id]) => !((document.getElementById(id) || {}).value || '').trim());
+  if(need.length){
+    alert('لازم تكتب: ' + need.map(x => x[1]).join('، '));
+    const el = document.getElementById(need[0][0]); if(el) el.focus();
     return;
   }
   const serialNumber = get('serialNumber');
@@ -7974,8 +7974,8 @@ function renderDetailNow(){
         ${techSelectHtml(d.technician, 'onTechPick(this, \'technician\')', { id:'techInput', disabled: isRet || isReception() })}
       </label>
       <label class="field">
-        <span>${t('det.accountant')}</span>
-        <input list="accountantListDetail" value="${esc(d.registeredBy||'')}" placeholder="${t('det.accountantPh')}"${roI} onblur="editField('registeredBy', this.value)" />
+        <span>اسم الموظف اللي سجّله</span>
+        <input list="accountantListDetail" value="${esc(d.registeredBy||'')}" placeholder="اسم الموظف"${roI} onblur="editField('registeredBy', this.value)" />
       </label>
     </div>
     <datalist id="accountantListDetail">${accountantOptions()}</datalist>
