@@ -1618,9 +1618,7 @@ function absBoxHtml(email){
   return `
     <div class="card-ded" style="background:var(--waiting-bg,#FFF7ED);color:var(--waiting,#B45309);border-color:var(--waiting,#B45309)">
       🏖️ الغياب والإجازات${bits.length ? ': ' + bits.join(' · ') : ''}
-      ${a.pending ? `<div style="margin-top:4px;font-weight:800;">المقترح خصمه: ${a.pending} ج.م</div>
-        <div style="margin-top:2px;font-size:11.5px;font-weight:700;opacity:.9;">
-          ⚠️ المبلغ ده <u>لسه ما اتخصمش</u> — واقف على قرارك</div>` : ''}
+      ${a.pending ? `<div style="margin-top:4px;font-weight:800;">المقترح خصمه: ${a.pending} ج.م</div>` : ''}
       ${od.length ? `<div style="margin-top:4px;">🏖️ نزل في راحته ${od.length} يوم${
         nDay ? ` · ${nDay} يوم كامل` : ''}${nOt ? ` · ${nOt} أوفر تايم` : ''}</div>` : ''}
       ${lbLineHtml(lb)}
@@ -2004,11 +2002,6 @@ function renderHrSettings(){
       </select>
     </label>
 
-    <div class="hintbox">
-      الحضور جوه فترة السماح بيتحسب كأنه في المعاد الأساسي — مفيش خصم ولا نقص ساعات.<br>
-      اللي بييجي بعد السماح وقبل الاحتياطي: مفيش خصم فلوس، بس بيمشي متأخر بنفس القدر.<br>
-      اللي بييجي بعد الاحتياطي: بيتخصم منه، والساعات من وقت حضوره الفعلي.
-    </div>
 
     <label class="fld"><span>🕙 المعاد الأساسي</span>
       <input type="time" id="fStart" value="${esc(c.shift_start ? String(c.shift_start).slice(0,5) : '')}">
@@ -2845,6 +2838,7 @@ let SLIP = { email:'', rows:[], busy:false };
 
 async function openPayslips(email){
   SLIP = { email:(email||'').toLowerCase(), rows:[], busy:false };
+  SLIP_OLD_OPEN = false;   // كل موظف بيفتح ودرجه مقفول
   document.getElementById('slipTitle').textContent = '🧾 كشوف — ' + nameOf(SLIP.email);
   document.getElementById('slipBody').innerHTML = '<div class="empty">جاري التحميل…</div>';
   openSheet('slipSheet');
@@ -2897,21 +2891,28 @@ function renderPayslips(){
         ✅ كل الكشوف اتصرفت</div>`}
 
     ${paid.length ? `
-      <button class="mini-btn" style="width:100%;margin-top:16px;padding:11px;"
-              onclick="slipToggleOld()">
-        <span id="slipArrow">▾</span> 📜 سجل المرتبات المصروفة (${paid.length})
-      </button>
-      <div id="slipOld" class="hidden" style="margin-top:11px;">
-        ${paid.map(r => slipCard(r)).join('')}
+      <div class="wd-drawer" style="margin-top:16px;">
+        <button class="wd-head" onclick="slipToggleOld()">
+          <span class="wd-ttl">🗄️ درج المرتبات المصروفة</span>
+          <span class="wd-sum">${paid.length} شهر</span>
+          <span class="wd-arw">${SLIP_OLD_OPEN ? '▴' : '▾'}</span>
+        </button>
+        ${SLIP_OLD_OPEN ? `<div class="wd-body">${paid.map(r => slipCard(r)).join('')}</div>` : ''}
       </div>` : ''}`;
 }
 
+// ============================================================
+// 🗄️ درج المرتبات المصروفة
+// ------------------------------------------------------------
+// 🐞 قبل كده الكروت المصروفة كانت بتظهر مفتوحة على طول: الدرج كان
+//    معتمد على كلاس «hidden» والصفحة دي ماكانش فيها تعريف ليه.
+// ✅ دلوقتي الكروت **مبتترسمش أصلاً** غير لما الدرج يتفتح — مفيش
+//    حاجة تعتمد على CSS. والدرج بيرجع مقفول كل ما تفتح كشوف موظف.
+// ============================================================
+let SLIP_OLD_OPEN = false;
 function slipToggleOld(){
-  const box = document.getElementById('slipOld');
-  const arw = document.getElementById('slipArrow');
-  if(!box) return;
-  box.classList.toggle('hidden');
-  if(arw) arw.textContent = box.classList.contains('hidden') ? '▾' : '▴';
+  SLIP_OLD_OPEN = !SLIP_OLD_OPEN;
+  renderPayslips();
 }
 
 // ============================================================
