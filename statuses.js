@@ -85,7 +85,9 @@ const ROLE_STATUS_LABELS = {
 //                بيوصل للمحاسب العام.
 // ============================================================
 // 💵 «تم التسليم والدفع» مش خانة الاستقبال — الدفع كله شغل المحاسب
-const RECEPTION_HIDDEN      = ['received_from_reception', 'diagnosing', 'repairing', 'done', 'delivered_paid', 'trashed'];
+// 🚫 «تم الرفض» (العميل خد الجهاز المرفوض) كمان — الجهاز خرج خلاص.
+//    الاتنين بيلاقيهم بالبحث اللي فوق لو العميل رجع.
+const RECEPTION_HIDDEN      = ['received_from_reception', 'diagnosing', 'repairing', 'done', 'delivered_paid', 'rejected', 'trashed'];
 const RECEPTION_IN_WORKSHOP = ['sent_to_repair', 'received_from_reception', 'diagnosing', 'repairing', 'done'];
 const RECEPTION_NEXT = {
   waiting:           ['sent_to_repair', 'delivered', 'rejected'],
