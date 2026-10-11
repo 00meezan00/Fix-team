@@ -5823,8 +5823,8 @@ function renderDetailNow(){
          اتسلّم وقتها. فلو قفلنا الحقول دي بعد التسليم بتبقى
          مالهاش لازمة خالص — محدش هيقدر يصحح نقطة غلط. */ ''}
     ${(hasRet && !isReception()) ? `<label class="field"><span style="color:var(--violet);font-weight:800;">${t('det.substituteTech')}</span>${techSelectHtml(d.substituteTechnician, "onTechPick(this, 'substituteTechnician')")}</label>
-    <label class="field"><span style="color:var(--violet);font-weight:800;">⭐ ${t('det.returnPoints')}</span><input type="text" inputmode="numeric" value="${esc(d.returnPoints||'')}" oninput="fixDigitsInput(this)" onblur="editField('returnPoints', enDigits(this.value).replace(/[^0-9.]/g,''))" placeholder="${t('det.returnPointsPh')}" /></label>
-    ${d.assistTechnician && (parseFloat(enDigits(d.assistPercent))||0) > 0 ? `
+    ${isSuperAdmin() ? `<label class="field"><span style="color:var(--violet);font-weight:800;">⭐ ${t('det.returnPoints')}</span><input type="text" inputmode="numeric" value="${esc(d.returnPoints||'')}" oninput="fixDigitsInput(this)" onblur="editField('returnPoints', enDigits(this.value).replace(/[^0-9.]/g,''))" placeholder="${t('det.returnPointsPh')}" /></label>` : ''}
+    ${isSuperAdmin() && d.assistTechnician && (parseFloat(enDigits(d.assistPercent))||0) > 0 ? `
     <div style="margin-bottom:10px;">
       <span style="font-size:13px;color:var(--muted);display:block;margin-bottom:6px;">🤝 ${tdT('blameQ')}</span>
       <div class="pay-choice">
@@ -5834,7 +5834,8 @@ function renderDetailNow(){
     </div>` : ''}` : ''}
     ${(d.status==='waiting' && !d.technician && !isReception()) ? `<div class="tech-warn">⚠ ${t('det.techWarn')}</div>` : ''}
 
-    ${isReception() ? '' : `<button type="button" class="points-toggle" onclick="togglePointsBox()">
+    ${/* ⭐ (٢٠٢٦-١٠-١١) النقاط والفني المساعد — للمحاسب العام بس */ ''}
+    ${!isSuperAdmin() ? '' : `<button type="button" class="points-toggle" onclick="togglePointsBox()">
       <span>⭐ ${t('det.pointsToggle')}</span>
       <span id="pointsToggleArrow">${pointsBoxOpen ? '▲' : '▼'}</span>
     </button>
@@ -6239,6 +6240,8 @@ async function editField(key, value){
   if(isCashier()) return;   // 💵 أمين الخزنة بيحصّل فلوس بس
   let extra = {};
   // 🛎️ الاستقبال مابيحسبش نقط — النقط شغل المحاسب
+  // ⭐ الحساب التلقائي للنقط من العطل شغّال لأي حد بيعدّل العطل (ما عدا الاستقبال)
+  //    — حتى لو قسم النقاط نفسه مش ظاهر له (المحاسب العام بس اللي بيشوفه)
   if(key === 'reportedIssue' && !isReception()){
     const cur = devices.find(x => x.id === selectedId);
     if(cur && !cur.isWholesale){
