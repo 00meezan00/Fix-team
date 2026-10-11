@@ -464,6 +464,17 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
   .ph1-today-n{font-family:'Cairo',sans-serif; font-weight:900; font-size:28px; color:var(--success); line-height:1.1;}
   .ph1-today-n small{font-size:14px; font-weight:800;}
   .ph1-today-s{font-size:12.5px; color:var(--muted); font-weight:700; margin-inline-start:auto;}
+  /* 🚀🚀 المرحلة التانية */
+  .ph2-close-row{display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;
+    margin:8px 22px 0; padding:10px 14px; background:var(--surface); border:1px solid var(--border);
+    border-radius:12px; font-size:13px; color:var(--ink-2); font-weight:700;}
+  .card.ph2-late{box-shadow:0 0 0 2px var(--danger), 0 1px 2px rgba(0,0,0,.06);}
+  .ph2-ch{background:var(--info-bg); border:1px solid var(--info-border); border-radius:10px; padding:10px 12px; margin:-4px 0 12px;}
+  .ph2-ch-head{font-size:13.5px; font-weight:800; color:var(--ink); margin-bottom:6px; line-height:1.7;}
+  .ph2-ch-row{display:flex; justify-content:space-between; align-items:center; gap:8px; width:100%; text-align:start;
+    background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:7px 9px; margin-top:5px;
+    font-family:inherit; font-size:12.5px; color:var(--ink-2); cursor:pointer; line-height:1.6;}
+  .ph2-ch-row small{display:block; color:var(--muted); font-size:11.5px;}
 
   /* ============================================================
      شريط البحث الرئيسي
@@ -1666,7 +1677,7 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
            هو من اللي اتكتب في الحقول قبل كده، ولما تدوس على واحد
            بيملّي الاسم **والرقم** من أقدم تسجيل — مش أحدث واحد.
            الاقتراح اللي تحت بقى من عندنا، وبيملّي أحدث رقم. -->
-      <label class="field"><span data-i18n="add.customerName">اسم العميل</span><input id="f_customerName" list="custNameList" autocomplete="off" oninput="onCustomerNameInput()" /></label>
+      <label class="field"><span data-i18n="add.customerName">اسم العميل</span><input id="f_customerName" list="custNameList" autocomplete="off" oninput="onCustomerNameInput(); ph2CustHistory();" /></label>
       <datalist id="custNameList"></datalist>
       <label class="field"><span data-i18n="add.shopName">اسم المحل</span><input id="f_shopName" list="shopNameList" autocomplete="off" oninput="autoWholesaleCheck()" /></label>
       <div id="wsAutoHint" style="display:none;background:var(--violet-bg,#F5F3FF);color:var(--violet);border:1px solid var(--violet);border-radius:9px;padding:8px 11px;font-size:12.5px;font-weight:800;margin-bottom:10px;">🏷️ عميل جملة معروف — اتظبط تلقائي (تقدر تغيّره تحت)</div>
@@ -1677,7 +1688,9 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
       <datalist id="broughtByList"></datalist>
       <label class="field"><span data-i18n="add.registeredBy">اسم المحاسب اللي بيسجل الجهاز</span><input id="f_registeredBy" list="accountantList" /></label>
       <datalist id="accountantList"></datalist>
-      <label class="field"><span data-i18n="add.phone">رقم التليفون</span><input id="f_customerPhone" list="phoneHistory" autocomplete="off" inputmode="tel" oninput="fixDigitsInput(this); this.dataset.autoFill='';" /></label>
+      <label class="field"><span data-i18n="add.phone">رقم التليفون</span><input id="f_customerPhone" list="phoneHistory" autocomplete="off" inputmode="tel" oninput="fixDigitsInput(this); this.dataset.autoFill=''; ph2CustHistory();" onchange="ph2CustHistory()" /></label>
+      <!-- 👤 (المرحلة التانية) تاريخ العميل — بيظهر لوحده لما الرقم يطابق أجهزة قديمة -->
+      <div id="ph2CustHist" class="ph2-ch" style="display:none;"></div>
       <datalist id="phoneHistory"></datalist>
       <div class="row2">
         <label class="field"><span data-i18n="add.deviceType">نوع الجهاز</span><input id="f_deviceType" placeholder="iPhone / Samsung..." /></label>
@@ -2175,6 +2188,7 @@ function applyRoleVisibility(){
   try{ prSyncMenu(); }catch(e){}   // زرار مراجعة قطع الغيار حسب الدور/الميزة
   try{ loadPartsLog(); }catch(e){}   // 🧰 إشعار حركة الفنيين على المخزن (للمحاسب/الأدمن بس)
   try{ loadTrash(); }catch(e){}      // 🗑 المهملات + المسح التلقائي بعد ٣٠ يوم
+  try{ loadClosings(); }catch(e){}   // 🔒 تقفيلات الخزنة (أمين الخزنة + المحاسب العام)
   // خانة "حسابي" — مستقلة تماماً عن الإشعارات، عشان تظهر حتى لو
   // ميزة الإشعارات مقفولة (ده كان بيمنعها من الظهور خالص).
   try{ syncAccountMenu(); }catch(e){}
@@ -3899,8 +3913,10 @@ function render(){
 function renderApprovalsPanel(){
   const host = document.getElementById('approvalsHost');
   // 📝 + التقارير (للمحاسب العام) · 🚀 المرحلة الأولى: إجمالي النهارده · الصندوق · تقاريري
-  if(host) host.innerHTML = cashierTodayHtml() + approvalsPanelHtml() + reportsPanelHtml()
-                          + inboxPanelHtml() + myReportsPanelHtml();
+  // 🚀🚀 المرحلة التانية: تقفيل الخزنة · التقفيلات (للمحاسب العام) · نايمين في الدرج · المتأخرين
+  if(host) host.innerHTML = cashierTodayHtml() + closingStripHtml() + approvalsPanelHtml() + reportsPanelHtml()
+                          + closingsPanelHtml() + inboxPanelHtml() + latePanelHtml() + sleepPanelHtml()
+                          + myReportsPanelHtml();
 }
 
 // ============================================================
@@ -4381,11 +4397,12 @@ function rcCardChips(d, s){
   }
   h += outcomeChip(d);
   h += ph1CardChips(d);   // 🚀 ⏳ مستني من إمتى · 🚫 سبب الرفض · 💬 لسه ماتبلّغش
+  h += ph2CardChips(d);   // 🚀🚀 🔩 مستني قطعة · ⏰ متأخر · 😴 نايم في الدرج
   return h;
 }
 
 function cardHtml(d, s){
-  return `<div class="card" style="border-top-color:${accent(s.varname)}" onclick="openDetail('${d.id}')">
+  return `<div class="card${ph2CardClass(d)}" style="border-top-color:${accent(s.varname)}" onclick="openDetail('${d.id}')">
     <div class="card-top">
       <span class="badge" style="background:${accentBg(s.varname)};color:${accent(s.varname)}">#${d.id.slice(-5).toUpperCase()}</span>
       <span class="days">${daysSince(d.intakeDate)} يوم</span>
@@ -4451,6 +4468,7 @@ function openAddModal(){
   setAddPayType('cash');
   setAddWholesale(false);
   togglePayTypeVisibility();
+  try{ ph2CustHistory(); }catch(e){}   // 👤 الرقم اتمسح → تاريخ العميل يختفي
   const now = new Date();
   const pad = n => String(n).padStart(2,'0');
   document.getElementById('f_intakeDateOnly').value = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
@@ -5709,7 +5727,8 @@ function inboxPanelHtml(){
     <div class="spn-head" style="color:var(--${statusInfo(k) ? statusInfo(k).varname : 'info'});">${title}
       <span class="spn-count" style="background:var(--${statusInfo(k) ? statusInfo(k).varname : 'info'});">${list.length}</span>
       ${late ? `<span style="font-size:12px;color:var(--danger);font-weight:800;">🔴 ${late} مستني أكتر من ${INBOX_LATE_H} ساعة</span>` : ''}
-      ${ph1NotifyBtn()}</div>
+      ${ph1NotifyBtn()}
+      ${isProduction() ? `<button class="spn-clear" style="color:var(--received_from_reception);" onclick="event.stopPropagation();openBatchRecv()">📦 استلام دفعة بالباركود</button>` : ''}</div>
     ${rows}${more}
   </div>`;
 }
@@ -5966,6 +5985,620 @@ function ph1OnRemote(prev, next){
   }catch(e){ console.warn('تنبيهات المرحلة الأولى:', e); }
 }
 
+// ############################################################
+// 🚀🚀 المرحلة التانية — تنظيم الشغل اليومي
+// ------------------------------------------------------------
+//   ٨)  👤 تاريخ العميل وقت التسجيل (الاستقبال)
+//   ٩)  😴 أجهزة نايمة في الدرج → «كلّم العميل» (الاستقبال)
+//   ١٠) 🧾 إيصال تسليم — طباعة / واتساب بالسعر والضمان (الاستقبال + أمين الخزنة)
+//   ١٢) 📦 استلام بالباركود دفعة واحدة (مدير الإنتاج)
+//   ١٣) ⏰ تنبيه التأخير جوه الورشة (مدير الإنتاج)
+//   ١٤) 🔩 «مستني قطعة» — علامة مش حالة (مدير الإنتاج يحطها، الاستقبال يشوفها)
+//   ١٥) 🔒 تقفيل الخزنة آخر اليوم (أمين الخزنة → المحاسب العام) — السيرفر: ملف 86
+//   ⏭️ اتأجّلوا: لوحة الفنيين (موجودة في الجرد) · طريقة الدفع (كاش/إنستاباي/محفظة)
+// ############################################################
+
+// ---------- ٨) 👤 تاريخ العميل ----------
+// 🧸 الاستقبال بيكتب رقم التليفون → تحته على طول: «العميل ده جه قبل كده كام مرة،
+//    وآخر أجهزته إيه، ورجع مرتجع كام مرة». ودوسة بتملا الاسم والمحل من آخر زيارة.
+// ⚠️ المطابقة بآخر ١٠ أرقام — عشان «+2010…» و«010…» يبقوا نفس العميل.
+function phoneKey(p){ const s = enDigits(String(p || '')).replace(/[^0-9]/g, ''); return s.length >= 8 ? s.slice(-10) : ''; }
+function hadReturn(d){ return (d.statusHistory || []).some(h => h && h.status === 'returned') || (Array.isArray(d.returnRounds) && d.returnRounds.length > 0); }
+function custHistoryFor(phone){
+  const k = phoneKey(phone);
+  if(!k) return [];
+  return devices.filter(d => phoneKey(d.customerPhone) === k)
+    .sort((a, b) => (Date.parse(b.intakeDate) || 0) - (Date.parse(a.intakeDate) || 0));
+}
+function ph2CustHistory(){
+  const box = document.getElementById('ph2CustHist');
+  const inp = document.getElementById('f_customerPhone');
+  if(!box || !inp) return;
+  const list = custHistoryFor(inp.value);
+  if(!list.length){ box.innerHTML = ''; box.style.display = 'none'; return; }
+  const rets = list.filter(hadReturn).length;
+  const open = list.filter(d => ACTIVE_STATUSES.includes(d.status)).length;
+  const last = list[0];
+  const rows = list.slice(0, 5).map(d => {
+    const st = statusInfo(effStatus(d));
+    return `<button type="button" class="ph2-ch-row" onclick="openDetail('${d.id}')">
+      <span><b>${esc(d.deviceType)} ${esc(d.model)}</b> · ${d.intakeDate ? new Date(d.intakeDate).toLocaleDateString('ar-EG') : ''}${hadReturn(d) ? ' · <span style="color:var(--returned);font-weight:800;">🔁 رجع مرتجع</span>' : ''}
+        ${d.reportedIssue ? `<small>🛠️ ${esc(d.reportedIssue)}</small>` : ''}</span>
+      ${st ? `<span class="gs-tag" style="background:${accentBg(st.varname)};color:${accent(st.varname)}">${esc(stLabel(st))}</span>` : ''}
+    </button>`;
+  }).join('');
+  const nm = document.getElementById('f_customerName'), sh = document.getElementById('f_shopName');
+  const canFill = (nm && !nm.value.trim() && last.customerName) || (sh && !sh.value.trim() && last.shopName);
+  box.style.display = 'block';
+  box.innerHTML = `<div class="ph2-ch-head">👤 العميل ده جه قبل كده <b>${list.length}</b> ${list.length === 1 ? 'مرة' : 'مرات'}
+      ${rets ? ` · <span style="color:var(--returned);">🔁 ${rets} مرتجع</span>` : ''}
+      ${open ? ` · <span style="color:var(--warn);">🔧 ${open} لسه عندنا</span>` : ''}</div>
+    ${canFill ? `<button type="button" class="acc-mini-btn" style="margin:2px 0 6px;" onclick="ph2FillFromLast()">📋 املا الاسم والمحل من آخر مرة (${esc(last.customerName || last.shopName)})</button>` : ''}
+    ${rows}${list.length > 5 ? `<div style="font-size:12px;color:var(--muted);margin-top:4px;">و ${list.length - 5} أجهزة أقدم — دوّر بالرقم في البحث فوق</div>` : ''}`;
+}
+function ph2FillFromLast(){
+  const inp = document.getElementById('f_customerPhone');
+  const last = custHistoryFor(inp && inp.value)[0];
+  if(!last) return;
+  const nm = document.getElementById('f_customerName'), sh = document.getElementById('f_shopName');
+  if(nm && !nm.value.trim() && last.customerName) nm.value = last.customerName;
+  if(sh && !sh.value.trim() && last.shopName) sh.value = last.shopName;
+  try{ autoWholesaleCheck(); }catch(e){}
+  ph2CustHistory();
+}
+
+// ---------- ٩) 😴 أجهزة نايمة في الدرج ----------
+// 🧸 جهاز في درج الخالص (أو درج الرفض وهو لسه في المحل) بقاله أكتر من ٧ أيام
+//    → بيطلع في لوحة «😴 نايمين في الدرج» عند الاستقبال: «كلّم العميل».
+//    «💬 ذكّره» أو «📞 كلّمته» → الجهاز بيختفي ٣ أيام وبعدين يرجع لو لسه موجود.
+// ⚠️ SLEEP_FROM: الأجهزة اللي دخلت الدرج قبل التاريخ ده مابتطلعش —
+//    عشان أجهزة الأرشيف القديمة كلها ماتنزلش مرة واحدة.
+const SLEEP_DAYS = 7, SLEEP_SNOOZE_DAYS = 3;
+const SLEEP_FROM = '2026-10-01';
+let sleepOpen = false;
+function inDrawer(d){ return d.status === 'fixed_drawer' || (d.status === 'rejected' && d.rejectedInShop); }
+function drawerDays(d){ return Math.floor(hoursSince(enteredAt(d, d.status)) / 24); }
+function sleepList(){
+  return devices.filter(inDrawer)
+    .map(d => ({ d, at: enteredAt(d, d.status) }))
+    .filter(x => String(x.at).slice(0, 10) >= SLEEP_FROM)
+    .map(x => ({ ...x, days: Math.floor(hoursSince(x.at) / 24) }))
+    .filter(x => x.days >= SLEEP_DAYS
+              && !(x.d.drawerCall && hoursSince(x.d.drawerCall.at) < SLEEP_SNOOZE_DAYS * 24))
+    .sort((a, b) => b.days - a.days);
+}
+function sleepPanelHtml(){
+  if(!isReception()) return '';
+  const list = sleepList();
+  if(!list.length) return '';
+  const rows = sleepOpen ? list.map(({d, days}) => `<div class="spn-row">
+      <div class="spn-info" style="cursor:pointer;" onclick="openDetail('${d.id}')">
+        <div class="spn-t"><span class="spn-kind" style="color:var(--danger);">😴 ${days} يوم</span>📱 ${esc(d.deviceType)} ${esc(d.model)}${d.customerName ? ' — ' + esc(d.customerName) : ''}</div>
+        <div class="spn-m">${d.status === 'fixed_drawer' ? '🟢 درج الخالص' : '🔴 درج الرفض'}${d.customerPhone ? ' · 📞 ' + esc(d.customerPhone) : ' · ⚠️ مفيش رقم'}${d.drawerCall ? ' · آخر مرة اتكلّم ' + esc(splAgoTxt(d.drawerCall.at)) : ''}</div>
+      </div>
+      <div class="appr-row-actions">
+        ${d.customerPhone ? `<button class="appr-btn-yes" onclick="ph2SleepWa('${d.id}')">💬 ذكّره</button>` : ''}
+        <button class="spn-ok" onclick="ph2SleepCalled('${d.id}')">📞 كلّمته</button>
+      </div>
+    </div>`).join('') : '';
+  return `<div class="spn-panel" style="border-color:var(--danger-border);">
+    <div class="spn-head" style="color:var(--danger);cursor:pointer;" onclick="sleepOpen=!sleepOpen;renderApprovalsPanel();">😴 أجهزة نايمة في الدرج — كلّم العميل
+      <span class="spn-count" style="background:var(--danger);">${list.length}</span>
+      <span class="spn-clear">${sleepOpen ? 'اقفل ▲' : 'افتح ▼'}</span></div>
+    ${rows}
+  </div>`;
+}
+function sleepReminderMsg(d){
+  const ref = devRef(d), dev = `${d.deviceType || ''} ${d.model || ''}`.trim(), days = drawerDays(d);
+  const price = parseInt(d.agreedPrice) || 0;
+  return d.status === 'fixed_drawer'
+    ? `أهلاً ${d.customerName || ''} 👋\nتذكير: جهازك *${dev}* (${ref}) جاهز ومستنيك في المحل من ${days} يوم 🎉${price ? `\nتكلفة الصيانة: *${price.toLocaleString('en-EG')} ج.م*` : ''}\nمستنيينك في I Fix Team 🙏`
+    : `أهلاً ${d.customerName || ''} 👋\nتذكير: جهازك *${dev}* (${ref}) لسه عندنا في المحل من ${days} يوم.${d.rejectReason ? `\nللأسف تعذّرت صيانته — السبب: ${d.rejectReason}` : ''}\nتقدر تعدّي تستلمه في أي وقت 🙏`;
+}
+async function ph2MarkCalled(id, how){
+  const now = new Date().toISOString();
+  devices = devices.map(x => x.id === id ? { ...x,
+    drawerCall: { at: now, by: currentUser.name, how },
+    activityNotes: [...(x.activityNotes || []), { text: how === 'wa' ? '💬 اتبعت للعميل تذكير «جهازك لسه في الدرج»' : '📞 اتكلّم مع العميل — الجهاز لسه في الدرج',
+      at: now, by: currentUser.name, role: currentRoleLabel() }] } : x);
+  render();
+  if(selectedId === id) renderDetail();
+  await persist();
+}
+async function ph2SleepWa(id){
+  const d = devices.find(x => x.id === id);
+  if(!d || !d.customerPhone) return;
+  const msg = sleepReminderMsg(d);
+  await ph2MarkCalled(id, 'wa');      // ⚠️ الحفظ قبل الواتساب (الصفحة بتنام لما الواتس يفتح)
+  openWa(d.customerPhone, msg);
+}
+async function ph2SleepCalled(id){ await ph2MarkCalled(id, 'call'); }
+
+// ---------- ١٠) 🧾 إيصال التسليم ----------
+// 🧸 بعد ما الجهاز يتسلّم: ورقة للعميل فيها الجهاز والعطل والسعر والضمان.
+//    تتطبع أو تتبعت واتساب. الاستقبال بيختار الضمان مرة (بيتحفظ على الجهاز)،
+//    وأمين الخزنة يقدر يطبعه أو يبعته بعد كده.
+const WARRANTY_OPTS = [0, 7, 14, 30, 90];
+let rcptOpenId = null;
+function warrantyLine(d){
+  const w = d.warranty;
+  if(!w || w.days == null) return '';
+  if(!(w.days > 0)) return 'بدون ضمان';
+  const from = Date.parse(w.from || deliveredDateOf(d) || w.at) || Date.now();
+  const until = new Date(from + w.days * 86400000);
+  return `ضمان ${w.days} يوم على نفس العطل — لحد ${until.toLocaleDateString('ar-EG')}`;
+}
+function receiptHtml(d){
+  if(d.status !== 'delivered' || !(isReception() || isCashier())) return '';
+  if(rcptOpenId !== d.id){
+    return `<button class="btn-secondary" style="width:100%;color:var(--ink);border-color:var(--border);margin-bottom:12px;" onclick="rcptOpenId='${d.id}';renderDetail();">🧾 إيصال التسليم (طباعة / واتساب)</button>`;
+  }
+  const canW = isReception();
+  const cur = d.warranty ? d.warranty.days : null;
+  const pills = canW ? `<div style="font-size:12.5px;color:var(--muted);font-weight:700;margin-bottom:6px;">🛡️ الضمان</div>
+    <div class="status-pills" style="margin:0 0 10px;">${WARRANTY_OPTS.map(n => {
+      const on = cur === n;
+      return `<button type="button" class="pill" style="border-color:var(--success);background:${on ? 'var(--success)' : 'var(--surface)'};color:${on ? '#fff' : 'var(--success)'}" onclick="ph2SetWarranty('${d.id}',${n})">${n ? n + ' يوم' : 'بدون ضمان'}</button>`;
+    }).join('')}</div>` : (d.warranty ? `<div class="detail-row"><span>🛡️ الضمان</span><span style="font-weight:700;">${esc(warrantyLine(d))}</span></div>` : '');
+  const ready = !canW || cur !== null;
+  return `<div class="rfr-box" style="background:var(--surface-2);border-color:var(--border-strong);">
+    <div class="rfr-q">🧾 إيصال التسليم</div>
+    ${pills}
+    ${ready ? '' : '<div style="font-size:12.5px;color:var(--warn);font-weight:700;margin-bottom:8px;">اختار الضمان الأول</div>'}
+    <div class="pay-choice">
+      <button type="button" class="pay-btn" style="border-color:var(--ink-2);color:var(--ink);background:var(--surface);" ${ready ? `onclick="ph2PrintReceipt('${d.id}')"` : 'disabled'}>🖨 اطبع</button>
+      ${d.customerPhone ? `<button type="button" class="pay-btn" style="border-color:var(--success);color:#fff;background:#16A34A;" ${ready ? `onclick="ph2WaReceipt('${d.id}')"` : 'disabled'}>💬 ابعته واتساب</button>` : ''}
+    </div>
+    <button class="acc-mini-btn" style="margin-top:8px;" onclick="rcptOpenId=null;renderDetail();">اقفل</button>
+  </div>`;
+}
+async function ph2SetWarranty(id, days){
+  if(!isReception()) return;
+  const now = new Date().toISOString();
+  try{ localStorage.setItem('ifix_warranty_days', String(days)); }catch(e){}
+  devices = devices.map(x => x.id === id ? { ...x,
+    warranty: { days, from: deliveredDateOf(x) || now, by: currentUser.name, at: now },
+    activityNotes: [...(x.activityNotes || []), { text: '🛡️ ' + (days ? 'ضمان ' + days + ' يوم' : 'بدون ضمان'), at: now, by: currentUser.name, role: currentRoleLabel() }] } : x);
+  renderDetail();
+  await persist();
+}
+function receiptData(d){
+  const price = parseInt(d.agreedPrice) || 0;
+  const rp = (typeof isReturnPriced === 'function' && isReturnPriced(d)) ? (parseInt(d.returnPrice) || 0) : null;
+  const pay = d.paymentType === 'deferred' ? 'آجل على حساب ' + (d.billedShop || d.shopName || 'المحل')
+            : (isPaidDevice(d) && !returnPaymentDue(d)) ? 'مدفوع ✓' : 'بانتظار الدفع';
+  return {
+    ref: devRef(d), dev: `${d.deviceType || ''} ${d.model || ''}`.trim(),
+    cust: d.customerName || '', shop: d.shopName || '', phone: d.customerPhone || '',
+    issue: d.repairIssue || d.discoveredIssue || d.reportedIssue || '',
+    intake: d.intakeDate ? new Date(d.intakeDate).toLocaleDateString('ar-EG') : '',
+    out: deliveredDateOf(d) ? new Date(deliveredDateOf(d)).toLocaleString('ar-EG') : new Date().toLocaleString('ar-EG'),
+    price, rp, pay, warranty: warrantyLine(d), track: trackUrl(d)
+  };
+}
+function ph2PrintReceipt(id){
+  const d = devices.find(x => x.id === id);
+  if(!d) return;
+  const r = receiptData(d);
+  const row = (k, v) => v ? `<tr><td>${esc(k)}</td><td><b>${esc(v)}</b></td></tr>` : '';
+  const html = `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>إيصال ${esc(r.ref)}</title>
+    <style>@page{size:80mm auto;margin:4mm;} body{font-family:Tahoma,Arial,sans-serif;width:72mm;margin:0 auto;color:#000;font-size:12px;}
+    h1{font-size:17px;text-align:center;margin:2px 0;} .c{text-align:center;} table{width:100%;border-collapse:collapse;margin:6px 0;}
+    td{padding:3px 0;border-bottom:1px dashed #999;vertical-align:top;} td:first-child{color:#444;white-space:nowrap;padding-inline-end:6px;}
+    .tot{font-size:16px;text-align:center;border:2px solid #000;padding:6px;margin:8px 0;font-weight:bold;}
+    .w{border:1px solid #000;padding:6px;text-align:center;font-weight:bold;margin:6px 0;} .s{font-size:10.5px;color:#333;text-align:center;}</style></head>
+    <body><h1>I Fix Team</h1><div class="c">🧾 إيصال تسليم جهاز</div><div class="c"><b>${esc(r.ref)}</b></div>
+    <table>${row('العميل', r.cust)}${row('المحل', r.shop)}${row('التليفون', r.phone)}${row('الجهاز', r.dev)}${row('العطل', r.issue)}
+    ${row('تاريخ الاستلام', r.intake)}${row('تاريخ التسليم', r.out)}${row('الدفع', r.pay)}</table>
+    <div class="tot">تكلفة الصيانة: ${r.price.toLocaleString('en-EG')} ج.م${r.rp !== null ? `<br>صيانة المرتجع: ${r.rp.toLocaleString('en-EG')} ج.م` : ''}</div>
+    ${r.warranty ? `<div class="w">🛡️ ${esc(r.warranty)}</div>` : ''}
+    <div class="s">الضمان على نفس العطل بس، ومايشملش الكسر أو المياه أو فتح الجهاز برّه المحل.</div>
+    <div class="s" style="margin-top:6px;">شكراً لثقتك في I Fix Team 🌟</div></body></html>`;
+  ph2PrintHtml(html);
+}
+// ⚠️ الطباعة من iframe جوه الصفحة — window.open على الأيفون المثبّت بيبوظ (درس قديم)
+function ph2PrintHtml(html){
+  let f = document.getElementById('ph2PrintFrame');
+  if(f) f.remove();
+  f = document.createElement('iframe');
+  f.id = 'ph2PrintFrame';
+  f.style.cssText = 'position:fixed;width:0;height:0;border:0;inset-inline-start:-9999px;';
+  document.body.appendChild(f);
+  const doc = f.contentWindow.document;
+  doc.open(); doc.write(html); doc.close();
+  setTimeout(() => { try{ f.contentWindow.focus(); f.contentWindow.print(); }catch(e){ alert('الطباعة مش متاحة هنا'); } }, 350);
+}
+function ph2WaReceipt(id){
+  const d = devices.find(x => x.id === id);
+  if(!d || !d.customerPhone) return;
+  const r = receiptData(d);
+  const msg = `🧾 *إيصال تسليم — I Fix Team*\nرقم الجهاز: *${r.ref}*\nالجهاز: ${r.dev}${r.issue ? `\nالعطل: ${r.issue}` : ''}\nتاريخ التسليم: ${r.out}\n`
+    + `تكلفة الصيانة: *${r.price.toLocaleString('en-EG')} ج.م*${r.rp !== null ? `\nصيانة المرتجع: *${r.rp.toLocaleString('en-EG')} ج.م*` : ''}\nالدفع: ${r.pay}`
+    + (r.warranty ? `\n🛡️ ${r.warranty}` : '') + `\n\nشكراً لثقتك فينا 🌟`;
+  openWa(d.customerPhone, msg);
+}
+
+// ---------- ١٣) ⏰ تنبيه التأخير ----------
+// 🧸 جهاز واقف في نفس الخانة جوه الورشة أكتر من اللازم → الكارت بيتحدد بالأحمر
+//    وبيطلع في لوحة «⏰ متأخرين» عند مدير الإنتاج.
+//    الجهاز اللي عليه «🔩 مستني قطعة» مش متأخر — هو مستني حاجة معروفة.
+const LATE_H = { received_from_reception: 24, diagnosing: 24, repairing: 48 };
+const LATE_NAME = { received_from_reception: 'محدش بدأ فيه', diagnosing: 'في الكشف', repairing: 'في الصيانة' };
+let lateOpen = false;
+function lateInfo(d){
+  const h = LATE_H[d && d.status];
+  if(!h || d.partWait) return null;
+  const at = enteredAt(d, d.status);
+  const hrs = hoursSince(at);
+  return hrs >= h ? { hrs, at } : null;
+}
+function hrsTxt(h){ return h >= 48 ? Math.floor(h / 24) + ' يوم' : Math.floor(h) + ' ساعة'; }
+function latePanelHtml(){
+  if(!isProduction()) return '';
+  const list = devices.map(d => ({ d, l: lateInfo(d) })).filter(x => x.l).sort((a, b) => b.l.hrs - a.l.hrs);
+  if(!list.length) return '';
+  const rows = lateOpen ? list.map(({d, l}) => `<div class="spn-row del" style="cursor:pointer;" onclick="openDetail('${d.id}')">
+      <div class="spn-info">
+        <div class="spn-t"><span class="spn-kind del">⏰ ${hrsTxt(l.hrs)}</span>📱 ${esc(d.deviceType)} ${esc(d.model)}${d.customerName ? ' — ' + esc(d.customerName) : ''}</div>
+        <div class="spn-m">${esc(LATE_NAME[d.status] || '')}${d.technician ? ' · 🔧 ' + esc(d.technician) : ''}</div>
+      </div>
+    </div>`).join('') : '';
+  return `<div class="spn-panel" style="border-color:var(--danger-border);">
+    <div class="spn-head" style="color:var(--danger);cursor:pointer;" onclick="lateOpen=!lateOpen;renderApprovalsPanel();">⏰ أجهزة متأخرة في الورشة
+      <span class="spn-count" style="background:var(--danger);">${list.length}</span>
+      <span class="spn-clear">${lateOpen ? 'اقفل ▲' : 'افتح ▼'}</span></div>
+    ${rows}
+  </div>`;
+}
+
+// ---------- ١٤) 🔩 مستني قطعة ----------
+// 🧸 علامة على الجهاز (مش حالة): القطعة إيه · مين طلبها · من إمتى.
+//    مدير الإنتاج بيحطها وبيشيلها («✅ القطعة وصلت»). الاستقبال بيشوفها بس
+//    (عشان يقول للعميل) — والسيرفر قافلها عليه (ملف 86).
+//    الجهاز خرج من الورشة؟ العلامة بتتشال لوحدها.
+const PART_STATES = ['received_from_reception', 'diagnosing', 'repairing', 'returned'];
+let partAskId = null;
+function partWaitHtml(d){
+  const pw = d.partWait;
+  if(pw && (isProduction() || isReception())){
+    return `<div class="rc-where" style="background:var(--info-bg);color:var(--info)">🔩 مستني قطعة: <b>${esc(pw.part)}</b>
+      <div style="font-weight:600;font-size:12.5px;margin-top:2px;">طلبها ${esc(pw.by || '—')} · ${esc(splAgoTxt(pw.at))}</div>
+      ${isProduction() ? `<button class="acc-mini-btn" style="margin-top:6px;color:var(--success);border-color:var(--success-border);" onclick="ph2PartArrived('${d.id}')">✅ القطعة وصلت</button>` : ''}</div>`;
+  }
+  if(!isProduction() || !PART_STATES.includes(d.status) || (d.status === 'returned' && d.returnInbound)) return '';
+  if(partAskId !== d.id){
+    return `<button class="acc-mini-btn" style="width:100%;padding:9px;margin-bottom:12px;color:var(--info);border-color:var(--info-border);" onclick="partAskId='${d.id}';renderDetail();setTimeout(()=>{const e=document.getElementById('partWaitName');if(e)e.focus();},60);">🔩 الجهاز مستني قطعة؟</button>`;
+  }
+  return `<div class="rfr-box" style="background:var(--info-bg);border-color:var(--info);">
+    <div class="rfr-q">🔩 الجهاز مستني قطعة — الكارت هيتعلّم، ومش هيتحسب «متأخر»</div>
+    <label class="field"><span>القطعة</span><input id="partWaitName" placeholder="مثال: شاشة A12 أصلي" /></label>
+    <label class="field"><span>مين طلبها</span><input id="partWaitBy" value="${esc(d.technician || currentUser.name || '')}" /></label>
+    <div class="pay-choice">
+      <button type="button" class="pay-btn" style="border-color:var(--info);background:var(--info);color:#fff;" onclick="ph2SetPartWait('${d.id}')">🔩 علّمه «مستني قطعة»</button>
+      <button type="button" class="pay-btn" style="border-color:var(--border);color:var(--ink-2);background:var(--surface);" onclick="partAskId=null;renderDetail();">إلغاء</button>
+    </div>
+  </div>`;
+}
+async function ph2SetPartWait(id){
+  if(!isProduction()) return;
+  const part = ((document.getElementById('partWaitName') || {}).value || '').trim();
+  const by   = ((document.getElementById('partWaitBy') || {}).value || '').trim();
+  if(part.length < 2){ alert('اكتب القطعة'); return; }
+  const now = new Date().toISOString();
+  partAskId = null;
+  devices = devices.map(x => x.id === id ? { ...x,
+    partWait: { part, by: by || currentUser.name, at: now, setBy: currentUser.name },
+    lastModifiedAt: now, lastModifiedBy: currentUser.name,
+    activityNotes: [...(x.activityNotes || []), { text: '🔩 مستني قطعة: ' + part + (by ? ' — طلبها ' + by : ''), at: now, by: currentUser.name, role: currentRoleLabel() }] } : x);
+  renderDetail(); render();
+  await persist();
+}
+async function ph2PartArrived(id){
+  if(!isProduction()) return;
+  const d = devices.find(x => x.id === id);
+  if(!d || !d.partWait) return;
+  const now = new Date().toISOString();
+  const note = '✅ القطعة وصلت: ' + d.partWait.part + ' (كان مستنيها ' + splAgoTxt(d.partWait.at).replace(/^من /, '') + ')';
+  devices = devices.map(x => x.id === id ? { ...x, partWait: null,
+    lastModifiedAt: now, lastModifiedBy: currentUser.name,
+    activityNotes: [...(x.activityNotes || []), { text: note, at: now, by: currentUser.name, role: currentRoleLabel() }] } : x);
+  renderDetail(); render();
+  await persist();
+}
+
+// ---------- شارات الكارت (المرحلة التانية) ----------
+function ph2CardChips(d){
+  let h = '';
+  if(d.partWait && (isProduction() || isReception()))
+    h += `<span class="rc-chip" style="background:var(--info-bg);color:var(--info)">🔩 ${esc(d.partWait.part)} · ${esc(splAgoTxt(d.partWait.at))}</span> `;
+  if(isProduction()){
+    const l = lateInfo(d);
+    if(l) h += `<span class="rc-chip" style="background:var(--danger-bg);color:var(--danger)">⏰ ${esc(LATE_NAME[d.status] || '')} من ${hrsTxt(l.hrs)}</span> `;
+  }
+  if(isReception() && inDrawer(d)){
+    const days = drawerDays(d);
+    if(days >= SLEEP_DAYS) h += `<span class="rc-chip" style="background:var(--danger-bg);color:var(--danger)">😴 في الدرج من ${days} يوم</span> `;
+  }
+  return h;
+}
+function ph2CardClass(d){ return (isProduction() && lateInfo(d)) ? ' ph2-late' : ''; }
+
+// ---------- ١٢) 📦 استلام بالباركود دفعة واحدة ----------
+// 🧸 الصبح الاستقبال بيبعت ١٥ جهاز. بدل ما مدير الإنتاج يفتح كل جهاز لوحده:
+//    يفتح «📦 استلام دفعة» → يمسح الليبلات ورا بعض (كاميرا أو ماسح سلكي)
+//    → كل جهاز بيتضاف للقايمة → «✅ استلم الكل» → كلهم «تم الاستلام».
+//    المرتجع بينزل «المرتجعات» لوحده (نفس منطق الاستلام العادي).
+let batchRecv = { open: false, list: [], msg: '', cam: false, busy: false };
+const BATCH_FROM = ['sent_to_repair', 'waiting'];
+function openBatchRecv(){
+  if(!isProduction()) return;
+  batchRecv = { open: true, list: [], msg: '', cam: false, busy: false };
+  renderBatchRecv();
+  setTimeout(() => { const e = document.getElementById('batchRecvInput'); if(e && !(window.IFixScan && IFixScan.scanUseful())) e.focus(); }, 80);
+}
+function closeBatchRecv(){
+  if(batchRecv.busy) return;
+  batchRecv.open = false; batchRecv.cam = false;
+  const o = document.getElementById('batchRecvOverlay');
+  if(o) o.remove();
+}
+function batchAddText(text){
+  const q = String(text || '').trim();
+  if(!q) return;
+  const hit = findDeviceByScan(q);
+  if(!hit){ batchRecv.msg = '❌ مفيش جهاز بالكود ده'; renderBatchRecv(); return; }
+  batchAdd(hit);
+}
+function batchAdd(hit){
+  const d = devices.find(x => x.id === hit.id) || hit;
+  const dev = `${d.deviceType || ''} ${d.model || ''}`.trim();
+  if(batchRecv.list.includes(d.id)) batchRecv.msg = '↩️ ' + dev + ' اتمسح قبل كده';
+  else if(!BATCH_FROM.includes(d.status)) batchRecv.msg = '⚠️ ' + dev + ' مش في الوارد — حالته «' + stLabel(statusInfo(effStatus(d)) || { key: d.status }) + '»';
+  else {
+    batchRecv.list.push(d.id);
+    batchRecv.msg = '✅ ' + dev + (d.customerName ? ' — ' + d.customerName : '');
+    try{ if(navigator.vibrate) navigator.vibrate(60); }catch(e){}
+  }
+  renderBatchRecv();
+}
+function batchScanCam(){
+  if(!window.IFixScan) return;
+  batchRecv.cam = true;
+  IFixScan.open(text => {
+    batchAddText(text);
+    // الكاميرا بتقفل بعد كل قراية — بنفتحها تاني للجهاز اللي بعده
+    setTimeout(() => { if(batchRecv.open && batchRecv.cam && !batchRecv.busy) batchScanCam(); }, 700);
+  });
+}
+function renderBatchRecv(){
+  if(!batchRecv.open) return;
+  let o = document.getElementById('batchRecvOverlay');
+  if(!o){
+    o = document.createElement('div');
+    o.id = 'batchRecvOverlay';
+    o.className = 'overlay';
+    o.style.zIndex = '55';
+    document.body.appendChild(o);
+  }
+  const rows = batchRecv.list.map((id, i) => {
+    const d = devices.find(x => x.id === id);
+    if(!d) return '';
+    return `<div class="spn-row"><div class="spn-info"><div class="spn-t">${i + 1}. 📱 ${esc(d.deviceType)} ${esc(d.model)}${d.customerName ? ' — ' + esc(d.customerName) : ''}${d.returnInbound ? ' <span class="rc-chip" style="background:var(--returned-bg);color:var(--returned)">🔁 مرتجع</span>' : ''}</div>
+      <div class="spn-m">${esc(devRef(d))}</div></div>
+      <button class="spn-ok" ${batchRecv.busy ? 'disabled' : ''} onclick="batchRecv.list=batchRecv.list.filter(x=>x!=='${id}');renderBatchRecv();">✕</button></div>`;
+  }).join('');
+  const inbox = devices.filter(d => d.status === 'sent_to_repair').length;
+  const canCam = !!(window.IFixScan && IFixScan.scanUseful());
+  o.innerHTML = `<div class="modal" style="max-width:480px;">
+    <div class="modal-head"><h2>📦 استلام دفعة بالباركود</h2><button class="close-btn" onclick="closeBatchRecv()">×</button></div>
+    <div style="font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:10px;">امسح ليبلات الأجهزة ورا بعض، وفي الآخر دوس «استلم الكل». في الوارد دلوقتي <b>${inbox}</b> جهاز.</div>
+    ${canCam ? `<button class="btn-primary" style="box-shadow:none;width:100%;justify-content:center;margin-bottom:10px;" ${batchRecv.busy ? 'disabled' : ''} onclick="batchScanCam()">📷 امسح بالكاميرا</button>` : ''}
+    <label class="field"><span>${canCam ? 'أو اكتب / امسح بالماسح هنا' : 'امسح بالماسح هنا (أو اكتب الكود واضغط Enter)'}</span>
+      <input id="batchRecvInput" autocomplete="off" ${batchRecv.busy ? 'disabled' : ''} onkeydown="if(event.key==='Enter'){event.preventDefault();event.stopPropagation();batchAddText(this.value);this.value='';}" /></label>
+    ${batchRecv.msg ? `<div class="rc-where" style="background:var(--surface-2);color:var(--ink);">${esc(batchRecv.msg)}</div>` : ''}
+    <div style="max-height:40vh;overflow-y:auto;margin-bottom:10px;">${rows || '<div class="empty-col">لسه مامسحتش حاجة</div>'}</div>
+    <button class="btn-primary" style="box-shadow:none;width:100%;justify-content:center;background:var(--received_from_reception);font-size:16px;padding:14px;"
+      ${(!batchRecv.list.length || batchRecv.busy) ? 'disabled' : ''} onclick="batchConfirm()">${batchRecv.busy ? '⏳ جاري الاستلام…' : '✅ استلم الكل (' + batchRecv.list.length + ')'}</button>
+  </div>`;
+}
+async function batchConfirm(){
+  if(!isProduction() || batchRecv.busy || !batchRecv.list.length) return;
+  batchRecv.busy = true; batchRecv.cam = false;
+  try{ if(window.IFixScan) IFixScan.close(); }catch(e){}
+  renderBatchRecv();
+  const ids = [...batchRecv.list];
+  let ok = 0;
+  const failed = [];
+  const keepSel = selectedId;
+  for(const id of ids){
+    const d = devices.find(x => x.id === id);
+    if(!d || !BATCH_FROM.includes(d.status)){ failed.push(id); continue; }
+    try{
+      selectedId = id;
+      await changeStatus('received_from_reception');
+      const nd = devices.find(x => x.id === id);
+      if(nd && nd.status !== d.status) ok++; else failed.push(id);
+    }catch(e){ console.error('استلام دفعة:', e); failed.push(id); }
+  }
+  selectedId = keepSel;
+  batchRecv.busy = false;
+  batchRecv.list = failed;
+  batchRecv.msg = '✅ اتستلم ' + ok + ' جهاز' + (failed.length ? ' · ⚠️ ' + failed.length + ' مااتستلمش (حالتهم اتغيّرت؟)' : '');
+  render();
+  if(!failed.length){ closeBatchRecv(); ph1Toast('📦 ' + batchRecv.msg); }
+  else renderBatchRecv();
+}
+
+// ---------- ١٥) 🔒 تقفيل الخزنة ----------
+// 🧸 آخر اليوم أمين الخزنة بيعدّ الفلوس اللي في الدرج ويكتب الرقم.
+//    السيستم بيقوله «المفروض كام» (كل التحصيلات من آخر تقفيل، ناقص اللي اتلغى)،
+//    والفرق — زيادة أو عجز — بيوصل للمحاسب العام في «🔒 تقفيلات الخزنة».
+//    التقفيل بيتحفظ في جدول لوحده (cash_closings — ملف 86): مايتمسحش ولا يتعدّل،
+//    والمحاسب العام بس اللي بيعلّم عليه «راجعته».
+let closings = [], closingsErr = '', closingsTimer = null;
+async function loadClosings(){
+  if(!(isCashier() || isSuperAdmin())) return;
+  try{
+    const { data, error } = await sb.from('cash_closings')
+      .select('id,from_at,to_at,expected,counted,diff,items,note,by_name,created_at,reviewed,reviewed_by,reviewed_at')
+      .order('created_at', { ascending: false }).limit(60);
+    if(error) throw error;
+    closings = data || [];
+    closingsErr = '';
+  }catch(e){
+    closings = [];
+    closingsErr = (e && e.message) || String(e);
+    console.error('[الخزنة] تحميل التقفيلات فشل:', e);
+  }
+  if(!closingsTimer) closingsTimer = setInterval(() => { try{ loadClosings(); }catch(e){} }, 5 * 60000);
+  renderApprovalsPanel();
+}
+function collectedSince(fromMs){
+  let sum = 0, n = 0;
+  devices.forEach(d => (d.statusHistory || []).forEach(h => {
+    if(!h || !h.date) return;
+    const t = Date.parse(h.date);
+    if(!(t > fromMs)) return;
+    if(PAY_IN_KEYS.includes(h.labelKey)){ sum += parseInt(d.agreedPrice) || 0; n++; }
+    else if(h.labelKey === 'hist.returnPaidCash'){ sum += parseInt(String((h.labelVars || {}).amount || '').replace(/[^0-9]/g, '')) || 0; n++; }
+    else if(h.payUndo){ sum -= parseInt(h.payUndo.amount) || 0; n--; }
+  }));
+  return { sum, n: Math.max(0, n) };
+}
+// من إمتى بنعدّ؟ من آخر تقفيل — ولو مفيش تقفيل خالص، من بداية يوم المحل
+function closingFrom(){
+  const last = closings[0];
+  return last ? Date.parse(last.to_at) : shopDayStart();
+}
+let closeBox = { open: false, busy: false };
+function closingStripHtml(){
+  if(!isCashier()) return '';
+  const last = closings[0];
+  const lastTxt = last
+    ? `آخر تقفيل ${esc(splAgoTxt(last.to_at))} (${esc(last.by_name || '')})${Number(last.diff) ? ` · <b style="color:var(--${Number(last.diff) < 0 ? 'danger' : 'warn'})">${Number(last.diff) > 0 ? 'زيادة' : 'عجز'} ${Math.abs(Number(last.diff)).toLocaleString('en-EG')} ج.م</b>` : ' · ✅ مظبوط'}`
+    : 'لسه مفيش تقفيل قبل كده';
+  return `<div class="ph2-close-row">
+    <span>${lastTxt}</span>
+    <button class="btn-primary" style="box-shadow:none;padding:9px 16px;font-size:14px;" onclick="openCloseBox()">🔒 قفّل الخزنة</button>
+  </div>`;
+}
+function openCloseBox(){
+  if(!isCashier()) return;
+  if(closingsErr && /cash_closings|relation|does not exist|schema cache/i.test(closingsErr)){
+    alert('⚠️ دفتر تقفيل الخزنة لسه مش موجود على السيرفر — ملف SQL رقم 86 لسه ما اتشغّلش. كلّم المحاسب العام.');
+    return;
+  }
+  closeBox = { open: true, busy: false };
+  renderCloseBox();
+  setTimeout(() => { const e = document.getElementById('closeCounted'); if(e) e.focus(); }, 80);
+}
+function closeCloseBox(){
+  if(closeBox.busy) return;
+  closeBox.open = false;
+  const o = document.getElementById('closeBoxOverlay');
+  if(o) o.remove();
+}
+function closeDiffNow(){
+  const exp = collectedSince(closingFrom()).sum;
+  const v = enDigits(((document.getElementById('closeCounted') || {}).value || '')).replace(/[^0-9]/g, '');
+  const el = document.getElementById('closeDiff');
+  if(!el) return;
+  if(v === ''){ el.innerHTML = ''; return; }
+  const diff = parseInt(v) - exp;
+  el.innerHTML = diff === 0
+    ? `<div class="rc-where" style="background:var(--success-bg);color:var(--success)">✅ مظبوط — مفيش فرق</div>`
+    : `<div class="rc-where" style="background:var(--${diff < 0 ? 'danger' : 'warn'}-bg);color:var(--${diff < 0 ? 'danger' : 'warn'})">${diff < 0 ? '🔻 عجز' : '🔺 زيادة'} ${Math.abs(diff).toLocaleString('en-EG')} ج.م — اكتب السبب تحت (إجباري)</div>`;
+}
+function renderCloseBox(){
+  if(!closeBox.open) return;
+  let o = document.getElementById('closeBoxOverlay');
+  if(!o){
+    o = document.createElement('div');
+    o.id = 'closeBoxOverlay';
+    o.className = 'overlay';
+    o.style.zIndex = '55';
+    document.body.appendChild(o);
+  }
+  const from = closingFrom();
+  const { sum, n } = collectedSince(from);
+  o.innerHTML = `<div class="modal" style="max-width:440px;">
+    <div class="modal-head"><h2>🔒 تقفيل الخزنة</h2><button class="close-btn" onclick="closeCloseBox()">×</button></div>
+    <div style="font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:8px;">من ${new Date(from).toLocaleString('ar-EG')} لحد دلوقتي</div>
+    <div class="ph1-today" style="margin:0 0 14px;">
+      <div class="ph1-today-l">💵 المفروض في الخزنة</div>
+      <div class="ph1-today-n">${sum.toLocaleString('en-EG')} <small>ج.م</small></div>
+      <div class="ph1-today-s">${n} تحصيل</div>
+    </div>
+    <label class="field"><span>🧮 عدّيت كام فعلاً؟</span>
+      <input id="closeCounted" type="text" inputmode="numeric" autocomplete="off" oninput="fixDigitsInput(this);closeDiffNow()" placeholder="المبلغ اللي في الدرج بالجنيه" /></label>
+    <div id="closeDiff"></div>
+    <label class="field"><span>📝 ملاحظة / سبب الفرق</span>
+      <textarea id="closeNote" rows="2" placeholder="مثال: ٥٠ ج فكة اديتها لعميل ومارجعتش"></textarea></label>
+    <button class="btn-primary" style="box-shadow:none;width:100%;justify-content:center;font-size:16px;padding:14px;" ${closeBox.busy ? 'disabled' : ''} onclick="submitClosing()">${closeBox.busy ? '⏳ جاري الحفظ…' : '🔒 قفّل وابعت للمحاسب العام'}</button>
+    <div style="font-size:12px;color:var(--muted);margin-top:8px;line-height:1.7;">⚠️ التقفيل مايتعدّلش ولا يتمسح بعد ما يتحفظ. التقفيل الجاي هيبدأ يعدّ من دلوقتي.</div>
+  </div>`;
+}
+async function submitClosing(){
+  if(!isCashier() || closeBox.busy) return;
+  const raw = enDigits(((document.getElementById('closeCounted') || {}).value || '')).replace(/[^0-9]/g, '');
+  const note = ((document.getElementById('closeNote') || {}).value || '').trim();
+  if(raw === ''){ alert('اكتب المبلغ اللي عدّيته'); return; }
+  const from = closingFrom();
+  const toIso = new Date().toISOString();
+  const { sum, n } = collectedSince(from);
+  const counted = parseInt(raw);
+  if(counted !== sum && note.length < 3){ alert('فيه فرق — اكتب السبب'); const e = document.getElementById('closeNote'); if(e) e.focus(); return; }
+  if(!confirm('🔒 هتقفّل الخزنة:\nالمفروض ' + sum.toLocaleString('en-EG') + ' ج.م · عدّيت ' + counted.toLocaleString('en-EG') + ' ج.م\n\nمتأكد؟')) return;
+  if(!isOnline()){ alert('النت مقطوع — التقفيل محتاج نت'); return; }
+  closeBox.busy = true; renderCloseBox();
+  const { data, error } = await sb.from('cash_closings').insert({
+    from_at: new Date(from).toISOString(), to_at: toIso,
+    expected: sum, counted, items: n, note, by_name: currentUser.name
+  }).select('id,from_at,to_at,expected,counted,diff,items,note,by_name,created_at,reviewed,reviewed_by,reviewed_at').maybeSingle();
+  closeBox.busy = false;
+  if(error){
+    console.error('[الخزنة] التقفيل فشل:', error);
+    alert('⚠️ التقفيل ما اتحفظش: ' + (error.message || error) + '\n(لو مكتوب cash_closings أو relation — ملف SQL رقم 86 لسه ما اتشغّلش)');
+    renderCloseBox();
+    return;
+  }
+  if(data) closings = [data, ...closings];
+  closeCloseBox();
+  renderApprovalsPanel();
+  ph1Toast('🔒 الخزنة اتقفلت — ' + (counted === sum ? '✅ مظبوط' : (counted < sum ? '🔻 عجز ' : '🔺 زيادة ') + Math.abs(counted - sum).toLocaleString('en-EG') + ' ج.م'));
+}
+// لوحة المحاسب العام: التقفيلات اللي لسه ماتراجعتش
+function closingsPanelHtml(){
+  if(!isSuperAdmin()) return '';
+  const list = closings.filter(c => !c.reviewed);
+  if(!list.length) return '';
+  const rows = list.map(c => {
+    const diff = Number(c.diff) || 0;
+    const col = diff === 0 ? 'success' : diff < 0 ? 'danger' : 'warn';
+    return `<div class="appr-row" style="background:var(--${col}-bg);border-color:var(--${col}-border, var(--border));">
+      <div class="appr-row-info">
+        <div class="appr-row-dev"><span class="appr-row-kind" style="background:var(--surface);color:var(--${col});">${diff === 0 ? '✅ مظبوط' : (diff < 0 ? '🔻 عجز ' : '🔺 زيادة ') + Math.abs(diff).toLocaleString('en-EG') + ' ج.م'}</span>
+          المفروض ${Number(c.expected).toLocaleString('en-EG')} · اتعدّ ${Number(c.counted).toLocaleString('en-EG')} ج.م</div>
+        ${c.note ? `<div style="font-size:13.5px;line-height:1.7;margin-top:5px;white-space:pre-wrap;">${esc(c.note)}</div>` : ''}
+        <div class="appr-row-meta">💵 ${esc(c.by_name || '')} · ${c.items} تحصيل · من ${new Date(c.from_at).toLocaleString(getLocale())} لـ ${new Date(c.to_at).toLocaleString(getLocale())}</div>
+      </div>
+      <div class="appr-row-actions"><button class="appr-btn-yes" onclick="reviewClosing('${c.id}')">✓ راجعته</button></div>
+    </div>`;
+  }).join('');
+  return `<div class="appr-panel">
+    <div class="appr-panel-head">🔒 تقفيلات الخزنة <span class="appr-count">${list.length}</span></div>
+    ${rows}
+  </div>`;
+}
+async function reviewClosing(id){
+  if(!isSuperAdmin()) return;
+  const now = new Date().toISOString();
+  const { error } = await sb.from('cash_closings').update({ reviewed: true, reviewed_by: currentUser.name, reviewed_at: now }).eq('id', id);
+  if(error){ alert('⚠️ ماتحفظش: ' + (error.message || error)); return; }
+  closings = closings.map(c => c.id === id ? { ...c, reviewed: true, reviewed_by: currentUser.name, reviewed_at: now } : c);
+  renderApprovalsPanel();
+}
+
 function renderDetail(){
   const modal = document.getElementById('detailModal');
   const ae = document.activeElement;
@@ -6042,6 +6675,7 @@ function cashierDetailHtml(d){
     ${ret}
     ${payUndoBtnHtml(d, 'return')}
     ${payUndoBoxHtml(d)}
+    ${receiptHtml(d)}
     <div style="margin-bottom:14px;">
       ${row(t('det.customerName'), d.customerName)}
       ${row(t('det.shopName'), d.shopName)}
@@ -6142,7 +6776,7 @@ function renderDetailNow(){
     <h2 style="font-family:'Cairo',sans-serif;font-size:18px;margin:4px 0 10px;">${esc(d.deviceType)} ${esc(d.model)}</h2>
     ${pendingApprovalText(d) ? `<div class="pending-appr-banner">⏳ ${pendingApprovalText(d)} — ${t('appr.bannerHint')}</div>` : ''}
     ${isReception() ? receptionWhereHtml(d) : ''}
-    ${drawerWaHtml(d)}${rejectReasonShowHtml(d)}
+    ${drawerWaHtml(d)}${rejectReasonShowHtml(d)}${partWaitHtml(d)}${receiptHtml(d)}
 
     <div class="row2">
       <label class="field"><span>${t('det.customerName')}</span><input value="${esc(d.customerName)}"${roC} onblur="editField('customerName', this.value)" /></label>
@@ -7440,6 +8074,13 @@ async function changeStatus(newStatus, paymentChoice, rejectedInShopChoice, opts
             && (outcome === 'fixed' || ['received_from_reception','diagnosing','repairing','done'].includes(newStatus))){
     extra.rejectReason = null;
   }
+  // 🔩 (المرحلة التانية) الجهاز خرج من الورشة وهو متعلّم «مستني قطعة» → العلامة تتشال
+  if(isProduction() && d.partWait && ['done', 'workshop_rejected', 'sent_to_reception'].includes(newStatus)){
+    extra.partWait = null;
+    extra.activityNotes = [...(extra.activityNotes || d.activityNotes || []), {
+      text: '🔩 علامة «مستني قطعة» (' + d.partWait.part + ') اتشالت — الجهاز خرج من الورشة',
+      at: new Date().toISOString(), by: currentUser.name, role: currentRoleLabel() }];
+  }
 
   // 📝 تقرير الاستقبال — بيتخزّن جوه الجهاز ويظهر للمحاسب العام في «تقارير الاستقبال»
   if(needsReport){
@@ -8556,6 +9197,14 @@ function scanWithCamera(){
 }
 
 function openScannedDevice(hit){
+  // 📦 (المرحلة التانية) شاشة «استلام دفعة» مفتوحة؟ الجهاز يتضاف للقايمة بدل ما يتفتح
+  if(typeof batchRecv !== 'undefined' && batchRecv.open){
+    const ae = document.activeElement;
+    if(ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA')) ae.value = '';
+    gScanBuf = '';
+    batchAdd(hit);
+    return;
+  }
   const el = document.activeElement;
   if(el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')){
     el.value = '';
