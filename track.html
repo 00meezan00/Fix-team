@@ -271,7 +271,9 @@ function renderTrack(data){
   let st = data.status;
   // 🔴 «المرفوض» كمان — العميل مايعرفش إنه اترفض لحد ما مدير الإنتاج يقرر ويبعته
   const sentToRepair = (st === 'sent_to_repair' || st === 'received_from_reception' || st === 'workshop_rejected');
-  if(st === 'sent_to_reception') st = 'done';
+  // 📥 صندوق الاستلام فيه الاتنين — العميل بيشوف نتيجة الورشة · درج الخالص = جاهز
+  if(st === 'sent_to_reception') st = (data.outcome === 'rejected') ? 'rejected' : 'done';
+  if(st === 'fixed_drawer') st = 'done';
   const special = $('specialBox');
   special.style.display = 'none';
 

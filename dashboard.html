@@ -167,6 +167,8 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
     --sent_to_reception:#4D7C0F; --sent_to_reception-bg:#EEF6E2;
     /* 🔴 «المرفوض» — الفني رفضه وهو لسه جوه الورشة */
     --workshop_rejected:#B91C1C; --workshop_rejected-bg:#FDECEC;
+    /* 🟢 «درج الخالص» — صندوق لوحده عند الاستقبال */
+    --fixed_drawer:#047857; --fixed_drawer-bg:#E3F5EC;
     --diagnosing:#6E56CF; --diagnosing-bg:#F1EEFB;
     --repairing:#2B6CB0; --repairing-bg:#EAF1F8;
     --done:#15803D; --done-bg:#EAF6EE;
@@ -207,6 +209,7 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
     --received_from_reception:#818CF8; --received_from_reception-bg:rgba(129,140,248,.15);
     --sent_to_reception:#A3E635; --sent_to_reception-bg:rgba(163,230,53,.13);
     --workshop_rejected:#FB7185; --workshop_rejected-bg:rgba(251,113,133,.15);
+    --fixed_drawer:#34D399; --fixed_drawer-bg:rgba(52,211,153,.14);
     --diagnosing:#A78BFA;       --diagnosing-bg:rgba(167,139,250,.15);
     --repairing:#7BA9DC;        --repairing-bg:rgba(123,169,220,.15);
     --done:#4ADE80;             --done-bg:rgba(74,222,128,.14);
@@ -4316,7 +4319,7 @@ function rcCardChips(d, s){
   const real = effStatus(d);
   if(s && real !== s.key){
     const ri = statusInfo(real);
-    // 🛎️ «تم الصيانة» مابيبانش للاستقبال — لحد ما مدير الإنتاج يبعته «درج الخالص»
+    // 🛎️ «تم الصيانة» مابيبانش للاستقبال — لحد ما مدير الإنتاج يبعته «تم الاستلام من الصيانة»
     if(isReception() && (real === 'done' || real === 'workshop_rejected')) h += `<span class="rc-chip" style="background:${accentBg('repairing')};color:${accent('repairing')}">📍 🔧 في الورشة</span> `;
     else if(ri) h += `<span class="rc-chip" style="background:${accentBg(ri.varname)};color:${accent(ri.varname)}">📍 ${esc(stLabel(ri))}</span> `;
   }
@@ -5330,7 +5333,7 @@ function receptionWhereHtml(d){
   if(!si) return '';
   const inWs = RECEPTION_IN_WORKSHOP.includes(st);
   const tech = (inWs && d.technician) ? ` — مع الفني <b>${esc(d.technician)}</b>` : '';
-  const hint = inWs ? '<div style="font-weight:600;font-size:12.5px;margin-top:2px;">🔧 الجهاز في الورشة — هيوصلك «درج الخالص» أو «درج الرفض» لما مدير الإنتاج يبعته</div>' : '';
+  const hint = inWs ? '<div style="font-weight:600;font-size:12.5px;margin-top:2px;">🔧 الجهاز في الورشة — هيوصلك في «تم الاستلام من الصيانة» لما مدير الإنتاج يبعته</div>' : '';
   return `<div class="rc-where" style="background:${accentBg(si.varname)};color:${accent(si.varname)}">
     📍 الجهاز دلوقتي: ${esc(stLabel(si))}${tech} ${outcomeChip(d)}${hint}</div>`;
 }
@@ -5375,11 +5378,15 @@ function rolePillsHtml(d, actions, nextMap){
 }
 
 // شارة نتيجة الورشة
+// 🧸 في صندوق الاستلام («تم الاستلام من الصيانة»): أخضر = اتحلّت · أحمر = مرفوض
+//    وبتفضل ظاهرة في الدرج اللي الاستقبال حطّه فيه.
 function outcomeChip(d){
-  if(d.repairOutcome === 'fixed' && d.status === 'sent_to_reception')
+  const fixedHere = ['sent_to_reception', 'fixed_drawer'].includes(d.status);
+  const rejHere   = ['sent_to_reception', 'rejected'].includes(d.status);
+  if(d.repairOutcome === 'fixed' && fixedHere)
     return `<span class="rc-chip" style="background:var(--done-bg);color:var(--done)">✅ المشكلة اتحلّت</span>`;
-  if(d.repairOutcome === 'rejected' && d.status === 'rejected')
-    return `<span class="rc-chip" style="background:var(--rejected-bg);color:var(--rejected)">🚫 الورشة رفضته</span>`;
+  if(d.repairOutcome === 'rejected' && rejHere)
+    return `<span class="rc-chip" style="background:var(--rejected-bg);color:var(--rejected)">🚫 مرفوض</span>`;
   return '';
 }
 
@@ -5389,8 +5396,8 @@ function toRecBoxHtml(d){
   return `<div class="rfr-box">
     <div class="rfr-q">📤 هتبعت الجهاز للاستقبال — إيه اللي حصل في الورشة؟</div>
     <div class="pay-choice">
-      <button type="button" class="pay-btn" style="border-color:var(--done);color:var(--done);background:var(--surface);" onclick="changeStatus('sent_to_reception', undefined, undefined, {outcome:'fixed'})">✅ المشكلة اتحلّت → درج الخالص</button>
-      <button type="button" class="pay-btn" style="border-color:var(--rejected);color:var(--rejected);background:var(--surface);" onclick="changeStatus('sent_to_reception', undefined, undefined, {outcome:'rejected'})">🚫 الجهاز اترفض → درج الرفض</button>
+      <button type="button" class="pay-btn" style="border-color:var(--done);color:var(--done);background:var(--surface);" onclick="changeStatus('sent_to_reception', undefined, undefined, {outcome:'fixed'})">✅ المشكلة اتحلّت → للاستقبال</button>
+      <button type="button" class="pay-btn" style="border-color:var(--rejected);color:var(--rejected);background:var(--surface);" onclick="changeStatus('sent_to_reception', undefined, undefined, {outcome:'rejected'})">🚫 الجهاز اترفض → للاستقبال</button>
     </div>
     <button class="acc-mini-btn" style="margin-top:8px;" onclick="toRecAskId=null;renderDetail();">إلغاء</button>
   </div>`;
@@ -6730,9 +6737,22 @@ async function changeStatus(newStatus, paymentChoice, rejectedInShopChoice, opts
   }
   reportAsk = null;
 
+  // 📥 الاستقبال بيوزّع من صندوق الاستلام — لو اختار عكس اللي الورشة قالته، نسأله
+  if(isReception() && d.status === 'sent_to_reception' && !opts.confirmedOutcome){
+    const wrongFix = newStatus === 'fixed_drawer' && d.repairOutcome === 'rejected';
+    const wrongRej = newStatus === 'rejected'     && d.repairOutcome === 'fixed';
+    if((wrongFix && !confirm('⚠️ الورشة قالت الجهاز ده «مرفوض» 🚫\nمتأكد إنك عايز تحطه في درج الخالص؟'))
+    || (wrongRej && !confirm('⚠️ الورشة قالت المشكلة «اتحلّت» ✅\nمتأكد إنك عايز تحطه في درج الرفض؟'))){
+      renderDetail();
+      return;
+    }
+  }
+
   // 📤 «تم الإرسال للاستقبال» لازم معاها إجابة: اتحلّت ولا اترفض؟
   //    أول دوسة بتسأل بس (toRecBoxHtml) — والإجابة بترجع هنا تاني.
-  //    اترفض → الجهاز بيروح «درج الرفض» على طول (مش «درج الخالص»).
+  //    🆕 في الحالتين الجهاز بيقع في صندوق الاستلام عند الاستقبال
+  //       («تم الاستلام من الصيانة») ومكتوب عليه النتيجة بالأخضر أو الأحمر.
+  //       الاستقبال هو اللي بيوديه درج الخالص / يسلّمه / درج الرفض.
   let outcome = null;
   if(newStatus === 'sent_to_reception'){
     // 🧸 الصندوق اللي الجهاز واقف فيه هو اللي بيقول الإجابة:
@@ -6748,7 +6768,6 @@ async function changeStatus(newStatus, paymentChoice, rejectedInShopChoice, opts
       return;
     }
     outcome = opts.outcome;
-    if(outcome === 'rejected'){ newStatus = 'rejected'; rejectedInShopChoice = true; }
   }
   toRecAskId = null;
 
@@ -8406,6 +8425,9 @@ function waStatusMsg(d, statusKey){
     delivered:  `تم تسليم جهازك *${dev}* (${ref}) ✅\nشكراً لثقتك في I Fix Team 🌟\nلو حصلت أي ملاحظة بعد الاستلام كلمنا فوراً.`,
     price:      `تحديث جهازك *${dev}* (${ref}) 💰\nتم تحديد تكلفة الصيانة: *${price.toLocaleString('en-EG')} ج.م*\nلو عندك أي استفسار كلمنا، ولو موافق هنكمل الصيانة على طول.`,
   };
+  // 📥 صندوق الاستلام فيه الاتنين — الرسالة حسب نتيجة الورشة
+  if(statusKey === 'sent_to_reception' && d.repairOutcome === 'rejected') return M.rejected;
+  if(statusKey === 'fixed_drawer') return M.done;
   return M[statusKey] || M.waiting;
 }
 
@@ -9561,7 +9583,7 @@ function lastChangeOf(d){
   return h.length ? h[h.length-1].date : d.intakeDate;
 }
 // 🛎️ «تم الإرسال للصيانة» و«تم الاستلام من الصيانة» لسه جوه المحل — بيتعدّوا
-const ACTIVE_STATUSES = ['waiting','sent_to_repair','received_from_reception','diagnosing','repairing','done','workshop_rejected','sent_to_reception'];
+const ACTIVE_STATUSES = ['waiting','sent_to_repair','received_from_reception','diagnosing','repairing','done','workshop_rejected','sent_to_reception','fixed_drawer'];
 // أجهزة كارت "شغال عليه دلوقتي": اللي بيتشتغل عليها فعلاً — من غير "تم الصيانة" ولا "تم التسليم"، والمرتجع بيفضل
 const OPEN_STATUSES = ['waiting','sent_to_repair','received_from_reception','diagnosing','repairing','returned'];
 // أجهزة الفني النشطة: لسه ماخلصتش ولا اتسلّمت (بتشمل المرتجع، وبتستبعد "تم الصيانة" و"تم التسليم" و"المرفوض")

@@ -24,10 +24,19 @@
 //      الاستقبال مابيشوفوش — بيفضل عنده «في الورشة» لحد ما مدير
 //      الإنتاج يدوس «تم الإرسال للاستقبال» ← يروح «درج الرفض».
 //
+// 🆕 (٢٠٢٦-١٠-١١ — آخر اليوم) صندوق استلام عند الاستقبال:
+//   sent_to_reception  عند الاستقبال اسمه «تم الاستلام من الصيانة»
+//                      🧸 كل جهاز مدير الإنتاج يبعته بيقع هنا الأول —
+//                      مكتوب عليه ✅ اتحلّت (أخضر) أو 🚫 مرفوض (أحمر)
+//                      والاستقبال هو اللي يقرر: درج الخالص / يسلّم / درج الرفض
+//   fixed_drawer       «درج الخالص» — بقى صندوق لوحده (كان هو sent_to_reception)
+//
 // 🧸 رحلة الجهاز:
 //   انتظار ← اتبعت للورشة ← الورشة استلمت ← كشف ← صيانة ← خلص / المرفوض
-//          ← اتبعت للاستقبال (درج الخالص) ← اتسلّم للعميل
-//                       أو ← درج الرفض ← العميل خده (تم الرفض)
+//          ← اتبعت للاستقبال (تم الاستلام من الصيانة)
+//          ← الاستقبال: درج الخالص ← اتسلّم للعميل
+//                    أو اتسلّم على طول
+//                    أو درج الرفض ← العميل خده (تم الرفض)
 //
 // ⚠️ الترتيب هنا هو ترتيب الخانات في الشاشة الرئيسية والأزرار.
 // ⚠️ قواعد «مين يحرّك لفين» متكررة في قاعدة البيانات (ملف 74 ثم 77 —
@@ -44,6 +53,8 @@ const STATUSES = [
   // 🔴 الصندوق الأحمر — الفني رفضه، ومدير الإنتاج لسه ما بعتوش
   { key: "workshop_rejected", label: "المرفوض", labelKey:"status.workshop_rejected", varname:"workshop_rejected" },
   { key: "sent_to_reception", label: "تم الإرسال للاستقبال", labelKey:"status.sent_to_reception", varname:"sent_to_reception" },
+  // 🟢 درج الخالص — الاستقبال حطّه هنا مستني العميل ييجي ياخده
+  { key: "fixed_drawer", label: "درج الخالص", labelKey:"status.fixed_drawer", varname:"fixed_drawer" },
   { key: "delivered_paid", label: "تم التسليم والدفع", labelKey:"status.delivered_paid", varname:"delivered_paid" },
   { key: "delivered_unpaid", label: "تم التسليم بانتظار الدفع", labelKey:"status.delivered_unpaid", varname:"delivered_unpaid" },
   { key: "rejected_shop", label: "درج الرفض", labelKey:"status.rejected_shop", varname:"rejected_shop" },
@@ -66,6 +77,7 @@ const ACTION_STATUSES = [
   { key: "done", label: "تم الصيانة", labelKey:"status.done", varname:"done" },
   { key: "workshop_rejected", label: "المرفوض", labelKey:"status.workshop_rejected", varname:"workshop_rejected" },
   { key: "sent_to_reception", label: "تم الإرسال للاستقبال", labelKey:"status.sent_to_reception", varname:"sent_to_reception" },
+  { key: "fixed_drawer", label: "درج الخالص", labelKey:"status.fixed_drawer", varname:"fixed_drawer" },
   { key: "delivered", label: "تم التسليم", labelKey:"status.delivered", varname:"delivered" },
   { key: "rejected", label: "تم الرفض", labelKey:"status.rejected", varname:"rejected" },
   { key: "returned", label: "المرتجعات", labelKey:"status.returned", varname:"returned" },
@@ -75,10 +87,10 @@ const ACTION_STATUSES = [
 // 🏷️ نفس الحالة — اسم مختلف حسب مين بيبص
 // ------------------------------------------------------------
 // 🧸 الجهاز اللي مدير الإنتاج «بعته للاستقبال» هو نفسه اللي
-//    الاستقبال شايفه في «درج الخالص». حالة واحدة، اسمين.
+//    الاستقبال شايفه في «تم الاستلام من الصيانة». حالة واحدة، اسمين.
 // ============================================================
 const ROLE_STATUS_LABELS = {
-  reception:  { sent_to_reception: 'درج الخالص' },
+  reception:  { sent_to_reception: 'تم الاستلام من الصيانة' },
   production: { sent_to_repair:    'وارد من الاستقبال' },
 };
 
@@ -102,7 +114,9 @@ const RECEPTION_IN_WORKSHOP = ['sent_to_repair', 'received_from_reception', 'dia
 const RECEPTION_NEXT = {
   waiting:           ['sent_to_repair', 'delivered', 'rejected'],
   sent_to_repair:    ['waiting', 'delivered', 'rejected'],
-  sent_to_reception: ['delivered', 'rejected', 'sent_to_repair'],
+  // 📥 صندوق الاستلام: الاستقبال بيقرر الجهاز يروح فين
+  sent_to_reception: ['fixed_drawer', 'delivered', 'rejected', 'sent_to_repair'],
+  fixed_drawer:      ['delivered', 'rejected', 'sent_to_repair'],
   delivered:         ['returned'],
   returned:          ['sent_to_repair', 'delivered', 'rejected'],
 };
@@ -111,19 +125,20 @@ const RECEPTION_NEEDS_REPORT = {
   sent_to_repair: ['delivered', 'rejected'],
   returned:       ['delivered', 'rejected'],
 };
-const RECEPTION_ACTIONS = ['waiting', 'sent_to_repair', 'delivered', 'rejected', 'returned'];
+const RECEPTION_ACTIONS = ['waiting', 'sent_to_repair', 'fixed_drawer', 'delivered', 'rejected', 'returned'];
 
 // ============================================================
 // 🏭 مدير الإنتاج
 // ------------------------------------------------------------
-// بيشوف شاشة المحاسب من غير خانات التسليم و«تم الرفض» و«درج الرفض»
-// (درج الرفض بتاع الاستقبال — مدير الإنتاج عنده «المرفوض» بداله).
-// هو اللي بيقرر: زرار «تم الإرسال للاستقبال»:
+// بيشوف شاشة المحاسب من غير خانات التسليم و«تم الرفض» والدرجين
+// (درج الخالص ودرج الرفض بتوع الاستقبال — مدير الإنتاج عنده «المرفوض»).
+// هو اللي بيقرر النتيجة: زرار «تم الإرسال للاستقبال»:
 //   الجهاز في «تم الصيانة» → يتبعت «اتحلّت» على طول
-//   الجهاز في «المرفوض»    → يتبعت «اترفض» على طول (درج الرفض)
+//   الجهاز في «المرفوض»    → يتبعت «اترفض» على طول
 //   أي خانة قبلهم          → بيسأله: اتحلّت ولا اترفض؟
+// وفي الحالتين الجهاز بيقع في صندوق الاستلام عند الاستقبال — مش في درج.
 // ============================================================
-const PRODUCTION_HIDDEN = ['delivered_paid', 'delivered_unpaid', 'rejected_shop', 'rejected', 'trashed'];
+const PRODUCTION_HIDDEN = ['fixed_drawer', 'delivered_paid', 'delivered_unpaid', 'rejected_shop', 'rejected', 'trashed'];
 const PRODUCTION_NEXT = {
   waiting:                 ['received_from_reception'],
   sent_to_repair:          ['received_from_reception'],
@@ -133,7 +148,7 @@ const PRODUCTION_NEXT = {
   repairing:               ['received_from_reception', 'diagnosing', 'done', 'workshop_rejected', 'sent_to_reception'],
   done:                    ['diagnosing', 'repairing', 'workshop_rejected', 'sent_to_reception'],
   workshop_rejected:       ['diagnosing', 'repairing', 'done', 'sent_to_reception'],
-  // رجّعه للاستقبال بالغلط؟ يقدر يسحبه تاني قبل ما يتسلّم
+  // رجّعه للاستقبال بالغلط؟ يقدر يسحبه تاني طول ما هو في صندوق الاستلام
   sent_to_reception:       ['diagnosing', 'repairing', 'done', 'workshop_rejected'],
 };
 const PRODUCTION_ACTIONS = ['received_from_reception', 'diagnosing', 'repairing', 'done', 'workshop_rejected', 'sent_to_reception'];
