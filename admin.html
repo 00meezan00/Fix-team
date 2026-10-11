@@ -453,7 +453,7 @@ function render(){
       <textarea id="bcBody" rows="2" placeholder="${t('adm.bcBodyPh')}"></textarea>
       <select id="bcAudience" onchange="bcAudienceChanged()">
         <option value="all">📢 للكل</option>
-        <option value="accountant">💼 المحاسبين بس</option>
+        <option value="accountant">💵 أمناء الخزنة بس</option>
         <option value="technician">🔧 الفنيين بس</option>
         <option value="dispatcher">🚦 مسؤولي الحركة بس</option>
         <option value="reception">🛎️ موظفين الاستقبال بس</option>
@@ -915,7 +915,7 @@ async function removeRole(em){
 // أسماء الجمهور — للتأكيد وسجل العمليات
 const BC_AUDIENCE = {
   all:        'كل المستخدمين',
-  accountant: 'المحاسبين بس',
+  accountant: 'أمناء الخزنة بس',
   technician: 'الفنيين بس',
   dispatcher: 'مسؤولي الحركة بس',
   reception:  'موظفين الاستقبال بس',

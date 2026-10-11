@@ -409,6 +409,20 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
      ⚠️ الجرد بيستخبى فيه الفلوس لوحده (money-only) لأن الاتنين no-money.
      ============================================================ */
   body.role-reception .eval-menu-item, body.role-production .eval-menu-item{display:none !important;}
+  /* ============================================================
+     💵 أمين الخزنة (accountant) — قايمة الأساسيات بس
+     ------------------------------------------------------------
+     🧸 قسم «المحل» كله وقسم «قطع الغيار» كله مستخبيين، وزرار
+        «+ جهاز جديد» كمان. فاضل: المواعيد · مرتبك · حسابي ·
+        الإعدادات · التحديث · الخروج.
+     ⚠️ المحاسب العام (super_admin) مالوش دعوة — شاشته زي ما هي.
+     ============================================================ */
+  body.role-accountant .mh-shop, body.role-accountant .mh-parts, body.role-accountant .mh-admin,
+  body.role-accountant .money-menu-item, body.role-accountant .admin-menu-item,
+  body.role-accountant #waHeldMenuBtn, body.role-accountant #purMenuBtn,
+  body.role-accountant #invMenuBtn, body.role-accountant #partsReviewMenuBtn,
+  body.role-accountant .new-dev-btn,
+  body.role-accountant #dpSection{display:none !important;}
   body.role-reception:not(.cap-inv) .inv-menu-item,
   body.role-production:not(.cap-inv) .inv-menu-item{display:none !important;}
   body.role-reception:not(.cap-pur) #purMenuBtn, body.role-reception:not(.cap-pur) #invMenuBtn,
@@ -1464,7 +1478,7 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
       </div>
     </div>
     <input id="importFile" type="file" accept="application/json" style="display:none" onchange="onImportFileChosen(this.files[0])" />
-    <button class="btn-primary" data-i18n="btn.newDevice" onclick="openAddModal()">+ جهاز جديد</button>
+    <button class="btn-primary new-dev-btn" data-i18n="btn.newDevice" onclick="openAddModal()">+ جهاز جديد</button>
   </div>
   <div class="menu-wrap">
     <button class="menu-btn" onclick="toggleMenu()">⋮</button>
@@ -1491,7 +1505,7 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
     <button class="pay-menu-btn" style="display:none;" onclick="openPayroll()">💰 مرتبك</button>
     <button id="accountMenuBtn" class="hidden" onclick="openAccount()">👤 حسابي</button>
 
-    <div class="mh">🏪 المحل</div>
+    <div class="mh mh-shop">🏪 المحل</div>
     <button class="money-menu-item" onclick="openAnalytics()">📊 الملخص المالي</button>
     <button class="money-menu-item" onclick="openAccounts()">📒 الحسابات</button>
     <!-- 💬 للسوبر أدمن بس — syncWaHeldMenu بيظهّره ويحط عليه العدد -->
@@ -1500,11 +1514,11 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
     <button class="admin-menu-item eval-menu-item" onclick="openTechEval()">🏆 تقييم الفنيين</button>
     <button class="money-menu-item" onclick="openStaff()">👥 الموظفين</button>
 
-    <div class="mh">🔩 قطع الغيار</div>
+    <div class="mh mh-parts">🔩 قطع الغيار</div>
     <!-- 📍 فواتير المشتريات · مخزن قطع الغيار · مراجعة قطع الغيار بيتحطوا هنا -->
     <span id="slotParts" hidden></span>
 
-    <div class="mh">🛡️ إدارة النظام</div>
+    <div class="mh mh-admin">🛡️ إدارة النظام</div>
     <!-- 📍 «لوحة الأدمن» (للمحاسب العام بس، على الفون بس) بتتحط هنا -->
     <span id="slotAdmin" hidden></span>
 
@@ -2055,13 +2069,19 @@ function isReception(){ return myRole() === 'reception'; }
 // 🏭 مدير الإنتاج — شاشة المحاسب من غير التسليم والرفض والفلوس (بيشوف السعر بس).
 //    هو اللي بيستلم من الاستقبال، ويوزّع على الفنيين، ويقرر: اتحلّت ولا اترفض.
 function isProduction(){ return myRole() === 'production'; }
+// 💵 أمين الخزنة = دور accountant القديم بعد ما اتغيّر (٢٠٢٦-١٠-١١).
+//    بيشوف ٣ خانات بس (بانتظار الدفع · اتدفع · تم الرفض) وبيحصّل فلوس بس.
+//    ⚠️ المحاسب العام (super_admin) مش هو — ده دور تاني خالص.
+function isCashier(){ return myRole() === 'accountant'; }
+const CASHIER_COLUMNS = ['delivered_unpaid', 'delivered_paid', 'rejected'];
 // مين يقدر يعدّل السعر؟ المحاسب والأدمن والاستقبال (مدير الإنتاج بيشوف بس)
 function canEditPrice(){ return canSeeMoney() || isReception(); }
 
 // الأسعار والأرباح والملخص المالي
 function canSeeMoney(){ const r = myRole(); return r === 'super_admin' || r === 'accountant'; }
 // اعتماد طلبات مسؤول الحركة (قبول / رفض)
-function canApprove(){ return canSeeMoney(); }
+// ✅ طلبات مسؤول الحركة: المحاسب العام والاستقبال (أمين الخزنة لأ)
+function canApprove(){ return isSuperAdmin() || isReception(); }
 
 // اسم الفني المربوط بالحساب — بيستخدم في بوابة الفني
 function myTechName(){
@@ -2146,7 +2166,7 @@ function applyRoleVisibility(){
   }catch(e){}
   // 🛎️ الشاشة اترسمت أول مرة قبل ما نعرف الدور (كانت فاكراه محاسب) —
   //    نعيد الرسم عشان خانات الورشة تختفي والأزرار تبقى بتاعته
-  try{ if(isReception() || isProduction()) render(); }catch(e){}
+  try{ if(isReception() || isProduction() || isCashier()) render(); }catch(e){}
 
   // زرار اللغة جوه هيدر البوابة
   try{
@@ -3480,7 +3500,7 @@ function intervalMsFor(freq){
 }
 
 async function checkAutoBackup(){
-  if(!canSeeMoney()) return;   // 🛎️🏭 النسخ الاحتياطي مش شغل الاستقبال ولا مدير الإنتاج
+  if(!canSeeMoney() || isCashier()) return;   // 🛎️🏭💵 النسخ الاحتياطي مش شغلهم
   const ms = intervalMsFor(backupSettings.frequency);
   if(!ms) return;
   // ⚠️ نسخة احتياطية من نص الأجهزة (والأرشيف لسه بيتحمّل) = نسخة بايظة
@@ -3844,7 +3864,7 @@ function splAgoTxt(iso){
 }
 
 function partsLogPanelHtml(){
-  if(!canSeeMoney()) return '';
+  if(!canSeeMoney() || isCashier()) return '';
   const list = splPending();
   if(list.length === 0) return '';
   const rows = list.map(r => {
@@ -3907,7 +3927,7 @@ function trashPending(){
 }
 
 function trashPanelHtml(){
-  if(!canSeeMoney()) return '';
+  if(!canSeeMoney() || isCashier()) return '';
   const list = trashPending();
   if(list.length === 0) return '';
   const rows = list.map(d => `
@@ -3974,7 +3994,11 @@ function renderBoard(){
   //    بتتعدّ عنده جوه «تم الإرسال للصيانة» (boardStatus)
   board.innerHTML = STATUSES.filter(s => (s.key !== 'trashed' || canSeeMoney())
                                       && !(isReception() && RECEPTION_HIDDEN.includes(s.key))
-                                      && !(isProduction() && PRODUCTION_HIDDEN.includes(s.key))).map(s => {
+                                      && !(isProduction() && PRODUCTION_HIDDEN.includes(s.key))
+                                      && !(isCashier() && !CASHIER_COLUMNS.includes(s.key)))
+    // 💵 أمين الخزنة: «بانتظار الدفع» الأول — ده شغله
+    .sort((a, b) => isCashier() ? CASHIER_COLUMNS.indexOf(a.key) - CASHIER_COLUMNS.indexOf(b.key) : 0)
+    .map(s => {
     // ⚠️ المهملات بتتعدّ من مصفوفتها هي — الأجهزة المحذوفة مش
     //    موجودة في `devices` أصلاً، فـ effStatus مش هيلاقيها.
     const count = (s.key === 'trashed')
@@ -4304,6 +4328,8 @@ async function markPaid(){
   if(!d) return;
   // الصفر ينفع يتأكد دفعه — الجهاز اتسلّم واتحاسب، والمبلغ صفر.
   if(!isPriced(d)){ alert(t('msg.needPriceFirst')); return; }
+  // 💵 أمين الخزنة بيحصّل بعد التسليم بس — والآجل المحاسب العام هو اللي بيقيّده
+  if(isCashier() && (d.status !== 'delivered' || d.paymentType === 'deferred')) return;
   const labelKey = d.status === 'delivered' ? 'hist.paidDelivered' : 'hist.paidCash';
   devices = devices.map(x => x.id === selectedId
     ? { ...x, paymentStatus:'paid', lastModifiedAt:new Date().toISOString(), lastModifiedBy:currentUser.name,
@@ -5426,9 +5452,80 @@ function renderDetail(){
   renderDetailNow();
 }
 
+// ============================================================
+// 💵 تفاصيل الجهاز عند أمين الخزنة
+// ------------------------------------------------------------
+// 🧸 بالبلدي: أمين الخزنة بيحصّل فلوس وبس. فالتفاصيل عنده
+//    ورقة بيانات للقراية + زرار واحد: «💵 تأكيد الدفع».
+//    مفيش تعديل سعر ولا فوري/آجل ولا قيد على حساب محل ولا
+//    تغيير حالة ولا فني ولا حذف. الملاحظات بس مسموحة.
+// ⚠️ الآجل: المحاسب العام هو اللي بيقيّده على حساب المحل.
+// ============================================================
+function cashierDetailHtml(d){
+  const s = statusInfo(effStatus(d)) || statusInfo(d.status) || { varname:'waiting', label:d.status };
+  const priced = isPriced(d);
+  const price  = parseInt(d.agreedPrice) || 0;
+  const box = (bg, fg, txt) => `<div class="rc-where" style="background:var(${bg});color:var(${fg})">${txt}</div>`;
+
+  let pay;
+  if(!priced)                         pay = box('--warn-bg', '--warn', '⚠️ الجهاز لسه ماتسعّرش — كلّم الاستقبال يحدد السعر الأول');
+  else if(isPaidDevice(d))            pay = box('--paid-bg', '--paid', '✓ اتدفع — ' + price.toLocaleString('en-EG') + ' ج.م');
+  else if(d.paymentType === 'deferred') pay = box('--warn-bg', '--warn', '🕐 آجل على حساب «' + esc(d.billedShop || d.shopName || '—') + '» — المحاسب العام هو اللي بيقيّده');
+  else if(d.status === 'delivered')   pay = `<button class="btn-primary" style="box-shadow:none;background:var(--paid);width:100%;justify-content:center;font-size:17px;padding:15px;margin-bottom:12px;" onclick="markPaid()">💵 ${t('det.confirmPay')} — ${price.toLocaleString('en-EG')} ج.م</button>`;
+  else                                pay = box('--surface-2', '--muted', '💵 الدفع بيتأكد بعد ما الجهاز يتسلّم');
+
+  // المرتجع ليه فلوسه لوحده
+  let ret = '';
+  if(typeof isReturnPriced === 'function' && isReturnPriced(d)){
+    const rp = parseInt(d.returnPrice) || 0;
+    if(d.returnPaymentType === 'deferred')      ret = box('--warn-bg', '--warn', '↩️ المرتجع آجل — ' + rp.toLocaleString('en-EG') + ' ج.م (المحاسب العام بيقيّده)');
+    else if(d.returnPaymentStatus === 'paid')   ret = box('--paid-bg', '--paid', '↩️ المرتجع اتدفع — ' + rp.toLocaleString('en-EG') + ' ج.م');
+    else ret = `<button class="btn-primary" style="box-shadow:none;background:var(--returned);width:100%;justify-content:center;margin-bottom:12px;" onclick="markReturnPaid()">💵 تأكيد دفع المرتجع — ${rp.toLocaleString('en-EG')} ج.م</button>`;
+  }
+
+  const row = (k, v) => v ? `<div class="detail-row"><span>${esc(k)}</span><span style="font-weight:700;">${esc(v)}</span></div>` : '';
+  const history = (d.statusHistory||[]).map(h =>
+    `<div class="hist-item">‹ ${esc(histLabel(h))} — ${new Date(h.date).toLocaleString('ar-EG')}${h.by ? ` — <b style="color:var(--accent);">${t('det.by')} ${esc(h.by)}</b>` : ''}</div>`).join('');
+  const notes = detNotes(d);
+
+  return `
+    <div class="modal-head">
+      <span class="badge" style="background:${accentBg(s.varname)};color:${accent(s.varname)}">#${d.id.slice(-5).toUpperCase()}</span>
+      <button class="close-btn" onclick="closeDetail()">×</button>
+    </div>
+    <h2 style="font-family:'Cairo',sans-serif;font-size:18px;margin:4px 0 10px;">${esc(d.deviceType)} ${esc(d.model)}</h2>
+    <div class="rc-where" style="background:${accentBg(s.varname)};color:${accent(s.varname)}">📍 ${esc(stLabel(s))}</div>
+    ${pay}
+    ${ret}
+    <div style="margin-bottom:14px;">
+      ${row(t('det.customerName'), d.customerName)}
+      ${row(t('det.shopName'), d.shopName)}
+      ${row('📞 رقم العميل', d.customerPhone)}
+      ${row('🛵 ' + (typeof ACC_BB_LABEL !== 'undefined' ? ACC_BB_LABEL : 'المندوب'), d.broughtBy)}
+      ${row('💰 ' + t('det.price'), priced ? price.toLocaleString('en-EG') + ' ج.م' : '')}
+      ${row(t('det.payMethod'), priced ? (d.paymentType === 'deferred' ? t('det.payDeferred') : t('det.payCash')) : '')}
+      ${row(t('det.issue'), d.reportedIssue)}
+      ${row(t('det.technician'), d.technician)}
+      ${row(t('det.intakeAt'), d.intakeDate ? formatDateTime(d.intakeDate) : '')}
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">${t('det.statusLog')}</div>
+    <div style="margin-bottom:10px;">${history}</div>
+    <div style="font-size:12px;color:var(--muted);margin:14px 0 8px;">📝 ${t('det.notesTitle')}</div>
+    <div style="margin-bottom:8px;">${notes.length
+      ? notes.map(n => `<div style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:6px;">
+          <div style="font-size:13px;line-height:1.6;white-space:pre-wrap;">${esc((n.kind && I18N.has(n.kind)) ? t(n.kind, n.args||{}) : n.text)}</div>
+          <div style="font-size:11px;color:var(--muted-2);margin-top:3px;">${new Date(n.at).toLocaleString('ar-EG')} — ${esc(n.by||'')}${n.role?` (${esc(n.role)})`:''}</div>
+        </div>`).join('')
+      : `<div style="color:var(--muted-2);font-size:12px;">${t('det.noNotes')}</div>`}</div>
+    <textarea id="newActivityNote" rows="2" placeholder="${t('det.newNotePh')}" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;margin-bottom:6px;"></textarea>
+    <button class="btn-secondary" style="width:100%;color:var(--info);border-color:var(--info-border);margin-bottom:10px;" onclick="addActivityNote()">➕ ${t('det.addNote')}</button>
+  `;
+}
+
 function renderDetailNow(){
   const d = devices.find(x => x.id === selectedId);
   if(!d) return closeDetail();
+  if(isCashier()){ document.getElementById('detailModal').innerHTML = cashierDetailHtml(d); return; }
   const s = statusInfo(d.status);
   // ===== المرتجعات: تفاصيل الجهاز القديمة بتتقفل، وبتظهر حقول المرتجع الجديدة =====
   const isRet = d.status === 'returned';
@@ -5871,7 +5968,7 @@ function autoPointsNote(d){
 let _partsBusy = false;
 window.onDevicePartsChanged = function(deviceId){
   if(_partsBusy) return;
-  if(isReception()) return;   // 🛎️ النقط مش شغل الاستقبال
+  if(isReception() || isCashier()) return;   // 🛎️💵 النقط مش شغل الاستقبال ولا أمين الخزنة
   if(deviceId !== selectedId) return;
   const d = devices.find(x => x.id === selectedId);
   if(!d || d.isWholesale) return;
@@ -5927,7 +6024,7 @@ async function runAiForDevice(deviceId){
 
 // يشغّل الـ AI بس لو الكيوردز عاجز (ملقاش/فيه غموض) ومفيش كاش لنفس النص
 function runAiIfNeeded(deviceId){
-  if(isReception()) return;   // 🛎️ النقط مش شغل الاستقبال
+  if(isReception() || isCashier()) return;   // 🛎️💵 النقط مش شغل الاستقبال ولا أمين الخزنة
   const d = devices.find(x => x.id === deviceId);
   if(!d || d.isWholesale) return;
   const text = (d.reportedIssue||'').trim();
@@ -6034,6 +6131,7 @@ function applyPtsCalc(){
 }
 
 async function editField(key, value){
+  if(isCashier()) return;   // 💵 أمين الخزنة بيحصّل فلوس بس
   let extra = {};
   // 🛎️ الاستقبال مابيحسبش نقط — النقط شغل المحاسب
   if(key === 'reportedIssue' && !isReception()){
@@ -6321,6 +6419,7 @@ async function setAssistBlamed(val){
 }
 
 async function setWholesale(val){
+  if(isCashier()) return;   // 💵 أمين الخزنة بيحصّل فلوس بس
   devices = devices.map(d => d.id === selectedId ? { ...d, isWholesale: val, lastModifiedAt: new Date().toISOString(), lastModifiedBy: currentUser.name } : d);
   renderDetail();
   render();
@@ -6332,6 +6431,7 @@ async function setWholesale(val){
 let _techPickField = 'technician';
 let _techPickPrev  = '';
 function onTechPick(sel, field){
+  if(isCashier()) return;   // 💵 أمين الخزنة بيحصّل فلوس بس
   if(sel.value === '__ADD_TECH__'){
     _techPickField = field;
     _techPickPrev  = (openDevice() && openDevice()[field]) || '';
@@ -6500,6 +6600,23 @@ async function approveRequest(deviceId){
   const d = devices.find(x => x.id === deviceId);
   if(!d || !d.pendingApproval || d.pendingApproval.status !== 'pending') return;
   const req = d.pendingApproval;
+  // 🛎️ الاستقبال بيوافق على طلبات مسؤول الحركة — بس على طريقه هو:
+  //    • حركة مش في طريقه → رسالة، والطلب يفضل معلّق للمحاسب العام
+  //    • خروج من غير مدير الإنتاج → بنفتح الجهاز ونطلب التقرير الأول،
+  //      والطلب بيتشال لوحده لما الحركة تتم (changeStatus)
+  if(isReception()){
+    const target = req.payload && req.payload.status;
+    if(!(RECEPTION_NEXT[d.status] || []).includes(target)){
+      showError('⚠️ الطلب ده مش من صلاحيات الاستقبال من الحالة الحالية — هيفضل مستني المحاسب العام');
+      return;
+    }
+    if((RECEPTION_NEEDS_REPORT[d.status] || []).includes(target)){
+      openDetail(deviceId);
+      reportAsk = { id: deviceId, to: target };
+      renderDetail();
+      return;
+    }
+  }
   // نفس حارس changeStatus: مينفعش نسلّم جهاز طالع من "قيد الانتظار" من غير فني
   if(req.payload.status === 'delivered' && d.status === 'waiting' && !d.technician){
     showError(t('msg.needTech')); return;
@@ -6535,6 +6652,7 @@ async function rejectRequest(deviceId){
 
 // تبديل مكان الجهاز المرفوض: في درج الرفض (لسه بالمحل) ولا اتسلّم (خرج من المحل)
 async function markRejectedLocation(inShop){
+  if(isCashier()) return;   // 💵 أمين الخزنة بيحصّل فلوس بس
   if(isProduction()) return;   // 🏭 تسليم الجهاز المرفوض للعميل شغل الاستقبال/المحاسب
   const d = devices.find(x => x.id === selectedId);
   if(!d || d.status !== 'rejected') return;
@@ -6547,6 +6665,7 @@ async function markRejectedLocation(inShop){
 }
 
 async function changeStatus(newStatus, paymentChoice, rejectedInShopChoice, opts){
+  if(isCashier()) return;   // 💵 أمين الخزنة بيحصّل فلوس بس
   const d = devices.find(x => x.id === selectedId);
   if(!d) return;
   opts = opts || {};
@@ -6698,6 +6817,12 @@ async function changeStatus(newStatus, paymentChoice, rejectedInShopChoice, opts
     extra.activityNotes = [...(d.activityNotes || []), {
       text: '📝 تقرير للمحاسب العام: ' + String(opts.report).trim(),
       at: nowR, by: currentUser.name, role: currentRoleLabel() }];
+    // طلب مسؤول الحركة على نفس الحركة؟ اتنفّذ خلاص → يتشال
+    const pa = d.pendingApproval;
+    if(pa && pa.status === 'pending' && pa.payload && pa.payload.status === newStatus){
+      extra.pendingApproval = null;
+      extra.activityNotes = [...extra.activityNotes, approvalActivityNote({ ...pa, status:'approved', decidedBy: currentUser.name, decidedAt: nowR }, 'approved')];
+    }
   }
 
   showError('');
@@ -6736,6 +6861,7 @@ async function changeStatus(newStatus, paymentChoice, rejectedInShopChoice, opts
 //      ٢) purgeFromTrash — الأدمن بإيده
 // ============================================================
 async function deleteDevice(){
+  if(isCashier()) return;   // 💵 أمين الخزنة بيحصّل فلوس بس
   if(!canSeeMoney()){ alert('الحذف من عند المحاسب بس'); return; }
   const d = devices.find(x => x.id === selectedId);
   if(!d) return;
@@ -7139,7 +7265,7 @@ document.addEventListener('click', (e) => {
 });
 
 function openSummaries(){
-  if(!myCap('inventory_view')) return;   // 🛎️🏭 الجرد بصلاحية من الأدمن
+  if(!myCap('inventory_view') || isCashier()) return;   // 🛎️🏭 الجرد بصلاحية من الأدمن
   invView = null;   // نفتح على القائمة دايماً، مش على آخر عرض
   document.getElementById('menuDropdown').classList.add('hidden');
   shieldGhostClick();
@@ -8328,6 +8454,7 @@ function setAddPayType(t){
 
 // تغيير طريقة الدفع في أي مرحلة — بيقيّد على حساب المحل أو يرجّع القيد
 async function editPayType(t){
+  if(isCashier()) return;   // 💵 أمين الخزنة بيحصّل فلوس بس
   const d = devices.find(x => x.id === selectedId);
   if(!d) return;
   // 🛎️ الاستقبال يحدد فوري/آجل قبل التسليم بس — بعد التسليم الدفتر بيتلمس، وده شغل المحاسب
@@ -8380,6 +8507,7 @@ async function editPayType(t){
 
 // تعديل السعر: أرقام صحيحة — ولو الجهاز "متسلم بس مش متسعر" واتسعر دلوقتي يتحاسب تلقائياً
 async function editPrice(value){
+  if(isCashier()) return;   // 💵 أمين الخزنة بيحصّل فلوس بس
   if(!canEditPrice()) return;   // 🏭 مدير الإنتاج بيشوف السعر بس
   const price = intPrice(value);
   const d = devices.find(x => x.id === selectedId);
@@ -9689,7 +9817,7 @@ let staffRows = [];
 let staffErr  = '';
 
 function openStaff(){
-  if(!canSeeMoney()) return;   // 🛎️🏭
+  if(!canSeeMoney() || isCashier()) return;   // 🛎️🏭
   document.getElementById('menuDropdown').classList.add('hidden');
   if(typeof shieldGhostClick === 'function') shieldGhostClick();
   const s = document.getElementById('staffSearch'); if(s) s.value = '';
@@ -9914,7 +10042,7 @@ function exportDeliveredUnpaidPdf(list){
 let anPeriod = { mode: 'month', from: '', to: '' };
 
 function openAnalytics(){
-  if(!canSeeMoney()) return;   // 🛎️🏭 الملخص المالي للمحاسب بس
+  if(!canSeeMoney() || isCashier()) return;   // 🛎️🏭 الملخص المالي للمحاسب بس
   document.getElementById('menuDropdown').classList.add('hidden');
   shieldGhostClick();
   document.getElementById('analyticsOverlay').classList.remove('hidden');
@@ -10212,7 +10340,7 @@ let teOpenTech = null;
 let teRows = [];
 
 function openTechEval(){
-  if(!canSeeMoney()) return;   // 🛎️🏭 تقييم الفنيين للمحاسب بس
+  if(!canSeeMoney() || isCashier()) return;   // 🛎️🏭 تقييم الفنيين للمحاسب بس
   document.getElementById('menuDropdown').classList.add('hidden');
   shieldGhostClick();
   document.getElementById('techEvalOverlay').classList.remove('hidden');

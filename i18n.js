@@ -565,7 +565,7 @@
       'adm.noAudit': 'مفيش عمليات متسجلة لسه',
       'adm.logout': 'تسجيل الخروج',
       'adm.roleSuper': 'Super Admin',
-      'adm.roleAcc': 'محاسب',
+      'adm.roleAcc': 'أمين الخزنة',   // 💵 كان «محاسب» — اتغيّر ٢٠٢٦-١٠-١١
       'adm.roleDisp': 'مسؤول الحركة',
       'adm.roleTech': 'فني',
       'adm.roleHr': 'شؤون العاملين (HR)',
@@ -1258,7 +1258,7 @@
       'adm.noAudit': 'No operations recorded yet',
       'adm.logout': 'Sign Out',
       'adm.roleSuper': 'Super Admin',
-      'adm.roleAcc': 'Accountant',
+      'adm.roleAcc': 'Cashier',
       'adm.roleDisp': 'Dispatcher',
       'adm.roleTech': 'Technician',
       'adm.roleHr': 'HR',
