@@ -64,8 +64,11 @@
       /* ⚠️ 15 مش 30. التوب بار z-index:20 وبيعمل سياق تكديس خاص،
          والقايمة المنسدلة جواه — فأي رقم أعلى من 20 على الرف بيخلي
          الرف يركب على القايمة. تحت العشرين، والرف لسه فوق محتوى
-         الصفحة العادي (z-index:auto). */
-      '#dkRail{position:fixed;inset-inline-end:0;z-index:15;width:var(--dk-rail);',
+         الصفحة العادي (z-index:auto).
+         --dk-z: الصفحات التانية (المالك · الديسباتشر · الفني · الموظف)
+         فيها شرايط sticky أعلى من 15 كانت بتغطي اللوحة على الموبايل،
+         فـ common.js بيحطه = التوب بار − 1 (تحت القايمة وفوق الشرايط). */
+      '#dkRail{position:fixed;inset-inline-end:0;z-index:var(--dk-z,15);width:var(--dk-rail);',
       '  background:var(--surface-2);border-inline-start:1px solid var(--border);',
       '  display:flex;flex-direction:column;align-items:center;gap:6px;',
       '  padding:10px 0;overflow:visible;}',
@@ -91,7 +94,7 @@
       '  font:900 10px/16px system-ui;text-align:center;padding:0 4px;}',
 
       /* ===== اللوحة ===== */
-      '#dkPanel{position:fixed;inset-inline-end:var(--dk-rail);z-index:14;',
+      '#dkPanel{position:fixed;inset-inline-end:var(--dk-rail);z-index:var(--dk-z,14);',
       '  width:var(--dk-panel);background:var(--surface);',
       '  border-inline-start:1px solid var(--border);',
       '  display:flex;flex-direction:column;overflow:hidden;',
@@ -170,7 +173,9 @@
   //    فبنقرا من الآلية الموجودة أصلاً: مراقب بيحط modal-open على
   //    body أول ما أي .overlay تتفتح. مصدر واحد للحقيقة.
   function onMain() {
-    try { return !document.body.classList.contains('modal-open'); }
+    // dk-hide: نفس الفكرة للصفحات التانية (common.js بيحطها لما أي
+    // .overlay تتفتح — الصفحات دي مافيهاش modal-open).
+    try { var c = document.body.classList; return !(c.contains('modal-open') || c.contains('dk-hide')); }
     catch (e) { return true; }
   }
 
@@ -178,7 +183,9 @@
     var rail = document.getElementById('dkRail'), panel = document.getElementById('dkPanel');
     if (!rail || !panel) return;
 
-    if (!onMain()) {
+    // ⚠️ رف فاضي (مفيش ولا أداة اتسجّلت — زي موظف ممنوع من الشات أو
+    //    ملف 89 مش متشغّل) = مفيش رف خالص، ولا حشو على الصفحة.
+    if (!onMain() || !TOOLS.length) {
       rail.style.display = 'none'; panel.style.display = 'none';
       document.body.classList.remove('dk-open', 'dk-rail-on');
       return;
@@ -264,6 +271,7 @@
     if (TOOLS.some(function (x) { return x.id === tool.id; })) return;
     TOOLS.push(tool);
     build();
+    layout();
     renderRail();
     if (expanded && openId === tool.id) renderPane();
   }

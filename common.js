@@ -290,6 +290,55 @@ addEventListener('DOMContentLoaded', function(){
 });
 
 // ============================================================
+// 💬 شات الموظفين — تحميل dock.js + dock-tools.js
+// ------------------------------------------------------------
+// 🧠 بالبلدي: الداشبورد بيحمّل الشريط الجانبي بنفسه. باقي الصفحات
+//    (المالك · الديسباتشر · الفني · الموظف) common.js هو اللي
+//    بيجيبهولهم — عشان ماحدش يلمس الصفحات الكبيرة.
+//    الـ HR والأدمن والتتبّع والدفع مش في القايمة → مفيش شات هناك.
+//
+// ⚠️ الترتيب مهم: dock.js الأول (بيعرّف IFixDock)، وبعدين
+//    dock-tools.js (بيسجّل الشات فيه) — فبنحمّل التاني في onload الأول.
+// ⚠️ لو الملف مش مرفوع أو ملف 89 مش متشغّل: الشريط مبيظهرش وخلاص،
+//    ولا صفحة بتقع.
+// ============================================================
+addEventListener('DOMContentLoaded', function(){
+  try{
+    var page = (location.pathname.split('/').pop() || '').toLowerCase().replace(/\.html$/,'');
+    var PAGES = ['owner','dispatch','my-devices','staff'];
+    if(PAGES.indexOf(page) === -1) return;
+    if(window.IFixStaffChat || document.getElementById('dkScript')) return;
+    function add(id, src, then){
+      var s = document.createElement('script');
+      s.id = id; s.src = src;
+      s.onload = then || null;
+      s.onerror = function(){ console.error('فشل تحميل ' + src + ' — شات الموظفين مش هيظهر'); };
+      document.head.appendChild(s);
+    }
+    // 🧱 الطبقة: تحت التوب بار بدرجة (عشان القايمة المنسدلة تفضل فوق
+    //    الشريط) وفوق شرايط البحث/«جهاز جديد» اللي بتفضل بانية.
+    var tb = document.querySelector('.topbar');
+    var tz = tb ? parseInt(getComputedStyle(tb).zIndex, 10) : NaN;
+    if(tz > 1) document.documentElement.style.setProperty('--dk-z', String(tz - 1));
+    // 🙈 أول ما أي شاشة منبثقة (.overlay) تتفتح، الشريط يستخبى — وإلا
+    //    كان هيركب فوق خلفيتها الغامقة.
+    var hideT = 0;
+    function syncHide(){
+      hideT = 0;
+      var open = !!document.querySelector('.overlay:not(.hidden)');
+      document.body.classList.toggle('dk-hide', open);
+    }
+    try{
+      new MutationObserver(function(){ if(!hideT) hideT = requestAnimationFrame(syncHide); })
+        .observe(document.body, { subtree:true, childList:true, attributes:true, attributeFilter:['class'] });
+    }catch(e){}
+    syncHide();
+    if(window.IFixDock) add('dktScript', 'dock-tools.js');
+    else add('dkScript', 'dock.js', function(){ add('dktScript', 'dock-tools.js'); });
+  }catch(e){ console.error('staff-chat loader:', e); }
+});
+
+// ============================================================
 // 🗂️ ترتيب قايمة التلت نقط — إخفاء العناوين الفاضية
 // ------------------------------------------------------------
 // 🧠 بالبلدي: القايمة متقسّمة مجموعات، فوق كل مجموعة عنوان صغير
