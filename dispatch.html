@@ -426,6 +426,42 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
     font-family:'Cairo',sans-serif; font-weight:900; font-size:16px; cursor:pointer; box-shadow:0 8px 20px rgba(232,50,30,.3);}
   .save:active{transform:translateY(1px);}
 
+  /* ============================================================
+     🆕 (٢٠٢٦-١٠-١٣) فورم «جهاز جديد» بقت زي الاستقبال بالظبط
+     ------------------------------------------------------------
+     🧸 الخانات الجديدة: ⏳ الميعاد مع العميل · 👤 تاريخ العميل ·
+        🖼️ صورة القفل · ✅ شاشة «اتسجّل» ومعاها الليبل.
+     الشكل منقول من dashboard.html بأسماء ألوان الصفحة دي.
+     ============================================================ */
+  .req{color:var(--rejected);}
+  .due-lbl{display:block; font-size:12.5px; font-weight:700; color:var(--muted); margin-bottom:6px;}
+  .due-chips{display:flex; flex-wrap:wrap; gap:6px;}
+  .due-chip{border:1.5px solid var(--line); background:var(--card); color:var(--ink); border-radius:18px;
+    padding:8px 12px; font:inherit; font-size:13px; font-weight:700; cursor:pointer;}
+  .due-chip.on{background:var(--repairing); border-color:var(--repairing); color:#fff;}
+  .due-input{width:100%; margin-top:8px; border:1px solid var(--line); border-radius:11px; padding:11px 12px;
+    font:inherit; background:var(--card); color:var(--ink);}
+  .due-res{font-size:13.5px; margin:8px 0 2px; color:var(--ink);}
+  .due-sug{font-size:12.5px; margin-top:8px; padding:8px 10px; border-radius:9px;
+    background:var(--repairing-bg); color:var(--repairing); line-height:1.8;}
+  .due-sug .due-chip{padding:4px 10px; font-size:12px; margin-inline-start:4px;}
+  .ph-ch{background:var(--repairing-bg); border:1px solid var(--line); border-radius:11px; padding:10px 12px; margin:-4px 0 13px;}
+  .ph-ch-head{font-size:13.5px; font-weight:800; color:var(--ink); margin-bottom:6px; line-height:1.7;}
+  .ph-ch-row{display:flex; justify-content:space-between; align-items:center; gap:8px; width:100%; text-align:start;
+    background:var(--card); border:1px solid var(--line); border-radius:9px; padding:7px 9px; margin-top:5px;
+    font:inherit; font-size:12.5px; color:var(--ink); cursor:pointer; line-height:1.6;}
+  .ph-ch-row small{display:block; color:var(--muted); font-size:11.5px;}
+  .ph-ch-tag{flex:none; font-size:11px; font-weight:800; padding:2px 8px; border-radius:7px;}
+  .ph-fill{border:1px solid var(--line); background:var(--card); color:var(--repairing); border-radius:9px;
+    padding:7px 10px; font:800 12px/1.4 inherit; cursor:pointer; margin:2px 0 4px;}
+  .ok-msg{text-align:center; font-weight:900; color:var(--done); font-size:15px; margin:4px 0 14px;}
+  .lk-file{font-size:13px; color:var(--ink); max-width:100%;}
+  .lk-prev img{max-width:130px; border-radius:9px; margin-top:8px; border:1px solid var(--line); display:block;}
+  .done-btn{display:block; width:100%; text-align:center; text-decoration:none; border-radius:12px; padding:14px;
+    font-family:'Cairo',sans-serif; font-weight:900; font-size:15px; cursor:pointer; margin-top:10px;}
+  .done-wa{background:var(--done-bg); color:var(--done); border:none;}
+  .done-ok{background:var(--card); color:var(--ink); border:1px solid var(--line);}
+
   /* ===== شيت الأكشن العام: تفاصيل / تسليم / رفض ===== */
   .info-row{display:flex; align-items:center; justify-content:space-between; gap:14px; padding:12px 2px; border-bottom:1px solid var(--line);}
   .info-row:last-child{border-bottom:none;}
@@ -478,7 +514,7 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
     border-radius:11px; padding:11px; font:800 13.5px/1 inherit; cursor:pointer;}
   .dn-add:disabled{opacity:.55; cursor:default;}
 
-  /* ===== 🔒 باسورد الجهاز — نفس فكرة الداشبورد (تبويبين) ===== */
+  /* ===== 🔒 باسورد الجهاز — نفس فكرة الداشبورد (٣ تبويبات) ===== */
   .lk-tabs{display:flex; gap:7px; margin-bottom:10px;}
   .lk-tab{flex:1; border:1px solid var(--line); background:var(--card); color:var(--muted);
     border-radius:10px; padding:9px 6px; font:800 12.5px/1 inherit; cursor:pointer;}
@@ -874,47 +910,71 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
 <div class="searchbar"><input id="q" oninput="render()" placeholder="دوّر على جهاز، عميل، أو محل..." data-i18n-ph="rp.searchPh"></div>
 <div class="wrap" id="app"></div>
 
-<!-- شيت إدخال جهاز -->
+<!-- ============================================================
+     📥 شيت تسجيل جهاز جديد
+     ------------------------------------------------------------
+     🆕 (٢٠٢٦-١٠-١٣) بقت **زي فورم الاستقبال بالظبط** (dashboard.html
+        ← #addOverlay): نفس الخانات، نفس الترتيب، نفس الإجباري.
+        🧸 يعني لو موظف اتعلّم يسجّل جهاز في شاشة، يسجّل في التانية
+           من غير ما يدوّر على حاجة.
+
+     الفرق الوحيد عن الاستقبال — عن قصد:
+       • مفيش «السعر المبدئي» ولا «فوري/آجل»: مسؤول الحركة مابيشوفش
+         أسعار خالص (devices_dispatch بتشيلها قبل ما توصل).
+       • مفيش «تاريخ/وقت الدخول»: device_intake بتكتبه على السيرفر
+         لوحدها، فأي حاجة نكتبها هنا كانت هتترمي.
+
+     ⚠️ مفيش data-i18n على العناوين اللي اتغيّرت — ملف الترجمة لسه
+        فيه الكلام القديم وكان هيكتب فوق الجديد.
+     ⚠️ autocomplete="off" ضروري: من غيره المتصفح بيعرض اقتراحاته
+        هو، ولما تدوس على واحد بيملّي الاسم **والرقم** من أقدم تسجيل.
+     ============================================================ -->
 <div class="sheet-bg" id="sheetBg" onclick="closeIntake()"></div>
 <div class="sheet" id="sheet">
   <div class="sheet-head">
     <div class="grab"></div>
-    <div class="sh-row"><div class="sh-title" data-i18n="dp.intakeTitle">📥 استلام جهاز جديد</div><button class="sh-x" onclick="closeIntake()">×</button></div>
+    <div class="sh-row"><div class="sh-title">📥 تسجيل جهاز جديد</div><button class="sh-x" onclick="closeIntake()">×</button></div>
   </div>
   <div class="sh-body">
-    <div class="frow">
-      <div class="fld"><label data-i18n="dp.deviceType">نوع الجهاز</label><input id="f_type" placeholder="ايفون / سامسونج..." data-i18n-ph="dp.deviceTypePh"></div>
-      <div class="fld"><label data-i18n="dp.model">الموديل</label><input id="f_model" placeholder="13 Pro / A54..."></div>
-    </div>
-    <!-- ⚠️ autocomplete="off" ضروري: من غيره المتصفح بيعرض اقتراحاته
-         هو من اللي اتكتب قبل كده، ولما تدوس على واحد بيملّي الاسم
-         **والرقم** من أقدم تسجيل مش أحدث واحد. -->
-    <div class="fld"><label data-i18n="dp.customerName">اسم العميل</label><input id="f_cust" list="dpCustList" autocomplete="off" oninput="onDpCustInput()" placeholder="اسم صاحب الجهاز" data-i18n-ph="dp.customerNamePh"></div>
-    <datalist id="dpCustList"></datalist>
-    <!-- 🎨 لون الجهاز — كتابة حرة (مش قايمة) وإجباري -->
-    <div class="fld"><label>🎨 لون الجهاز <b style="color:var(--rejected)">*</b></label><input id="f_color" autocomplete="off" maxlength="40" placeholder="أسود، أبيض، أزرق فاتح…"></div>
-    <!-- 🔢 الرقم التسلسلي — اختياري. خط ثابت العرض عشان الأرقام تتقرا صح -->
-    <div class="fld"><label>🔢 الرقم التسلسلي IMEI/SN (اختياري)</label><input id="f_serial" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="60" placeholder="اكتبه أو سيبه فاضي" style="font-family:var(--mono,monospace); direction:ltr; text-align:right;"></div>
-    <div class="frow">
-      <div class="fld"><label data-i18n="dp.customerPhone">تليفون العميل</label><input id="f_phone" list="dpPhoneList" autocomplete="off" inputmode="tel" oninput="this.dataset.autoFill='';" placeholder="010..." style="direction:ltr;text-align:right;"></div>
-      <datalist id="dpPhoneList"></datalist>
-      <div class="fld"><label data-i18n="dp.shopOpt">المحل (اختياري)</label><input id="f_shop" list="dpShopList" autocomplete="off" placeholder="لو الجهاز من محل" data-i18n-ph="dp.shopPh"></div>
+    <div id="intakeForm">
+      <div class="fld"><label>اسم العميل</label><input id="f_cust" list="dpCustList" autocomplete="off" oninput="onDpCustInput(); dpCustHistory();" placeholder="اسم صاحب الجهاز"></div>
+      <datalist id="dpCustList"></datalist>
+      <div class="fld"><label>اسم المحل</label><input id="f_shop" list="dpShopList" autocomplete="off" placeholder="لو الجهاز من محل"></div>
       <datalist id="dpShopList"></datalist>
+      <!-- 🛵 المندوب = اللي جاب الجهاز للمحل (مش صاحبه). اختياري.
+           ⚠️ محتاج ملف SQL رقم 69 — من غيره السيرفر بيرمي الخانة في صمت. -->
+      <div class="fld"><label>🛵 اسم المندوب (اللي جاب الجهاز)</label><input id="f_bb" list="dpBBList" autocomplete="off" maxlength="60" placeholder="سيبه فاضي لو صاحب الجهاز جابه بنفسه"></div>
+      <datalist id="dpBBList"></datalist>
+      <!-- 👤 زي الاستقبال: اسم الموظف اللي بيسجّل — بيتملي باسمك لوحده ويتعدّل -->
+      <div class="fld"><label>اسم الموظف اللي بيسجل الجهاز</label><input id="f_regby" list="dpRegList" autocomplete="off" maxlength="60"></div>
+      <datalist id="dpRegList"></datalist>
+      <div class="fld"><label>رقم التليفون</label><input id="f_phone" list="dpPhoneList" autocomplete="off" inputmode="tel" oninput="this.dataset.autoFill=''; dpCustHistory();" onchange="dpCustHistory()" placeholder="010..." style="direction:ltr;text-align:right;"></div>
+      <datalist id="dpPhoneList"></datalist>
+      <!-- 👤 تاريخ العميل — بيظهر لوحده لما الرقم يطابق أجهزة قديمة -->
+      <div id="dpCustHist" class="ph-ch" style="display:none;"></div>
+      <div class="frow">
+        <div class="fld"><label>نوع الجهاز</label><input id="f_type" placeholder="iPhone / Samsung..." oninput="dpDueRender()"></div>
+        <div class="fld"><label>الموديل</label><input id="f_model" placeholder="13 Pro / A54..."></div>
+      </div>
+      <!-- 🎨 لون الجهاز — كتابة حرة (مش قايمة) وإجباري -->
+      <div class="fld"><label>🎨 لون الجهاز <b class="req">*</b></label><input id="f_color" autocomplete="off" maxlength="40" placeholder="أسود، أبيض، أزرق فاتح…"></div>
+      <!-- 🔢 الرقم التسلسلي — إجباري زي الاستقبال (من ٢٠٢٦-١٠-١٢) -->
+      <div class="fld"><label>الرقم التسلسلي (IMEI/SN) <b class="req">*</b></label><input id="f_serial" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="60" style="font-family:var(--mono,monospace); direction:ltr; text-align:right;"></div>
+      <!-- 🔒 باسورد الجهاز — المحتوى بيتبني من dpMountLock() (رقم/نص · نمط · صورة) -->
+      <div class="fld"><label>🔒 رمز قفل الجهاز (اختياري)</label><div id="dpLockHostIntake"></div></div>
+      <div class="fld"><label>العطل حسب كلام العميل <b class="req">*</b></label><textarea id="f_issue" rows="2" oninput="dpDueRender()"></textarea></div>
+      <!-- ⏳ الميعاد مع العميل — إجباري (dpDueRender بيرسمه) -->
+      <div class="fld" id="dpDueHost"></div>
+      <div class="fld"><label>حالة الجهاز الشكلية عند الاستلام</label><textarea id="f_cond" rows="2" maxlength="500" placeholder="خدوش، كسور، حالة الشاشة..."></textarea></div>
+      <button id="btnSave" class="save" onclick="saveIntake()">تسجيل الجهاز — يدخل تلقائياً في "قيد الانتظار"</button>
     </div>
-    <!-- 🛵 المندوب = اللي جاب الجهاز للمحل (مش صاحبه). اختياري.
-         ⚠️ محتاج ملف SQL رقم 69 — من غيره السيرفر بيرمي الخانة في صمت. -->
-    <div class="fld"><label>🛵 اسم المندوب (اللي جاب الجهاز)</label><input id="f_bb" list="dpBBList" autocomplete="off" maxlength="60" placeholder="سيبه فاضي لو صاحب الجهاز جابه بنفسه"></div>
-    <datalist id="dpBBList"></datalist>
-    <div class="fld"><label data-i18n="rp.tech">الفني</label>
-      <select id="f_tech" class="tech-select"></select>
-      <div id="f_techHint" class="fld-hint" style="display:none;"></div></div>
-    <div class="fld"><label data-i18n="dp.issueLabel">العطل / المشكلة</label><textarea id="f_issue" placeholder="اكتب شكوى العميل بالتفصيل..." data-i18n-ph="dp.issuePh"></textarea></div>
-    <!-- 📝 ملاحظات وقت الاستلام — بتتحفظ كأول ملاحظة في سجل الجهاز
-         (نفس القايمة اللي المحاسب والفني بيشوفوها وبيضيفوا عليها) -->
-    <!-- 🔒 باسورد الجهاز — المحتوى بيتبني من dpMountLock() -->
-    <div class="fld"><label>🔒 باسورد الجهاز (اختياري)</label><div id="dpLockHostIntake"></div></div>
-    <div class="fld"><label>📝 ملاحظات (اختياري)</label><textarea id="f_note" maxlength="500" placeholder="أي حاجة تحب الفني أو المحاسب يعرفها… (خدش، العميل مستعجل، معاه جراب…)"></textarea></div>
-    <button id="btnSave" class="save" onclick="saveIntake()" data-i18n="dp.submit">سجّل الجهاز في المحل</button>
+    <!-- ✅ بعد التسجيل — زي الاستقبال: رسالة + الليبل للطباعة + تم -->
+    <div id="intakeDone" style="display:none;">
+      <div class="ok-msg">✅ اتسجل الجهاز في "قيد الانتظار"</div>
+      <div id="dpAddLabel"></div>
+      <a id="dpAddWa" class="done-btn done-wa" style="display:none;" target="_blank" rel="noopener">💬 ابعت للعميل رسالة الاستلام على واتساب</a>
+      <button class="done-btn done-ok" onclick="closeIntake()">تم</button>
+    </div>
   </div>
 </div>
 
@@ -1202,6 +1262,7 @@ function adapt(d){
     phone:   d.customerPhone || '',
     shop:    d.shopName || '',
     bb:      (d.broughtBy || '').trim(),   // 🛵 المندوب
+    cond:    d.conditionNotes || '',       // 🆕 حالة الجهاز الشكلية (زي الاستقبال)
     issue:   d.reportedIssue || '',
     status:  d.status || 'waiting',
     tech:    (d.technician || '').trim(),
@@ -1371,7 +1432,7 @@ async function boot(){
   try{
     const { data:row } = await sb.from('app_data').select('value').eq('key','user-roles').maybeSingle();
     const roles = (row && row.value) ? JSON.parse(row.value) : {};
-    userRoles = roles;                       // محتاجينها لقايمة الفنيين
+    userRoles = roles;                       // محتاجينها لاسم الموظف الرسمي (techName)
     const ent = roles[MY_EMAIL];
     if(typeof ent === 'string') role = ent;
     else if(ent && typeof ent === 'object') role = ent.role || 'accountant';
@@ -1473,7 +1534,6 @@ async function boot(){
     localStorage.setItem('ifix-last-email', MY_EMAIL);
     sessionStorage.removeItem('ifix-bounced');
   }catch(e){}
-  loadTechNames();          // مش await — القايمة تتعبّى في الخلفية
   await loadDevices();
   finish();
 }
@@ -1696,6 +1756,8 @@ function showInfo(id){
   const name = [d.type, d.model].filter(Boolean).join(' ') || '—';
   // الرقم للاتصال: بنشيل أي حاجة مش رقم
   const tel = String(d.phone || '').replace(/[^\d+]/g, '');
+  // ⏳ الميعاد مع العميل (لو اتسجّل) — عرض بس
+  const dueAt = d._raw && d._raw.dueAt;
 
   const row = (k, v) => v ? `<div class="di-row"><span class="di-k">${esc(k)}</span><span class="di-v">${v}</span></div>` : '';
 
@@ -1740,9 +1802,9 @@ function showInfo(id){
         <div class="di-card-h">🔧 الصيانة</div>
         ${row('🎨 اللون', esc(d.color || ''))}
         ${d.serial ? row('🔢 السريال', `<span style="font-family:var(--mono,monospace);direction:ltr;display:inline-block;">${esc(d.serial)}</span>`) : ''}
-        ${row(t('rp.tech'), esc(d.tech || t('tp.noTechYet')) + (dpCanChangeTech(d)
-            ? `<button class="di-edit" onclick="editTech('${d.id}')">✏️ تغيير</button>`
-            : `<button class="di-edit lock" onclick="toast(dpTechLockMsg())">🔒</button>`))}
+        ${row('🔍 الحالة الشكلية', esc(d.cond || ''))}
+        ${dueAt ? row('⏳ الميعاد مع العميل', esc(dpDueWhenTxt(dueAt)) + (d._raw.dueLabel ? ` <small style="color:var(--muted)">(${esc(d._raw.dueLabel)})</small>` : '')) : ''}
+        ${row(t('rp.tech'), esc(d.tech || t('tp.noTechYet')))}
         ${row(t('rp.by'), d.by ? esc(d.by) : '')}
         ${row(t('dp.intake'), esc(fmtDate(d.intake)))}
       </div>
@@ -1779,16 +1841,18 @@ function showInfo(id){
 }
 
 // ============================================================
-// 🔒 باسورد الجهاز — كتابة وعرض وتعديل (زي المحاسب)
+// 🔒 باسورد الجهاز — كتابة وعرض وتعديل (زي الاستقبال)
 // ------------------------------------------------------------
-// نوعين: «رقم/نص» و«نمط». (نوع «صورة» بيتعمل من الداشبورد بس —
-// الديسباتشر بيشوفه هنا للقراية ويقدر يستبدله.)
+// تلات أنواع زي الاستقبال بالظبط: «رقم/نص» و«نمط» و«صورة».
+// 🆕 (٢٠٢٦-١٠-١٣) «صورة» اتضافت — قبل كده كانت من الداشبورد بس.
 //
 // النمط بيتحفظ حاجتين مع بعض:
 //   lockPattern = ترتيب النقط '1-5-9-6'  ← للتشغيل خطوة بخطوة
 //   lockImage   = صورة صغيرة للرسمة      ← الداشبورد وصفحة الفني
 //                 بيعرضوا النمط **من الصورة دي**. لو مبعتناش
 //                 الصورة، النمط هيبان فاضي عندهم.
+// والصورة: بتتصغّر لـ ٥٠٠ بكسل JPEG — نفس الداشبورد بالظبط،
+// عشان ماتبقاش تقيلة على قاعدة البيانات.
 //
 // 🔴 الباسورد **مش** بيتحمّل مع قايمة الأجهزة.
 //    الصور تقيلة (EGRESS-REPORT.md) ولو كانت في الـview كانت
@@ -1798,6 +1862,7 @@ function showInfo(id){
 let dpLockTab = 'text';
 let dpPatSeq  = [];
 let dpPatThumb = '';
+let dpLockImgData = '';
 
 // بنبني محتوى القفل بالـJS مش في الـHTML عشان نفس الشاشة تتركّب
 // مرة في فورم الاستلام ومرة في شيت التعديل — من غير IDs مكررة.
@@ -1806,11 +1871,12 @@ function dpMountLock(hostId){
     const el = $(h); if(el && h !== hostId) el.innerHTML = '';
   });
   const host = $(hostId); if(!host) return;
-  dpLockTab = 'text'; dpPatSeq = []; dpPatThumb = '';
+  dpLockTab = 'text'; dpPatSeq = []; dpPatThumb = ''; dpLockImgData = '';
   host.innerHTML = `
     <div class="lk-tabs">
-      <button type="button" class="lk-tab on" id="dpLkT_text"    onclick="dpSetLockTab('text')">١٢٣ رقم / نص</button>
-      <button type="button" class="lk-tab"    id="dpLkT_pattern" onclick="dpSetLockTab('pattern')">⠿ نمط</button>
+      <button type="button" class="lk-tab on" id="dpLkT_text"    onclick="dpSetLockTab('text')">رقم/نص</button>
+      <button type="button" class="lk-tab"    id="dpLkT_pattern" onclick="dpSetLockTab('pattern')">نمط</button>
+      <button type="button" class="lk-tab"    id="dpLkT_image"   onclick="dpSetLockTab('image')">صورة</button>
     </div>
     <div id="dpLkP_text">
       <div class="lk-wrap">
@@ -1819,7 +1885,7 @@ function dpMountLock(hostId){
              الزرار 🙈 بيخفيها لو حب. -->
         <input id="dpLkText" class="lk-in" type="text" inputmode="text" autocomplete="off"
                autocapitalize="off" autocorrect="off" spellcheck="false"
-               name="device-unlock-code" data-lpignore="true" maxlength="60" placeholder="رمز الفتح…">
+               name="device-unlock-code" data-lpignore="true" maxlength="60" placeholder="رمز الفتح (أرقام أو نص)">
         <button type="button" class="lk-eye" id="dpLkEye" onclick="dpToggleLockEye()">🙈</button>
       </div>
     </div>
@@ -1827,16 +1893,41 @@ function dpMountLock(hostId){
       <div id="dpPatPad"></div>
       <div class="lk-hint" id="dpPatHint">ارسم النمط بإصبعك</div>
       <button type="button" class="lk-redraw" onclick="dpInitPattern()">إعادة الرسم</button>
+    </div>
+    <div id="dpLkP_image" style="display:none;">
+      <input type="file" accept="image/*" class="lk-file" onchange="dpOnLockImage(this)">
+      <div id="dpLkImgPrev" class="lk-prev"></div>
     </div>`;
 }
 
 function dpSetLockTab(k){
   dpLockTab = k;
-  ['text','pattern'].forEach(x => {
+  ['text','pattern','image'].forEach(x => {
     const tb = $('dpLkT_' + x); if(tb) tb.classList.toggle('on', x === k);
     const pn = $('dpLkP_' + x); if(pn) pn.style.display = x === k ? 'block' : 'none';
   });
   if(k === 'pattern') dpInitPattern();
+}
+
+// 🖼️ صورة القفل — نفس تصغير الداشبورد (onLockImage): أقصى ٥٠٠ بكسل، JPEG ٦٠٪
+function dpOnLockImage(input){
+  const file = input.files && input.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const img = new Image();
+    img.onload = () => {
+      const max = 500, scale = Math.min(1, max / Math.max(img.width, img.height));
+      const cvs = document.createElement('canvas');
+      cvs.width = Math.round(img.width * scale); cvs.height = Math.round(img.height * scale);
+      cvs.getContext('2d').drawImage(img, 0, 0, cvs.width, cvs.height);
+      dpLockImgData = cvs.toDataURL('image/jpeg', 0.6);
+      const pv = $('dpLkImgPrev'); if(pv) pv.innerHTML = `<img src="${dpLockImgData}" alt="">`;
+    };
+    img.onerror = () => toast('⚠️ الصورة دي مش بتتفتح — جرّب صورة تانية');
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
 }
 
 function dpToggleLockEye(){
@@ -1906,6 +1997,8 @@ function dpCollectLock(){
     return { lockType:'text', lockText:txt, lockPattern:'', lockImage:'' };
   if(dpLockTab === 'pattern' && dpPatSeq.length >= 2)
     return { lockType:'pattern', lockText:'', lockPattern:dpPatSeq.join('-'), lockImage:dpPatThumb };
+  if(dpLockTab === 'image' && dpLockImgData)
+    return { lockType:'image', lockText:'', lockPattern:'', lockImage:dpLockImgData };
   return null;
 }
 
@@ -2018,8 +2111,13 @@ function dpEditLock(id){
 
 async function dpSaveLock(id){
   const lock = dpCollectLock();
-  if(!lock){ toast(dpLockTab === 'pattern' ? 'ارسم النمط الأول (نقطتين على الأقل)' : 'اكتب الرمز الأول'); return; }
-  await dpWriteLock(id, lock, lock.lockType === 'text' ? 'رمز رقمي/نصي' : 'نمط مرسوم');
+  if(!lock){
+    toast(dpLockTab === 'pattern' ? 'ارسم النمط الأول (نقطتين على الأقل)'
+        : dpLockTab === 'image'   ? 'اختار صورة القفل الأول'
+        : 'اكتب الرمز الأول');
+    return;
+  }
+  await dpWriteLock(id, lock, lock.lockType === 'text' ? 'رمز رقمي/نصي' : lock.lockType === 'image' ? 'صورة' : 'نمط مرسوم');
 }
 
 async function dpClearLock(id){
@@ -2147,48 +2245,45 @@ async function deVerifyNote(id, expectedLen){
   return true;
 }
 
-// 📝 الملاحظة و🔒 الباسورد وقت الاستلام → على الجهاز الجديد بعد ما يتسجّل
-// ⚠️ ليه مش جوه device_intake نفسها؟ الدالة دي بتنقّي حقول محددة
-//    من الحمولة وبتتجاهل أي حاجة تانية **في صمت** (SYSTEM.md).
-//    وكودها مش قدامنا — فبدل ما نعدّلها من الذاكرة، بنضيفهم
-//    بعدها بـ device_patch (اللي أصلاً شغالة للديسباتشر في الاعتمادات).
-// نداء واحد للاتنين — مش نداءين.
+// ============================================================
+// 🧷 بعد التسجيل: ضمان تاني للخانات + الباسورد
+// ------------------------------------------------------------
+// ⚠️ ليه؟ device_intake بتنقّي حقول محددة من الحمولة وبتتجاهل أي
+//    حاجة تانية **في صمت** (SYSTEM.md). فاللون والسريال والمندوب
+//    والحالة الشكلية والميعاد بيتبعتوا تاني هنا بـ device_patch.
+//    الكتابة مرتين بنفس القيمة مالهاش أي ضرر.
+// 🆕 (٢٠٢٦-١٠-١٣) بقت بتاخد «شنطة خانات» (fields) بدل لستة طويلة،
+//    عشان الفورم الجديدة فيها خانات أكتر.
+// ⚠️ الميعاد مع العميل إجباري — فلو السيرفر رماه (ملف 92 مااتشغّلش)
+//    بنقول بوضوح بدل ما يضيع في صمت.
 // بترجّع true لو اتحفظ اللي مطلوب.
-async function dpAfterIntake(newId, text, lock, color, serial, bb){
+// ============================================================
+async function dpAfterIntake(newId, fields, lock){
   if(!newId) return false;
-  const p = {};
+  const p = Object.assign({}, fields || {});
   if(lock) Object.assign(p, lock);
-  if(color) p.deviceColor = color;
-  if(serial) p.serialNumber = serial;
-  if(bb) p.broughtBy = bb;          // 🛵 ضمان تاني — نفس فكرة اللون
-  if(text){
-    const notes = await dpNotesWith(newId, mkNote('📝 ' + text));
-    if(!notes) return false;
-    p.activityNotes = notes;
-  }
+  Object.keys(p).forEach(k => { if(p[k] === '' || p[k] == null) delete p[k]; });
+  if(!Object.keys(p).length) return true;
   if(!await patch(newId, p)) return false;
-  if(text && !await deVerifyNote(newId, p.activityNotes.length)) return false;
   if(lock && !await dpVerifyLock(newId, lock.lockType)) return false;
-  return true;   // اللون مش بنتأكد منه هنا — بيتشاف في التفاصيل على طول
+  if(p.dueAt && !await deVerify(newId, 'dueAt', p.dueAt, 'الميعاد مع العميل')) return false;
+  return true;
 }
 
 // ============================================================
-// ✏️ تعديل الفني والعطل من الديسباتشر
+// ✏️ تعديل العطل والمندوب من الديسباتشر
 // ------------------------------------------------------------
-// من شاشة التفاصيل: زرار ✏️ جنب العطل وجنب الفني.
-// الحفظ عبر device_patch — والسيرفر هو اللي بيحدد المسموح (migration 43).
+// من شاشة التفاصيل: زرار ✏️ جنب العطل وجنب المندوب.
+// الحفظ عبر device_patch — والسيرفر هو اللي بيحدد المسموح.
 //
-// 🔒 تغيير الفني مسموح **بس** والجهاز لسه شغّال:
-//    قيد الانتظار · جاري الكشف · جاري الصيانة
-// ⚠️ ليه؟ نقط الفني بتتحسب على اسم الفني المكتوب على الجهاز لما
-//    يخلص. لو الديسباتشر غيّر فني جهاز خلص/اتسلّم، النقط (يعني
-//    فلوس) بتتنقل من فني لفني من غير ما المحاسب يعرف. والمرتجعات
-//    ليها نظام نقط خاص عند المحاسب («رجع وراح لفني تاني»).
-//    نفس القاعدة متطبّقة على السيرفر — مش على الشاشة بس.
+// 🔒 (٢٠٢٦-١٠-١٣) الفني **مقفول تماماً** على مسؤول الحركة — بقرار بلال:
+//    مسؤول الحركة مايختارش فني خالص، لا وقت التسجيل ولا بعده.
+//    🧸 زي الاستقبال بالظبط: هو بيستلم الجهاز ويسلّمه، واللي بيوزّع
+//       الأجهزة على الفنيين حد تاني.
+//    • زرار «🔄 تغيير الفني» اتشال من التفاصيل (الفني بيبان قراية بس).
+//    • والقفل الحقيقي على السيرفر (ملف SQL رقم 93): حتى لو حد بعت
+//      فني من الكونسول، السيرفر بيرجّعه زي ما كان في صمت.
 // ============================================================
-const DP_TECH_EDITABLE = ['waiting', 'diagnosing', 'repairing'];
-function dpCanChangeTech(d){ return !!d && DP_TECH_EDITABLE.includes(d.status); }
-function dpTechLockMsg(){ return '🔒 الجهاز ده مش في الصيانة — تغيير الفني بيحرّك النقط، فده من عند المحاسب'; }
 
 // ⚠️ Supabase مبيرميش خطأ لو السيرفر تجاهل حقل (لو migration 43
 //    مااتشغّلتش مثلاً). فبعد الحفظ بنقرا الحقل ده بس ونتأكد إنه اتكتب.
@@ -2219,55 +2314,6 @@ function deApplyLocal(d, raw){
   try{ if(window.IFixSearch) IFixSearch.invalidate(d); }catch(e){}
   reindexSearch();
   render();
-}
-
-// ---------- 🔄 تغيير الفني ----------
-function editTech(id){
-  const d = devices.find(x => x.id === id); if(!d) return;
-  if(!dpCanChangeTech(d)){ toast(dpTechLockMsg()); return; }
-  const cur  = (d.tech || '').trim();
-  const list = allTechNames().filter(x => x.name !== cur);
-  if(!list.length){ toast('مفيش فنيين تانيين تنقل ليهم'); return; }
-  openAct('🔄 تغيير الفني', `
-    ${actDevBlock(d)}
-    <div class="de-cur">الفني دلوقتي: <b>${esc(cur || t('tp.noTechYet'))}</b></div>
-    <select id="deTech" class="tech-select" style="margin-bottom:14px;">
-      <option value="">— اختار الفني الجديد —</option>
-      ${list.map(x => `<option value="${esc(x.name)}">${esc(x.name)}${x.pending ? ' ⏳' : ''}</option>`).join('')}
-    </select>
-    <div class="de-hint">الجهاز هيختفي من عند «${esc(cur || '—')}» ويظهر عند الفني الجديد.</div>
-    <button class="act-btn act-primary" id="deGo" onclick="doEditTech('${d.id}')">🔄 انقل الجهاز</button>
-    <button class="act-btn act-ghost" onclick="showInfo('${d.id}')">${t('rp.cancel')}</button>`);
-}
-
-async function doEditTech(id){
-  const d = devices.find(x => x.id === id); if(!d) return;
-  const target = (($('deTech') || {}).value || '').trim();
-  if(!target){ toast('اختار الفني الجديد'); return; }
-  if(!dpCanChangeTech(d)){ toast(dpTechLockMsg()); return; }   // الحالة ممكن تكون اتغيّرت وهو فاتح الشيت
-  const from = (d.tech || '').trim();
-  if(target === from){ showInfo(id); return; }
-
-  const raw = d._raw || {};
-  // نفس ترجمة الملاحظة اللي في i18n.js (note.handoffFull) — بتتقري
-  // عربي أو إنجليزي حسب لغة اللي بيقرا
-  const args = { from: from || '—', to: target };
-  const note = mkNote(t('note.handoffFull', args), 'note.handoffFull', args);
-
-  const btn = $('deGo'); if(btn) btn.disabled = true;
-  const notes = await dpNotesWith(id, note);   // نسخة السيرفر — شوف dpNotesWith
-  const p = notes && { technician: target, activityNotes: notes,
-                       lastModifiedAt: nowIso(), lastModifiedBy: ME };
-  const ok = !!p && await patch(id, p) && await deVerify(id, 'technician', target, 'الفني الجديد');
-  if(btn) btn.disabled = false;
-  if(!ok) return;
-
-  // لو الفني الجديد كان مساعد على نفس الجهاز، مبقاش مساعد — بقى الأساسي.
-  // السيرفر بيعمل ده لوحده (migration 43) — إحنا بس بنحدّث الشاشة.
-  if((raw.assistTechnician || '').trim() === target) p.assistTechnician = '';
-  deApplyLocal(d, p);
-  toast('🔄 الجهاز اتنقل لـ ' + target);
-  showInfo(id);
 }
 
 // ============================================================
@@ -2380,12 +2426,15 @@ function dpToggleLabel(id){
   //    وصفحة الديسباتشر بتخزّنها بأسماء مختصرة (type · customer …).
   //    فبنبعتله السجل الخام لو موجود — وإلا بنركّب واحد بالأسماء الصح.
   //    من غير ده الليبل كان هيطلع فاضي من غير أي خطأ يظهر.
-  const raw = d._raw || {
+  renderLabelInto('dpLabelArea', dpRawOf(d));
+}
+// السجل الخام لجهاز (بأسماء النظام) — label.js بيحتاجه
+function dpRawOf(d){
+  return d._raw || {
     id: d.id, deviceType: d.type, model: d.model,
     customerName: d.customer, shopName: d.shop,
     reportedIssue: d.issue, status: d.status, intakeDate: d.intake
   };
-  renderLabelInto('dpLabelArea', raw);
 }
 
 // رقم الواتساب: مصر بتبدأ بصفر، وواتساب عايز كود الدولة
@@ -2511,6 +2560,12 @@ function buildDpSuggest(){
   // 🛵 أسامي المناديب — الأحدث فوق، من غير تكرار
   const bbl = $('dpBBList');
   if(bbl) bbl.innerHTML = bbNames().map(n=>`<option value="${esc(n)}">`).join('');
+  // 👤 أسامي اللي بيسجّلوا (زي قايمة الموظفين عند الاستقبال) — اسمي الأول
+  const rl = $('dpRegList');
+  if(rl){
+    const names = [ME, ...devices.map(d => (d.by || '').trim())].filter(Boolean);
+    rl.innerHTML = [...new Set(names)].slice(0, 30).map(n=>`<option value="${esc(n)}">`).join('');
+  }
 }
 
 function onDpCustInput(){
@@ -2542,12 +2597,261 @@ function onDpCustInput(){
   }
 }
 
+// ============================================================
+// 👤 تاريخ العميل — زي الاستقبال (ph2CustHistory في dashboard.html)
+// ------------------------------------------------------------
+// 🧸 بتكتب رقم التليفون → تحته على طول: «العميل ده جه قبل كده كام مرة،
+//    وآخر أجهزته إيه، ورجع مرتجع كام مرة». ودوسة بتملا الاسم والمحل.
+// ⚠️ المطابقة بآخر ١٠ أرقام — عشان «+2010…» و«010…» يبقوا نفس العميل.
+// ⚠️ بيشوف بس اللي الصفحة محمّلاه (المحل + المسلَّم آخر ٣٠ يوم) —
+//    الاستقبال شايف أكتر. تنبيه مساعد مش سجل كامل.
+// ============================================================
+function dpDigits(s){
+  return String(s || '')
+    .replace(/[٠-٩]/g, c => '٠١٢٣٤٥٦٧٨٩'.indexOf(c))
+    .replace(/[۰-۹]/g, c => '۰۱۲۳۴۵۶۷۸۹'.indexOf(c));
+}
+function dpPhoneKey(p){ const s = dpDigits(p).replace(/[^0-9]/g, ''); return s.length >= 8 ? s.slice(-10) : ''; }
+function dpHadReturn(d){
+  const r = d._raw || {};
+  return (r.statusHistory || []).some(h => h && h.status === 'returned') || (Array.isArray(r.returnRounds) && r.returnRounds.length > 0);
+}
+function dpCustHistoryFor(phone){
+  const k = dpPhoneKey(phone);
+  if(!k) return [];
+  return devices.filter(d => dpPhoneKey(d.phone) === k)
+    .sort((a, b) => (Date.parse(b.intake) || 0) - (Date.parse(a.intake) || 0));
+}
+function dpCustHistory(){
+  const box = $('dpCustHist'), inp = $('f_phone');
+  if(!box || !inp) return;
+  const list = dpCustHistoryFor(inp.value);
+  if(!list.length){ box.innerHTML = ''; box.style.display = 'none'; return; }
+  const rets = list.filter(dpHadReturn).length;
+  const open = list.filter(d => IN_SHOP.includes(d.status)).length;
+  const last = list[0];
+  const rows = list.slice(0, 5).map(d => {
+    const s = ST[d.status] || { label: d.status, c: '--muted' };
+    return `<button type="button" class="ph-ch-row" onclick="showInfo('${d.id}')">
+      <span><b>${esc(d.type)} ${esc(d.model)}</b> · ${d.intake ? new Date(d.intake).toLocaleDateString('ar-EG') : ''}${dpHadReturn(d) ? ' · <span style="color:var(--returned);font-weight:800;">🔁 رجع مرتجع</span>' : ''}
+        ${d.issue ? `<small>🛠️ ${esc(d.issue)}</small>` : ''}</span>
+      <span class="ph-ch-tag" style="background:var(${s.c}-bg);color:var(${s.c})">${esc(s.label)}</span>
+    </button>`;
+  }).join('');
+  const nm = $('f_cust'), sh = $('f_shop');
+  const canFill = (nm && !nm.value.trim() && last.customer) || (sh && !sh.value.trim() && last.shop);
+  box.style.display = 'block';
+  box.innerHTML = `<div class="ph-ch-head">👤 العميل ده جه قبل كده <b>${list.length}</b> ${list.length === 1 ? 'مرة' : 'مرات'}
+      ${rets ? ` · <span style="color:var(--returned);">🔁 ${rets} مرتجع</span>` : ''}
+      ${open ? ` · <span style="color:var(--waiting);">🔧 ${open} لسه عندنا</span>` : ''}</div>
+    ${list.some(d => d._raw && d._raw.noCall) ? `<div style="font-size:12px;color:var(--muted);margin-bottom:6px;">🚫 طلب مانتصلش بيه</div>` : ''}
+    ${canFill ? `<button type="button" class="ph-fill" onclick="dpFillFromLast()">📋 املا الاسم والمحل من آخر مرة (${esc(last.customer || last.shop)})</button>` : ''}
+    ${rows}${list.length > 5 ? `<div style="font-size:12px;color:var(--muted);margin-top:4px;">و ${list.length - 5} أجهزة أقدم — دوّر بالرقم في البحث فوق</div>` : ''}`;
+}
+function dpFillFromLast(){
+  const last = dpCustHistoryFor(($('f_phone') || {}).value)[0];
+  if(!last) return;
+  const nm = $('f_cust'), sh = $('f_shop');
+  if(nm && !nm.value.trim() && last.customer) nm.value = last.customer;
+  if(sh && !sh.value.trim() && last.shop) sh.value = last.shop;
+  dpCustHistory();
+}
+
+// ============================================================
+// ⏳ الميعاد مع العميل — «الساعة الرملية» (زي الاستقبال بالظبط)
+// ------------------------------------------------------------
+// 🧸 إجباري: «اتفقت مع العميل على قد إيه؟» — ساعة · ساعة ونص · …
+//    الرملة بتبدأ من **دلوقتي** (وقت التسجيل) — مسؤول الحركة مالوش
+//    خانة «وقت الدخول»، السيرفر بيكتبه لوحده.
+// 💡 اقتراح المدة: من الأجهزة اللي زيه (نفس الماركة + نوع العطل) —
+//    «النص» مش المتوسط، ولازم ٣ أجهزة على الأقل.
+// ⚠️ نسخة من دوال dashboard.html (DUE_CHIPS · dueFromChip · dueSuggest…)
+//    بأسماء dp — لو غيّرت الاختيارات هناك، غيّرها هنا كمان.
+// ⚠️ السيرفر لازم يكون مسموحله بالخانات dueAt · dueStart · dueLabel ·
+//    dueLog للديسباتشر — ملف SQL رقم 92.
+// ============================================================
+const DP_DUE_MIN_SAMPLES = 3;
+const DP_DUE_CHIPS = [
+  { k:'1h',  label:'ساعة',          h:1 },
+  { k:'90m', label:'ساعة ونص',      h:1.5 },
+  { k:'2h',  label:'ساعتين',        h:2 },
+  { k:'eod', label:'آخر النهارده',  at:'eod' },
+  { k:'tmr', label:'بكره',          at:'tmr' },
+  { k:'2d',  label:'يومين',         h:48 },
+  { k:'3d',  label:'٣ أيام',        h:72 },
+  { k:'1w',  label:'أسبوع',         h:168 },
+];
+function dpDueFromChip(k, fromMs){
+  const c = DP_DUE_CHIPS.find(x => x.k === k);
+  if(!c) return null;
+  const base = new Date(fromMs || Date.now());
+  if(c.h) return new Date(base.getTime() + c.h * 3600000);
+  const t = new Date(base);
+  if(c.at === 'eod'){ t.setHours(22, 0, 0, 0); if(t.getTime() - base.getTime() < 3600000) return new Date(base.getTime() + 3600000); return t; }
+  if(c.at === 'tmr'){ t.setDate(t.getDate() + 1); t.setHours(18, 0, 0, 0); return t; }
+  return null;
+}
+function dpDueWhenTxt(iso){
+  const d = new Date(iso);
+  if(isNaN(d)) return '';
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const day = new Date(d); day.setHours(0, 0, 0, 0);
+  const diff = Math.round((day - today) / 86400000);
+  const tm = d.toLocaleTimeString('ar-EG', { hour:'numeric', minute:'2-digit' });
+  if(diff === 0) return 'النهارده ' + tm;
+  if(diff === 1) return 'بكره ' + tm;
+  if(diff === -1) return 'امبارح ' + tm;
+  return d.toLocaleDateString('ar-EG', { weekday:'long', day:'numeric', month:'long' }) + ' ' + tm;
+}
+function dpDurTxt(ms){
+  const m = Math.max(0, Math.round(ms / 60000));
+  if(m < 60) return m + ' د';
+  const h = Math.floor(m / 60), r = m % 60;
+  if(h < 48) return h + ' س' + (r ? ' و ' + r + ' د' : '');
+  const dd = Math.floor(h / 24), hh = h % 24;
+  return dd + ' يوم' + (hh ? ' و ' + hh + ' س' : '');
+}
+const DP_ISSUE_GROUPS = [
+  { k:'screen', name:'شاشة',   w:['شاش', 'تاتش', 'lcd', 'screen', 'oled', 'عرض'] },
+  { k:'batt',   name:'بطارية', w:['بطار', 'battery', 'بيفصل'] },
+  { k:'charge', name:'شحن',    w:['شحن', 'سوكت', 'شاحن', 'charg'] },
+  { k:'soft',   name:'سوفت',   w:['سوفت', 'فلاش', 'تحديث', 'هنج', 'ريستارت', 'لوجو', 'soft', 'icloud', 'اكونت', 'حساب'] },
+  { k:'water',  name:'مياه',   w:['مياه', 'مايه', 'ميه', 'وقع في', 'water'] },
+  { k:'cam',    name:'كاميرا', w:['كامير', 'camera'] },
+  { k:'audio',  name:'صوت',    w:['سماع', 'مايك', 'صوت', 'سبيكر', 'speaker', 'mic'] },
+  { k:'back',   name:'ضهر',    w:['باغ', 'ضهر', 'ظهر', 'back', 'فريم', 'شاسيه'] },
+  { k:'board',  name:'بوردة',  w:['بورد', 'ايسي', ' ic', 'شورت', 'board', 'مابيفتحش', 'ميت'] },
+  { k:'btn',    name:'زراير',  w:['زرار', 'زراير', 'باور', 'فوليوم', 'بصم', 'face', 'فيس'] },
+];
+function dpNorm(s){
+  return ' ' + String(s || '').toLowerCase()
+    .replace(/[ً-ْ]/g, '').replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي') + ' ';
+}
+function dpIssueGroup(issue){
+  const t = dpNorm(issue);
+  // الكلمة اللي بتبدأ بمسافة (« ic») لازم تبقى أول كلمة — عشان «ic» جوه كلمة تانية مايتحسبش
+  return DP_ISSUE_GROUPS.find(g => g.w.some(w => t.includes((w.startsWith(' ') ? ' ' : '') + dpNorm(w).trim()))) || null;
+}
+function dpBrand(type){ return dpNorm(type).trim().split(/\s+/)[0] || ''; }
+let dpSugCache = { at: 0, map: null };
+function dpSuggestMap(){
+  if(dpSugCache.map && Date.now() - dpSugCache.at < 10 * 60000) return dpSugCache.map;
+  const map = {};
+  const from = Date.now() - 180 * 86400000;
+  devices.forEach(d => {
+    const s = Date.parse(d.intake);
+    if(!(s >= from)) return;
+    const h = (d._raw && d._raw.statusHistory) || [];
+    const fin = h.find(x => x && x.date && ['done', 'workshop_rejected', 'sent_to_reception'].includes(x.status));
+    if(!fin) return;
+    const ms = Date.parse(fin.date) - s;
+    if(!(ms > 0)) return;
+    const g = dpIssueGroup(d.issue);
+    if(!g) return;
+    const b = dpBrand(d.type);
+    [b + '|' + g.k, '*|' + g.k].forEach(key => (map[key] = map[key] || []).push(ms));
+  });
+  Object.keys(map).forEach(k => map[k].sort((a, b) => a - b));
+  dpSugCache = { at: Date.now(), map };
+  return map;
+}
+function dpDueSuggest(type, issue){
+  const g = dpIssueGroup(issue);
+  if(!g) return null;
+  const map = dpSuggestMap();
+  const b = dpBrand(type);
+  let list = map[b + '|' + g.k], scope = (type || '').trim();
+  if(!list || list.length < DP_DUE_MIN_SAMPLES){ list = map['*|' + g.k]; scope = 'كل الأنواع'; }
+  if(!list || list.length < DP_DUE_MIN_SAMPLES) return null;
+  const med = list[Math.floor(list.length / 2)];
+  const hrs = med / 3600000;
+  const chip = hrs <= 1 ? '1h' : hrs <= 1.5 ? '90m' : hrs <= 2 ? '2h' : hrs <= 8 ? 'eod' : hrs <= 30 ? 'tmr' : hrs <= 48 ? '2d' : hrs <= 72 ? '3d' : '1w';
+  return { med, n: list.length, group: g.name, scope, chip };
+}
+
+let dpDue = { chip: '', custom: '' };
+function dpDueReset(){ dpDue = { chip: '', custom: '' }; dpDueRender(); }
+function dpDueAt(){
+  if(dpDue.chip === 'custom'){
+    const t = dpDue.custom ? new Date(dpDue.custom) : null;
+    return t && !isNaN(t) ? t : null;
+  }
+  return dpDue.chip ? dpDueFromChip(dpDue.chip, Date.now()) : null;
+}
+function dpDuePick(k){ dpDue.chip = k; dpDueRender(); }
+function dpDueCustom(v){ dpDue.custom = v; dpDue.chip = 'custom'; dpDueRender(true); }
+function dpDueOpenCustom(){
+  dpDue.chip = 'custom'; dpDueRender();
+  setTimeout(() => { const e = $('dpDueCustom'); if(e) e.focus(); }, 50);
+}
+function dpDueRender(keepInput){
+  const host = $('dpDueHost');
+  if(!host) return;
+  const at = dpDueAt();
+  if(keepInput){
+    const r = $('dpDueResult');
+    if(r) r.innerHTML = dpDueResultHtml(at);   // الخانة المفتوحة ماتترسمش تاني عشان الكتابة ماتضيعش
+    return;
+  }
+  const sug = (() => { try{ return dpDueSuggest(($('f_type') || {}).value, ($('f_issue') || {}).value); }catch(e){ return null; } })();
+  const btn = c => `<button type="button" class="due-chip${dpDue.chip === c.k ? ' on' : ''}" onclick="dpDuePick('${c.k}')">${c.label}</button>`;
+  const sugHtml = sug ? `<div class="due-sug">💡 أجهزة ${esc(sug.group)} (${esc(sug.scope)}) بتخلص عادة في حوالي <b>${esc(dpDurTxt(sug.med))}</b> <small>(من ${sug.n} جهاز)</small>
+      ${dpDue.chip !== sug.chip ? `<button type="button" class="due-chip" onclick="dpDuePick('${sug.chip}')">استخدم «${esc(DP_DUE_CHIPS.find(c => c.k === sug.chip).label)}»</button>` : ''}</div>` : '';
+  host.innerHTML = `<span class="due-lbl">⏳ اتفقت مع العميل على قد إيه؟ <b class="req">*</b></span>
+    <div class="due-chips">${DP_DUE_CHIPS.map(btn).join('')}
+      <button type="button" class="due-chip${dpDue.chip === 'custom' ? ' on' : ''}" onclick="dpDueOpenCustom()">📅 ميعاد معيّن</button></div>
+    ${dpDue.chip === 'custom' ? `<input type="datetime-local" id="dpDueCustom" class="due-input" value="${esc(dpDue.custom)}" onchange="dpDueCustom(this.value)" />` : ''}
+    <div id="dpDueResult">${dpDueResultHtml(at)}</div>
+    ${sugHtml}`;
+}
+function dpDueResultHtml(at){
+  if(!at) return '';
+  return at.getTime() > Date.now()
+    ? `<div class="due-res">⏰ الميعاد: <b>${esc(dpDueWhenTxt(at.toISOString()))}</b></div>`
+    : `<div class="due-res" style="color:var(--rejected);">⚠️ الميعاد لازم يبقى بعد دلوقتي</div>`;
+}
+// بيتنده من saveIntake — بيرجّع الخانات أو { err }
+function dpDueFields(intakeIso){
+  const at = dpDueAt();
+  if(!at) return { err: 'اختار المدة اللي اتفقت عليها مع العميل' };
+  if(at.getTime() <= Date.parse(intakeIso)) return { err: 'الميعاد مع العميل لازم يبقى بعد وقت الدخول' };
+  const c = DP_DUE_CHIPS.find(x => x.k === dpDue.chip);
+  const label = c ? c.label : dpDueWhenTxt(at.toISOString());
+  const iso = at.toISOString();
+  return { fields: {
+    dueAt: iso, dueStart: intakeIso, dueLabel: label,
+    // ⚠️ role = 'dispatcher' (اسم الدور) — زي الداشبورد اللي بيكتب myRole()
+    dueLog: [{ kind: 'set', text: '⏳ اتفقنا مع العميل: ' + label + ' (لحد ' + dpDueWhenTxt(iso) + ')',
+               at: nowIso(), by: ME, role: 'dispatcher', dueAt: iso }],
+  } };
+}
+
+// 💬 رسالة الاستلام للعميل — نفس نص الداشبورد (waStatusMsg → waiting)، من غير السعر
+function dpWaMsg(raw){
+  const ref = '#' + String(raw.id || '').slice(-5).toUpperCase();
+  const dev = `${raw.deviceType || ''} ${raw.model || ''}`.trim();
+  const link = raw.trackToken
+    ? `\nتقدر تتابع حالة جهازك لحظة بلحظة من اللينك ده:\n${location.origin}/track.html?t=${raw.trackToken}` : '';
+  return `أهلاً ${raw.customerName || ''} 👋\nتم استلام جهازك *${dev}* بنجاح في I Fix Team ✅\nرقم المتابعة: *${ref}*${link}\nوهنبعتلك تحديثات أول بأول على الواتساب كمان.`;
+}
+
+const DP_INTAKE_FIELDS = ['f_cust','f_shop','f_bb','f_regby','f_phone','f_type','f_model','f_color','f_serial','f_issue','f_cond'];
+
 function openIntake(){
   buildDpSuggest();
   dpMountLock('dpLockHostIntake');   // 🔒 شاشة الباسورد (فاضية كل مرة)
-  const ph = $('f_phone'); if(ph && ph.dataset) ph.dataset.autoFill = '';
+  DP_INTAKE_FIELDS.forEach(id => { const e = $(id); if(!e) return; e.value = ''; if(e.dataset) e.dataset.autoFill = ''; });
+  ['dpCustList','dpPhoneList'].forEach(id => { const e = $(id); if(e) e.innerHTML = ''; });
+  const rb = $('f_regby'); if(rb) rb.value = ME;      // 👤 باسمك — ويتعدّل لو حد تاني بيسجّل
+  dpCustHistory();                   // الرقم فاضي → تاريخ العميل يختفي
+  dpDueReset();                      // ⏳ الميعاد يبدأ فاضي كل مرة
+  $('intakeForm').style.display = '';
+  $('intakeDone').style.display = 'none';
+  $('dpAddLabel').innerHTML = '';
+  const wa = $('dpAddWa'); if(wa){ wa.style.display = 'none'; wa.removeAttribute('href'); }
+  $('sheet').scrollTop = 0;
   $('sheet').classList.add('on'); $('sheetBg').classList.add('on');
-  setTimeout(()=>$('f_type').focus(),300);
+  setTimeout(()=>$('f_cust').focus(),300);
 }
 function closeIntake(){ $('sheet').classList.remove('on'); $('sheetBg').classList.remove('on'); }
 
@@ -2605,12 +2909,11 @@ function actDevBlock(d){
   return `<div class="act-dev"><span class="act-dev-ic">📱</span><div><div class="act-dev-name">${esc(name)}</div>${sub?`<div class="act-dev-sub">${esc(sub)}</div>`:''}</div></div>`;
 }
 // ============================================================
-// أسماء الفنيين — نفس مصدر الداشبورد بالظبط
+// الأدوار والصلاحيات اللي الصفحة بتحتاجها
 // ------------------------------------------------------------
-//   ١) فنيين ليهم حسابات (user-roles، role=technician)
-//   ٢) فنيين معلّقين (pending-technicians) لسه مستنيين إيميل
-// الحقل اختيار مقفول — مفيش كتابة حرة عشان مايحصلش تكرار
-// ولا أخطاء إملائية في الأسماء.
+// userRoles = خريطة الأدوار (منها بنجيب اسم الموظف الرسمي).
+// 🔒 (٢٠٢٦-١٠-١٣) قايمة أسماء الفنيين اتشالت من هنا خالص:
+//    مسؤول الحركة مابيختارش فني — لا وقت التسجيل ولا بعده (ملف 93).
 // ============================================================
 let userRoles = {};
 let CAN_PURCHASES = false;
@@ -2642,62 +2945,47 @@ function openCap(api){
   if(m && typeof m.open === 'function') m.open();
   else toast(t('dp.capLoading'));
 }
-let pendingTechs = [];
-
-async function loadTechNames(){
-  try{
-    const { data } = await sb.from('app_data').select('value')
-      .eq('key','pending-technicians').maybeSingle();
-    pendingTechs = (data && data.value) ? (JSON.parse(data.value) || []) : [];
-  }catch(e){ pendingTechs = []; }
-  renderTechSelect();
-}
-
-function accountTechNames(){
-  return Object.values(userRoles)
-    .map(v => (typeof v === 'string') ? null : v)
-    .filter(v => v && (v.role === 'technician' || v.role === 'owner') && v.techName)
-    .map(v => String(v.techName).trim()).filter(Boolean);
-}
-function allTechNames(){
-  const acc = [...new Set(accountTechNames())].sort((a,b)=>a.localeCompare(b,'ar'));
-  const accSet = new Set(acc);
-  const pend = [...new Set(pendingTechs.map(x => (x.name||'').trim())
-                 .filter(n => n && !accSet.has(n)))].sort((a,b)=>a.localeCompare(b,'ar'));
-  return acc.map(n=>({name:n,pending:false})).concat(pend.map(n=>({name:n,pending:true})));
-}
-
-function renderTechSelect(){
-  const sel = $('f_tech'); if(!sel) return;
-  const cur  = sel.value;
-  const list = allTechNames();
-  sel.innerHTML = '<option value="">— ' + t('tp.pickTechPh').replace(/^—\s*|\s*—$/g,'') + ' —</option>'
-    + list.map(x => '<option value="'+esc(x.name)+'">'+esc(x.name)+(x.pending?' ⏳':'')+'</option>').join('');
-  if(cur) sel.value = cur;
-
-  // مفيش فنيين خالص؟ نوضّح للديسباتشر يعمل إيه بدل قايمة فاضية صامتة
-  const hint = $('f_techHint');
-  if(hint){
-    hint.textContent = list.length ? '' : t('dp.noTechsHint');
-    hint.style.display = list.length ? 'none' : 'block';
-  }
-}
-
+// ============================================================
+// 💾 تسجيل الجهاز — نفس قواعد الاستقبال (submitAdd في dashboard.html)
+// ------------------------------------------------------------
+// إجباري: اسم العميل · نوع الجهاز · اللون · السريال · العطل · الميعاد.
+// ⚠️ زي الاستقبال: الرسالة بتقول الناقص إيه وبتودّيك على الخانة —
+//    مش زرار يتداس وميحصلش حاجة.
+// ============================================================
+const DP_SUBMIT_TXT = 'تسجيل الجهاز — يدخل تلقائياً في "قيد الانتظار"';
 let saving = false;
 async function saveIntake(){
   if(saving) return;
-  const type=$('f_type').value.trim(), model=$('f_model').value.trim(), cust=$('f_cust').value.trim();
-  const color=$('f_color').value.trim();
-  if(!type || !cust){ toast(t('dp.needFields')); return; }
-  if(!color){ toast('🎨 اكتب لون الجهاز الأول'); const c=$('f_color'); if(c) c.focus(); return; }
-  // 🔢 السريال اختياري — بس لو مكرر بنسأل (نفس تحذير المحاسب)
-  const serial = $('f_serial').value.trim();
-  const bb = (($('f_bb') || {}).value || '').trim();   // 🛵 المندوب
-  if(serial){
-    const dup = devices.find(d => (d.serial || '').trim().toLowerCase() === serial.toLowerCase());
-    // ⚠️ الديسباتشر عنده أجهزة المحل + المسلّم في آخر ٣٠ يوم بس،
-    //    فالتحذير ده مش شامل كل تاريخ المحل — تنبيه مساعد مش ضمان.
-    if(dup && !confirm('الرقم ده متسجّل قبل كده لجهاز «' + (dup.model || dup.type) + '» — ' + dup.customer + '.\nتكمّل التسجيل برضه؟')) return;
+  const v = id => (($(id) || {}).value || '').trim();
+  const need = [
+    ['f_cust',   'اسم العميل'],
+    ['f_type',   'نوع الجهاز'],
+    ['f_color',  'لون الجهاز'],
+    ['f_serial', 'الرقم التسلسلي (IMEI/SN)'],
+    ['f_issue',  'العطل'],
+  ].filter(([id]) => !v(id));
+  if(need.length){
+    alert('لازم تكتب: ' + need.map(x => x[1]).join('، '));
+    const el = $(need[0][0]); if(el) el.focus();
+    return;
+  }
+  const type = v('f_type'), model = v('f_model'), cust = v('f_cust');
+  const color = v('f_color'), serial = v('f_serial'), issue = v('f_issue');
+  const bb = v('f_bb'), cond = v('f_cond'), phone = v('f_phone'), shop = v('f_shop');
+  const regBy = v('f_regby') || ME;
+  // 🔢 السريال مكرر؟ بنسأل (نفس تحذير الاستقبال)
+  const dup = devices.find(d => (d.serial || '').trim().toLowerCase() === serial.toLowerCase());
+  // ⚠️ الديسباتشر عنده أجهزة المحل + المسلّم في آخر ٣٠ يوم بس،
+  //    فالتحذير ده مش شامل كل تاريخ المحل — تنبيه مساعد مش ضمان.
+  if(dup && !confirm('الرقم التسلسلي ده متسجل قبل كده لجهاز «' + ((dup.type + ' ' + dup.model).trim()) + '» — ' + dup.customer + '.\nعايز تكمل التسجيل برضه؟')) return;
+
+  // ⏳ الميعاد مع العميل — إجباري، والرملة بتبدأ من دلوقتي
+  const intakeIso = nowIso();
+  const dueF = dpDueFields(intakeIso);
+  if(dueF.err){
+    alert('⏳ ' + dueF.err);
+    const h = $('dpDueHost'); if(h) h.scrollIntoView({ block:'center', behavior:'smooth' });
+    return;
   }
   if(!navigator.onLine){ toast(t('dp.offlineIntake')); return; }
 
@@ -2705,68 +2993,73 @@ async function saveIntake(){
   saving = true;
   if(btn){ btn.disabled = true; btn.textContent = t('dp.submitting'); }
 
+  // الخانات اللي بتتبعت مرتين (جوه device_intake + ضمان بعدها)
+  const extra = { deviceColor: color, serialNumber: serial, broughtBy: bb,
+                  conditionNotes: cond, ...dueF.fields };
+
   // device_intake بتولّد الرقم والتوكن والتاريخ على السيرفر،
-  // وبتحدد السعر صفر — الديسباتشر مايكتبش سعر خالص
+  // وبتحدد السعر صفر — الديسباتشر مايكتبش سعر خالص.
+  // الفني فاضي دايماً — مسؤول الحركة مابيختارش فني (والسيرفر بيقفله — ملف 93).
   const { data, error } = await sb.rpc('device_intake', { p_payload: {
     deviceType:    type,
     model:         model,
     customerName:  cust,
-    customerPhone: $('f_phone').value.trim(),
-    shopName:      $('f_shop').value.trim(),
-    reportedIssue: $('f_issue').value.trim(),
-    technician:    ($('f_tech') ? $('f_tech').value : ''),
-    deviceColor:   color,
-    serialNumber:  serial,
-    broughtBy:     bb,                 // 🛵 (ملف SQL رقم 69)
-    registeredBy:  ME
+    customerPhone: phone,
+    shopName:      shop,
+    reportedIssue: issue,
+    technician:    '',
+    registeredBy:  regBy,
+    ...extra                           // 🛵 69 · 🔍 ⏳ 92
   }});
 
   saving = false;
-  if(btn){ btn.disabled = false; btn.textContent = t('dp.submit'); }
+  if(btn){ btn.disabled = false; btn.textContent = DP_SUBMIT_TXT; }
 
   if(error){ toast('فشل التسجيل: ' + esc(error.message || error)); return; }
 
-  // 📝 الملاحظة و🔒 الباسورد (لو فيه) — بعد ما الجهاز اتسجّل
-  const noteText0 = (($('f_note') || {}).value || '').trim();
-  const lock0 = dpCollectLock();
-  // ⚠️ اللون بيتبعت مرتين عن قصد: مرة جوه device_intake (لو السيرفر
-  //    بياخده) ومرة في الترقيع بعدها. الدالة بتتجاهل أي حقل مش في
-  //    قايمتها **في صمت** (SYSTEM.md) وكودها مش قدامنا — فالترقيع
-  //    هو الضمان. الكتابة مرتين بنفس القيمة مالهاش أي ضرر.
-  let noteLost = false;
-  if(noteText0 || lock0 || color || serial){
-    // device_intake بترجّع رقم الجهاز — بس شكل الرد مش موثّق،
-    // فبنقبل الأشكال المعقولة كلها بدل ما نفترض واحد.
-    let newId = (typeof data === 'string') ? data
-              : (data && (data.id || (data.data && data.data.id) || data.device_id)) || '';
-    // مش لاقيين الرقم في الرد؟ ندوّر عليه: أحدث جهاز سجّلته أنا بنفس
-    // اسم العميل في آخر دقيقتين — ولازم يكون **واحد بس**، وإلا منخمّنش.
-    if(!newId){
-      try{
-        const since = new Date(Date.now() - 120000).toISOString();
-        const { data: rows } = await sb.from('devices_dispatch').select('id,data')
-          .gte('intake_date', since).order('intake_date', { ascending:false }).limit(10);
-        const mine = (rows || []).filter(r => r.data && r.data.registeredBy === ME
-                                            && (r.data.customerName || '').trim() === cust);
-        if(mine.length === 1) newId = mine[0].id;
-      }catch(e){ console.error('البحث عن الجهاز الجديد:', e); }
-    }
-    noteLost = !(await dpAfterIntake(newId, noteText0, lock0, color, serial, bb));
+  // device_intake بترجّع رقم الجهاز — بس شكل الرد مش موثّق،
+  // فبنقبل الأشكال المعقولة كلها بدل ما نفترض واحد.
+  let newId = (typeof data === 'string') ? data
+            : (data && (data.id || (data.data && data.data.id) || data.device_id)) || '';
+  // مش لاقيين الرقم في الرد؟ ندوّر عليه: أحدث جهاز اتسجّل باسم اللي سجّل
+  // ونفس اسم العميل في آخر دقيقتين — ولازم يكون **واحد بس**، وإلا منخمّنش.
+  if(!newId){
+    try{
+      const since = new Date(Date.now() - 120000).toISOString();
+      const { data: rows } = await sb.from('devices_dispatch').select('id,data')
+        .gte('intake_date', since).order('intake_date', { ascending:false }).limit(10);
+      const mine = (rows || []).filter(r => r.data && r.data.registeredBy === regBy
+                                          && (r.data.customerName || '').trim() === cust);
+      if(mine.length === 1) newId = mine[0].id;
+    }catch(e){ console.error('البحث عن الجهاز الجديد:', e); }
   }
 
-  dpMountLock('dpLockHostIntake');   // 🔒 تصفير شاشة الباسورد
-  ['f_type','f_model','f_cust','f_phone','f_shop','f_bb','f_issue','f_note','f_color','f_serial'].forEach(id=>{
-    const e = $(id); if(!e) return; e.value=''; if(e.dataset) e.dataset.autoFill='';
-  });
-  ['dpCustList','dpPhoneList'].forEach(id=>{ const e=$(id); if(e) e.innerHTML=''; });
-  if($('f_tech')) $('f_tech').value = '';
-  closeIntake();
+  // 🔒 الباسورد + ضمان تاني للخانات — بعد ما الجهاز اتسجّل
+  const lock0 = dpCollectLock();
+  const extraOk = await dpAfterIntake(newId, extra, lock0);
+
   await loadDevices();
-  activeTab='mine'; render();
-  // الجهاز اتسجّل بس الملاحظة لأ → نقول بوضوح بدل ما تضيع في صمت
-  if(noteLost){
-    toast('✅ الجهاز اتسجّل — ⚠️ بس الملاحظة/الباسورد ماتحفظوش، ضيفهم من «تفاصيل»');
-    console.error('ملاحظة/باسورد الاستلام ضاعوا:', noteText0, lock0);
+  activeTab = 'mine'; render();
+
+  // ✅ شاشة «اتسجّل» — زي الاستقبال: الليبل جاهز للطباعة + رسالة الواتساب
+  const dNew = newId && devices.find(x => x.id === newId);
+  const raw = dNew ? dpRawOf(dNew) : { id: newId || '', deviceType: type, model, customerName: cust,
+                                       shopName: shop, reportedIssue: issue, status: 'waiting', intakeDate: intakeIso };
+  $('intakeForm').style.display = 'none';
+  $('intakeDone').style.display = '';
+  $('sheet').scrollTop = 0;
+  if(raw.id) renderLabelInto('dpAddLabel', raw);
+  const wa = $('dpAddWa');
+  if(wa && phone){
+    wa.href = 'https://wa.me/' + waNum(phone) + '?text=' + encodeURIComponent(dpWaMsg(raw));
+    wa.style.display = '';
+  }
+  dpMountLock('dpLockHostIntake');   // 🔒 تصفير شاشة الباسورد
+
+  // الجهاز اتسجّل بس حاجة من الإضافات لأ → نقول بوضوح بدل ما تضيع في صمت
+  if(!extraOk){
+    toast('✅ الجهاز اتسجّل — ⚠️ بس فيه خانات ماتحفظتش (الباسورد أو الميعاد)، كمّلها من «تفاصيل»');
+    console.error('خانات الاستلام ماتحفظتش:', newId, extra, lock0);
   } else {
     toast(t('dp.logged'));
   }
@@ -3407,34 +3700,10 @@ function ivxIsLegacy(d){
   return false;
 }
 
-// ============================================================
-// 🔁 مين ماسك الجهاز دلوقتي؟ (نفس invHolderOf في dashboard.html)
-// ------------------------------------------------------------
-// 🐞 اتصلّح (أكتوبر ٢٠٢٦): الجهاز اللي بيرجع ويتسجّل عليه «فني
-//    بديل» كان بيفضل في الجرد على الفني القديم — لأن d.tech هو
-//    technician بس، والبديل في خانة تانية (substituteTechnician).
-//
-// الترتيب: بديل الجولة الحالية ← آخر بديل في returnRounds ← الفني الأصلي.
-// ⚠️ ده للجرد بس. d.tech نفسه مبيتغيّرش — عشان «تغيير الفني»
-//    وباقي الصفحة يفضلوا شغالين على الفني الأصلي زي ما هما.
-// ============================================================
-function ivxHolder(d){
-  if(!d) return '';
-  const r = d._raw || {};
-  const cur = String(r.substituteTechnician || '').trim();
-  if(cur) return cur;
-  const past = Array.isArray(r.returnRounds) ? r.returnRounds : [];
-  for(let i = past.length - 1; i >= 0; i--){
-    const s = String((past[i] && past[i].substituteTechnician) || '').trim();
-    if(s) return s;
-  }
-  return (d.tech || '').trim();
-}
-
 // اسم الكارت اللي الجهاز ده المفروض يقف فيه
 function ivxKey(d){
-  const tech = ivxHolder(d);
-  if(tech) return tech;                 // عليه فني → كارت اللي ماسكه دلوقتي
+  const tech = (d.tech || '').trim();
+  if(tech) return tech;                 // عليه فني → كارت الفني، مبنلمسوش
   return ivxIsLegacy(d) ? ivxLegacyName() : ivxNoTechName();
 }
 
@@ -3492,7 +3761,7 @@ function invStuckDevices(){
 }
 
 function invMatchesSearch(d, q){
-  const hay = [d.customer, d.shop, d.tech, ivxHolder(d), d.type, d.model, d.phone, d.issue].join(' ').toLowerCase();   // 🔁 البحث باسم الفني البديل كمان
+  const hay = [d.customer, d.shop, d.tech, d.type, d.model, d.phone, d.issue].join(' ').toLowerCase();
   return hay.includes(q.toLowerCase());
 }
 
