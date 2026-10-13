@@ -450,6 +450,10 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
   /* 🛵 (ملف 95) زرار صفحة مسؤول القطع — المحاسب العام ومدير الإنتاج بس */
   .runner-menu-item{display:none !important;}
   body.role-super_admin .runner-menu-item, body.role-production .runner-menu-item{display:block !important;}
+  /* 📒 (ملفات 98 و 99) زرار «حسابات العملاء» — المحاسب العام بس، وبيحل محل «📒 الحسابات» القديم عنده */
+  .cust-menu-item{display:none !important;}
+  body.role-super_admin .cust-menu-item{display:block !important;}
+  body.role-super_admin .old-acc-menu-item{display:none !important;}
   .as-stars{display:flex; gap:4px; direction:ltr; justify-content:flex-end;}
   .as-star{border:none; background:none; font-size:32px; line-height:1; color:var(--border); cursor:pointer; padding:2px;}
   .as-star.on{color:#F5B301;}
@@ -1684,7 +1688,11 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
 
     <div class="mh mh-shop">🏪 المحل</div>
     <button class="money-menu-item" onclick="openAnalytics()">📊 الملخص المالي</button>
-    <button class="money-menu-item" onclick="openAccounts()">📒 الحسابات</button>
+    <!-- 📒 الحسابات القديمة — للمحاسب العام اتشالت من هنا واتنقلت لـ «📒 حسابات العملاء» (customers.html).
+         الشاشة نفسها لسه موجودة (openAccounts) لأي زرار تاني بيفتحها. -->
+    <button class="money-menu-item old-acc-menu-item" onclick="openAccounts()">📒 الحسابات</button>
+    <!-- 📒 (ملفات 98 و 99) حسابات العملاء: دفعات · خصم · كشف · أكواد · دمج · استحواذ — للمحاسب العام بس -->
+    <button class="cust-menu-item" onclick="location.href='customers.html'">📒 حسابات العملاء</button>
     <!-- 💬 للسوبر أدمن بس — syncWaHeldMenu بيظهّره ويحط عليه العدد -->
     <button id="waHeldMenuBtn" style="display:none;" onclick="openWaHeld()">💬 مسدجات الواتساب المتوقفة <span id="waHeldCount" style="display:none;background:#DC2626;color:#fff;border-radius:10px;padding:1px 7px;font-size:11.5px;font-weight:800;margin-inline-start:4px;"></span></button>
     <button class="admin-menu-item inv-menu-item" onclick="openSummaries()">📋 الجرد</button>
