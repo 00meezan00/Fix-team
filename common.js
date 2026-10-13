@@ -340,6 +340,30 @@ addEventListener('DOMContentLoaded', function(){
 });
 
 // ============================================================
+// 🏪 اختيار المحل من «📒 حسابات العملاء» — تحميل shop-picker.js
+// ------------------------------------------------------------
+// 🧸 بالبلدي: خانة «اسم المحل» في تسجيل الجهاز وتفاصيله بقت تقترح
+//    المحلات بالكود وتوحّد الاسم (ملفات SQL 98 و 100). common.js هو
+//    اللي بيجيب الملف للشاشات اللي فيها الخانة دي — زي الشات بالظبط،
+//    من غير ما نلمس الصفحات الكبيرة:
+//      dashboard (الاستقبال والمحاسب العام) · dispatch · owner
+// ⚠️ لو الملف مش مرفوع أو ملف 98 مش متشغّل: الخانة بتفضل كتابة حرة
+//    زي زمان — ولا صفحة بتقع.
+// ============================================================
+addEventListener('DOMContentLoaded', function(){
+  try{
+    var page = (location.pathname.split('/').pop() || '').toLowerCase().replace(/\.html$/,'') || 'index';
+    if(['dashboard','dispatch','owner'].indexOf(page) === -1) return;
+    if(window.IFixShops || document.getElementById('spScript')) return;
+    var s = document.createElement('script');
+    s.id = 'spScript';
+    s.src = 'shop-picker.js';
+    s.onerror = function(){ console.error('فشل تحميل shop-picker.js — خانة المحل هتفضل كتابة حرة'); };
+    document.head.appendChild(s);
+  }catch(e){ console.error('shop-picker loader:', e); }
+});
+
+// ============================================================
 // 🗂️ ترتيب قايمة التلت نقط — إخفاء العناوين الفاضية
 // ------------------------------------------------------------
 // 🧠 بالبلدي: القايمة متقسّمة مجموعات، فوق كل مجموعة عنوان صغير
