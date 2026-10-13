@@ -5,6 +5,7 @@
 
    💬 (٢٠٢٦-١٠-١٢) شات الموظفين — بدل «محادثات العملاء» (الأسيست اتشال).
    📞 (٢٠٢٦-١٠-١٣) الكول سنتر اتضاف للأدوار (ملف 91).
+   🛵 (٢٠٢٦-١٠-١٣) مسؤول قطع الغيار اتضاف للأدوار (ملف 95).
    ============================================================ */
 (function () {
   'use strict';
@@ -52,9 +53,10 @@
     reception:   { t: 'الاستقبال',     i: '🛎️' },
     production:  { t: 'مدير الإنتاج',  i: '🏭' },
     callcenter:  { t: 'الكول سنتر',    i: '📞' },
+    parts:       { t: 'مسؤول القطع',   i: '🛵' },
     staff:       { t: 'موظف',          i: '👤' }
   };
-  var ROLE_ORDER = ['super_admin', 'owner', 'reception', 'production', 'callcenter', 'accountant', 'dispatcher', 'technician', 'staff'];
+  var ROLE_ORDER = ['super_admin', 'owner', 'reception', 'production', 'parts', 'callcenter', 'accountant', 'dispatcher', 'technician', 'staff'];
   var KEEP = 400;                       // آخر كام رسالة في الذاكرة
 
   var S = {

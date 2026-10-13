@@ -84,7 +84,7 @@
       accountant:'أمين الخزنة', dispatcher:'مسؤول حركة', technician:'فني',
       hr:'شؤون العاملين', staff:'موظف', owner:'المالك',
       reception:'موظف الاستقبال', production:'مدير الإنتاج',
-      callcenter:'الكول سنتر'
+      callcenter:'الكول سنتر', parts:'مسؤول قطع الغيار'
     };
     return map[r] || r || '';
   }

@@ -305,7 +305,8 @@ addEventListener('DOMContentLoaded', function(){
 addEventListener('DOMContentLoaded', function(){
   try{
     var page = (location.pathname.split('/').pop() || '').toLowerCase().replace(/\.html$/,'');
-    var PAGES = ['owner','dispatch','my-devices','staff'];
+    // 🛵 parts = صفحة مسؤول قطع الغيار (ملف 95)
+    var PAGES = ['owner','dispatch','my-devices','staff','parts'];
     if(PAGES.indexOf(page) === -1) return;
     if(window.IFixStaffChat || document.getElementById('dkScript')) return;
     function add(id, src, then){

@@ -244,9 +244,11 @@ let ME = '', ROLES_MAP = {}, MY_ROLE = '';
     dispatcher:  'dispatch.html',
     hr:          'hr.html',
     owner:       'owner.html',
-    // 🛎️🏭 الاستقبال ومدير الإنتاج على شاشة المحاسب
+    parts:       'parts.html',     // 🛵 مسؤول قطع الغيار (ملف 95)
+    // 🛎️🏭📞 الاستقبال ومدير الإنتاج والكول سنتر على شاشة المحاسب
     reception:   'dashboard.html',
     production:  'dashboard.html',
+    callcenter:  'dashboard.html',
     accountant:  'dashboard.html',
     super_admin: 'dashboard.html'
   };
@@ -264,7 +266,8 @@ let ME = '', ROLES_MAP = {}, MY_ROLE = '';
 function roleLabel(r){
   return { super_admin:'أدمن', accountant:'أمين الخزنة', dispatcher:'مسؤول حركة',
            technician:'فني', hr:'شؤون العاملين', staff:'موظف',
-           owner:'المالك', reception:'موظف الاستقبال', production:'مدير الإنتاج' }[r] || r;
+           owner:'المالك', reception:'موظف الاستقبال', production:'مدير الإنتاج',
+           callcenter:'الكول سنتر', parts:'مسؤول قطع الغيار' }[r] || r;
 }
 function nameOf(email){
   const v = ROLES_MAP[email];

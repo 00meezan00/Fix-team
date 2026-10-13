@@ -459,6 +459,7 @@ function render(){
         <option value="reception">🛎️ موظفين الاستقبال بس</option>
         <option value="production">🏭 مديرين الإنتاج بس</option>
         <option value="callcenter">📞 الكول سنتر بس</option>
+        <option value="parts">🛵 مسؤولي قطع الغيار بس</option>
         <option value="user">👤 شخص بعينه…</option>
       </select>
       <select id="bcUser" style="display:none;">
@@ -759,7 +760,9 @@ async function toggleFlag(key){
 //    الاتنين على dashboard.html بمفتاح أصغر من المحاسب.
 // 📞 callcenter = الكول سنتر (ملف 91) — على dashboard.html كمان:
 //    بيكلّم العملاء بس (وقت أطول · الدرج · ما بعد البيع)، ومابيحرّكش أجهزة.
-const ROLES = ['super_admin', 'accountant', 'dispatcher', 'technician', 'hr', 'staff', 'owner', 'reception', 'production', 'callcenter'];
+// 🛵 parts = مسؤول قطع الغيار (ملف 95) — صفحته parts.html: بيجيب القطع من التجار
+//    وبيسجّلها على حساباتهم. مايشوفش الأجهزة ولا العملاء ولا الفلوس بتاعة الزباين.
+const ROLES = ['super_admin', 'accountant', 'dispatcher', 'technician', 'hr', 'staff', 'owner', 'reception', 'production', 'callcenter', 'parts'];
 const ROLE_LABEL_KEYS = {
   super_admin: 'adm.roleSuper',
   accountant:  'adm.roleAcc',
@@ -772,7 +775,7 @@ const ROLE_LABEL_KEYS = {
 };
 // الأدوار اللي لسه مالهاش مفتاح ترجمة — من غير ده بيظهر الاسم
 // الإنجليزي الخام (staff) قدّام الأدمن.
-const ROLE_LABEL_FALLBACK = { staff: 'موظف', owner: 'المالك', reception: 'موظف الاستقبال', production: 'مدير الإنتاج', callcenter: 'الكول سنتر' };
+const ROLE_LABEL_FALLBACK = { staff: 'موظف', owner: 'المالك', reception: 'موظف الاستقبال', production: 'مدير الإنتاج', callcenter: 'الكول سنتر', parts: 'مسؤول قطع الغيار' };
 function roleLabel(r){
   const k = ROLE_LABEL_KEYS[r];
   try{ return k ? t(k) : (ROLE_LABEL_FALLBACK[r] || r); }
@@ -801,8 +804,8 @@ function normRole(v){
 // ============================================================
 const CAPS = [
   { key:'purchases', icon:'🧾', label:'فواتير المشتريات ومخزن قطع الغيار',
-    hint:'قراءة الفواتير بالذكاء الاصطناعي + المخزن + ربط القطع بالأجهزة',
-    forRoles:['dispatcher','owner','hr','reception','production'] },  // الديسباتشر بس — صفحة الفني مش موصّلة بالموديول
+    hint:'قراءة الفواتير بالذكاء الاصطناعي + المخزن + ربط القطع بالأجهزة — 🛵 لمسؤول القطع: افتحها عشان «صوّر الفاتورة» يقراها لوحده',
+    forRoles:['dispatcher','owner','hr','reception','production','parts'] },  // الديسباتشر بس — صفحة الفني مش موصّلة بالموديول
   { key:'parts_review', icon:'🔩', label:'مراجعة قطع الغيار',
     hint:'يشوف كومنت قطع الغيار اللي الفني كتبه على كل جهاز، ويربط القطع بالأجهزة',
     forRoles:['dispatcher','owner','hr','reception','production'] },
@@ -923,7 +926,8 @@ const BC_AUDIENCE = {
   dispatcher: 'مسؤولي الحركة بس',
   reception:  'موظفين الاستقبال بس',
   production: 'مديرين الإنتاج بس',
-  callcenter: 'الكول سنتر بس'
+  callcenter: 'الكول سنتر بس',
+  parts:      'مسؤولي قطع الغيار بس'
 };
 
 // علامة إن المنشور اللي هيتبعت هو منشور خطط الاشتراك تحديداً.

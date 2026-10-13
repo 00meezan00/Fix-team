@@ -68,12 +68,13 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
       }
     }
 
-    if(!bounced && sameUser && (last === 'dispatcher' || last === 'technician' || last === 'hr' || last === 'staff' || last === 'owner')){
+    if(!bounced && sameUser && (last === 'dispatcher' || last === 'technician' || last === 'hr' || last === 'staff' || last === 'owner' || last === 'parts')){
       sessionStorage.setItem('ifix-bounced', '1');
       location.replace(last === 'dispatcher' ? 'dispatch.html'
                      : last === 'hr'         ? 'hr.html'
                      : last === 'staff'      ? 'staff.html'
                      : last === 'owner'      ? 'owner.html'
+                     : last === 'parts'      ? 'parts.html'     // 🛵 (ملف 95)
                      : 'my-devices.html');
       return;
     }
@@ -446,6 +447,9 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
   body.role-callcenter .new-dev-btn, body.role-callcenter #dpSection,
   body.role-callcenter #backupWrap, body.role-callcenter .eval-menu-item,
   body.role-callcenter #board{display:none !important;}
+  /* 🛵 (ملف 95) زرار صفحة مسؤول القطع — المحاسب العام ومدير الإنتاج بس */
+  .runner-menu-item{display:none !important;}
+  body.role-super_admin .runner-menu-item, body.role-production .runner-menu-item{display:block !important;}
   .as-stars{display:flex; gap:4px; direction:ltr; justify-content:flex-end;}
   .as-star{border:none; background:none; font-size:32px; line-height:1; color:var(--border); cursor:pointer; padding:2px;}
   .as-star.on{color:#F5B301;}
@@ -1691,6 +1695,8 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
     <button class="money-menu-item" onclick="openStaff()">👥 الموظفين</button>
 
     <div class="mh mh-parts">🔩 قطع الغيار</div>
+    <!-- 🛵 (ملف 95) طلبات القطع · التجار وحساباتهم · الفواتير · المطابقة — للمحاسب العام ومدير الإنتاج -->
+    <button class="runner-menu-item" onclick="location.href='parts.html'">🛵 مسؤول القطع والتجار</button>
     <!-- 📍 فواتير المشتريات · مخزن قطع الغيار · مراجعة قطع الغيار بيتحطوا هنا -->
     <span id="slotParts" hidden></span>
 
@@ -2216,7 +2222,7 @@ const ADMIN_EMAIL_SET = ADMIN_EMAILS.length > 0;
 const ROLES_KEY = 'user-roles';
 // 🛎️ reception = موظف الاستقبال — بيفضل على الداشبورد ده (مفيش تحويل لصفحة تانية)
 // 🏭 production = مدير الإنتاج — برضه على الداشبورد ده
-const ROLES = ['super_admin', 'accountant', 'dispatcher', 'technician', 'hr', 'staff', 'owner', 'reception', 'production', 'callcenter'];   // 📞 (ملف 91)
+const ROLES = ['super_admin', 'accountant', 'dispatcher', 'technician', 'hr', 'staff', 'owner', 'reception', 'production', 'callcenter', 'parts'];   // 📞 (ملف 91) · 🛵 (ملف 95)
 let userRoles = {};   // { "email": "super_admin" }  أو  { "email": {role, techName} }
 
 // rolesLoadOk = قدرنا نقرا الأدوار من السيرفر فعلاً؟
@@ -2329,7 +2335,7 @@ const ROLE_LABEL_KEYS = {
 };
 // دور HR اتضاف بعد ما الخريطة دي اتكتبت ومالوش مفتاح ترجمة،
 // فبيرجّع 'hr' خام. الخريطة دي بتغطّي أي دور مالوش مفتاح.
-const ROLE_LABEL_FALLBACK = { hr: 'موارد بشرية', staff: 'موظف', owner: 'المالك', reception: 'موظف الاستقبال', production: 'مدير الإنتاج', callcenter: 'الكول سنتر' };
+const ROLE_LABEL_FALLBACK = { hr: 'موارد بشرية', staff: 'موظف', owner: 'المالك', reception: 'موظف الاستقبال', production: 'مدير الإنتاج', callcenter: 'الكول سنتر', parts: 'مسؤول قطع الغيار' };
 function roleLabel(r){
   // 🧾 حساب السوبر أدمن **هو** «المحاسب العام» — ولوحة الأدمن باب جواه.
   //    فاسمه في كل حاجة الناس بتشوفها (ملاحظات الأجهزة · حسابي ·
@@ -2361,6 +2367,7 @@ function applyRoleVisibility(){
   try{ loadPartsLog(); }catch(e){}   // 🧰 إشعار حركة الفنيين على المخزن (للمحاسب/الأدمن بس)
   try{ loadTrash(); }catch(e){}      // 🗑 المهملات + المسح التلقائي بعد ٣٠ يوم
   try{ loadClosings(); }catch(e){}   // 🔒 تقفيلات الخزنة (أمين الخزنة + المحاسب العام)
+  try{ prnLoadOpen(); }catch(e){}    // 🛵 (ملف 95) طلبات قطع الغيار المفتوحة — شارة على الكروت
   try{ document.body.classList.toggle('push-on', PUSH_ENABLED); pushAutoRefresh(); }catch(e){}   // 🔔 (المرحلة ٣) الموبايل المتفعّل بيتجدّد تسجيله في صمت
   // خانة "حسابي" — مستقلة تماماً عن الإشعارات، عشان تظهر حتى لو
   // ميزة الإشعارات مقفولة (ده كان بيمنعها من الظهور خالص).
@@ -2397,6 +2404,8 @@ function applyRoleVisibility(){
   if(myRole() === 'staff'){ location.replace('staff.html'); return; }
   // 👑 المالك: صفحته owner.html — بتقرا من devices_owner
   if(myRole() === 'owner'){ location.replace('owner.html'); return; }
+  // 🛵 (ملف 95) مسؤول قطع الغيار: صفحته parts.html — مالوش دعوة بالأجهزة ولا الفلوس هنا
+  if(myRole() === 'parts'){ location.replace('parts.html'); return; }
 
   // الدور اتحدد → نحفظه ونحدّث الكلاسات
   try{
@@ -7945,7 +7954,7 @@ const LATE_NAME = { received_from_reception: 'محدش بدأ فيه', diagnosin
 let lateOpen = false;
 function lateInfo(d){
   const h = LATE_H[d && d.status];
-  if(!h || d.partWait) return null;
+  if(!h || d.partWait || prnOpenFor(d.id).length) return null;   // 🛵 (ملف 95) طلب قطعة مفتوح = مستني حاجة معروفة
   const at = enteredAt(d, d.status);
   const hrs = hoursSince(at);
   return hrs >= h ? { hrs, at } : null;
@@ -7991,6 +8000,7 @@ function partWaitHtml(d){
     <div class="rfr-q">🔩 الجهاز مستني قطعة — الكارت هيتعلّم، ومش هيتحسب «متأخر»</div>
     <label class="field"><span>القطعة</span><input id="partWaitName" placeholder="مثال: شاشة A12 أصلي" /></label>
     <label class="field"><span>مين طلبها</span><input id="partWaitBy" value="${esc(d.technician || currentUser.name || '')}" /></label>
+    <label class="field" style="display:flex;gap:8px;align-items:center;"><input id="partWaitRunner" type="checkbox" checked style="width:auto;" /> <span style="margin:0;">🛵 ابعت طلب لمسؤول قطع الغيار يجيبها</span></label>
     <div class="pay-choice">
       <button type="button" class="pay-btn" style="border-color:var(--info);background:var(--info);color:#fff;" onclick="ph2SetPartWait('${d.id}')">🔩 علّمه «مستني قطعة»</button>
       <button type="button" class="pay-btn" style="border-color:var(--border);color:var(--ink-2);background:var(--surface);" onclick="partAskId=null;renderDetail();">إلغاء</button>
@@ -8002,6 +8012,7 @@ async function ph2SetPartWait(id){
   const part = ((document.getElementById('partWaitName') || {}).value || '').trim();
   const by   = ((document.getElementById('partWaitBy') || {}).value || '').trim();
   if(part.length < 2){ alert('اكتب القطعة'); return; }
+  const toRunner = !!((document.getElementById('partWaitRunner') || {}).checked);
   const now = new Date().toISOString();
   partAskId = null;
   devices = devices.map(x => x.id === id ? { ...x,
@@ -8010,6 +8021,8 @@ async function ph2SetPartWait(id){
     activityNotes: [...(x.activityNotes || []), { text: '🔩 مستني قطعة: ' + part + (by ? ' — طلبها ' + by : ''), at: now, by: currentUser.name, role: currentRoleLabel() }] } : x);
   renderDetail(); render();
   await persist();
+  // 🛵 (ملف 95) طلب لمسؤول القطع — في دفتره هو، مش جوه الجهاز
+  if(toRunner) await prnRequest(id, part, by ? 'طلبها ' + by : '');
   // ⏳ (٢٠٢٦-١٠-١٣) القطعة غالباً هتأخّره — نسأله على طول
   const nd = devices.find(x => x.id === id);
   if(nd && isDueActive(nd) && !dueAskOpen(nd)
@@ -8023,6 +8036,8 @@ async function ph2PartArrived(id){
   if(!d || !d.partWait) return;
   const now = new Date().toISOString();
   const note = '✅ القطعة وصلت: ' + d.partWait.part + ' (كان مستنيها ' + splAgoTxt(d.partWait.at).replace(/^من /, '') + ')';
+  // 🛵 (ملف 95) الطلبات اللي اتشرت للجهاز ده → «الفني استلم»
+  try{ await prnMarkReceived(id); }catch(e){}
   devices = devices.map(x => x.id === id ? { ...x, partWait: null,
     lastModifiedAt: now, lastModifiedBy: currentUser.name,
     activityNotes: [...(x.activityNotes || []), { text: note, at: now, by: currentUser.name, role: currentRoleLabel() }] } : x);
@@ -8034,6 +8049,7 @@ async function ph2PartArrived(id){
 function ph2CardChips(d){
   let h = dueCardChip(d);   // ⏳ (٢٠٢٦-١٠-١٣) الميعاد مع العميل
   h += dispCardChip(d);     // 🚗 (ملف 94) العهدة مع مسؤول الحركة
+  h += prnCardChip(d);      // 🛵 (ملف 95) طلب قطعة عند مسؤول القطع
   if(d.partWait && (isProduction() || isReception()))
     h += `<span class="rc-chip" style="background:var(--info-bg);color:var(--info)">🔩 ${esc(d.partWait.part)} · ${esc(splAgoTxt(d.partWait.at))}</span> `;
   if(isProduction()){
@@ -8164,6 +8180,7 @@ let closings = [], closingsErr = '', closingsTimer = null;
 let closingsLimit = 60;   // 🚀🚀🚀 دفتر المراجعة بيطلب أكتر (loadClosings(500))
 async function loadClosings(lim){
   if(!(isCashier() || isSuperAdmin())) return;
+  try{ await loadSupPays(); }catch(e){}   // 🛵 (ملف 95) دفعات التجار — بتطلع من الخزنة
   if(lim) closingsLimit = Math.max(closingsLimit, lim);
   try{
     const { data, error } = await sb.from('cash_closings')
@@ -8228,7 +8245,7 @@ function closeCloseBox(){
   if(o) o.remove();
 }
 function closeDiffNow(){
-  const exp = collectedSince(closingFrom()).sum;
+  const exp = collectedSince(closingFrom()).sum - supPaidSince(closingFrom()).sum;   // 🛵 (ملف 95) دفعات التجار طلعت من الخزنة
   const v = enDigits(((document.getElementById('closeCounted') || {}).value || '')).replace(/[^0-9]/g, '');
   const el = document.getElementById('closeDiff');
   if(!el) return;
@@ -8249,14 +8266,16 @@ function renderCloseBox(){
     document.body.appendChild(o);
   }
   const from = closingFrom();
-  const { sum, n } = collectedSince(from);
+  const { n } = collectedSince(from);
+  const got = collectedSince(from).sum, sup = supPaidSince(from);   // 🛵 (ملف 95)
+  const sum = got - sup.sum;
   o.innerHTML = `<div class="modal" style="max-width:440px;">
     <div class="modal-head"><h2>🔒 تقفيل الخزنة</h2><button class="close-btn" onclick="closeCloseBox()">×</button></div>
     <div style="font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:8px;">من ${new Date(from).toLocaleString('ar-EG')} لحد دلوقتي</div>
     <div class="ph1-today" style="margin:0 0 14px;">
       <div class="ph1-today-l">💵 المفروض في الخزنة</div>
       <div class="ph1-today-n">${sum.toLocaleString('en-EG')} <small>ج.م</small></div>
-      <div class="ph1-today-s">${n} تحصيل</div>
+      <div class="ph1-today-s">${n} تحصيل${sup.n ? ` · 💵 اتحصّل ${got.toLocaleString('en-EG')} − 🏪 اتدفع للتجار ${sup.sum.toLocaleString('en-EG')}` : ''}</div>
     </div>
     <label class="field"><span>🧮 عدّيت كام فعلاً؟</span>
       <input id="closeCounted" type="text" inputmode="numeric" autocomplete="off" oninput="fixDigitsInput(this);closeDiffNow()" placeholder="المبلغ اللي في الدرج بالجنيه" /></label>
@@ -8274,7 +8293,8 @@ async function submitClosing(){
   if(raw === ''){ alert('اكتب المبلغ اللي عدّيته'); return; }
   const from = closingFrom();
   const toIso = new Date().toISOString();
-  const { sum, n } = collectedSince(from);
+  const { n } = collectedSince(from);
+  const sum = collectedSince(from).sum - supPaidSince(from).sum;   // 🛵 (ملف 95) دفعات التجار
   const counted = parseInt(raw);
   if(counted !== sum && note.length < 3){ alert('فيه فرق — اكتب السبب'); const e = document.getElementById('closeNote'); if(e) e.focus(); return; }
   if(!confirm('🔒 هتقفّل الخزنة:\nالمفروض ' + sum.toLocaleString('en-EG') + ' ج.م · عدّيت ' + counted.toLocaleString('en-EG') + ' ج.م\n\nمتأكد؟')) return;
@@ -9504,7 +9524,7 @@ function renderDetailNow(){
     <h2 style="font-family:'Cairo',sans-serif;font-size:18px;margin:4px 0 10px;">${esc(d.deviceType)} ${esc(d.model)}</h2>
     ${pendingApprovalText(d) ? `<div class="pending-appr-banner">⏳ ${pendingApprovalText(d)} — ${t('appr.bannerHint')}</div>` : ''}
     ${isReception() ? receptionWhereHtml(d) : ''}
-    ${dispBoxHtml(d)}${drawerWaHtml(d)}${rejectReasonShowHtml(d)}${dueBoxHtml(d)}${asBoxHtml(d)}${callLogHtml(d)}${partWaitHtml(d)}${receiptHtml(d)}
+    ${dispBoxHtml(d)}${drawerWaHtml(d)}${rejectReasonShowHtml(d)}${dueBoxHtml(d)}${asBoxHtml(d)}${callLogHtml(d)}${partWaitHtml(d)}${partsRunnerHtml(d)}${receiptHtml(d)}
 
     <div class="row2">
       <label class="field"><span>${t('det.customerName')}</span><input value="${esc(d.customerName)}"${roC} onblur="editField('customerName', this.value)" /></label>
@@ -15865,5 +15885,212 @@ async function saveSubInfo(){
 
 <!-- شاشة «مرتبك» — بتتبني بالكامل من payroll.js -->
 <div id="payOverlay" class="hidden"></div>
+<script>
+// ############################################################
+// 🛵 (ملف 95) مسؤول قطع الغيار — جوه الداشبورد
+// ------------------------------------------------------------
+// 🧸 بالبلدي: مسؤول القطع شغّال من صفحته (parts.html). هنا بس:
+//   • 🏷️ شارة على كارت الجهاز: «🛵 شاشة · 🚶 رايح يجيبها»
+//   • 📋 قسم في تفاصيل الجهاز: الطلبات · القطع اللي اتجابت (ملاحظة
+//     المسؤول) جنب كلام الفني · ✅/🔴 مطابق · 🛵 اطلب قطعة
+//   • 🔒 الخزنة: دفعات التجار بتتخصم من «المفروض في الخزنة»
+// ⚠️ كل حاجة هنا بتتقرا من دوال السيرفر (parts_open_requests /
+//    parts_device_info) — والسيرفر بيشيل الأسعار عن الاستقبال
+//    ومدير الإنتاج قبل ما توصل. ومفيش ولا سطر بيكتب في جدول الأجهزة.
+// ############################################################
+const PRN = { open: [], byDev: {}, info: {}, loading: {}, timer: null, sig: '', off: false };
+function prnCan(){ return isSuperAdmin() || isProduction() || isReception(); }
+function prnOpenFor(id){ return (PRN.byDev && PRN.byDev[id]) || []; }
+const PRN_ST = { new:'🆕 مستني المسؤول', going:'🚶 رايح يجيبها', bought:'🛒 اتشرت — مستني الفني يستلم',
+                 received:'✅ الفني استلم', unavailable:'🚫 مش متوفرة', cancelled:'✖️ اتلغى' };
+
+async function prnLoadOpen(){
+  if(!prnCan() || PRN.off) return;
+  try{
+    const { data, error } = await sb.rpc('parts_open_requests');
+    if(error) throw error;
+    const rows = data || [];
+    const sig = JSON.stringify(rows.map(r => r.id + r.status + (r.taken_by_name || '')));
+    PRN.open = rows; PRN.byDev = {};
+    rows.forEach(r => { (PRN.byDev[r.device_id] = PRN.byDev[r.device_id] || []).push(r); });
+    if(sig !== PRN.sig){ PRN.sig = sig; try{ render(); }catch(e){} }
+  }catch(e){
+    // ملف 95 لسه ما اتشغّلش؟ → نسكت خالص بدل ما نسأل كل دقيقتين
+    if(/parts_open_requests|schema cache|does not exist|PGRST202/i.test((e && e.message) || '')) PRN.off = true;
+    console.warn('[قطع الغيار] الطلبات المفتوحة:', e && e.message);
+  }
+  if(!PRN.timer && !PRN.off) PRN.timer = setInterval(() => { if(!document.hidden) prnLoadOpen(); }, 120000);
+}
+
+function prnCardChip(d){
+  if(!prnCan()) return '';
+  return prnOpenFor(d.id).map(r => `<span class="rc-chip" style="background:var(--info-bg);color:var(--info)">🛵 ${esc(r.part)} · ${
+    r.status === 'going' ? '🚶 ' + esc(r.taken_by_name || 'رايح يجيبها') : r.status === 'bought' ? '🛒 اتشرت' : '🆕 مستني'}</span> `).join('');
+}
+
+// ---------- 📋 القسم جوه تفاصيل الجهاز ----------
+function partsRunnerHtml(d){
+  if(!d || !prnCan() || PRN.off) return '';
+  const info = PRN.info[d.id];
+  if(!info || Date.now() - info._at > 60000) setTimeout(() => prnLoadInfo(d.id), 0);
+  return `<div id="prnBox" data-dev="${esc(d.id)}">${prnBoxInner(d, info)}</div>`;
+}
+async function prnLoadInfo(id){
+  if(PRN.loading[id]) return;
+  PRN.loading[id] = true;
+  try{
+    const { data, error } = await sb.rpc('parts_device_info', { p_device_id: id });
+    if(error) throw error;
+    PRN.info[id] = Object.assign({}, data || {}, { _at: Date.now() });
+  }catch(e){
+    const m = (e && e.message) || String(e);
+    if(/parts_device_info|schema cache|does not exist|PGRST202/i.test(m)) PRN.off = true;
+    PRN.info[id] = { _err: m, _at: Date.now() };
+  }
+  PRN.loading[id] = false;
+  const box = document.getElementById('prnBox');
+  if(box && box.dataset.dev === id){
+    const d = devices.find(x => x.id === id);
+    box.innerHTML = d ? prnBoxInner(d, PRN.info[id]) : '';
+  }
+}
+function prnBoxInner(d, info){
+  if(!info) return '';
+  if(info._err) return PRN.off ? '' : `<div class="rc-where" style="background:var(--danger-bg);color:var(--danger)">⚠️ قطع الغيار: ${esc(info._err)}</div>`;
+  const reqs = info.requests || [];
+  const buys = (info.purchases || []).filter(p => p.dest === 'device');
+  const stocked = (info.purchases || []).filter(p => p.dest === 'stock');
+  const boss = isSuperAdmin(), prod = isProduction();
+  if(!reqs.length && !buys.length && !stocked.length && !(boss || prod)) return '';
+  const m = info.match;
+  const tech = String(d.partsComment || '').trim();
+
+  const reqHtml = reqs.map(q => {
+    const acts = [];
+    if((boss || prod) && ['new', 'going'].includes(q.status)) acts.push(`<button class="acc-mini-btn" style="color:var(--danger);border-color:var(--danger-border);" onclick="prnAct('${q.id}','cancel','${esc(d.id)}')">✖️ إلغاء</button>`);
+    if((boss || prod) && q.status === 'bought') acts.push(`<button class="acc-mini-btn" style="color:var(--success);border-color:var(--success-border);" onclick="prnAct('${q.id}','received','${esc(d.id)}')">✅ الفني استلم</button>`);
+    if((boss || prod) && ['unavailable', 'cancelled'].includes(q.status)) acts.push(`<button class="acc-mini-btn" onclick="prnAct('${q.id}','reopen','${esc(d.id)}')">🔄 افتحه تاني</button>`);
+    return `<div style="padding:7px 0;border-top:1px solid var(--border);">
+      <b>${q.urgent ? '🔥 ' : ''}${esc(q.part)}</b> — <span style="color:var(--muted)">${esc(PRN_ST[q.status] || q.status)}${q.taken_by_name ? ' · ' + esc(q.taken_by_name) : ''}</span>
+      <div style="font-size:12px;color:var(--muted);">طلبها ${esc(q.requested_by_name)} · ${esc(splAgoTxt(q.created_at))}${q.close_note ? ' · ' + esc(q.close_note) : ''}</div>
+      ${acts.length ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:5px;">${acts.join('')}</div>` : ''}</div>`;
+  }).join('');
+
+  const price = p => (boss && p.unit_price != null)
+    ? ` · <b>${Number(p.unit_price).toLocaleString('en-EG')}</b> ج.م` : (boss ? ' · <span style="color:var(--warn)">⏳ من غير سعر</span>' : '');
+  const buyRow = p => `<div style="padding:5px 0;${p.status === 'returned' ? 'text-decoration:line-through;opacity:.6;' : ''}">
+      🛒 <b>${esc(p.part)}</b>${Number(p.qty) > 1 ? ' ×' + Number(p.qty) : ''} · 🏪 ${esc(p.supplier)}${price(p)}
+      ${p.status === 'bad' ? ' <span style="color:var(--danger)">🔧 بايظة</span>' : ''}${p.status === 'returned' ? ' ↩️ رجعت' : ''}${p.dup_state === 'open' ? ' <span style="color:var(--danger)">🔴 تكرار</span>' : ''}
+      <div style="font-size:12px;color:var(--muted);">${esc(p.bought_by_name)} · ${esc(splAgoTxt(p.bought_at))}${p.note ? ' · ' + esc(p.note) : ''}</div>
+      ${(boss || prod) && p.status === 'active' ? `<button class="acc-mini-btn" style="margin-top:4px;color:var(--danger);border-color:var(--danger-border);" onclick="prnBad('${p.id}','${esc(d.id)}')">🔧 القطعة بايظة</button>` : ''}</div>`;
+
+  const mState = !buys.length ? '' : (m && !m.stale) ? (m.decision === 'match' ? '✅ مطابق' : '🔴 مش مطابق') : '🟡 محتاج مراجعة';
+  const matchBox = !buys.length ? '' : `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">
+      <div style="background:var(--surface-2);border-radius:9px;padding:7px 9px;font-size:12.5px;line-height:1.7;">
+        <div style="font-size:11px;font-weight:900;color:var(--muted);">🔧 الفني كتب</div>${tech ? esc(tech) : '<span style="color:var(--muted)">لسه ماكتبش</span>'}</div>
+      <div style="background:var(--surface-2);border-radius:9px;padding:7px 9px;font-size:12.5px;line-height:1.7;">
+        <div style="font-size:11px;font-weight:900;color:var(--muted);">🛵 المسؤول جاب</div>${buys.filter(p => p.status !== 'returned').map(p => esc(p.part) + (Number(p.qty) > 1 ? ' ×' + Number(p.qty) : '')).join('<br>') || '—'}</div>
+    </div>
+    <div style="margin-top:6px;font-weight:800;">${mState}${m && !m.stale ? ` <span style="font-weight:600;font-size:12px;color:var(--muted)">— ${esc(m.by_name)}${m.note ? ': ' + esc(m.note) : ''}</span>` : ''}</div>
+    ${(boss || prod) ? `<div style="display:flex;gap:6px;margin-top:6px;">
+      <button class="acc-mini-btn" style="color:var(--success);border-color:var(--success-border);" onclick="prnMatch('${esc(d.id)}','match')">✅ مطابق</button>
+      <button class="acc-mini-btn" style="color:var(--danger);border-color:var(--danger-border);" onclick="prnMatch('${esc(d.id)}','mismatch')">🔴 مش مطابق</button></div>` : ''}`;
+
+  return `<div class="rc-where" style="background:var(--surface-2);color:var(--ink);border:1px solid var(--border);text-align:start;">
+    <div style="font-weight:900;margin-bottom:4px;">🛵 قطع الغيار من التجار</div>
+    ${reqHtml || '<div style="font-size:12.5px;color:var(--muted);">مفيش طلبات قطع للجهاز ده.</div>'}
+    ${buys.length ? `<div style="margin-top:6px;border-top:1px solid var(--border);padding-top:6px;">${buys.map(buyRow).join('')}</div>` : ''}
+    ${stocked.length ? `<div style="font-size:12px;color:var(--muted);margin-top:4px;">📦 ${stocked.length} قطعة زيادة اتجابت للجهاز ده ودخلت المخزن</div>` : ''}
+    ${matchBox}
+    ${(boss || prod) ? `<button class="acc-mini-btn" style="width:100%;margin-top:8px;padding:9px;color:var(--info);border-color:var(--info-border);" onclick="prnAsk('${esc(d.id)}')">🛵 اطلب قطعة من مسؤول القطع</button>` : ''}
+  </div>`;
+}
+function prnRefresh(devId){
+  delete PRN.info[devId];
+  prnLoadInfo(devId);
+  prnLoadOpen();
+}
+async function prnRequest(devId, part, note){
+  try{
+    const { error } = await sb.rpc('part_request_create', { p_device_id: devId, p_part: part, p_note: note || '', p_urgent: false });
+    if(error) throw error;
+    ph1Toast('🛵 الطلب وصل لمسؤول القطع: ' + part);
+  }catch(e){
+    const m = (e && e.message) || String(e);
+    // ملف 95 لسه ما اتشغّلش → علامة «مستني قطعة» اتحطت عادي، والطلب بس هو اللي مااتبعتش
+    alert('⚠️ الطلب مااتبعتش لمسؤول القطع: ' + m + (/part_request_create|schema cache|does not exist/i.test(m) ? '\n(ملف SQL رقم 95 لسه ما اتشغّلش)' : ''));
+  }
+  prnRefresh(devId);
+}
+async function prnAsk(devId){
+  const part = (prompt('🛵 القطعة المطلوبة؟ (هتوصل لمسؤول قطع الغيار)') || '').trim();
+  if(part.length < 2) return;
+  const note = prompt('📝 ملاحظة للمسؤول (اختياري)', '');
+  if(note === null) return;
+  await prnRequest(devId, part, note);
+}
+async function prnAct(reqId, action, devId){
+  let note = '';
+  if(action === 'cancel'){ note = prompt('✖️ سبب الإلغاء (اختياري)', ''); if(note === null) return; }
+  try{
+    const { error } = await sb.rpc('part_request_act', { p_id: reqId, p_action: action, p_note: note });
+    if(error) throw error;
+  }catch(e){ alert('⚠️ ' + ((e && e.message) || e)); }
+  prnRefresh(devId);
+}
+async function prnBad(purchaseId, devId){
+  const why = prompt('🔧 القطعة فيها إيه؟ (هتروح لمسؤول القطع يرجّعها للتاجر)');
+  if(!why) return;
+  try{
+    const { error } = await sb.rpc('part_purchase_mark', { p_id: purchaseId, p_action: 'bad', p_reason: why });
+    if(error) throw error;
+  }catch(e){ alert('⚠️ ' + ((e && e.message) || e)); }
+  prnRefresh(devId);
+}
+async function prnMatch(devId, decision){
+  let note = '';
+  if(decision === 'mismatch'){ note = prompt('🔴 إيه اللي مش مطابق؟ (هيوصل للمحاسب العام)'); if(note === null) return; }
+  try{
+    const { error } = await sb.rpc('part_match_set', { p_device_id: devId, p_decision: decision, p_note: note });
+    if(error) throw error;
+  }catch(e){ alert('⚠️ ' + ((e && e.message) || e)); }
+  prnRefresh(devId);
+}
+// «✅ القطعة وصلت» عند مدير الإنتاج → الطلبات اللي اتشرت للجهاز تتقفل «الفني استلم»
+async function prnMarkReceived(devId){
+  if(PRN.off) return;
+  const list = prnOpenFor(devId).filter(r => r.status === 'bought');
+  for(const r of list){
+    try{ await sb.rpc('part_request_act', { p_id: r.id, p_action: 'received', p_note: '' }); }catch(e){}
+  }
+  if(list.length) prnRefresh(devId);
+}
+
+// ---------- 🔒 الخزنة: دفعات التجار ----------
+// 🧸 المحاسب العام بيدفع للتاجر من الخزنة → الفلوس دي خرجت من الدرج،
+//    فـ«المفروض في الخزنة» عند التقفيل بيقل بيها.
+let supPays = [];
+async function loadSupPays(){
+  if(!(isCashier() || isSuperAdmin())) return;
+  try{
+    const { data, error } = await sb.from('supplier_payments')
+      .select('id,amount,paid_at,voided')
+      .eq('voided', false)
+      .gte('paid_at', new Date(Date.now() - 60 * 86400000).toISOString())
+      .order('paid_at', { ascending: false }).limit(500);
+    if(error) throw error;
+    supPays = data || [];
+  }catch(e){
+    supPays = [];
+    if(!/supplier_payments|schema cache|does not exist/i.test((e && e.message) || '')) console.warn('[الخزنة] دفعات التجار:', e);
+  }
+}
+function supPaidSince(fromMs){
+  let sum = 0, n = 0;
+  supPays.forEach(p => { if(!p.voided && Date.parse(p.paid_at) > fromMs){ sum += Number(p.amount) || 0; n++; } });
+  return { sum, n };
+}
+</script>
 </body>
 </html>

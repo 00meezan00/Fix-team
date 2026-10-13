@@ -858,6 +858,7 @@ async function loadDevices(){
     }
   }
   await loadTechNames();
+  await tprLoadOpen();   // 🛵 (ملف 95) طلبات القطع المفتوحة على أجهزتي
 }
 
 // ============================================================
@@ -1226,6 +1227,7 @@ function ticketHtml(d, canAct){
     ${d.issue?`<div class="tk-issue"><span class="w">🛠️</span><span>${esc(d.issue)}</span></div>`:''}
     ${d.status==='returned' ? `<div class="tk-issue" style="color:var(--returned);font-weight:800;"><span class="w">🔁</span><span>${(d._raw && (d._raw.returnComplaint || d._raw.discoveredFault)) ? esc('سبب الرجوع: ' + (d._raw.returnComplaint || d._raw.discoveredFault)) : 'الجهاز رجع — محتاج مراجعة'}</span></div>` : ''}
     ${lock}
+    ${tprChip(d)}
     ${actions}
   </div>`;
 }
@@ -2159,6 +2161,114 @@ async function editIssue(id){
   toast(t('tp.issueSaved'));
 }
 
+
+// ============================================================
+// 🛵 (ملف 95) طلب قطعة من مسؤول قطع الغيار
+// ------------------------------------------------------------
+// 🧸 بالبلدي: الفني محتاج قطعة؟ يدوس «🛵 اطلب قطعة» جوه الجهاز.
+//    الطلب بيوصل لمسؤول القطع، والفني بيشوف حالته هنا:
+//      🆕 مستني المسؤول → 🚶 فلان رايح يجيبها → 🛒 اتشرت → ✅ استلمتها
+//    ولو القطعة طلعت بايظة: «🔧 القطعة بايظة» → بترجع للمسؤول يرجّعها للتاجر.
+// ⚠️ الفني مابيشوفش أسعار القطع خالص — السيرفر بيشيلها قبل ما توصل.
+// ⚠️ ده دفتر لوحده على السيرفر — مش بيكتب في الجهاز نفسه. فكومنت
+//    «🔩 قطع الغيار» بتاعك لسه زي ما هو: إنت بتكتب اللي ركّبته،
+//    والمسؤول بيكتب اللي جابه، والمدير بيقارن الاتنين.
+// ============================================================
+const TPR = { open: {}, info: {}, off: false };
+const TPR_ST = { new:'🆕 مستني المسؤول', going:'🚶 رايح يجيبها', bought:'🛒 اتشرت — استلمها',
+                 received:'✅ استلمتها', unavailable:'🚫 مش متوفرة', cancelled:'✖️ اتلغى' };
+async function tprLoadOpen(){
+  if(TPR.off || !navigator.onLine) return;
+  try{
+    const { data, error } = await sb.rpc('parts_open_requests');
+    if(error) throw error;
+    TPR.open = {};
+    (data || []).forEach(r => { (TPR.open[r.device_id] = TPR.open[r.device_id] || []).push(r); });
+  }catch(e){
+    if(/parts_open_requests|schema cache|does not exist|PGRST202/i.test((e && e.message) || '')) TPR.off = true;
+    console.warn('[قطع الغيار] الطلبات:', e && e.message);
+  }
+}
+function tprChip(d){
+  const l = TPR.open[d.id] || [];
+  if(!l.length) return '';
+  return l.map(r => `<div class="tk-lock" style="background:var(--repairing-bg);color:var(--repairing);">🛵 <b style="font-family:inherit;letter-spacing:0;">${esc(r.part)}</b> · ${
+    r.status === 'going' ? '🚶 ' + esc(r.taken_by_name || '') : r.status === 'bought' ? '🛒 اتشرت' : '🆕 مستني'}</div>`).join(' ');
+}
+async function tprLoadInfo(id){
+  try{
+    const { data, error } = await sb.rpc('parts_device_info', { p_device_id: id });
+    if(error) throw error;
+    TPR.info[id] = data || {};
+  }catch(e){
+    const m = (e && e.message) || String(e);
+    if(/parts_device_info|schema cache|does not exist|PGRST202/i.test(m)) TPR.off = true;
+    TPR.info[id] = { _err: m };
+  }
+  const box = document.getElementById('tprBox');
+  if(box && box.dataset.dev === id) box.innerHTML = tprInner(id);
+}
+function techPartsPanel(d){
+  if(TPR.off) return '';
+  setTimeout(() => tprLoadInfo(d.id), 0);
+  return `<div class="panel"><div class="panel-h">🛵 قطع من مسؤول القطع</div>
+    <div id="tprBox" data-dev="${esc(d.id)}">${tprInner(d.id)}</div></div>`;
+}
+function tprInner(id){
+  const info = TPR.info[id];
+  const mine = devices.find(x => x.id === id);
+  const canAct = mine && mine.tech === ME && !DONE_STATES.includes(mine.status);
+  const btn = canAct ? `<button class="hb-ok" style="background:var(--repairing);box-shadow:none;margin-top:10px;" onclick="tprAsk('${esc(id)}')">🛵 اطلب قطعة</button>` : '';
+  if(!info) return `<div style="color:var(--faint);font-size:13px;">لحظة…</div>` + btn;
+  if(info._err) return TPR.off ? '' : `<div style="color:var(--red);font-size:12.5px;">⚠️ ${esc(info._err)}</div>` + btn;
+  const reqs = info.requests || [];
+  const buys = (info.purchases || []).filter(p => p.dest === 'device');
+  const rows = reqs.map(q => `<div class="note"><div class="av">🛵</div><div style="flex:1;">
+      <div><b>${q.urgent ? '🔥 ' : ''}${esc(q.part)}</b> — ${esc(TPR_ST[q.status] || q.status)}${q.status === 'going' && q.taken_by_name ? ' (' + esc(q.taken_by_name) + ')' : ''}</div>
+      <div class="meta">طلبها ${esc(q.requested_by_name)} · ${fmtDate(q.created_at)}${q.close_note ? ' · ' + esc(q.close_note) : ''}</div>
+      ${q.status === 'bought' && mine && mine.tech === ME ? `<button class="act act-done" style="margin-top:7px;" onclick="tprAct('${q.id}','received','${esc(id)}')">✅ استلمت القطعة</button>` : ''}
+      ${['new','going'].includes(q.status) && q.requested_by_name === ME ? `<button class="act act-rej" style="margin-top:7px;" onclick="tprAct('${q.id}','cancel','${esc(id)}')">✖️ مش محتاجها</button>` : ''}
+    </div></div>`).join('');
+  const brows = buys.map(p => `<div class="note"><div class="av">🛒</div><div style="flex:1;">
+      <div>${esc(p.part)}${Number(p.qty) > 1 ? ' ×' + Number(p.qty) : ''} · 🏪 ${esc(p.supplier)}${p.status === 'bad' ? ' · 🔧 بايظة' : p.status === 'returned' ? ' · ↩️ رجعت للتاجر' : ''}</div>
+      <div class="meta">جابها ${esc(p.bought_by_name)} · ${fmtDate(p.bought_at)}</div>
+      ${p.status === 'active' && mine && mine.tech === ME ? `<button class="act act-rej" style="margin-top:7px;" onclick="tprBad('${p.id}','${esc(id)}')">🔧 القطعة بايظة</button>` : ''}
+    </div></div>`).join('');
+  return (rows || brows) ? rows + brows + btn
+    : `<div style="color:var(--faint);font-size:13px;">محتاج قطعة للجهاز ده؟ اطلبها من هنا وهتوصل لمسؤول القطع على طول.</div>` + btn;
+}
+async function tprAsk(id){
+  const part = (prompt('🛵 القطعة اللي محتاجها؟ (مثال: شاشة A12 أصلي)') || '').trim();
+  if(part.length < 2) return;
+  const note = prompt('📝 ملاحظة للمسؤول (اختياري — لون، نوع…)', '');
+  if(note === null) return;
+  const urgent = confirm('🔥 مستعجلة؟\n«موافق» = مستعجلة · «إلغاء» = عادي');
+  try{
+    const { error } = await sb.rpc('part_request_create', { p_device_id: id, p_part: part, p_note: note || '', p_urgent: urgent });
+    if(error) throw error;
+    toast('🛵 الطلب وصل لمسؤول القطع ✅');
+  }catch(e){ toast('⚠️ الطلب مااتبعتش: ' + esc((e && e.message) || e)); }
+  await tprLoadOpen(); render(); tprLoadInfo(id);
+}
+async function tprAct(reqId, action, id){
+  try{
+    const { error } = await sb.rpc('part_request_act', { p_id: reqId, p_action: action, p_note: '' });
+    if(error) throw error;
+    toast(action === 'received' ? '✅ اتسجّل إنك استلمت القطعة — متنساش تكتبها في «🔩 قطع الغيار»' : '✖️ الطلب اتلغى');
+  }catch(e){ toast('⚠️ ' + esc((e && e.message) || e)); }
+  await tprLoadOpen(); render(); tprLoadInfo(id);
+}
+async function tprBad(pid, id){
+  const why = prompt('🔧 القطعة فيها إيه؟ (هترجع لمسؤول القطع يرجّعها للتاجر)');
+  if(!why) return;
+  try{
+    const { error } = await sb.rpc('part_purchase_mark', { p_id: pid, p_action: 'bad', p_reason: why });
+    if(error) throw error;
+    toast('🔧 اتسجّلت بايظة — المسؤول هيرجّعها');
+  }catch(e){ toast('⚠️ ' + esc((e && e.message) || e)); }
+  tprLoadInfo(id);
+}
+
 /* ===== شيت التفاصيل ===== */
 let sheetId='', handOn=false, handMode='', handTarget='';
 // ============================================================
@@ -2343,6 +2453,8 @@ function renderSheet(){
           <span class="k" data-i18n="rp.issue">العطل</span><span class="v issue">${esc(d.issue)||'—'}</span>
         </div>
       </div>
+
+      ${techPartsPanel(d)}
 
       <div class="panel">
         <div class="panel-h" data-i18n="tp.notes">📝 ملاحظات الفني</div>
