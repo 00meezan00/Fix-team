@@ -65,6 +65,15 @@
   }
   .bar-status{text-align:center; font-size:15px; font-weight:700; margin-bottom:20px;}
 
+  /* ⏳ (٢٠٢٦-١٠-١٣) الميعاد المتوقع */
+  .due-card{
+    display:none; margin:-8px 0 18px; background:#EEF2FF; border:1.5px solid #C7D2FE;
+    border-radius:14px; padding:11px 14px; text-align:center;
+  }
+  .due-card .lbl{font-size:12.5px; color:#4338CA; font-weight:800;}
+  .due-card .when{font-family:'Cairo',sans-serif; font-size:17px; font-weight:900; margin-top:2px;}
+  .due-card .chg{font-size:12px; color:#6B7280; margin-top:3px;}
+
   /* المراحل */
   .steps{display:flex; flex-direction:column; gap:0; margin-top:6px;}
   .step{display:flex; gap:14px; align-items:flex-start; position:relative; padding-bottom:22px;}
@@ -161,6 +170,13 @@
       <div class="bar-pct" id="pct">0%</div>
       <div class="bar-status" id="statusLine"></div>
 
+      <!-- ⏳ (٢٠٢٦-١٠-١٣) الميعاد المتوقع — بيظهر طول ما الجهاز لسه في الصيانة -->
+      <div class="due-card" id="dueCard">
+        <div class="lbl">⏰ متوقع يخلص</div>
+        <div class="when" id="dueWhen"></div>
+        <div class="chg" id="dueChg"></div>
+      </div>
+
       <div class="steps" id="steps"></div>
 
       <div class="issue-card" id="issueCard">
@@ -251,6 +267,19 @@ const STEPS = [
 ];
 const ORDER = ['waiting','diagnosing','repairing','done'];
 
+// ⏳ (٢٠٢٦-١٠-١٣) «النهارده ٦ م» / «بكره ٢ م» / «الخميس ١٥ أكتوبر ٦ م»
+function dueWhenTxt(iso){
+  const d = new Date(iso);
+  if(isNaN(d)) return '';
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const day = new Date(d); day.setHours(0, 0, 0, 0);
+  const diff = Math.round((day - today) / 86400000);
+  const tm = d.toLocaleTimeString('ar-EG', { hour:'numeric', minute:'2-digit' });
+  if(diff === 0) return 'النهارده ' + tm;
+  if(diff === 1) return 'بكره ' + tm;
+  return d.toLocaleDateString('ar-EG', { weekday:'long', day:'numeric', month:'long' }) + ' ' + tm;
+}
+
 let responses = {};
 function renderTrack(data){
   $('loading').style.display = 'none';
@@ -313,6 +342,18 @@ function renderTrack(data){
   requestAnimationFrame(() => { bar.style.width = pct + '%'; });
   $('pct').textContent = pct + '%';
   $('statusLine').textContent = statusText;
+
+  // ⏳ (٢٠٢٦-١٠-١٣) الميعاد المتوقع — طول ما الجهاز لسه بيتصلّح بس
+  //    (لو الميعاد عدّى مابنكتبش «متأخر» للعميل — بنقوله إننا بنخلّصه)
+  const working = (st === 'waiting' || st === 'diagnosing' || st === 'repairing' || sentToRepair);
+  if(data.dueAt && working){
+    const late = Date.parse(data.dueAt) < Date.now();
+    $('dueCard').style.display = 'block';
+    $('dueWhen').textContent = late ? 'بنخلّص جهازك دلوقتي 🔧' : dueWhenTxt(data.dueAt);
+    $('dueChg').textContent = late ? 'هنبلغك أول ما يجهز' : (data.dueChanged ? 'الميعاد اتعدّل بعد ما اتفقنا معاك 🙏' : '');
+  } else {
+    $('dueCard').style.display = 'none';
+  }
 
   $('steps').innerHTML = STEPS.map((s, i) => {
     const cls = (st === 'delivered' || i < idx) ? 'done' : (i === idx && st !== 'delivered' ? (st === 'done' ? 'done' : 'current') : '');

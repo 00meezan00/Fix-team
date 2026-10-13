@@ -483,6 +483,34 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
     margin:8px 22px 0; padding:10px 14px; background:var(--surface); border:1px solid var(--border);
     border-radius:12px; font-size:13px; color:var(--ink-2); font-weight:700;}
   .card.ph2-late{box-shadow:0 0 0 2px var(--danger), 0 1px 2px rgba(0,0,0,.06);}
+  /* ⏳ (٢٠٢٦-١٠-١٣) الميعاد مع العميل */
+  .card.due-warn{box-shadow:0 0 0 2px var(--warn), 0 1px 2px rgba(0,0,0,.06);}
+  .card.due-over{box-shadow:0 0 0 2px var(--danger), 0 1px 2px rgba(0,0,0,.06); background:var(--danger-bg);}
+  .due-field .due-lbl{font-size:13.5px; color:var(--muted); display:block; margin-bottom:6px;}
+  .due-chips{display:flex; flex-wrap:wrap; gap:6px;}
+  .due-chip{border:1.5px solid var(--border); background:var(--surface); color:var(--ink-2); border-radius:18px; padding:7px 12px; font:inherit; font-size:13px; font-weight:700; cursor:pointer;}
+  .due-chip.on{background:var(--accent); border-color:var(--accent); color:#fff;}
+  .due-input{width:100%; margin-top:8px; border:1px solid var(--border); border-radius:8px; padding:9px 10px; font:inherit; background:var(--surface); color:var(--ink);}
+  .due-res{font-size:13.5px; margin:8px 0 4px; color:var(--ink-2);}
+  .due-sug{font-size:12.5px; margin-top:8px; padding:8px 10px; border-radius:9px; background:var(--info-bg); color:var(--info); line-height:1.8;}
+  .due-sug .due-chip{padding:4px 10px; font-size:12px; margin-inline-start:4px;}
+  .due-box{border:1.5px solid var(--border); border-radius:11px; padding:10px 12px; margin:0 0 14px; background:var(--surface);}
+  .due-box-h{font-size:13.5px;} .due-box-h small{color:var(--muted);}
+  .due-box-s{font-size:12.5px; font-weight:700; margin-top:5px;}
+  .due-bar{height:8px; border-radius:6px; background:var(--surface-3); overflow:hidden; margin-top:7px;}
+  .due-bar i{display:block; height:100%; border-radius:6px;}
+  .due-alert-ov{position:fixed; inset:0; z-index:200; background:rgba(15,23,42,.55); display:flex; align-items:center; justify-content:center; padding:16px;}
+  .due-alert{background:var(--surface); color:var(--ink); border-radius:16px; padding:18px; width:100%; max-width:380px; box-shadow:0 20px 50px rgba(0,0,0,.3);}
+  .due-alert-h{font-size:17px; font-weight:900; margin-bottom:8px;}
+  .due-alert-dev{font-weight:800; font-size:14.5px; cursor:pointer; text-decoration:underline dotted;}
+  .due-alert-dev small{color:var(--muted); font-family:monospace;}
+  .due-alert-s{font-size:13px; color:var(--ink-2); margin:6px 0 4px; line-height:1.8;}
+  .due-alert-btn{display:block; width:100%; border:none; border-radius:11px; padding:13px; margin-top:9px; color:#fff; font:inherit; font-size:15px; font-weight:800; cursor:pointer;}
+  .due-alert-later{display:block; width:100%; border:none; background:none; color:var(--muted); padding:10px; margin-top:4px; font:inherit; font-size:13px; cursor:pointer;}
+  .due-st-t{font-size:12.5px; font-weight:800; margin:10px 0 4px; color:var(--ink-2);}
+  .due-st{width:100%; border-collapse:collapse; font-size:12.5px;}
+  .due-st th, .due-st td{padding:5px 6px; border-bottom:1px solid var(--border); text-align:center;}
+  .due-st td:first-child, .due-st th:first-child{text-align:start;}
   .ph2-ch{background:var(--info-bg); border:1px solid var(--info-border); border-radius:10px; padding:10px 12px; margin:-4px 0 12px;}
   .ph2-ch-head{font-size:13.5px; font-weight:800; color:var(--ink); margin-bottom:6px; line-height:1.7;}
   .ph2-ch-row{display:flex; justify-content:space-between; align-items:center; gap:8px; width:100%; text-align:start;
@@ -1628,6 +1656,8 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
     <button id="ntfBtn_sleep"   style="display:none;" onclick="openNtf('sleep')">😴 نايمين في الدرج</button>
     <button id="ntfBtn_appr"    style="display:none;" onclick="openNtf('appr')">✅ طلبات مسؤول الحركة</button>
     <button id="ntfBtn_deposit" style="display:none;" onclick="openNtf('deposit')">💰 العرابين</button>
+    <button id="ntfBtn_due"     style="display:none;" onclick="openNtf('due')">⏳ مواعيد العملاء</button>
+    <button id="ntfBtn_call"    style="display:none;" onclick="openNtf('call')">📞 كلّم العميل</button>
     <button id="ntfBtn_await"   style="display:none;" onclick="openNtf('await')">💵 عميل جاي يدفع</button>
     <button id="ntfBtn_paid"    style="display:none;" onclick="openNtf('paid')">✅ اتدفع</button>
     <button id="ntfBtn_reports" style="display:none;" onclick="openNtf('reports')">📝 تقاريري</button>
@@ -1787,7 +1817,7 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
       <div id="ph2CustHist" class="ph2-ch" style="display:none;"></div>
       <datalist id="phoneHistory"></datalist>
       <div class="row2">
-        <label class="field"><span data-i18n="add.deviceType">نوع الجهاز</span><input id="f_deviceType" placeholder="iPhone / Samsung..." /></label>
+        <label class="field"><span data-i18n="add.deviceType">نوع الجهاز</span><input id="f_deviceType" placeholder="iPhone / Samsung..." oninput="addDueRender()" /></label>
         <label class="field"><span data-i18n="add.model">الموديل</span><input id="f_model" /></label>
       </div>
       <!-- 🎨 لون الجهاز — كتابة حرة (مش قايمة) وإجباري -->
@@ -1829,7 +1859,9 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
       <!-- ✂️ (٢٠٢٦-١٠-١٢) «نوع التعامل» (قطاعي/جملة) اتشال من هنا — بقى عند المحاسب العام
            بس (تفاصيل الجهاز ← ⭐ النقاط). عميل الجملة المعروف لسه بيتعلّم لوحده في صمت
            (autoWholesaleCheck)، والمحاسب العام يقدر يغيّره. -->
-      <label class="field"><span>العطل حسب كلام العميل <b style="color:var(--danger)">*</b></span><textarea id="f_reportedIssue" rows="2"></textarea></label>
+      <label class="field"><span>العطل حسب كلام العميل <b style="color:var(--danger)">*</b></span><textarea id="f_reportedIssue" rows="2" oninput="addDueRender()"></textarea></label>
+      <!-- ⏳ (٢٠٢٦-١٠-١٣) الميعاد مع العميل — إجباري (addDueRender بيرسمه) -->
+      <div id="addDueHost" class="field due-field"></div>
       <label class="field"><span data-i18n="add.condition">حالة الجهاز الشكلية عند الاستلام</span><textarea id="f_conditionNotes" rows="2" data-i18n-ph="add.condition.ph" placeholder="خدوش، كسور، حالة الشاشة..."></textarea></label>
       <label class="field"><span data-i18n="add.price">السعر المبدئي (اختياري) — أرقام صحيحة بالجنيه، و٠ يعني ببلاش</span><input id="f_agreedPrice" type="text" inputmode="numeric" oninput="fixDigitsInput(this); togglePayTypeVisibility()" /></label>
       <div id="payTypeWrap" style="margin-bottom:12px; display:none;">
@@ -1840,8 +1872,8 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
         </div>
       </div>
       <div class="row2">
-        <label class="field"><span data-i18n="add.intakeDate">تاريخ الدخول</span><input type="date" id="f_intakeDateOnly" /></label>
-        <label class="field"><span data-i18n="add.intakeTime">وقت الدخول</span><input type="time" id="f_intakeTimeOnly" /></label>
+        <label class="field"><span data-i18n="add.intakeDate">تاريخ الدخول</span><input type="date" id="f_intakeDateOnly" onchange="addDueRender()" /></label>
+        <label class="field"><span data-i18n="add.intakeTime">وقت الدخول</span><input type="time" id="f_intakeTimeOnly" onchange="addDueRender()" /></label>
       </div>
       <button id="submitBtn" class="btn-primary" style="width:100%; justify-content:center;" data-i18n="add.submit" onclick="submitAdd()">تسجيل الجهاز — يدخل تلقائياً في "قيد الانتظار"</button>
     </div>
@@ -4210,6 +4242,638 @@ function linkAuditRowHtml(item){
   </div>`;
 }
 
+// ############################################################
+// ⏳ (٢٠٢٦-١٠-١٣) الميعاد مع العميل — «الساعة الرملية»
+// ------------------------------------------------------------
+// 🧸 الاستقبال وهو بيسجّل الجهاز بيكتب «اتفقنا مع العميل على قد إيه».
+//    دي ساعة رملية بتتقلب من لحظة التسجيل:
+//      🟢 أول نص الرملة       → كله تمام
+//      🟡 نص الرملة نزل       → مدير الإنتاج يتسأل: لسه شغال؟ قربنا؟ محتاجين وقت أطول؟
+//      🟠 ٣ أرباع (لو قال «لسه شغال») → يتسأل تاني
+//      🔴 الرملة خلصت          → يتسأل تاني كل ساعة + ورقة عند المحاسب العام
+//
+//    «🙏 هنحتاج وقت أطول» → مدير الإنتاج بيختار قد إيه والسبب →
+//       الجهاز بيروح عند الاستقبال في أوضة «📞 كلّم العميل» (ورسالة واتساب جاهزة) →
+//       الاستقبال يكتب رد العميل:
+//         ✅ وافق       → الميعاد الجديد بيتسجّل والرملة تتقلب من تاني
+//         🕐 ميعاد تاني → الاستقبال يختار الميعاد اللي اتفقوا عليه
+//         🚫 عايز جهازه → مدير الإنتاج يعرف ويرجّعه للاستقبال
+//
+// 🗄️ الحقول (جوه الجهاز):
+//    dueAt     الميعاد اللي اتفقنا عليه (ISO)            — الاستقبال (+ المحاسب العام)
+//    dueStart  الرملة اتقلبت إمتى (التسجيل أو آخر اتفاق) — الاستقبال
+//    dueLabel  الكلام اللي اتقال للعميل («ساعتين»)        — الاستقبال
+//    dueAck    آخر رد لمدير الإنتاج على السؤال              — مدير الإنتاج
+//    dueAsk    طلب «وقت أطول» ورد العميل                   — الاتنين
+//    dueLog    سجل كل اللي حصل (بيتزاد بس)
+//    السيرفر بيحرس ده — ملف 90.
+//
+// ⚠️ الأجهزة القديمة (من غير dueAt) مالهاش ساعة — مفيش أي تنبيه عليها.
+// ⚠️ الساعة بتقف أول ما الورشة تخلص (تم الصيانة / المرفوض / اتبعت للاستقبال).
+// ############################################################
+const DUE_ACTIVE = ['waiting', 'sent_to_repair', 'received_from_reception', 'diagnosing', 'repairing', 'returned'];
+const DUE_STOP   = ['done', 'workshop_rejected', 'sent_to_reception', 'fixed_drawer', 'delivered', 'rejected'];
+const DUE_OVER_REASK_H = 1;   // الميعاد عدّى → يتسأل كل ساعة
+const DUE_MIN_SAMPLES = 3;      // اقتراح المدة: لازم ٣ أجهزة شبهه على الأقل
+// الاختيارات السريعة — h = ساعات من دلوقتي · at = حساب على التقويم
+const DUE_CHIPS = [
+  { k:'1h',  label:'ساعة',          h:1 },
+  { k:'90m', label:'ساعة ونص',      h:1.5 },
+  { k:'2h',  label:'ساعتين',        h:2 },
+  { k:'eod', label:'آخر النهارده',  at:'eod' },
+  { k:'tmr', label:'بكره',          at:'tmr' },
+  { k:'2d',  label:'يومين',         h:48 },
+  { k:'3d',  label:'٣ أيام',        h:72 },
+  { k:'1w',  label:'أسبوع',         h:168 },
+];
+const DUE_EXTRA = [
+  { label:'ساعة', h:1 }, { label:'٣ ساعات', h:3 }, { label:'يوم', h:24 },
+  { label:'يومين', h:48 }, { label:'٣ أيام', h:72 }, { label:'أسبوع', h:168 },
+];
+const DUE_REASONS = ['🔩 مستني قطعة', '🔎 العطل أكبر من المتوقع', '📦 شغل كتير في الورشة', '🧪 محتاج تجربة أطول', '✍️ سبب تاني'];
+
+// ---------- الحسابات ----------
+// الميعاد من اختيار سريع — محسوب من وقت معيّن (وقت التسجيل أو دلوقتي)
+function dueFromChip(k, fromMs){
+  const c = DUE_CHIPS.find(x => x.k === k);
+  if(!c) return null;
+  const base = new Date(fromMs || Date.now());
+  if(c.h) return new Date(base.getTime() + c.h * 3600000);
+  const t = new Date(base);
+  if(c.at === 'eod'){ t.setHours(22, 0, 0, 0); if(t.getTime() - base.getTime() < 3600000) return new Date(base.getTime() + 3600000); return t; }
+  if(c.at === 'tmr'){ t.setDate(t.getDate() + 1); t.setHours(18, 0, 0, 0); return t; }
+  return null;
+}
+function dueWhenTxt(iso){
+  const d = new Date(iso);
+  if(isNaN(d)) return '';
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const day = new Date(d); day.setHours(0, 0, 0, 0);
+  const diff = Math.round((day - today) / 86400000);
+  const tm = d.toLocaleTimeString('ar-EG', { hour:'numeric', minute:'2-digit' });
+  if(diff === 0) return 'النهارده ' + tm;
+  if(diff === 1) return 'بكره ' + tm;
+  if(diff === -1) return 'امبارح ' + tm;
+  return d.toLocaleDateString('ar-EG', { weekday:'long', day:'numeric', month:'long' }) + ' ' + tm;
+}
+// آخر مرة الجهاز دخل المرتجعات — الساعة القديمة مالهاش دعوة بالمرتجع
+function lastReturnAt(d){
+  const h = (d && d.statusHistory) || [];
+  for(let i = h.length - 1; i >= 0; i--) if(h[i] && h[i].status === 'returned' && h[i].date) return Date.parse(h[i].date);
+  return 0;
+}
+function isDueActive(d){
+  if(!d || !d.dueAt || !d.dueStart) return false;
+  if(!DUE_ACTIVE.includes(d.status)) return false;
+  if(d.status === 'returned'){
+    if(d.returnInbound) return false;                         // لسه عند الاستقبال
+    if(Date.parse(d.dueStart) < lastReturnAt(d)) return false; // ميعاد قديم من قبل المرتجع
+  }
+  return true;
+}
+// وضع الرملة دلوقتي
+function dueInfo(d){
+  if(!isDueActive(d)) return null;
+  const s = Date.parse(d.dueStart), e = Date.parse(d.dueAt), now = Date.now();
+  if(!(e > s)) return null;
+  const pct = (now - s) / (e - s);
+  const level = pct >= 1 ? 100 : pct >= 0.75 ? 75 : pct >= 0.5 ? 50 : 0;
+  const color = pct >= 1 ? 'danger' : pct >= 0.5 ? 'warn' : 'success';
+  return { s, e, pct, left: e - now, level, color };
+}
+function dueLeftTxt(i){
+  return i.left >= 0 ? 'باقي ' + stageDurTxt(i.left) : 'متأخر ' + stageDurTxt(-i.left);
+}
+// طلب «وقت أطول» شغّال على الرملة دي؟
+function dueAskOpen(d){ return !!(d && d.dueAsk && d.dueAsk.state === 'wait' && d.dueAsk.start === d.dueStart); }
+function dueRefused(d){ return !!(d && d.dueAsk && d.dueAsk.state === 'refused' && d.dueAsk.start === d.dueStart && isDueActive(d)); }
+// مدير الإنتاج محتاج يتسأل؟ → بيرجّع المستوى (٥٠ / ٧٥ / ١٠٠) أو ٠
+function duePending(d){
+  const i = dueInfo(d);
+  if(!i || !i.level || dueAskOpen(d)) return 0;
+  const ack = (d.dueAck && d.dueAck.start === d.dueStart) ? d.dueAck : null;
+  if(!ack) return i.level;
+  if(i.level === 100){
+    if(ack.level < 100) return 100;
+    if(ack.answer !== 'more' && hoursSince(ack.at) >= DUE_OVER_REASK_H) return 100;
+    return 0;
+  }
+  if(i.level === 75 && ack.level === 50 && ack.answer === 'working') return 75;
+  return 0;
+}
+function dueAppend(x, kind, text, extra){
+  const now = new Date().toISOString();
+  return {
+    dueLog: [...(x.dueLog || []), { kind, text, at: now, by: currentUser.name, role: myRole(), ...(extra || {}) }],
+    activityNotes: [...(x.activityNotes || []), { text, at: now, by: currentUser.name, role: currentRoleLabel() }],
+    lastModifiedAt: now, lastModifiedBy: currentUser.name,
+  };
+}
+
+// ---------- 💡 اقتراح المدة من الأجهزة اللي زيه ----------
+// 🧸 بنشوف الأجهزة القديمة من نفس النوع ونفس نوع العطل خدت قد إيه
+//    من التسجيل لحد ما الورشة خلصتها، وبناخد «النص» (مش المتوسط — جهاز
+//    واحد قعد شهر مايبوّظش الرقم).
+const DUE_ISSUE_GROUPS = [
+  { k:'screen', name:'شاشة',   w:['شاش', 'تاتش', 'lcd', 'screen', 'oled', 'عرض'] },
+  { k:'batt',   name:'بطارية', w:['بطار', 'battery', 'بيفصل'] },
+  { k:'charge', name:'شحن',    w:['شحن', 'سوكت', 'شاحن', 'charg'] },
+  { k:'soft',   name:'سوفت',   w:['سوفت', 'فلاش', 'تحديث', 'هنج', 'ريستارت', 'لوجو', 'soft', 'icloud', 'اكونت', 'حساب'] },
+  { k:'water',  name:'مياه',   w:['مياه', 'مايه', 'ميه', 'وقع في', 'water'] },
+  { k:'cam',    name:'كاميرا', w:['كامير', 'camera'] },
+  { k:'audio',  name:'صوت',    w:['سماع', 'مايك', 'صوت', 'سبيكر', 'speaker', 'mic'] },
+  { k:'back',   name:'ضهر',    w:['باغ', 'ضهر', 'ظهر', 'back', 'فريم', 'شاسيه'] },
+  { k:'board',  name:'بوردة',  w:['بورد', 'ايسي', ' ic', 'شورت', 'board', 'مابيفتحش', 'ميت'] },
+  { k:'btn',    name:'زراير',  w:['زرار', 'زراير', 'باور', 'فوليوم', 'بصم', 'face', 'فيس'] },
+];
+function dueNorm(s){
+  return ' ' + String(s || '').toLowerCase()
+    .replace(/[ً-ْ]/g, '').replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي') + ' ';
+}
+function dueIssueGroup(issue){
+  const t = dueNorm(issue);
+  // الكلمة اللي بتبدأ بمسافة (« ic») لازم تبقى أول كلمة — عشان «ic» جوه كلمة تانية مايتحسبش
+  const g = DUE_ISSUE_GROUPS.find(g => g.w.some(w => t.includes((w.startsWith(' ') ? ' ' : '') + dueNorm(w).trim())));
+  return g || null;
+}
+function dueBrand(type){ return dueNorm(type).trim().split(/\s+/)[0] || ''; }
+// الورشة خلصت الجهاز إمتى (أول مرة دخل «تم الصيانة» / «المرفوض» / «اتبعت للاستقبال»)
+function dueFinishedAt(d){
+  const h = (d && d.statusHistory) || [];
+  const from = Date.parse(d.dueStart || d.intakeDate) || 0;
+  for(const x of h){
+    if(!x || !x.date) continue;
+    const t = Date.parse(x.date);
+    if(t >= from && ['done', 'workshop_rejected', 'sent_to_reception'].includes(x.status)) return t;
+  }
+  return 0;
+}
+let dueSuggestCache = { at: 0, map: null };
+function dueSuggestMap(){
+  if(dueSuggestCache.map && Date.now() - dueSuggestCache.at < 10 * 60000) return dueSuggestCache.map;
+  const map = {};
+  const from = Date.now() - 180 * 86400000;
+  devices.forEach(d => {
+    const s = Date.parse(d.intakeDate);
+    if(!(s >= from)) return;
+    const h = d.statusHistory || [];
+    const fin = h.find(x => x && x.date && ['done', 'workshop_rejected', 'sent_to_reception'].includes(x.status));
+    if(!fin) return;
+    const ms = Date.parse(fin.date) - s;
+    if(!(ms > 0)) return;
+    const g = dueIssueGroup(d.reportedIssue);
+    if(!g) return;
+    const b = dueBrand(d.deviceType);
+    [b + '|' + g.k, '*|' + g.k].forEach(key => (map[key] = map[key] || []).push(ms));
+  });
+  Object.keys(map).forEach(k => map[k].sort((a, b) => a - b));
+  dueSuggestCache = { at: Date.now(), map };
+  return map;
+}
+function dueSuggest(type, issue){
+  const g = dueIssueGroup(issue);
+  if(!g) return null;
+  const map = dueSuggestMap();
+  const b = dueBrand(type);
+  let list = map[b + '|' + g.k], scope = (type || '').trim();
+  if(!list || list.length < DUE_MIN_SAMPLES){ list = map['*|' + g.k]; scope = 'كل الأنواع'; }
+  if(!list || list.length < DUE_MIN_SAMPLES) return null;
+  const med = list[Math.floor(list.length / 2)];
+  // أقرب اختيار سريع أكبر من أو يساوي النص
+  const hrs = med / 3600000;
+  const chip = hrs <= 1 ? '1h' : hrs <= 1.5 ? '90m' : hrs <= 2 ? '2h' : hrs <= 8 ? 'eod' : hrs <= 30 ? 'tmr' : hrs <= 48 ? '2d' : hrs <= 72 ? '3d' : '1w';
+  return { med, n: list.length, group: g.name, scope, chip };
+}
+
+// ---------- 📝 خانة المدة في التسجيل ----------
+let addDue = { chip: '', custom: '' };
+function addDueReset(){ addDue = { chip: '', custom: '' }; addDueRender(); }
+function addIntakeMs(){
+  const dOnly = (document.getElementById('f_intakeDateOnly') || {}).value;
+  const tOnly = (document.getElementById('f_intakeTimeOnly') || {}).value || '00:00';
+  const t = dOnly ? new Date(`${dOnly}T${tOnly}`).getTime() : Date.now();
+  return isNaN(t) ? Date.now() : t;
+}
+function addDueAt(){
+  if(addDue.chip === 'custom'){
+    const t = addDue.custom ? new Date(addDue.custom) : null;
+    return t && !isNaN(t) ? t : null;
+  }
+  return addDue.chip ? dueFromChip(addDue.chip, addIntakeMs()) : null;
+}
+function addDuePick(k){ addDue.chip = k; addDueRender(); }
+function addDueCustom(v){ addDue.custom = v; addDue.chip = 'custom'; addDueRender(true); }
+function addDueRender(keepInput){
+  const host = document.getElementById('addDueHost');
+  if(!host) return;
+  const at = addDueAt();
+  const sug = (() => { try{
+    return dueSuggest((document.getElementById('f_deviceType') || {}).value, (document.getElementById('f_reportedIssue') || {}).value);
+  }catch(e){ return null; } })();
+  const btn = c => `<button type="button" class="due-chip${addDue.chip === c.k ? ' on' : ''}" onclick="addDuePick('${c.k}')">${c.label}</button>`;
+  const sugHtml = sug ? `<div class="due-sug">💡 أجهزة ${esc(sug.group)} (${esc(sug.scope)}) بتخلص عادة في حوالي <b>${esc(stageDurTxt(sug.med))}</b> <small>(من ${sug.n} جهاز)</small>
+      ${addDue.chip !== sug.chip ? `<button type="button" class="due-chip" onclick="addDuePick('${sug.chip}')">استخدم «${esc(DUE_CHIPS.find(c => c.k === sug.chip).label)}»</button>` : ''}</div>` : '';
+  if(keepInput){
+    const r = document.getElementById('addDueResult');
+    if(r) r.innerHTML = addDueResultHtml(at);   // الخانة المفتوحة ماتترسمش تاني عشان الكتابة ماتضيعش
+    return;
+  }
+  host.innerHTML = `<span class="due-lbl">⏳ اتفقت مع العميل على قد إيه؟ <b style="color:var(--danger)">*</b></span>
+    <div class="due-chips">${DUE_CHIPS.map(btn).join('')}
+      <button type="button" class="due-chip${addDue.chip === 'custom' ? ' on' : ''}" onclick="addDue.chip='custom';addDueRender();setTimeout(()=>{const e=document.getElementById('addDueCustom');if(e)e.focus();},50);">📅 ميعاد معيّن</button></div>
+    ${addDue.chip === 'custom' ? `<input type="datetime-local" id="addDueCustom" class="due-input" value="${esc(addDue.custom)}" onchange="addDueCustom(this.value)" />` : ''}
+    <div id="addDueResult">${addDueResultHtml(at)}</div>
+    ${sugHtml}`;
+}
+function addDueResultHtml(at){
+  if(!at) return '';
+  const ok = at.getTime() > addIntakeMs();
+  return ok ? `<div class="due-res">⏰ الميعاد: <b>${esc(dueWhenTxt(at.toISOString()))}</b></div>`
+            : `<div class="due-res" style="color:var(--danger);">⚠️ الميعاد لازم يبقى بعد وقت الدخول</div>`;
+}
+// بيتنده من submitAdd — بيرجّع الحقول أو null (ومعاها رسالة)
+function addDueFields(intakeIso){
+  const at = addDueAt();
+  if(!at) return { err: 'اختار المدة اللي اتفقت عليها مع العميل' };
+  if(at.getTime() <= Date.parse(intakeIso)) return { err: 'الميعاد مع العميل لازم يبقى بعد وقت الدخول' };
+  const c = DUE_CHIPS.find(x => x.k === addDue.chip);
+  const label = c ? c.label : dueWhenTxt(at.toISOString());
+  const iso = at.toISOString();
+  return { fields: {
+    dueAt: iso, dueStart: intakeIso, dueLabel: label,
+    dueLog: [{ kind: 'set', text: '⏳ اتفقنا مع العميل: ' + label + ' (لحد ' + dueWhenTxt(iso) + ')', at: new Date().toISOString(), by: currentUser.name, role: myRole(), dueAt: iso }],
+  } };
+}
+
+// ---------- 🏷️ على الكارت ----------
+function dueCardChip(d){
+  if(!(isProduction() || isReception() || isSuperAdmin())) return '';
+  const i = dueInfo(d);
+  if(!i) return '';
+  let h = `<span class="rc-chip" style="background:var(--${i.color}-bg);color:var(--${i.color})">⏳ ${esc(dueLeftTxt(i))}</span> `;
+  if(dueAskOpen(d)) h += `<span class="rc-chip" style="background:var(--info-bg);color:var(--info)">📞 مستني رد العميل على وقت أطول</span> `;
+  if(dueRefused(d)) h += `<span class="rc-chip" style="background:var(--danger-bg);color:var(--danger)">🚫 العميل عايز جهازه</span> `;
+  return h;
+}
+function dueCardClass(d){
+  if(!(isProduction() || isSuperAdmin())) return '';
+  const i = dueInfo(d);
+  return !i ? '' : i.pct >= 1 ? ' due-over' : i.pct >= 0.5 ? ' due-warn' : '';
+}
+// ترتيب خانات الورشة عند مدير الإنتاج: الأقرب ميعاد الأول، واللي مالوش ميعاد في الآخر
+function dueSortKey(d){ const i = dueInfo(d); return i ? i.e : Infinity; }
+function dueCmp(a, b){ const x = dueSortKey(a), y = dueSortKey(b); return x === y ? 0 : (x < y ? -1 : 1); }   // Infinity − Infinity = NaN، فبنقارن بإيدنا
+
+// ---------- 📋 في تفاصيل الجهاز ----------
+let dueEdit = null;   // { id, mode: 'set' | 'ask' | 'other', chip, custom, extra, reason, note }
+function dueBoxHtml(d){
+  if(!d || d.status === 'trashed') return '';
+  const canSet = isReception() || isSuperAdmin();
+  const i = dueInfo(d);
+  const ask = d.dueAsk && d.dueAsk.start === d.dueStart ? d.dueAsk : null;
+  const ed = dueEdit && dueEdit.id === d.id ? dueEdit : null;
+  let h = '';
+
+  // (١) الوضع الحالي
+  if(d.dueAt){
+    const active = isDueActive(d);
+    const fin = !active && DUE_STOP.includes(d.status) ? dueFinishedAt(d) : 0;
+    const finTxt = fin ? (fin <= Date.parse(d.dueAt) ? '✅ خلص في ميعاده' : '⚠️ خلص متأخر ' + stageDurTxt(fin - Date.parse(d.dueAt))) : '';
+    const col = i ? i.color : 'muted';
+    h += `<div class="due-box" style="border-color:var(--${i ? i.color : 'border'});">
+      <div class="due-box-h">⏳ الميعاد مع العميل: <b>${esc(dueWhenTxt(d.dueAt))}</b>${d.dueLabel ? ` <small>(${esc(d.dueLabel)})</small>` : ''}</div>
+      ${i ? `<div class="due-bar"><i style="width:${Math.min(100, Math.max(3, Math.round(i.pct * 100)))}%;background:var(--${col});"></i></div>
+             <div class="due-box-s" style="color:var(--${col});">${esc(dueLeftTxt(i))}${d.dueAck && d.dueAck.start === d.dueStart ? ` · 🏭 آخر رد: ${esc(DUE_ANS[d.dueAck.answer] || '')} (${esc(splAgoTxt(d.dueAck.at))})` : ''}</div>`
+          : (finTxt ? `<div class="due-box-s">${finTxt}</div>` : '')}
+      ${ask ? dueAskShowHtml(d, ask) : ''}
+      ${(isProduction() && i && !dueAskOpen(d) && !ed) ? `<button class="acc-mini-btn" style="margin-top:8px;" onclick="dueOpen('${d.id}','ask')">🙏 هنحتاج وقت أطول</button>` : ''}
+      ${(canSet && !ed) ? `<button class="acc-mini-btn" style="margin-top:8px;" onclick="dueOpen('${d.id}','set')">✏️ ميعاد جديد مع العميل</button>` : ''}
+    </div>`;
+  } else if(canSet && DUE_ACTIVE.includes(d.status) && !ed){
+    h += `<button class="acc-mini-btn" style="width:100%;padding:9px;margin-bottom:12px;" onclick="dueOpen('${d.id}','set')">⏳ حدّد الميعاد مع العميل</button>`;
+  }
+
+  // (٢) فورم مفتوح
+  if(ed) h += dueFormHtml(d, ed);
+  return h;
+}
+const DUE_ANS = { working: '🔧 لسه شغال', almost: '🏁 قربنا نخلص', more: '🙏 محتاجين وقت أطول' };
+function dueAskShowHtml(d, ask){
+  const head = `🙏 مدير الإنتاج طلب <b>${esc(ask.extraLabel || '')}</b> زيادة — ${esc(ask.reason || '')}${ask.note ? ': ' + esc(ask.note) : ''}
+    <div style="font-size:12px;font-weight:600;margin-top:2px;">الميعاد الجديد المقترح: ${esc(dueWhenTxt(ask.proposedAt))} · ${esc(ask.by || '')} · ${esc(splAgoTxt(ask.at))}</div>`;
+  if(ask.state === 'wait'){
+    return `<div class="rc-where" style="background:var(--info-bg);color:var(--info);margin-top:8px;">${head}
+      ${(isReception() || isSuperAdmin()) ? `<div class="due-chips" style="margin-top:8px;">
+        ${d.customerPhone ? `<button class="due-chip" onclick="dueWa('${d.id}')">💬 ابعت للعميل</button>` : ''}
+        <button class="due-chip on" style="background:var(--success);border-color:var(--success);" onclick="dueReply('${d.id}','agreed')">✅ العميل وافق</button>
+        <button class="due-chip" onclick="dueOpen('${d.id}','other')">🕐 اتفقنا على ميعاد تاني</button>
+        <button class="due-chip" style="color:var(--danger);border-color:var(--danger-border);" onclick="dueReply('${d.id}','refused')">🚫 عايز جهازه كده</button>
+      </div>` : `<div style="font-size:12px;margin-top:4px;">📞 مستني الاستقبال يكلّم العميل</div>`}
+    </div>`;
+  }
+  if(ask.state === 'refused'){
+    return `<div class="rc-where" style="background:var(--danger-bg);color:var(--danger);margin-top:8px;">${head}
+      <div style="margin-top:6px;">🚫 العميل مش موافق على التأخير وعايز جهازه${ask.recNote ? ' — ' + esc(ask.recNote) : ''} (${esc(ask.recBy || '')})</div>
+      ${isProduction() ? `<div style="font-size:12px;margin-top:4px;">ابعته للاستقبال من «تم الإرسال للاستقبال»</div>` : ''}</div>`;
+  }
+  return '';
+}
+function dueFormHtml(d, ed){
+  if(ed.mode === 'ask'){
+    const ex = DUE_EXTRA.map((x, k) => `<button type="button" class="due-chip${ed.extra === k ? ' on' : ''}" onclick="dueEdit.extra=${k};renderDetail();">${x.label}</button>`).join('');
+    const rs = DUE_REASONS.map((x, k) => `<button type="button" class="due-chip${ed.reason === k ? ' on' : ''}" onclick="dueEdit.reason=${k};renderDetail();">${x}</button>`).join('');
+    const prop = ed.extra != null ? new Date(Math.max(Date.now(), Date.parse(d.dueAt)) + DUE_EXTRA[ed.extra].h * 3600000).toISOString() : null;
+    return `<div class="rfr-box" style="background:var(--info-bg);border-color:var(--info);">
+      <div class="rfr-q">🙏 محتاجين قد إيه زيادة؟</div>
+      <div class="due-chips">${ex}</div>
+      <div class="rfr-q" style="margin-top:10px;">ليه؟</div>
+      <div class="due-chips">${rs}</div>
+      <label class="field" style="margin-top:8px;"><span>تفاصيل (اختياري — بتوصل للاستقبال)</span><input id="dueNote" value="${esc(ed.note || '')}" oninput="dueEdit.note=this.value" /></label>
+      ${prop ? `<div class="due-res">الميعاد الجديد هيبقى: <b>${esc(dueWhenTxt(prop))}</b> — لو العميل وافق</div>` : ''}
+      <div class="pay-choice">
+        <button type="button" class="pay-btn" style="border-color:var(--info);background:var(--info);color:#fff;" onclick="dueSendAsk('${d.id}')">📞 ابعت للاستقبال يكلّم العميل</button>
+        <button type="button" class="pay-btn" style="border-color:var(--border);color:var(--ink-2);background:var(--surface);" onclick="dueEdit=null;renderDetail();">إلغاء</button>
+      </div></div>`;
+  }
+  // set / other: الاستقبال بيكتب الميعاد اللي اتفق عليه
+  const at = dueEditAt();
+  const chips = DUE_CHIPS.map(c => `<button type="button" class="due-chip${ed.chip === c.k ? ' on' : ''}" onclick="dueEdit.chip='${c.k}';renderDetail();">${c.label}</button>`).join('');
+  return `<div class="rfr-box">
+    <div class="rfr-q">${ed.mode === 'other' ? '🕐 اتفقتوا على إيه؟' : '⏳ الميعاد مع العميل'} <small style="font-weight:600;">(من دلوقتي)</small></div>
+    <div class="due-chips">${chips}<button type="button" class="due-chip${ed.chip === 'custom' ? ' on' : ''}" onclick="dueEdit.chip='custom';renderDetail();">📅 ميعاد معيّن</button></div>
+    ${ed.chip === 'custom' ? `<input type="datetime-local" class="due-input" value="${esc(ed.custom || '')}" onchange="dueEdit.custom=this.value;renderDetail();" />` : ''}
+    ${at ? `<div class="due-res">⏰ <b>${esc(dueWhenTxt(at.toISOString()))}</b></div>` : ''}
+    <div class="pay-choice">
+      <button type="button" class="pay-btn" style="border-color:var(--success);background:var(--success);color:#fff;" onclick="dueSaveSet('${d.id}')">💾 احفظ الميعاد</button>
+      <button type="button" class="pay-btn" style="border-color:var(--border);color:var(--ink-2);background:var(--surface);" onclick="dueEdit=null;renderDetail();">إلغاء</button>
+    </div></div>`;
+}
+function dueEditAt(){
+  if(!dueEdit) return null;
+  if(dueEdit.chip === 'custom'){ const t = dueEdit.custom ? new Date(dueEdit.custom) : null; return t && !isNaN(t) ? t : null; }
+  return dueEdit.chip ? dueFromChip(dueEdit.chip, Date.now()) : null;
+}
+function dueOpen(id, mode, preset){
+  dueEdit = { id, mode, chip: '', custom: '', extra: null, reason: null, note: '', ...(preset || {}) };
+  if(selectedId !== id) openDetail(id); else renderDetail();
+}
+
+// ---------- ✍️ الكتابة ----------
+async function dueSaveSet(id){
+  if(!(isReception() || isSuperAdmin())) return;
+  const d = devices.find(x => x.id === id);
+  const at = dueEditAt();
+  if(!d || !at){ alert('اختار الميعاد'); return; }
+  if(at.getTime() <= Date.now()){ alert('الميعاد لازم يبقى بعد دلوقتي'); return; }
+  const c = DUE_CHIPS.find(x => x.k === dueEdit.chip);
+  const label = c ? c.label : dueWhenTxt(at.toISOString());
+  const now = new Date().toISOString(), iso = at.toISOString();
+  const other = dueEdit.mode === 'other';
+  dueEdit = null;
+  devices = devices.map(x => {
+    if(x.id !== id) return x;
+    const ask = (x.dueAsk && x.dueAsk.state === 'wait')
+      ? { ...x.dueAsk, state: 'other', recAt: now, recBy: currentUser.name, finalAt: iso } : x.dueAsk;
+    return { ...x, dueAt: iso, dueStart: now, dueLabel: label, dueAsk: ask,
+      ...dueAppend(x, other ? 'other' : 'set', (other ? '🕐 اتفقنا مع العميل على ميعاد تاني: ' : '⏳ ميعاد جديد مع العميل: ') + label + ' (لحد ' + dueWhenTxt(iso) + ')', { dueAt: iso }) };
+  });
+  renderDetail(); render(); await persist();
+  const nd = devices.find(x => x.id === id); if(nd) syncTrack(nd);
+}
+async function dueSendAsk(id){
+  if(!isProduction()) return;
+  const d = devices.find(x => x.id === id);
+  if(!d || !isDueActive(d)) return;
+  const ed = dueEdit || {};
+  if(ed.extra == null){ alert('اختار محتاجين قد إيه زيادة'); return; }
+  if(ed.reason == null){ alert('اختار السبب'); return; }
+  const ex = DUE_EXTRA[ed.extra], reason = DUE_REASONS[ed.reason];
+  const note = String(ed.note || '').trim();
+  if(ed.reason === DUE_REASONS.length - 1 && note.length < 3){ alert('اكتب السبب'); return; }
+  const now = new Date().toISOString();
+  const proposedAt = new Date(Math.max(Date.now(), Date.parse(d.dueAt)) + ex.h * 3600000).toISOString();
+  const i = dueInfo(d);
+  dueEdit = null;
+  devices = devices.map(x => x.id !== id ? x : { ...x,
+    dueAsk: { start: x.dueStart, state: 'wait', at: now, by: currentUser.name, extraH: ex.h, extraLabel: ex.label, reason, note, proposedAt },
+    dueAck: { start: x.dueStart, level: i ? i.level : 0, answer: 'more', at: now, by: currentUser.name },
+    ...dueAppend(x, 'ask', '🙏 مدير الإنتاج محتاج ' + ex.label + ' زيادة — ' + reason + (note ? ': ' + note : ''), { proposedAt }) });
+  dueAlertSkip.delete(id);
+  renderDetail(); render(); await persist();
+  ph1Toast('📞 اتبعت للاستقبال يكلّم العميل');
+}
+async function dueReply(id, ans){
+  if(!(isReception() || isSuperAdmin())) return;
+  const d = devices.find(x => x.id === id);
+  if(!d || !dueAskOpen(d)) return;
+  let recNote = '';
+  if(ans === 'refused'){
+    recNote = (prompt('العميل قال إيه؟ (اختياري)') || '').trim();
+  }
+  const now = new Date().toISOString();
+  devices = devices.map(x => {
+    if(x.id !== id) return x;
+    const ask = { ...x.dueAsk, state: ans, recAt: now, recBy: currentUser.name, recNote };
+    if(ans === 'agreed'){
+      return { ...x, dueAt: ask.proposedAt, dueStart: now, dueLabel: ask.extraLabel + ' زيادة', dueAsk: { ...ask, start: now, finalAt: ask.proposedAt },
+        ...dueAppend(x, 'agreed', '✅ العميل وافق على الميعاد الجديد: ' + dueWhenTxt(ask.proposedAt), { dueAt: ask.proposedAt }) };
+    }
+    return { ...x, dueAsk: ask,
+      ...dueAppend(x, 'refused', '🚫 العميل مش موافق على التأخير وعايز جهازه' + (recNote ? ' — ' + recNote : '')) };
+  });
+  renderDetail(); render(); await persist();
+  const nd = devices.find(x => x.id === id); if(nd) syncTrack(nd);
+}
+function dueWa(id){
+  const d = devices.find(x => x.id === id);
+  if(!d || !d.customerPhone || !d.dueAsk) return;
+  const a = d.dueAsk;
+  const dev = `${d.deviceType || ''} ${d.model || ''}`.trim();
+  const why = String(a.reason || '').replace(/^[^\s]+\s/, '');   // من غير الإيموجي
+  openWa(d.customerPhone, `أهلاً ${d.customerName || ''} 👋\nبخصوص جهازك *${dev}* (${devRef(d)}):\nالفني محتاج وقت زيادة شوية (${a.extraLabel}) — ${why}${a.note ? '، ' + a.note : ''}.\nالميعاد الجديد المتوقع: *${dueWhenTxt(a.proposedAt)}*\nلو موافق رد علينا بـ «موافق» 🙏 ولو حابب تستلم الجهاز كده قولنا.\nI Fix Team`);
+}
+
+// ---------- 🔔 السؤال لمدير الإنتاج (نافذة بتطلع لوحدها) ----------
+// 🧸 كل ما الشاشة تتحدّث بنشوف: فيه جهاز وصل نص الرملة ومحدش جاوب؟
+//    → بتطلع نافذة فيها الـ٣ اختيارات. «بعدين» بتسكّتها لحد ما الصفحة تتقفل.
+const dueAlertSkip = new Set();
+let dueAlertId = null;
+function dueAlertList(){
+  if(!isProduction()) return [];
+  return devices.map(d => ({ d, lv: duePending(d) })).filter(x => x.lv)
+    .sort((a, b) => b.lv - a.lv || dueSortKey(a.d) - dueSortKey(b.d));
+}
+function dueCheckAlerts(){
+  if(!isProduction()) return;
+  if(dueAlertId){
+    const cur = devices.find(x => x.id === dueAlertId);
+    if(cur && duePending(cur)) return;   // لسه مفتوحة على جهاز محتاج رد
+    dueAlertClose();
+  }
+  // مانطلّعش فوق نافذة تانية مفتوحة (تفاصيل جهاز / خانة / فورم)
+  if(document.querySelector('.overlay:not(.hidden)')) return;
+  const next = dueAlertList().find(x => !dueAlertSkip.has(x.d.id + '@' + x.lv));
+  if(!next) return;
+  dueAlertId = next.d.id;
+  dueAlertRender(next.d, next.lv);
+  try{ if(navigator.vibrate) navigator.vibrate([120, 60, 120]); }catch(e){}
+}
+function dueAlertRender(d, lv){
+  let o = document.getElementById('dueAlertOverlay');
+  if(!o){ o = document.createElement('div'); o.id = 'dueAlertOverlay'; o.className = 'due-alert-ov'; document.body.appendChild(o); }
+  const i = dueInfo(d);
+  const head = lv === 100 ? '🔴 الميعاد مع العميل عدّى!' : lv === 75 ? '🟠 عدّى ٣ أرباع الوقت' : '🟡 الجهاز ده عدّى نص الوقت';
+  o.innerHTML = `<div class="due-alert">
+    <div class="due-alert-h">${head}</div>
+    <div class="due-alert-dev" onclick="dueAlertOpenDev()">📱 ${esc(d.deviceType)} ${esc(d.model)}${d.customerName ? ' — ' + esc(d.customerName) : ''} <small>${esc(devRef(d))}</small></div>
+    <div class="due-alert-s">اتفقنا مع العميل: <b>${esc(dueWhenTxt(d.dueAt))}</b>${d.dueLabel ? ` (${esc(d.dueLabel)})` : ''}<br>${i ? esc(dueLeftTxt(i)) : ''}${d.technician ? ' · 🔧 ' + esc(d.technician) : ''} · 📍 ${esc(stLabel(statusInfo(d.status)) || d.status)}</div>
+    ${i ? `<div class="due-bar"><i style="width:${Math.min(100, Math.round(i.pct * 100))}%;background:var(--${i.color});"></i></div>` : ''}
+    <button class="due-alert-btn" style="background:var(--repairing);" onclick="dueAnswer('working')">🔧 لسه شغال في الجهاز</button>
+    <button class="due-alert-btn" style="background:var(--success);" onclick="dueAnswer('almost')">🏁 خلاص قربنا نخلص</button>
+    <button class="due-alert-btn" style="background:var(--info);" onclick="dueAnswer('more')">🙏 لا — هنحتاج وقت أطول</button>
+    <button class="due-alert-later" onclick="dueAlertLater()">بعدين</button>
+  </div>`;
+}
+function dueAlertClose(){
+  dueAlertId = null;
+  const o = document.getElementById('dueAlertOverlay');
+  if(o) o.remove();
+}
+function dueAlertLater(){
+  const d = devices.find(x => x.id === dueAlertId);
+  if(d) dueAlertSkip.add(d.id + '@' + duePending(d));
+  dueAlertClose();
+  setTimeout(dueCheckAlerts, 400);   // فيه غيره؟
+}
+function dueAlertOpenDev(){ const id = dueAlertId; dueAlertLater(); if(id) openDetail(id); }
+async function dueAnswer(ans){
+  const id = dueAlertId;
+  const d = devices.find(x => x.id === id);
+  if(!d || !isProduction()) return;
+  const lv = duePending(d);
+  dueAlertClose();
+  if(ans === 'more'){
+    dueAlertSkip.add(id + '@' + lv);   // لحد ما يبعت الطلب
+    dueOpen(id, 'ask', d.partWait ? { reason: 0, note: d.partWait.part } : null);
+    return;
+  }
+  const now = new Date().toISOString();
+  devices = devices.map(x => x.id !== id ? x : { ...x,
+    dueAck: { start: x.dueStart, level: lv, answer: ans, at: now, by: currentUser.name },
+    ...dueAppend(x, 'ack', '⏳ ' + (lv === 100 ? 'الميعاد عدّى' : lv === 75 ? '٣ أرباع الوقت' : 'نص الوقت') + ' — مدير الإنتاج: ' + DUE_ANS[ans]) });
+  render(); await persist();
+  setTimeout(dueCheckAlerts, 400);
+}
+
+// ---------- 📞 أوضة «كلّم العميل» (الاستقبال) + «⏳ المواعيد» (مدير الإنتاج) ----------
+function dueCallList(){ return devices.filter(d => dueAskOpen(d)).sort((a, b) => Date.parse(a.dueAsk.at) - Date.parse(b.dueAsk.at)); }
+function dueCallPanelHtml(){
+  if(!(isReception() || isSuperAdmin())) return '';
+  const list = dueCallList();
+  if(!list.length) return '';
+  return `<div class="spn-panel" style="border-color:var(--info);">
+    <div class="spn-head" style="color:var(--info);">📞 كلّم العميل — الورشة محتاجة وقت أطول
+      <span class="spn-count" style="background:var(--info);">${list.length}</span></div>
+    ${list.map(d => `<div class="spn-row">
+      <div class="spn-info" style="cursor:pointer;" onclick="openDetail('${d.id}')">
+        <div class="spn-t">📱 ${esc(d.deviceType)} ${esc(d.model)}${d.customerName ? ' — ' + esc(d.customerName) : ''}</div>
+        <div class="spn-m">🙏 ${esc(d.dueAsk.extraLabel)} زيادة · ${esc(d.dueAsk.reason)}${d.dueAsk.note ? ': ' + esc(d.dueAsk.note) : ''}<br>
+          كان: ${esc(dueWhenTxt(d.dueAt))} ← الجديد: <b>${esc(dueWhenTxt(d.dueAsk.proposedAt))}</b>${d.customerPhone ? ' · 📞 ' + esc(d.customerPhone) : ' · ⚠️ مفيش رقم'}</div>
+      </div>
+      <div class="appr-row-actions" style="flex-direction:column;">
+        ${d.customerPhone ? `<button class="appr-btn-yes" onclick="dueWa('${d.id}')">💬 ابعتله</button>` : ''}
+        <button class="spn-ok" onclick="openDetail('${d.id}')">✍️ رد العميل</button>
+      </div>
+    </div>`).join('')}
+  </div>`;
+}
+function dueProdPanelHtml(){
+  if(!isProduction()) return '';
+  const list = devices.map(d => ({ d, i: dueInfo(d) })).filter(x => x.i && (x.i.pct >= 0.5 || dueRefused(x.d)))
+    .sort((a, b) => a.i.e - b.i.e);
+  if(!list.length) return '';
+  return `<div class="spn-panel" style="border-color:var(--warn);">
+    <div class="spn-head" style="color:var(--warn);">⏳ مواعيد العملاء — عدّوا نص الوقت
+      <span class="spn-count" style="background:var(--warn);">${list.length}</span></div>
+    ${list.map(({d, i}) => `<div class="spn-row" style="cursor:pointer;${i.pct >= 1 ? 'background:var(--danger-bg);' : ''}" onclick="openDetail('${d.id}')">
+      <div class="spn-info">
+        <div class="spn-t">📱 ${esc(d.deviceType)} ${esc(d.model)}${d.customerName ? ' — ' + esc(d.customerName) : ''}</div>
+        <div class="spn-m">${dueCardChip(d)}${d.technician ? '🔧 ' + esc(d.technician) + ' · ' : ''}📍 ${esc(stLabel(statusInfo(d.status)) || d.status)}${duePending(d) ? ' · <b style="color:var(--danger)">❓ مستني ردك</b>' : ''}</div>
+      </div>
+    </div>`).join('')}
+  </div>`;
+}
+
+// ---------- 🧾 المحاسب العام: جهاز عدّى ميعاده ----------
+function dueAuditItems(){
+  if(!isSuperAdmin()) return [];
+  return devices.filter(d => { const i = dueInfo(d); return i && i.pct >= 1; })
+    .map(d => ({ type: 'overdue', at: d.dueAt, reviewed: false, d, live: true }));
+}
+function dueAuditRowHtml(x){
+  const d = x.d, i = dueInfo(d);
+  const ask = d.dueAsk && d.dueAsk.start === d.dueStart ? d.dueAsk : null;
+  const ack = d.dueAck && d.dueAck.start === d.dueStart ? d.dueAck : null;
+  const st = ask && ask.state === 'wait' ? '📞 مستني الاستقبال يكلّم العميل'
+           : ask && ask.state === 'refused' ? '🚫 العميل رفض التأخير وعايز جهازه'
+           : ack ? '🏭 آخر رد: ' + (DUE_ANS[ack.answer] || '') + ' (' + splAgoTxt(ack.at) + ')'
+           : '❓ مدير الإنتاج لسه ماردّش';
+  return `<div class="appr-row" style="background:var(--danger-bg);">
+    <div class="appr-row-info" style="cursor:pointer;" onclick="openDetail('${d.id}')">
+      <div class="appr-row-dev"><span class="appr-row-kind" style="background:var(--surface);color:var(--danger);">⏳ عدّى الميعاد مع العميل — ${i ? esc(stageDurTxt(-i.left)) : ''}</span>📱 ${esc(d.deviceType)} ${esc(d.model)}${d.customerName ? ' — ' + esc(d.customerName) : ''}</div>
+      <div style="font-size:13px;line-height:1.7;margin-top:5px;">اتفقنا: ${esc(dueWhenTxt(d.dueAt))}${d.technician ? ' · 🔧 ' + esc(d.technician) : ''} · 📍 ${esc(stLabel(statusInfo(d.status)) || d.status)}<br>${esc(st)}</div>
+      <div class="appr-row-meta">بتختفي لوحدها لما الورشة تخلصه أو العميل يوافق على ميعاد جديد</div>
+    </div>
+  </div>`;
+}
+
+// ---------- 🎯 أرقام «في الميعاد» (صفحة ⏱️ وقت كل مرحلة) ----------
+// 🧸 كل جهاز كان ليه ميعاد والورشة خلصته في المدة المختارة:
+//    ✅ في الميعاد الأول · 🙏 اتمدّ واتلحق (العميل وافق على وقت أطول) · 🔴 متأخر
+function dueStats(days){
+  const from = Date.now() - days * 86400000;
+  const rows = [];
+  devices.forEach(d => {
+    const log = d.dueLog || [];
+    const first = log.find(x => x && x.kind === 'set' && x.dueAt);
+    if(!first) return;
+    const fin = (() => {
+      const h = d.statusHistory || [], s = Date.parse(log[0].at) || 0;
+      for(const x of h){ if(x && x.date && Date.parse(x.date) >= s && ['done', 'workshop_rejected', 'sent_to_reception'].includes(x.status)) return Date.parse(x.date); }
+      return 0;
+    })();
+    if(!(fin >= from)) return;
+    const firstAt = Date.parse(first.dueAt);
+    const lastAt  = Date.parse(([...log].reverse().find(x => x && x.dueAt) || first).dueAt);
+    const res = fin <= firstAt ? 'ok' : fin <= lastAt ? 'ext' : 'late';
+    const g = dueIssueGroup(d.reportedIssue);
+    rows.push({ d, res, tech: d.technician || 'من غير فني', grp: g ? g.name : 'تاني' });
+  });
+  const agg = key => {
+    const m = {};
+    rows.forEach(r => { const k = r[key]; (m[k] = m[k] || { ok: 0, ext: 0, late: 0, n: 0 }); m[k][r.res]++; m[k].n++; });
+    return Object.entries(m).sort((a, b) => b[1].n - a[1].n);
+  };
+  const tot = { ok: 0, ext: 0, late: 0, n: rows.length };
+  rows.forEach(r => tot[r.res]++);
+  return { tot, byTech: agg('tech'), byGrp: agg('grp') };
+}
+function dueStatsHtml(){
+  const { tot, byTech, byGrp } = dueStats(stageDays);
+  if(!tot.n) return `<div class="st3-card"><div class="st3-h"><span class="st3-ic">🎯</span><div class="st3-t"><b>في الميعاد مع العميل</b><small>لسه مفيش أجهزة ليها ميعاد خلصت في المدة دي</small></div></div></div>`;
+  const pc = (a, n) => n ? Math.round(a / n * 100) + '%' : '—';
+  const tbl = (title, list) => `<div class="due-st-t">${title}</div>
+    <table class="due-st"><tr><th></th><th>✅</th><th>🙏</th><th>🔴</th><th>في الميعاد</th></tr>
+    ${list.map(([k, v]) => `<tr><td>${esc(k)}</td><td>${v.ok}</td><td>${v.ext}</td><td>${v.late}</td><td><b>${pc(v.ok, v.n)}</b></td></tr>`).join('')}</table>`;
+  return `<div class="st3-card">
+    <div class="st3-h"><span class="st3-ic">🎯</span>
+      <div class="st3-t"><b>في الميعاد مع العميل</b><small>✅ في الميعاد الأول · 🙏 اتمدّ واتلحق · 🔴 متأخر</small></div>
+      <div class="st3-med">${pc(tot.ok, tot.n)}<small>${tot.n} جهاز · 🙏 ${tot.ext} · 🔴 ${tot.late}</small></div></div>
+    ${tbl('🔧 لكل فني', byTech)}
+    ${tbl('🧩 لكل نوع عطل', byGrp)}
+  </div>`;
+}
+
 const NTF_PAGES = [
   { k:'inbox',   label: () => isReception() ? '📥 وصلك من الصيانة' : '📥 وارد من الاستقبال',
     on: () => isReception() || isProduction(),
@@ -4234,6 +4898,17 @@ const NTF_PAGES = [
                   : depRefundStep(d) === 'rec')
                 .map(d => d.id + '@' + (d.depositStatus || '') + '@' + (depRefundStep(d) || '')),
     html: () => isCashier() ? depositPanelHtml() : depositRecPanelHtml() },
+  // ⏳ (٢٠٢٦-١٠-١٣) مدير الإنتاج: مواعيد العملاء — «الجديد» = جهاز محتاج رد عند مستوى جديد
+  { k:'due',     label: () => '⏳ مواعيد العملاء',
+    on: () => isProduction(),
+    keys: () => devices.filter(d => duePending(d) || dueRefused(d)).map(d => d.id + '@' + duePending(d) + (dueRefused(d) ? '@no' : '')),
+    count: () => devices.filter(d => { const i = dueInfo(d); return i && (i.pct >= 0.5 || dueRefused(d)); }).length,
+    html: () => dueProdPanelHtml() },
+  // ⏳ الاستقبال: الورشة محتاجة وقت أطول → كلّم العميل
+  { k:'call',    label: () => '📞 كلّم العميل',
+    on: () => isReception(),
+    keys: () => dueCallList().map(d => d.id + '@' + d.dueAsk.at),
+    html: () => dueCallPanelHtml() },
   // 🔗 (٢٠٢٦-١٠-١٣) أمين الخزنة: «عميل جاي يدفع» — والجهاز اللي اتأخر بينوّر الأوضة تاني (@late)
   { k:'await',   label: () => '💵 عميل جاي يدفع',
     on: () => isCashier(),
@@ -4353,7 +5028,12 @@ function renderApprovalsPanel(){
       + myReportsPanelHtml();
   try{ syncAuditBadge(); }catch(e){}
   try{ if(ntfOpenK) renderNtf(); else syncNtf(); }catch(e){ console.warn('ntf:', e); }
+  try{ dueCheckAlerts(); }catch(e){ console.warn('due:', e); }   // ⏳ السؤال لمدير الإنتاج
 }
+// ⏳ كل دقيقة: الرملة بتنزل حتى لو محدش عمل حاجة → نشوف لو جهاز عدّى النص
+setInterval(() => {
+  try{ if(isProduction() || isReception() || isSuperAdmin()){ if(ntfOpenK) renderNtf(); else syncNtf(); dueCheckAlerts(); syncAuditBadge(); } }catch(e){}
+}, 60000);
 
 // ============================================================
 // 🧰 إشعار حركة الفنيين على المخزن
@@ -4732,7 +5412,8 @@ function renderColumn(keepPos){
     ? trashDevices.filter(d => ifxMatch('columnSearch', d, q, matchesSearch))
                   .sort((a,b) => new Date(b.trashedAt||0) - new Date(a.trashedAt||0))
     : devices.filter(d => boardStatus(d) === currentColumn && ifxMatch('columnSearch', d, q, matchesSearch))
-             .sort((a,b) => touchedAt(b) - touchedAt(a));
+             // ⏳ مدير الإنتاج: الأقرب ميعاد مع العميل الأول — واللي مالوش ميعاد بالترتيب القديم
+             .sort((a,b) => (isProduction() ? dueCmp(a, b) : 0) || (touchedAt(b) - touchedAt(a)));
   document.getElementById('columnTitle').textContent = `${stLabel(s)} (${colFullList.length.toLocaleString('en-EG')})`;
   document.getElementById('columnTitle').style.color = accent(s.varname);
 
@@ -4912,6 +5593,7 @@ function openAddModal(){
   const pad = n => String(n).padStart(2,'0');
   document.getElementById('f_intakeDateOnly').value = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
   document.getElementById('f_intakeTimeOnly').value = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  addDueReset();   // ⏳ الميعاد مع العميل يبدأ فاضي كل مرة
   document.getElementById('addFormWrap').classList.remove('hidden');
   document.getElementById('addSuccessWrap').classList.add('hidden');
   document.getElementById('addLabelArea').innerHTML = '';
@@ -5200,6 +5882,13 @@ async function submitAdd(){
   const timeOnly = document.getElementById('f_intakeTimeOnly').value || '00:00';
   const intakeDateObj = dateOnly ? new Date(`${dateOnly}T${timeOnly}`) : new Date();
   const intakeDate = isNaN(intakeDateObj.getTime()) ? new Date().toISOString() : intakeDateObj.toISOString();
+  // ⏳ (٢٠٢٦-١٠-١٣) الميعاد مع العميل — إجباري، والرملة بتبدأ من وقت الدخول
+  const dueF = addDueFields(intakeDate);
+  if(dueF.err){
+    alert('⏳ ' + dueF.err);
+    const h = document.getElementById('addDueHost'); if(h) h.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    return;
+  }
   const newDevice = {
     id: 'dev_' + Date.now(),
     trackToken: genTrackToken(),
@@ -5225,6 +5914,7 @@ async function submitAdd(){
     intakeDate,
     createdBy: currentUser.name,
     statusHistory: [{ status:'waiting', date: intakeDate, by: currentUser.name }],
+    ...dueF.fields,   // ⏳ dueAt · dueStart · dueLabel · dueLog
   };
   devices = [newDevice, ...devices];
   render();
@@ -5708,6 +6398,8 @@ function closeDetail(){
   pointsBoxOpen = false;
   refreshOpenOverlays();   // يعكس أي تغيير في الحالة على الجرد المفتوح ورا التفاصيل فوراً
   try{ prRestoreAfterDetail(); }catch(e){}   // جاي من مراجعة قطع الغيار؟ نرجّعك لنفس مكانك
+  dueEdit = null;
+  setTimeout(() => { try{ dueCheckAlerts(); }catch(e){} }, 300);   // ⏳ كان فيه سؤال مستني؟
 }
 // ============================================================
 // أسماء الفنيين — مصدر واحد للحقيقة
@@ -6739,6 +7431,12 @@ async function ph2SetPartWait(id){
     activityNotes: [...(x.activityNotes || []), { text: '🔩 مستني قطعة: ' + part + (by ? ' — طلبها ' + by : ''), at: now, by: currentUser.name, role: currentRoleLabel() }] } : x);
   renderDetail(); render();
   await persist();
+  // ⏳ (٢٠٢٦-١٠-١٣) القطعة غالباً هتأخّره — نسأله على طول
+  const nd = devices.find(x => x.id === id);
+  if(nd && isDueActive(nd) && !dueAskOpen(nd)
+     && confirm('🔩 الجهاز مستني قطعة.\nاتفقنا مع العميل: ' + dueWhenTxt(nd.dueAt) + '\n\nهنحتاج وقت أطول من الميعاد ده؟ (الاستقبال هيكلّم العميل)')){
+    dueOpen(id, 'ask', { reason: 0, note: part });
+  }
 }
 async function ph2PartArrived(id){
   if(!isProduction()) return;
@@ -6755,7 +7453,7 @@ async function ph2PartArrived(id){
 
 // ---------- شارات الكارت (المرحلة التانية) ----------
 function ph2CardChips(d){
-  let h = '';
+  let h = dueCardChip(d);   // ⏳ (٢٠٢٦-١٠-١٣) الميعاد مع العميل
   if(d.partWait && (isProduction() || isReception()))
     h += `<span class="rc-chip" style="background:var(--info-bg);color:var(--info)">🔩 ${esc(d.partWait.part)} · ${esc(splAgoTxt(d.partWait.at))}</span> `;
   if(isProduction()){
@@ -6768,7 +7466,7 @@ function ph2CardChips(d){
   }
   return h;
 }
-function ph2CardClass(d){ return (isProduction() && lateInfo(d)) ? ' ph2-late' : ''; }
+function ph2CardClass(d){ return ((isProduction() && lateInfo(d)) ? ' ph2-late' : '') + dueCardClass(d); }   // ⏳ + لون الميعاد
 
 // ---------- ١٢) 📦 استلام بالباركود دفعة واحدة ----------
 // 🧸 الصبح الاستقبال بيبعت ١٥ جهاز. بدل ما مدير الإنتاج يفتح كل جهاز لوحده:
@@ -7239,6 +7937,7 @@ function renderStageTimes(){
     <div class="st3-note">🧸 الساعة بتبدأ أول ما الجهاز يدخل المحطة وبتقف لما يخرج منها. الرقم الكبير = <b>نص الأجهزة خلصت في أقل منه</b>. «واقفين دلوقتي» = لسه جوه المحطة.</div>
     ${journey.n ? `<div class="st3-journey">🧭 الرحلة كلها — من التسجيل لحد التسليم: <b>${esc(stageDurTxt(journey.med))}</b>
        <small>(${journey.n.toLocaleString('en-EG')} جهاز · المتوسط ${esc(stageDurTxt(journey.avg))})</small></div>` : ''}
+    ${dueStatsHtml()}
     ${cards}`;
 }
 
@@ -7264,6 +7963,7 @@ const AUDIT_TYPES = {
   // 🔗 (٢٠٢٦-١٠-١٣) ورق «حي» — بيختفي لوحده لما الحاجة تتعمل (مفيش «✓ راجعته»)
   defer:   { icon:'📒', label:'آجل مستني يتقيّد' },
   paylate: { icon:'⏰', label:'اتسلّم ومادفعش' },
+  overdue: { icon:'⏳', label:'عدّى الميعاد مع العميل' },   // ⏳ (٢٠٢٦-١٠-١٣)
 };
 let auditF = { type: 'all', state: 'pending', days: 30 };
 
@@ -7277,12 +7977,14 @@ function auditItems(){
   closings.forEach(c => out.push({ type: 'closing', at: c.created_at || c.to_at, reviewed: !!c.reviewed, c }));
   depositAuditItems().forEach(x => out.push(x));   // 💰 (ملف 88)
   linkAuditItems().forEach(x => out.push(x));      // 🔗 📒 آجل مستني · ⏰ اتسلّم ومادفعش
+  dueAuditItems().forEach(x => out.push(x));       // ⏳ عدّى الميعاد مع العميل
   return out.sort((a, b) => (Date.parse(b.at) || 0) - (Date.parse(a.at) || 0));
 }
 
 function auditRowHtml(x){
   if(x.type === 'deposit') return depositAuditRowHtml(x);   // 💰 (ملف 88)
   if(x.type === 'defer' || x.type === 'paylate') return linkAuditRowHtml(x);   // 🔗
+  if(x.type === 'overdue') return dueAuditRowHtml(x);   // ⏳
   const when = x.at ? new Date(x.at).toLocaleString(getLocale()) : '';
   if(x.type === 'closing'){
     const c = x.c, diff = Number(c.diff) || 0;
@@ -8216,7 +8918,7 @@ function renderDetailNow(){
     <h2 style="font-family:'Cairo',sans-serif;font-size:18px;margin:4px 0 10px;">${esc(d.deviceType)} ${esc(d.model)}</h2>
     ${pendingApprovalText(d) ? `<div class="pending-appr-banner">⏳ ${pendingApprovalText(d)} — ${t('appr.bannerHint')}</div>` : ''}
     ${isReception() ? receptionWhereHtml(d) : ''}
-    ${drawerWaHtml(d)}${rejectReasonShowHtml(d)}${partWaitHtml(d)}${receiptHtml(d)}
+    ${drawerWaHtml(d)}${rejectReasonShowHtml(d)}${dueBoxHtml(d)}${partWaitHtml(d)}${receiptHtml(d)}
 
     <div class="row2">
       <label class="field"><span>${t('det.customerName')}</span><input value="${esc(d.customerName)}"${roC} onblur="editField('customerName', this.value)" /></label>
@@ -10804,6 +11506,9 @@ async function syncTrack(d){
       priceConfirmRequested: !!(d.priceConfirmation && d.priceConfirmation.requested),
       returnPriceConfirmRequested: !!(d.returnPriceConfirmation && d.returnPriceConfirmation.requested),
       intakeDate: d.intakeDate,
+      // ⏳ (٢٠٢٦-١٠-١٣) الميعاد المتوقع — ولو اتغيّر بعد أول اتفاق بنقول للعميل
+      dueAt: d.dueAt || '',
+      dueChanged: (d.dueLog || []).filter(x => x && x.dueAt).length > 1,
       updatedAt: new Date().toISOString()
     });
     await sb.from('public_track').upsert({ token: d.trackToken, payload, updated_at: new Date().toISOString() });
