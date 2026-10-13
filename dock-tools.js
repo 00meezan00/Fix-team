@@ -4,6 +4,7 @@
    dock.js مش عارف أي أداة — الأدوات بتسجّل نفسها هنا.
 
    💬 (٢٠٢٦-١٠-١٢) شات الموظفين — بدل «محادثات العملاء» (الأسيست اتشال).
+   📞 (٢٠٢٦-١٠-١٣) الكول سنتر اتضاف للأدوار (ملف 91).
    ============================================================ */
 (function () {
   'use strict';
@@ -50,9 +51,10 @@
     technician:  { t: 'فني',           i: '🔧' },
     reception:   { t: 'الاستقبال',     i: '🛎️' },
     production:  { t: 'مدير الإنتاج',  i: '🏭' },
+    callcenter:  { t: 'الكول سنتر',    i: '📞' },
     staff:       { t: 'موظف',          i: '👤' }
   };
-  var ROLE_ORDER = ['super_admin', 'owner', 'reception', 'production', 'accountant', 'dispatcher', 'technician', 'staff'];
+  var ROLE_ORDER = ['super_admin', 'owner', 'reception', 'production', 'callcenter', 'accountant', 'dispatcher', 'technician', 'staff'];
   var KEEP = 400;                       // آخر كام رسالة في الذاكرة
 
   var S = {

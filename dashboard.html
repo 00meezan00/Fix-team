@@ -93,7 +93,7 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
     // الأدمن والمحاسب بيفضلوا على الداشبورد → لوجو النظام صح، نعرضه فوراً.
     // الفني والديسباتشر (أو دور لسه مش معروف) → منعرضش حاجة، عشان
     // ماتظهرش لمحة لوجو غلط قبل التحويل.
-    if(last2 === 'super_admin' || last2 === 'accountant' || last2 === 'reception' || last2 === 'production')
+    if(last2 === 'super_admin' || last2 === 'accountant' || last2 === 'reception' || last2 === 'production' || last2 === 'callcenter')
       document.documentElement.classList.add('bv-brand');
   }catch(e){}
   // شبكة أمان: لو حصل خطأ ومنعش شيل الستارة، ما نسيبش المستخدم مقفول
@@ -438,6 +438,20 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
   body.role-reception:not(.cap-pur):not(.cap-rev) #dpSection,
   body.role-production:not(.cap-pur):not(.cap-rev) #dpSection{display:none !important;}
   body.role-reception #backupWrap, body.role-production #backupWrap{display:none !important;}
+  /* 📞 (٢٠٢٦-١٠-١٣) الكول سنتر — قايمة الأساسيات + الإشعارات بس، ومفيش تسجيل أجهزة ولا خانات */
+  body.role-callcenter .mh-shop, body.role-callcenter .mh-parts, body.role-callcenter .mh-admin,
+  body.role-callcenter .money-menu-item, body.role-callcenter .admin-menu-item,
+  body.role-callcenter #waHeldMenuBtn, body.role-callcenter #purMenuBtn,
+  body.role-callcenter #invMenuBtn, body.role-callcenter #partsReviewMenuBtn,
+  body.role-callcenter .new-dev-btn, body.role-callcenter #dpSection,
+  body.role-callcenter #backupWrap, body.role-callcenter .eval-menu-item,
+  body.role-callcenter #board{display:none !important;}
+  .as-stars{display:flex; gap:4px; direction:ltr; justify-content:flex-end;}
+  .as-star{border:none; background:none; font-size:32px; line-height:1; color:var(--border); cursor:pointer; padding:2px;}
+  .as-star.on{color:#F5B301;}
+  .cc-log{border:1px solid var(--border); border-radius:10px; padding:8px 11px; margin:0 0 14px; background:var(--surface);}
+  .cc-log summary{font-size:13px; font-weight:800; cursor:pointer;}
+  .cc-log-i{font-size:12.5px; line-height:1.7; border-top:1px solid var(--border); padding:6px 0;}
   .rc-chip{display:inline-block; margin-top:6px; font-size:11.5px; font-weight:800; border-radius:7px; padding:3px 8px;}
   .rc-where{border-radius:10px; padding:10px 12px; margin:0 0 12px; font-size:13.5px; font-weight:800; line-height:1.7;}
   .pill.pill-off{opacity:.35; cursor:not-allowed;}
@@ -1658,6 +1672,8 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
     <button id="ntfBtn_deposit" style="display:none;" onclick="openNtf('deposit')">💰 العرابين</button>
     <button id="ntfBtn_due"     style="display:none;" onclick="openNtf('due')">⏳ مواعيد العملاء</button>
     <button id="ntfBtn_call"    style="display:none;" onclick="openNtf('call')">📞 كلّم العميل</button>
+    <button id="ntfBtn_aftersale" style="display:none;" onclick="openNtf('aftersale')">🤝 ما بعد البيع</button>
+    <button id="ntfBtn_complaint" style="display:none;" onclick="openNtf('complaint')">🔁 عملاء عندهم مشكلة</button>
     <button id="ntfBtn_await"   style="display:none;" onclick="openNtf('await')">💵 عميل جاي يدفع</button>
     <button id="ntfBtn_paid"    style="display:none;" onclick="openNtf('paid')">✅ اتدفع</button>
     <button id="ntfBtn_reports" style="display:none;" onclick="openNtf('reports')">📝 تقاريري</button>
@@ -2200,7 +2216,7 @@ const ADMIN_EMAIL_SET = ADMIN_EMAILS.length > 0;
 const ROLES_KEY = 'user-roles';
 // 🛎️ reception = موظف الاستقبال — بيفضل على الداشبورد ده (مفيش تحويل لصفحة تانية)
 // 🏭 production = مدير الإنتاج — برضه على الداشبورد ده
-const ROLES = ['super_admin', 'accountant', 'dispatcher', 'technician', 'hr', 'staff', 'owner', 'reception', 'production'];
+const ROLES = ['super_admin', 'accountant', 'dispatcher', 'technician', 'hr', 'staff', 'owner', 'reception', 'production', 'callcenter'];   // 📞 (ملف 91)
 let userRoles = {};   // { "email": "super_admin" }  أو  { "email": {role, techName} }
 
 // rolesLoadOk = قدرنا نقرا الأدوار من السيرفر فعلاً؟
@@ -2313,7 +2329,7 @@ const ROLE_LABEL_KEYS = {
 };
 // دور HR اتضاف بعد ما الخريطة دي اتكتبت ومالوش مفتاح ترجمة،
 // فبيرجّع 'hr' خام. الخريطة دي بتغطّي أي دور مالوش مفتاح.
-const ROLE_LABEL_FALLBACK = { hr: 'موارد بشرية', staff: 'موظف', owner: 'المالك', reception: 'موظف الاستقبال', production: 'مدير الإنتاج' };
+const ROLE_LABEL_FALLBACK = { hr: 'موارد بشرية', staff: 'موظف', owner: 'المالك', reception: 'موظف الاستقبال', production: 'مدير الإنتاج', callcenter: 'الكول سنتر' };
 function roleLabel(r){
   // 🧾 حساب السوبر أدمن **هو** «المحاسب العام» — ولوحة الأدمن باب جواه.
   //    فاسمه في كل حاجة الناس بتشوفها (ملاحظات الأجهزة · حسابي ·
@@ -4089,7 +4105,7 @@ function render(){
 // ⚠️ شريط «اتحصّل النهارده» و«قفّل الخزنة» عند أمين الخزنة فاضلين
 //    مكانهم — دول أدوات شغل مش إشعارات.
 // ############################################################
-function ntfOn(){ return isReception() || isProduction() || isCashier(); }
+function ntfOn(){ return isReception() || isProduction() || isCashier() || isCallCenter(); }
 
 // كل أوضة: مين يشوفها · بتعدّ إيه · كل حاجة جواها ليها «بصمة» (عشان نعرف الجديد)
 // ############################################################
@@ -4563,12 +4579,12 @@ function dueAskShowHtml(d, ask){
     <div style="font-size:12px;font-weight:600;margin-top:2px;">الميعاد الجديد المقترح: ${esc(dueWhenTxt(ask.proposedAt))} · ${esc(ask.by || '')} · ${esc(splAgoTxt(ask.at))}</div>`;
   if(ask.state === 'wait'){
     return `<div class="rc-where" style="background:var(--info-bg);color:var(--info);margin-top:8px;">${head}
-      ${(isReception() || isSuperAdmin()) ? `<div class="due-chips" style="margin-top:8px;">
+      ${(isCallCenter() || isSuperAdmin()) ? `<div class="due-chips" style="margin-top:8px;">
         ${d.customerPhone ? `<button class="due-chip" onclick="dueWa('${d.id}')">💬 ابعت للعميل</button>` : ''}
         <button class="due-chip on" style="background:var(--success);border-color:var(--success);" onclick="dueReply('${d.id}','agreed')">✅ العميل وافق</button>
         <button class="due-chip" onclick="dueOpen('${d.id}','other')">🕐 اتفقنا على ميعاد تاني</button>
         <button class="due-chip" style="color:var(--danger);border-color:var(--danger-border);" onclick="dueReply('${d.id}','refused')">🚫 عايز جهازه كده</button>
-      </div>` : `<div style="font-size:12px;margin-top:4px;">📞 مستني الاستقبال يكلّم العميل</div>`}
+      </div>` : `<div style="font-size:12px;margin-top:4px;">📞 مستني الكول سنتر يكلّم العميل</div>`}
     </div>`;
   }
   if(ask.state === 'refused'){
@@ -4620,7 +4636,8 @@ function dueOpen(id, mode, preset){
 
 // ---------- ✍️ الكتابة ----------
 async function dueSaveSet(id){
-  if(!(isReception() || isSuperAdmin())) return;
+  if(!(isReception() || isCallCenter() || isSuperAdmin())) return;
+  if(isCallCenter() && !(dueEdit && dueEdit.mode === 'other')) return;   // 📞 بيرد على طلب الورشة بس
   const d = devices.find(x => x.id === id);
   const at = dueEditAt();
   if(!d || !at){ alert('اختار الميعاد'); return; }
@@ -4632,9 +4649,11 @@ async function dueSaveSet(id){
   dueEdit = null;
   devices = devices.map(x => {
     if(x.id !== id) return x;
-    const ask = (x.dueAsk && x.dueAsk.state === 'wait')
+    // 🛎️ الاستقبال مابيردّش على طلب الورشة — ده شغل الكول سنتر (السيرفر قافله — ملف 91)
+    const ask = (x.dueAsk && x.dueAsk.state === 'wait' && !isReception())
       ? { ...x.dueAsk, state: 'other', recAt: now, recBy: currentUser.name, finalAt: iso } : x.dueAsk;
-    return { ...x, dueAt: iso, dueStart: now, dueLabel: label, dueAsk: ask,
+    const log = other ? [...(x.callLog || []), { kind: 'due', result: 'other', at: now, by: currentUser.name, text: '🕐 اتفقنا على ميعاد تاني: ' + dueWhenTxt(iso) }] : x.callLog;
+    return { ...x, dueAt: iso, dueStart: now, dueLabel: label, dueAsk: ask, ...(log ? { callLog: log } : {}),
       ...dueAppend(x, other ? 'other' : 'set', (other ? '🕐 اتفقنا مع العميل على ميعاد تاني: ' : '⏳ ميعاد جديد مع العميل: ') + label + ' (لحد ' + dueWhenTxt(iso) + ')', { dueAt: iso }) };
   });
   renderDetail(); render(); await persist();
@@ -4663,7 +4682,7 @@ async function dueSendAsk(id){
   ph1Toast('📞 اتبعت للاستقبال يكلّم العميل');
 }
 async function dueReply(id, ans){
-  if(!(isReception() || isSuperAdmin())) return;
+  if(!(isCallCenter() || isSuperAdmin())) return;   // 📞 (٢٠٢٦-١٠-١٣)
   const d = devices.find(x => x.id === id);
   if(!d || !dueAskOpen(d)) return;
   let recNote = '';
@@ -4676,9 +4695,11 @@ async function dueReply(id, ans){
     const ask = { ...x.dueAsk, state: ans, recAt: now, recBy: currentUser.name, recNote };
     if(ans === 'agreed'){
       return { ...x, dueAt: ask.proposedAt, dueStart: now, dueLabel: ask.extraLabel + ' زيادة', dueAsk: { ...ask, start: now, finalAt: ask.proposedAt },
+        callLog: [...(x.callLog || []), { kind: 'due', result: 'agreed', at: now, by: currentUser.name, text: '✅ وافق على وقت أطول — الميعاد الجديد ' + dueWhenTxt(ask.proposedAt) }],
         ...dueAppend(x, 'agreed', '✅ العميل وافق على الميعاد الجديد: ' + dueWhenTxt(ask.proposedAt), { dueAt: ask.proposedAt }) };
     }
     return { ...x, dueAsk: ask,
+      callLog: [...(x.callLog || []), { kind: 'due', result: 'refused', at: now, by: currentUser.name, text: '🚫 مش موافق على التأخير وعايز جهازه' + (recNote ? ' — ' + recNote : '') }],
       ...dueAppend(x, 'refused', '🚫 العميل مش موافق على التأخير وعايز جهازه' + (recNote ? ' — ' + recNote : '')) };
   });
   renderDetail(); render(); await persist();
@@ -4768,7 +4789,7 @@ async function dueAnswer(ans){
 // ---------- 📞 أوضة «كلّم العميل» (الاستقبال) + «⏳ المواعيد» (مدير الإنتاج) ----------
 function dueCallList(){ return devices.filter(d => dueAskOpen(d)).sort((a, b) => Date.parse(a.dueAsk.at) - Date.parse(b.dueAsk.at)); }
 function dueCallPanelHtml(){
-  if(!(isReception() || isSuperAdmin())) return '';
+  if(!(isCallCenter() || isSuperAdmin())) return '';   // 📞 (٢٠٢٦-١٠-١٣) كان للاستقبال
   const list = dueCallList();
   if(!list.length) return '';
   return `<div class="spn-panel" style="border-color:var(--info);">
@@ -4874,6 +4895,365 @@ function dueStatsHtml(){
   </div>`;
 }
 
+// ############################################################
+// 📞 (٢٠٢٦-١٠-١٣) الكول سنتر — «اللي بيكلّم العملاء»
+// ------------------------------------------------------------
+// 🧸 موظف شغلته التليفون: الاستقبال يفضل مع العميل اللي قدامه،
+//    والكول سنتر يكلّم اللي بره. عنده ٣ قوايم على شاشته:
+//      📞 كلّم العميل      — الورشة محتاجة وقت أطول (اتنقلت من الاستقبال)
+//      😴 نايمين في الدرج  — «جهازك جاهز من أسبوع، تعالى خده» (اتنقلت من الاستقبال)
+//      🤝 ما بعد البيع     — أي جهاز اتسلّم من شهر: «الخدمة كانت عاملة إزاي؟»
+//
+// 🤝 المكالمة:
+//    ⭐ نجوم (١ لـ٥) · «اشتكى من» (السعر · الوقت · المعاملة · جودة الصيانة)
+//    🔧 «الجهاز شغال كويس؟» لأ → شكوى بتروح للاستقبال (العميل جاي بمرتجع)
+//       وللمحاسب العام في «🧾 دفتر المراجعة» (ومعاها أي تقييم ٢ نجوم أو أقل)
+//    📵 مردّش → الجهاز يرجع بعد يوم · ٣ مرات مردّش → يتقفل
+//    🚫 ماتتصلش بيا → كل أجهزة الرقم ده مابتظهرش في ما بعد البيع تاني
+//
+// 🗄️ الحقول (جوه الجهاز) — السيرفر بيحرسها (ملف 91):
+//    afterSale     نتيجة مكالمة ما بعد البيع           — الكول سنتر
+//    callLog       سجل المكالمات (بيتزاد بس)            — الكول سنتر
+//    noCall        «ماتتصلش بيا»                       — الكول سنتر
+//    complaintSeen الاستقبال شاف الشكوى                 — الاستقبال
+//
+// ⚠️ الكول سنتر مابيلمسش حالة الجهاز ولا السعر ولا الدفع — بيشوف بس.
+//    تفاصيل الجهاز عنده ورقة قراية (ccDetailHtml) + أدوات المكالمة.
+// ############################################################
+function isCallCenter(){ return myRole() === 'callcenter'; }
+
+const AS_DAYS = 30;            // اتسلّم من شهر → يظهر
+const AS_MAX_DAYS = 90;        // بعد ٣ شهور مالوش لازمة — بيختفي
+const AS_FROM = '2026-09-01';  // 🔧 الأجهزة اللي اتسلّمت قبل كده مابتظهرش (أرشيف قديم)
+const AS_RETRY_H = 24;         // مردّش → يرجع بعد يوم
+const AS_MAX_TRIES = 3;        // ٣ مرات مردّش → يتقفل
+const AS_TAGS = ['💰 السعر', '⏱️ الوقت', '😐 المعاملة', '🔧 جودة الصيانة', '✍️ حاجة تانية'];
+
+function ccPhoneKey(p){ const s = String(p || '').replace(/[^0-9]/g, ''); return s.length >= 8 ? s.slice(-10) : ''; }
+function ccNoCallSet(){
+  const s = new Set();
+  devices.forEach(d => { if(d.noCall){ const k = ccPhoneKey(d.customerPhone); if(k) s.add(k); } });
+  return s;
+}
+function ccIsNoCall(d){ const k = ccPhoneKey(d && d.customerPhone); return !!k && ccNoCallSet().has(k); }
+function ccLog(x, entry){
+  const now = new Date().toISOString();
+  return [...(x.callLog || []), { at: now, by: currentUser.name, ...entry }];
+}
+
+// ---------- 🤝 قايمة ما بعد البيع ----------
+function asDeliveredAt(d){ return deliveredDateOf(d); }
+function asList(){
+  const now = Date.now(), noCall = ccNoCallSet();
+  return devices.filter(d => {
+    if(d.status !== 'delivered' || !ccPhoneKey(d.customerPhone)) return false;
+    const at = asDeliveredAt(d);
+    if(!at || String(at).slice(0, 10) < AS_FROM) return false;
+    const days = (now - Date.parse(at)) / 86400000;
+    if(days < AS_DAYS || days > AS_MAX_DAYS) return false;
+    if(noCall.has(ccPhoneKey(d.customerPhone))) return false;
+    const a = d.afterSale;
+    if(!a) return true;
+    if(a.state === 'noanswer') return !(Date.parse(a.nextAt) > now);
+    return false;   // done / closed
+  }).map(d => ({ d, at: asDeliveredAt(d), tries: (d.afterSale && d.afterSale.tries) || 0 }))
+    .sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+}
+function asPanelHtml(){
+  if(!(isCallCenter() || isSuperAdmin())) return '';
+  const list = asList();
+  if(!list.length) return '';
+  return `<div class="spn-panel" style="border-color:var(--success);">
+    <div class="spn-head" style="color:var(--success);">🤝 خدمة ما بعد البيع — اتسلّموا من شهر
+      <span class="spn-count" style="background:var(--success);">${list.length}</span></div>
+    ${list.map(({d, at, tries}) => `<div class="spn-row" style="cursor:pointer;" onclick="openDetail('${d.id}')">
+      <div class="spn-info">
+        <div class="spn-t">👤 ${esc(d.customerName || '—')} · 📞 <span dir="ltr">${esc(d.customerPhone)}</span></div>
+        <div class="spn-m">📱 ${esc(d.deviceType)} ${esc(d.model)} · اتسلّم ${esc(splAgoTxt(at))}${d.technician ? ' · 🔧 ' + esc(d.technician) : ''}${tries ? ` · <b style="color:var(--warn)">📵 مردّش ${tries} مرة</b>` : ''}</div>
+      </div>
+      <div class="appr-row-actions"><button class="appr-btn-yes" style="background:var(--success);" onclick="event.stopPropagation();openDetail('${d.id}')">📞 كلّمه</button></div>
+    </div>`).join('')}
+  </div>`;
+}
+
+// ---------- 📋 فورمة المكالمة (جوه تفاصيل الجهاز) ----------
+let asEdit = null;   // { id, stars, tags:[], working, note }
+function asEligible(d){ return asList().some(x => x.d.id === d.id); }
+function asBoxHtml(d){
+  const a = d.afterSale;
+  const done = a && (a.state === 'done' || a.state === 'closed');
+  // نتيجة اتسجّلت قبل كده
+  if(done){
+    const st = a.state === 'closed' ? `📵 اتقفلت — مردّش ${a.tries || AS_MAX_TRIES} مرات`
+      : `${'⭐'.repeat(a.stars || 0)}${a.stars ? ` (${a.stars}/5)` : ''}${a.working === 'no' ? ' · <b style="color:var(--danger)">🔧 الجهاز فيه مشكلة</b>' : ' · ✅ الجهاز شغال'}`;
+    return `<div class="due-box" style="border-color:var(--${a.working === 'no' || (a.stars && a.stars <= 2) ? 'danger' : 'success'});">
+      <div class="due-box-h">🤝 ما بعد البيع: ${st}</div>
+      ${a.tags && a.tags.length ? `<div class="due-box-s">اشتكى من: ${esc(a.tags.join(' · '))}</div>` : ''}
+      ${a.note ? `<div style="font-size:13px;margin-top:5px;white-space:pre-wrap;">${esc(a.note)}</div>` : ''}
+      <div style="font-size:11.5px;color:var(--muted);margin-top:4px;">${esc(a.by || '')} · ${esc(splAgoTxt(a.at))}</div>
+    </div>`;
+  }
+  if(!isCallCenter()) return '';
+  if(ccIsNoCall(d)) return `<div class="rc-where" style="background:var(--surface-2);color:var(--muted);">🚫 العميل طلب مانتصلش بيه تاني</div>`;
+  if(!asEligible(d)) return '';
+  const e = asEdit && asEdit.id === d.id ? asEdit : (asEdit = { id: d.id, stars: 0, tags: [], working: '', note: '' });
+  const star = n => `<button type="button" class="as-star${e.stars >= n ? ' on' : ''}" onclick="asEdit.stars=${n};renderDetail();">★</button>`;
+  const tag = (t, i) => `<button type="button" class="due-chip${e.tags.includes(t) ? ' on' : ''}" onclick="asToggleTag(${i})">${t}</button>`;
+  return `<div class="rfr-box" style="background:var(--success-bg);border-color:var(--success);">
+    <div class="rfr-q">🤝 مكالمة ما بعد البيع — اتسلّم ${esc(splAgoTxt(asDeliveredAt(d)))}${a && a.tries ? ` · مردّش قبل كده ${a.tries} مرة` : ''}</div>
+    <div class="due-chips" style="margin-bottom:8px;">
+      ${d.customerPhone ? `<a class="due-chip" href="tel:${esc(ccPhoneKey(d.customerPhone) ? d.customerPhone : '')}" style="text-decoration:none;">📞 اتصل</a>
+      <button type="button" class="due-chip" onclick="asWa('${d.id}')">💬 واتساب</button>` : ''}
+    </div>
+    <div class="rfr-q">⭐ الخدمة كانت عاملة إزاي؟</div>
+    <div class="as-stars">${[1, 2, 3, 4, 5].map(star).join('')}</div>
+    <div class="rfr-q" style="margin-top:8px;">🔧 الجهاز شغال كويس؟</div>
+    <div class="due-chips">
+      <button type="button" class="due-chip${e.working === 'yes' ? ' on' : ''}" onclick="asEdit.working='yes';renderDetail();">✅ أيوه</button>
+      <button type="button" class="due-chip${e.working === 'no' ? ' on' : ''}" style="${e.working === 'no' ? 'background:var(--danger);border-color:var(--danger);' : ''}" onclick="asEdit.working='no';renderDetail();">🔧 لأ — فيه مشكلة</button>
+    </div>
+    <div class="rfr-q" style="margin-top:8px;">😕 اشتكى من حاجة؟ <small style="font-weight:600;">(اختياري)</small></div>
+    <div class="due-chips">${AS_TAGS.map(tag).join('')}</div>
+    <label class="field" style="margin-top:8px;"><span>${e.working === 'no' ? '✍️ المشكلة إيه؟ <b style="color:var(--danger)">*</b> (بتوصل للاستقبال)' : '✍️ قال إيه؟ (اختياري)'}</span>
+      <textarea id="asNote" rows="2" oninput="asEdit.note=this.value">${esc(e.note)}</textarea></label>
+    <button type="button" class="btn-primary" style="box-shadow:none;width:100%;justify-content:center;background:var(--success);margin-bottom:8px;" onclick="asSave('${d.id}')">💾 سجّل المكالمة</button>
+    <div class="pay-choice">
+      <button type="button" class="pay-btn" style="border-color:var(--warn);color:var(--warn);background:var(--surface);" onclick="asNoAnswer('${d.id}')">📵 مردّش</button>
+      <button type="button" class="pay-btn" style="border-color:var(--border);color:var(--muted);background:var(--surface);" onclick="asNoCall('${d.id}')">🚫 ماتتصلش بيا</button>
+    </div>
+  </div>`;
+}
+function asToggleTag(i){
+  if(!asEdit) return;
+  const t = AS_TAGS[i];
+  asEdit.tags = asEdit.tags.includes(t) ? asEdit.tags.filter(x => x !== t) : [...asEdit.tags, t];
+  renderDetail();
+}
+function asWa(id){
+  const d = devices.find(x => x.id === id);
+  if(!d || !d.customerPhone) return;
+  openWa(d.customerPhone, `أهلاً ${d.customerName || ''} 👋\nمعاك I Fix Team — بنطمّن على جهازك *${`${d.deviceType || ''} ${d.model || ''}`.trim()}* اللي صلّحناه من شهر 🙏\nالجهاز شغال كويس؟ ورأيك في الخدمة كان إيه؟`);
+}
+async function asSave(id){
+  if(!isCallCenter()) return;
+  const d = devices.find(x => x.id === id);
+  const e = asEdit && asEdit.id === id ? asEdit : null;
+  if(!d || !e) return;
+  const note = String((document.getElementById('asNote') || {}).value || e.note || '').trim();
+  if(!e.stars){ alert('اختار عدد النجوم'); return; }
+  if(!e.working){ alert('الجهاز شغال كويس؟ اختار أيوه أو لأ'); return; }
+  if(e.working === 'no' && note.length < 3){ alert('اكتب المشكلة — بتوصل للاستقبال'); return; }
+  const now = new Date().toISOString();
+  const prev = d.afterSale || {};
+  const a = { state: 'done', stars: e.stars, tags: e.tags, working: e.working, note, at: now, by: currentUser.name, tries: prev.tries || 0 };
+  const txt = '🤝 ما بعد البيع: ' + '⭐'.repeat(e.stars) + ` (${e.stars}/5)` + (e.working === 'no' ? ' · 🔧 الجهاز فيه مشكلة' : ' · ✅ الجهاز شغال')
+            + (e.tags.length ? ' · اشتكى من: ' + e.tags.join('، ') : '') + (note ? '\n' + note : '');
+  asEdit = null;
+  devices = devices.map(x => x.id !== id ? x : { ...x, afterSale: a,
+    callLog: ccLog(x, { kind: 'aftersale', result: 'done', stars: e.stars, text: txt }),
+    activityNotes: [...(x.activityNotes || []), { text: txt, at: now, by: currentUser.name, role: currentRoleLabel() }],
+    lastModifiedAt: now, lastModifiedBy: currentUser.name });
+  renderDetail(); render(); await persist();
+  ph1Toast(e.working === 'no' || e.stars <= 2 ? '📝 اتسجّلت — والشكوى وصلت للاستقبال والمحاسب العام' : '✅ اتسجّلت — شكراً');
+}
+async function asNoAnswer(id){
+  if(!isCallCenter()) return;
+  const d = devices.find(x => x.id === id);
+  if(!d) return;
+  const now = new Date(), prev = d.afterSale || {};
+  const tries = (prev.tries || 0) + 1;
+  const closed = tries >= AS_MAX_TRIES;
+  const a = { ...prev, state: closed ? 'closed' : 'noanswer', tries, at: now.toISOString(), by: currentUser.name,
+              nextAt: new Date(now.getTime() + AS_RETRY_H * 3600000).toISOString() };
+  const txt = closed ? `📵 ما بعد البيع: مردّش للمرة ${tries} — اتقفلت` : `📵 ما بعد البيع: مردّش (${tries}/${AS_MAX_TRIES}) — هيظهر تاني بكره`;
+  asEdit = null;
+  devices = devices.map(x => x.id !== id ? x : { ...x, afterSale: a,
+    callLog: ccLog(x, { kind: 'aftersale', result: 'noanswer', text: txt }),
+    lastModifiedAt: now.toISOString(), lastModifiedBy: currentUser.name });
+  closeDetail(); render(); await persist();
+  ph1Toast(txt);
+}
+async function asNoCall(id){
+  if(!isCallCenter()) return;
+  const d = devices.find(x => x.id === id);
+  const key = ccPhoneKey(d && d.customerPhone);
+  if(!d || !key) return;
+  const why = prompt('🚫 العميل طلب مانتصلش بيه تاني؟\nكل أجهزة الرقم ده مش هتظهر في ما بعد البيع.\n\nقال إيه؟ (اختياري)');
+  if(why === null) return;
+  const now = new Date().toISOString();
+  const nc = { at: now, by: currentUser.name, note: why.trim() };
+  asEdit = null;
+  devices = devices.map(x => {
+    if(ccPhoneKey(x.customerPhone) !== key) return x;
+    const base = { ...x, noCall: nc, lastModifiedAt: now, lastModifiedBy: currentUser.name };
+    if(x.id === id) base.callLog = ccLog(x, { kind: 'aftersale', result: 'nocall', text: '🚫 العميل طلب مانتصلش بيه تاني' + (nc.note ? ': ' + nc.note : '') });
+    return base;
+  });
+  closeDetail(); render(); await persist();
+  ph1Toast('🚫 اتسجّل — الرقم ده مش هيظهر تاني');
+}
+
+// ---------- 😕 الشكاوى ----------
+function asIsComplaint(d){ const a = d && d.afterSale; return !!(a && a.state === 'done' && (a.working === 'no' || (a.stars && a.stars <= 2))); }
+// 🛎️ الاستقبال: العميل عنده مشكلة → غالباً جاي بمرتجع
+function asComplaintList(){ return devices.filter(d => asIsComplaint(d) && d.afterSale.working === 'no' && !d.complaintSeen).sort((a, b) => Date.parse(b.afterSale.at) - Date.parse(a.afterSale.at)); }
+function asComplaintPanelHtml(){
+  if(!isReception()) return '';
+  const list = asComplaintList();
+  if(!list.length) return '';
+  return `<div class="spn-panel" style="border-color:var(--danger);">
+    <div class="spn-head" style="color:var(--danger);">🔁 عملاء قالوا الجهاز فيه مشكلة — غالباً جايين بمرتجع
+      <span class="spn-count" style="background:var(--danger);">${list.length}</span></div>
+    ${list.map(d => `<div class="spn-row">
+      <div class="spn-info" style="cursor:pointer;" onclick="openDetail('${d.id}')">
+        <div class="spn-t">👤 ${esc(d.customerName || '—')} · 📱 ${esc(d.deviceType)} ${esc(d.model)}</div>
+        <div class="spn-m">🔧 ${esc(d.afterSale.note || '')}<br>${'⭐'.repeat(d.afterSale.stars || 0)} · 📞 ${esc(d.afterSale.by || '')} · ${esc(splAgoTxt(d.afterSale.at))}${d.customerPhone ? ' · <span dir="ltr">' + esc(d.customerPhone) + '</span>' : ''}</div>
+      </div>
+      <div class="appr-row-actions"><button class="spn-ok" onclick="asSeen('${d.id}')">✓ شفتها</button></div>
+    </div>`).join('')}
+  </div>`;
+}
+async function asSeen(id){
+  if(!isReception()) return;
+  const now = new Date().toISOString();
+  devices = devices.map(x => x.id !== id ? x : { ...x, complaintSeen: { at: now, by: currentUser.name },
+    lastModifiedAt: now, lastModifiedBy: currentUser.name });
+  render(); await persist();
+}
+// 🧾 المحاسب العام: كل شكوى (جهاز فيه مشكلة أو ٢ نجوم أو أقل) — بـ«✓ راجعته»
+function asAuditItems(){
+  if(!isSuperAdmin()) return [];
+  return devices.filter(asIsComplaint).map(d => ({ type: 'complaint', at: d.afterSale.at, reviewed: !!d.afterSale.reviewed, d }));
+}
+function asAuditRowHtml(x){
+  const d = x.d, a = d.afterSale;
+  return `<div class="appr-row" style="${x.reviewed ? 'opacity:.75;' : 'background:var(--danger-bg);'}">
+    <div class="appr-row-info" style="cursor:pointer;" onclick="openDetail('${d.id}')">
+      <div class="appr-row-dev"><span class="appr-row-kind" style="background:var(--surface);color:var(--danger);">😕 شكوى عميل — ${'⭐'.repeat(a.stars || 0)} (${a.stars || 0}/5)${a.working === 'no' ? ' · 🔧 الجهاز فيه مشكلة' : ''}</span>📱 ${esc(d.deviceType)} ${esc(d.model)}${d.customerName ? ' — ' + esc(d.customerName) : ''}</div>
+      <div style="font-size:13px;line-height:1.7;margin-top:5px;">${a.tags && a.tags.length ? 'اشتكى من: ' + esc(a.tags.join(' · ')) + '<br>' : ''}${esc(a.note || '')}${d.technician ? '<br>🔧 الفني: ' + esc(d.technician) : ''}${d.complaintSeen ? '<br>🛎️ الاستقبال شافها (' + esc(d.complaintSeen.by || '') + ')' : ''}</div>
+      <div class="appr-row-meta">📞 ${esc(a.by || '')} · ${esc(new Date(a.at).toLocaleString(getLocale()))}${x.reviewed ? ` · ✓ راجعه ${esc(a.reviewed.by || '')}` : ''}</div>
+    </div>
+    ${x.reviewed ? '' : `<div class="appr-row-actions"><button class="appr-btn-yes" onclick="event.stopPropagation();auditReview('complaint','${d.id}')">✓ راجعته</button></div>`}
+  </div>`;
+}
+async function asReview(id){
+  if(!isSuperAdmin()) return;
+  const now = new Date().toISOString();
+  devices = devices.map(x => x.id !== id || !x.afterSale ? x : { ...x, afterSale: { ...x.afterSale, reviewed: { at: now, by: currentUser.name } },
+    lastModifiedAt: now, lastModifiedBy: currentUser.name });
+  render(); await persist();
+}
+
+// ---------- 📒 سجل المكالمات (لكل الأدوار في التفاصيل) ----------
+const CC_KIND = { aftersale: '🤝', due: '⏳', sleep: '😴' };
+function callLogHtml(d){
+  const log = (d && d.callLog) || [];
+  if(!log.length && !(d && d.noCall)) return '';
+  const nc = d.noCall ? `<div style="font-size:12.5px;color:var(--muted);margin-bottom:5px;">🚫 العميل طلب مانتصلش بيه${d.noCall.note ? ' — ' + esc(d.noCall.note) : ''} (${esc(d.noCall.by || '')})</div>` : '';
+  return `<details class="cc-log"${isCallCenter() ? ' open' : ''}><summary>📞 سجل المكالمات (${log.length})</summary>${nc}
+    ${[...log].reverse().map(c => `<div class="cc-log-i">${CC_KIND[c.kind] || '📞'} <span style="white-space:pre-wrap;">${esc(c.text || '')}</span>
+      <div style="font-size:11px;color:var(--muted-2);">${esc(c.by || '')} · ${esc(new Date(c.at).toLocaleString('ar-EG'))}</div></div>`).join('')}
+  </details>`;
+}
+// 👤 وقت التسجيل (تاريخ العميل): آخر رأي العميل في الخدمة — عشان الاستقبال يعرف
+function ccLastFeedback(phone){
+  const key = ccPhoneKey(phone);
+  if(!key) return null;
+  const list = devices.filter(d => ccPhoneKey(d.customerPhone) === key && d.afterSale && d.afterSale.state === 'done')
+    .sort((a, b) => Date.parse(b.afterSale.at) - Date.parse(a.afterSale.at));
+  return list[0] || null;
+}
+
+// ---------- 📋 تفاصيل الجهاز عند الكول سنتر (قراية + أدوات المكالمة) ----------
+function ccDetailHtml(d){
+  const s = statusInfo(effStatus(d)) || statusInfo(d.status) || { varname: 'waiting', label: d.status };
+  const where = RECEPTION_IN_WORKSHOP.includes(d.status) && !['sent_to_repair', 'returned'].includes(d.status) ? '🔧 في الورشة' : stLabel(s);
+  const row = (k, v) => v ? `<div class="detail-row"><span>${esc(k)}</span><span style="font-weight:700;">${esc(v)}</span></div>` : '';
+  const price = isPriced(d) ? (parseInt(d.agreedPrice) || 0).toLocaleString('en-EG') + ' ج.م' : '';
+  const sleepBox = inDrawer(d) ? `<div class="rfr-box">
+      <div class="rfr-q">😴 الجهاز في ${d.status === 'fixed_drawer' ? '🟢 درج الخالص (جاهز)' : '🔴 درج الرفض'} من ${drawerDays(d)} يوم${d.drawerCall ? ' · آخر مرة اتكلّم ' + esc(splAgoTxt(d.drawerCall.at)) : ''}</div>
+      <div class="due-chips">
+        ${d.customerPhone ? `<a class="due-chip" href="tel:${esc(d.customerPhone)}" style="text-decoration:none;">📞 اتصل</a>
+        <button class="due-chip" onclick="ph2SleepWa('${d.id}')">💬 ذكّره واتساب</button>` : ''}
+        <button class="due-chip on" onclick="ph2SleepCalled('${d.id}')">✓ كلّمته</button>
+      </div></div>` : '';
+  const notes = detNotes(d);
+  return `
+    <div class="modal-head">
+      <span class="badge" style="background:${accentBg(s.varname)};color:${accent(s.varname)}">#${d.id.slice(-5).toUpperCase()}</span>
+      <button class="close-btn" onclick="closeDetail()">×</button>
+    </div>
+    <h2 style="font-family:'Cairo',sans-serif;font-size:18px;margin:4px 0 10px;">${esc(d.deviceType)} ${esc(d.model)}</h2>
+    <div class="rc-where" style="background:${accentBg(s.varname)};color:${accent(s.varname)}">📍 ${esc(where)}</div>
+    <div style="margin-bottom:14px;">
+      ${row('👤 العميل', d.customerName)}
+      ${row('📞 الرقم', d.customerPhone)}
+      ${row('🏪 المحل', d.shopName)}
+      ${row('💰 السعر', price)}
+      ${row('🔧 العطل', d.reportedIssue)}
+      ${row('🔎 العطل المكتشف', d.discoveredFault)}
+      ${row('👨‍🔧 الفني', d.technician)}
+      ${row('📥 دخل', d.intakeDate ? formatDateTime(d.intakeDate) : '')}
+      ${row('📦 اتسلّم', deliveredDateOf(d) && d.status === 'delivered' ? formatDateTime(deliveredDateOf(d)) : '')}
+      ${row('🚫 سبب الرفض', d.rejectReason)}
+    </div>
+    ${dueBoxHtml(d)}
+    ${sleepBox}
+    ${asBoxHtml(d)}
+    ${callLogHtml(d)}
+    <div style="font-size:12px;color:var(--muted);margin:14px 0 8px;">📝 ${t('det.notesTitle')}</div>
+    <div style="margin-bottom:8px;">${notes.length
+      ? notes.slice(-6).map(n => `<div style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:6px;">
+          <div style="font-size:13px;line-height:1.6;white-space:pre-wrap;">${esc((n.kind && I18N.has(n.kind)) ? t(n.kind, n.args||{}) : n.text)}</div>
+          <div style="font-size:11px;color:var(--muted-2);margin-top:3px;">${new Date(n.at).toLocaleString('ar-EG')} — ${esc(n.by||'')}${n.role?` (${esc(n.role)})`:''}</div>
+        </div>`).join('')
+      : `<div style="color:var(--muted-2);font-size:12px;">${t('det.noNotes')}</div>`}</div>
+    <textarea id="newActivityNote" rows="2" placeholder="${t('det.newNotePh')}" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;margin-bottom:6px;"></textarea>
+    <button class="btn-secondary" style="width:100%;color:var(--info);border-color:var(--info-border);margin-bottom:10px;" onclick="addActivityNote()">➕ ${t('det.addNote')}</button>`;
+}
+
+// ---------- 🏠 الشاشة الرئيسية للكول سنتر ----------
+// 🧸 مفيش خانات شغل — القوايم التلاتة على الشاشة على طول + البحث فوق.
+function ccHomeHtml(){
+  if(!isCallCenter()) return '';
+  const html = dueCallPanelHtml() + sleepPanelHtml() + asPanelHtml();
+  return html || `<div class="st3-note" style="text-align:center;padding:30px 12px;">✅ مفيش مكالمات مستنياك دلوقتي<br><small>دوّر على أي جهاز من البحث اللي فوق</small></div>`;
+}
+
+// ---------- ⭐ أرقام الرضا (صفحة «⏱️ وقت كل مرحلة» — المحاسب العام ومدير الإنتاج) ----------
+function satStats(days){
+  const from = Date.now() - days * 86400000;
+  const done = devices.filter(d => d.afterSale && d.afterSale.state === 'done' && Date.parse(d.afterSale.at) >= from);
+  const closed = devices.filter(d => d.afterSale && d.afterSale.state === 'closed' && Date.parse(d.afterSale.at) >= from).length;
+  const avg = l => l.length ? l.reduce((a, d) => a + (d.afterSale.stars || 0), 0) / l.length : 0;
+  const byTech = {};
+  done.forEach(d => { const k = d.technician || 'من غير فني'; (byTech[k] = byTech[k] || []).push(d); });
+  const tags = {};
+  done.forEach(d => (d.afterSale.tags || []).forEach(t => tags[t] = (tags[t] || 0) + 1));
+  return {
+    n: done.length, avg: avg(done), closed,
+    broken: done.filter(d => d.afterSale.working === 'no').length,
+    techs: Object.entries(byTech).map(([k, l]) => ({ k, n: l.length, avg: avg(l), broken: l.filter(d => d.afterSale.working === 'no').length }))
+      .sort((a, b) => b.n - a.n),
+    tags: Object.entries(tags).sort((a, b) => b[1] - a[1]),
+  };
+}
+function satStatsHtml(){
+  const s = satStats(stageDays);
+  if(!s.n && !s.closed) return `<div class="st3-card"><div class="st3-h"><span class="st3-ic">⭐</span><div class="st3-t"><b>رضا العملاء</b><small>لسه مفيش مكالمات ما بعد البيع في المدة دي</small></div></div></div>`;
+  const f = n => n ? n.toFixed(1) : '—';
+  return `<div class="st3-card">
+    <div class="st3-h"><span class="st3-ic">⭐</span>
+      <div class="st3-t"><b>رضا العملاء</b><small>من مكالمات ما بعد البيع</small></div>
+      <div class="st3-med">${f(s.avg)} ⭐<small>${s.n} مكالمة · 🔧 ${s.broken} الجهاز فيه مشكلة · 📵 ${s.closed} مردّوش</small></div></div>
+    ${s.techs.length ? `<div class="due-st-t">🔧 لكل فني</div>
+    <table class="due-st"><tr><th></th><th>مكالمات</th><th>⭐</th><th>🔧 مشكلة</th></tr>
+      ${s.techs.map(x => `<tr><td>${esc(x.k)}</td><td>${x.n}</td><td><b>${f(x.avg)}</b></td><td>${x.broken}</td></tr>`).join('')}</table>` : ''}
+    ${s.tags.length ? `<div class="due-st-t">😕 أكتر حاجة بيشتكوا منها</div>
+      <div class="due-chips">${s.tags.map(([t, n]) => `<span class="due-chip">${esc(t)} · ${n}</span>`).join('')}</div>` : ''}
+  </div>`;
+}
+
 const NTF_PAGES = [
   { k:'inbox',   label: () => isReception() ? '📥 وصلك من الصيانة' : '📥 وارد من الاستقبال',
     on: () => isReception() || isProduction(),
@@ -4884,7 +5264,7 @@ const NTF_PAGES = [
     keys: () => devices.filter(d => lateInfo(d)).map(d => d.id + '@' + d.status),
     html: () => { lateOpen = true; return latePanelHtml(); } },
   { k:'sleep',   label: () => '😴 أجهزة نايمة في الدرج',
-    on: () => isReception(),
+    on: () => isCallCenter(),   // 📞 (٢٠٢٦-١٠-١٣) اتنقلت من الاستقبال للكول سنتر
     keys: () => sleepList().map(x => x.d.id + '@' + x.at),
     html: () => { sleepOpen = true; return sleepPanelHtml(); } },
   { k:'appr',    label: () => '✅ طلبات مسؤول الحركة',
@@ -4906,9 +5286,19 @@ const NTF_PAGES = [
     html: () => dueProdPanelHtml() },
   // ⏳ الاستقبال: الورشة محتاجة وقت أطول → كلّم العميل
   { k:'call',    label: () => '📞 كلّم العميل',
-    on: () => isReception(),
+    on: () => isCallCenter(),   // 📞 (٢٠٢٦-١٠-١٣) اتنقلت من الاستقبال للكول سنتر
     keys: () => dueCallList().map(d => d.id + '@' + d.dueAsk.at),
     html: () => dueCallPanelHtml() },
+  // 📞 الكول سنتر: خدمة ما بعد البيع
+  { k:'aftersale', label: () => '🤝 ما بعد البيع',
+    on: () => isCallCenter(),
+    keys: () => asList().map(x => x.d.id + '@' + ((x.d.afterSale && x.d.afterSale.tries) || 0)),
+    html: () => asPanelHtml() },
+  // 🛎️ الاستقبال: العميل قال الجهاز فيه مشكلة (من مكالمة ما بعد البيع)
+  { k:'complaint', label: () => '🔁 عملاء عندهم مشكلة',
+    on: () => isReception(),
+    keys: () => asComplaintList().map(d => d.id + '@' + d.afterSale.at),
+    html: () => asComplaintPanelHtml() },
   // 🔗 (٢٠٢٦-١٠-١٣) أمين الخزنة: «عميل جاي يدفع» — والجهاز اللي اتأخر بينوّر الأوضة تاني (@late)
   { k:'await',   label: () => '💵 عميل جاي يدفع',
     on: () => isCashier(),
@@ -5021,7 +5411,7 @@ function renderApprovalsPanel(){
   // 🔔 (٢٠٢٦-١٠-١٢) الاستقبال · مدير الإنتاج · أمين الخزنة: اللوحات بقت أوض في القايمة ⋮
   //    (ntf — فوق) — فوق الشاشة فاضل أدوات الخزنة بس + شريط «حصل تحديث».
   if(host) host.innerHTML = ntfOn()
-    ? cashierTodayHtml() + closingStripHtml()
+    ? (isCallCenter() ? ccHomeHtml() : cashierTodayHtml() + closingStripHtml())   // 📞 الكول سنتر: قوايمه على الشاشة على طول
     : cashierTodayHtml() + closingStripHtml() + depositPanelHtml() + depositRecPanelHtml()
       + approvalsPanelHtml() + auditPanelHtml()
       + inboxPanelHtml() + latePanelHtml() + sleepPanelHtml()
@@ -5220,7 +5610,8 @@ function renderBoard(){
   board.innerHTML = STATUSES.filter(s => (s.key !== 'trashed' || canSeeMoney())
                                       && !(isReception() && RECEPTION_HIDDEN.includes(s.key))
                                       && !(isProduction() && PRODUCTION_HIDDEN.includes(s.key))
-                                      && !(isCashier() && !CASHIER_COLUMNS.includes(s.key)))
+                                      && !(isCashier() && !CASHIER_COLUMNS.includes(s.key))
+                                      && !isCallCenter())   // 📞 الكول سنتر: قوايم المكالمات بس
     // 💵 أمين الخزنة: «بانتظار الدفع» الأول — ده شغله
     .sort((a, b) => isCashier() ? CASHIER_COLUMNS.indexOf(a.key) - CASHIER_COLUMNS.indexOf(b.key) : 0)
     .map(s => {
@@ -7171,6 +7562,10 @@ function ph2CustHistory(){
   box.innerHTML = `<div class="ph2-ch-head">👤 العميل ده جه قبل كده <b>${list.length}</b> ${list.length === 1 ? 'مرة' : 'مرات'}
       ${rets ? ` · <span style="color:var(--returned);">🔁 ${rets} مرتجع</span>` : ''}
       ${open ? ` · <span style="color:var(--warn);">🔧 ${open} لسه عندنا</span>` : ''}</div>
+    ${(() => { const f = ccLastFeedback(inp.value); if(!f) return '';
+        const a = f.afterSale;
+        return `<div style="font-size:12.5px;margin:2px 0 6px;">📞 آخر رأي له: ${'⭐'.repeat(a.stars || 0)}${a.working === 'no' ? ' · <b style="color:var(--danger)">قال الجهاز فيه مشكلة</b>' : ''}${a.note ? ' — ' + esc(a.note.slice(0, 80)) : ''}</div>`; })()}
+    ${(() => { const any = list.find(d => d.noCall); return any ? `<div style="font-size:12px;color:var(--muted);margin-bottom:6px;">🚫 طلب مانتصلش بيه</div>` : ''; })()}
     ${canFill ? `<button type="button" class="acc-mini-btn" style="margin:2px 0 6px;" onclick="ph2FillFromLast()">📋 املا الاسم والمحل من آخر مرة (${esc(last.customerName || last.shopName)})</button>` : ''}
     ${rows}${list.length > 5 ? `<div style="font-size:12px;color:var(--muted);margin-top:4px;">و ${list.length - 5} أجهزة أقدم — دوّر بالرقم في البحث فوق</div>` : ''}`;
 }
@@ -7206,7 +7601,8 @@ function sleepList(){
     .sort((a, b) => b.days - a.days);
 }
 function sleepPanelHtml(){
-  if(!isReception()) return '';
+  if(!isCallCenter()) return '';   // 📞 (٢٠٢٦-١٠-١٣) كان للاستقبال
+  sleepOpen = true;                // الكول سنتر شغلته دي — القايمة مفتوحة على طول
   const list = sleepList();
   if(!list.length) return '';
   const rows = sleepOpen ? list.map(({d, days}) => `<div class="spn-row">
@@ -7237,6 +7633,9 @@ async function ph2MarkCalled(id, how){
   const now = new Date().toISOString();
   devices = devices.map(x => x.id === id ? { ...x,
     drawerCall: { at: now, by: currentUser.name, how },
+    // 📞 (٢٠٢٦-١٠-١٣) سجل المكالمات
+    callLog: [...(x.callLog || []), { kind: 'sleep', result: how, at: now, by: currentUser.name,
+      text: how === 'wa' ? '💬 تذكير واتساب: الجهاز لسه في الدرج' : '📞 كلّمه: الجهاز لسه في الدرج' }],
     activityNotes: [...(x.activityNotes || []), { text: how === 'wa' ? '💬 اتبعت للعميل تذكير «جهازك لسه في الدرج»' : '📞 اتكلّم مع العميل — الجهاز لسه في الدرج',
       at: now, by: currentUser.name, role: currentRoleLabel() }] } : x);
   render();
@@ -7938,6 +8337,7 @@ function renderStageTimes(){
     ${journey.n ? `<div class="st3-journey">🧭 الرحلة كلها — من التسجيل لحد التسليم: <b>${esc(stageDurTxt(journey.med))}</b>
        <small>(${journey.n.toLocaleString('en-EG')} جهاز · المتوسط ${esc(stageDurTxt(journey.avg))})</small></div>` : ''}
     ${dueStatsHtml()}
+    ${satStatsHtml()}
     ${cards}`;
 }
 
@@ -7964,6 +8364,7 @@ const AUDIT_TYPES = {
   defer:   { icon:'📒', label:'آجل مستني يتقيّد' },
   paylate: { icon:'⏰', label:'اتسلّم ومادفعش' },
   overdue: { icon:'⏳', label:'عدّى الميعاد مع العميل' },   // ⏳ (٢٠٢٦-١٠-١٣)
+  complaint: { icon:'😕', label:'شكاوى العملاء' },          // 📞 (٢٠٢٦-١٠-١٣) من ما بعد البيع
 };
 let auditF = { type: 'all', state: 'pending', days: 30 };
 
@@ -7978,6 +8379,7 @@ function auditItems(){
   depositAuditItems().forEach(x => out.push(x));   // 💰 (ملف 88)
   linkAuditItems().forEach(x => out.push(x));      // 🔗 📒 آجل مستني · ⏰ اتسلّم ومادفعش
   dueAuditItems().forEach(x => out.push(x));       // ⏳ عدّى الميعاد مع العميل
+  asAuditItems().forEach(x => out.push(x));        // 😕 شكاوى ما بعد البيع
   return out.sort((a, b) => (Date.parse(b.at) || 0) - (Date.parse(a.at) || 0));
 }
 
@@ -7985,6 +8387,7 @@ function auditRowHtml(x){
   if(x.type === 'deposit') return depositAuditRowHtml(x);   // 💰 (ملف 88)
   if(x.type === 'defer' || x.type === 'paylate') return linkAuditRowHtml(x);   // 🔗
   if(x.type === 'overdue') return dueAuditRowHtml(x);   // ⏳
+  if(x.type === 'complaint') return asAuditRowHtml(x);  // 😕
   const when = x.at ? new Date(x.at).toLocaleString(getLocale()) : '';
   if(x.type === 'closing'){
     const c = x.c, diff = Number(c.diff) || 0;
@@ -8039,6 +8442,7 @@ async function auditReview(type, a, b, c){
   if(!isSuperAdmin()) return;
   if(type === 'closing') await reviewClosing(a);
   else if(type === 'deposit') await reviewDepRefund(a);   // 💰 (ملف 88)
+  else if(type === 'complaint') await asReview(a);         // 😕 (ملف 91)
   else await markReportReviewed(a, b, c);
   if(auditIsOpen()) renderAudit();
   syncAuditBadge();
@@ -8847,6 +9251,7 @@ function renderDetailNow(){
   const d = devices.find(x => x.id === selectedId);
   if(!d) return closeDetail();
   if(isCashier()){ document.getElementById('detailModal').innerHTML = cashierDetailHtml(d); return; }
+  if(isCallCenter()){ document.getElementById('detailModal').innerHTML = ccDetailHtml(d); return; }   // 📞 قراية + أدوات المكالمة
   const s = statusInfo(d.status);
   // ===== المرتجعات: تفاصيل الجهاز القديمة بتتقفل، وبتظهر حقول المرتجع الجديدة =====
   const isRet = d.status === 'returned';
@@ -8918,7 +9323,7 @@ function renderDetailNow(){
     <h2 style="font-family:'Cairo',sans-serif;font-size:18px;margin:4px 0 10px;">${esc(d.deviceType)} ${esc(d.model)}</h2>
     ${pendingApprovalText(d) ? `<div class="pending-appr-banner">⏳ ${pendingApprovalText(d)} — ${t('appr.bannerHint')}</div>` : ''}
     ${isReception() ? receptionWhereHtml(d) : ''}
-    ${drawerWaHtml(d)}${rejectReasonShowHtml(d)}${dueBoxHtml(d)}${partWaitHtml(d)}${receiptHtml(d)}
+    ${drawerWaHtml(d)}${rejectReasonShowHtml(d)}${dueBoxHtml(d)}${asBoxHtml(d)}${callLogHtml(d)}${partWaitHtml(d)}${receiptHtml(d)}
 
     <div class="row2">
       <label class="field"><span>${t('det.customerName')}</span><input value="${esc(d.customerName)}"${roC} onblur="editField('customerName', this.value)" /></label>
@@ -9492,7 +9897,7 @@ async function addActivityNote(){
   if(!ta) return;
   const text = (ta.value||'').trim();
   if(!text) return;
-  const note = { text, at: new Date().toISOString(), by: currentUser.name, role: isAdmin() ? 'المحاسب العام' : ((isReception() || isProduction()) ? currentRoleLabel() : 'موظف') };
+  const note = { text, at: new Date().toISOString(), by: currentUser.name, role: isAdmin() ? 'المحاسب العام' : ((isReception() || isProduction() || isCallCenter()) ? currentRoleLabel() : 'موظف') };
   devices = devices.map(d => d.id === selectedId ? { ...d, activityNotes: [...(d.activityNotes||[]), note] } : d);
   renderDetail();
   render();

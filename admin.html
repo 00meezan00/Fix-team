@@ -458,6 +458,7 @@ function render(){
         <option value="dispatcher">🚦 مسؤولي الحركة بس</option>
         <option value="reception">🛎️ موظفين الاستقبال بس</option>
         <option value="production">🏭 مديرين الإنتاج بس</option>
+        <option value="callcenter">📞 الكول سنتر بس</option>
         <option value="user">👤 شخص بعينه…</option>
       </select>
       <select id="bcUser" style="display:none;">
@@ -756,7 +757,9 @@ async function toggleFlag(key){
 //    ⚠️ الاسم الظاهر عنده **إجباري** — هو اللي بيربط أجهزته.
 // 🛎️ reception = موظف الاستقبال · 🏭 production = مدير الإنتاج (ملف 74)
 //    الاتنين على dashboard.html بمفتاح أصغر من المحاسب.
-const ROLES = ['super_admin', 'accountant', 'dispatcher', 'technician', 'hr', 'staff', 'owner', 'reception', 'production'];
+// 📞 callcenter = الكول سنتر (ملف 91) — على dashboard.html كمان:
+//    بيكلّم العملاء بس (وقت أطول · الدرج · ما بعد البيع)، ومابيحرّكش أجهزة.
+const ROLES = ['super_admin', 'accountant', 'dispatcher', 'technician', 'hr', 'staff', 'owner', 'reception', 'production', 'callcenter'];
 const ROLE_LABEL_KEYS = {
   super_admin: 'adm.roleSuper',
   accountant:  'adm.roleAcc',
@@ -769,7 +772,7 @@ const ROLE_LABEL_KEYS = {
 };
 // الأدوار اللي لسه مالهاش مفتاح ترجمة — من غير ده بيظهر الاسم
 // الإنجليزي الخام (staff) قدّام الأدمن.
-const ROLE_LABEL_FALLBACK = { staff: 'موظف', owner: 'المالك', reception: 'موظف الاستقبال', production: 'مدير الإنتاج' };
+const ROLE_LABEL_FALLBACK = { staff: 'موظف', owner: 'المالك', reception: 'موظف الاستقبال', production: 'مدير الإنتاج', callcenter: 'الكول سنتر' };
 function roleLabel(r){
   const k = ROLE_LABEL_KEYS[r];
   try{ return k ? t(k) : (ROLE_LABEL_FALLBACK[r] || r); }
@@ -919,7 +922,8 @@ const BC_AUDIENCE = {
   technician: 'الفنيين بس',
   dispatcher: 'مسؤولي الحركة بس',
   reception:  'موظفين الاستقبال بس',
-  production: 'مديرين الإنتاج بس'
+  production: 'مديرين الإنتاج بس',
+  callcenter: 'الكول سنتر بس'
 };
 
 // علامة إن المنشور اللي هيتبعت هو منشور خطط الاشتراك تحديداً.

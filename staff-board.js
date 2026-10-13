@@ -83,7 +83,8 @@
       super_admin: opts.adminLabel || 'المحاسب العام',
       accountant:'أمين الخزنة', dispatcher:'مسؤول حركة', technician:'فني',
       hr:'شؤون العاملين', staff:'موظف', owner:'المالك',
-      reception:'موظف الاستقبال', production:'مدير الإنتاج'
+      reception:'موظف الاستقبال', production:'مدير الإنتاج',
+      callcenter:'الكول سنتر'
     };
     return map[r] || r || '';
   }
