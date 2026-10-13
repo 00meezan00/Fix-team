@@ -462,6 +462,19 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
   .done-wa{background:var(--done-bg); color:var(--done); border:none;}
   .done-ok{background:var(--card); color:var(--ink); border:1px solid var(--line);}
 
+  /* ============================================================
+     🚗 (ملف 94) العهدة — الجهاز معاك + الفلوس وقت العهدة بس
+     ============================================================ */
+  .cu-box{border-radius:11px; padding:10px 12px; margin-top:9px; font-size:13px; font-weight:700; line-height:1.75;}
+  .cu-in{background:var(--repairing-bg); color:var(--repairing);}
+  .cu-off{background:var(--waiting-bg); color:var(--waiting);}
+  .cu-money{background:var(--done-bg); color:var(--done); border:1px solid var(--done);}
+  .cu-money b{font-family:'Cairo',sans-serif; font-size:17px; font-weight:900;}
+  .cu-money small{display:block; font-weight:600; opacity:.85;}
+  .act-take{background:var(--repairing); color:#fff;}
+  .act-give{background:var(--done); color:#fff;}
+  .act-back{background:var(--paper); color:var(--waiting);}
+
   /* ===== شيت الأكشن العام: تفاصيل / تسليم / رفض ===== */
   .info-row{display:flex; align-items:center; justify-content:space-between; gap:14px; padding:12px 2px; border-bottom:1px solid var(--line);}
   .info-row:last-child{border-bottom:none;}
@@ -966,6 +979,10 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
       <!-- ⏳ الميعاد مع العميل — إجباري (dpDueRender بيرسمه) -->
       <div class="fld" id="dpDueHost"></div>
       <div class="fld"><label>حالة الجهاز الشكلية عند الاستلام</label><textarea id="f_cond" rows="2" maxlength="500" placeholder="خدوش، كسور، حالة الشاشة..."></textarea></div>
+      <!-- 💰 (ملف 94) الحساب المتوقع — أرقام صحيحة بالجنيه. من غير فوري/آجل:
+           الاستقبال هو اللي بيحددها. بيبانلك لحد ما الاستقبال يستلم الجهاز بس. -->
+      <div class="fld"><label>💰 الحساب المتوقع (اختياري)</label><input id="f_price" type="text" inputmode="numeric" autocomplete="off" maxlength="9" oninput="this.value=dpDigits(this.value).replace(/[^0-9]/g,'')" placeholder="بالجنيه — من غير فوري أو آجل">
+        <div class="fld-hint">الاستقبال يقدر يعدّله · بيبانلك لحد ما الاستقبال يستلم الجهاز بس</div></div>
       <button id="btnSave" class="save" onclick="saveIntake()">تسجيل الجهاز — يدخل تلقائياً في "قيد الانتظار"</button>
     </div>
     <!-- ✅ بعد التسجيل — زي الاستقبال: رسالة + الليبل للطباعة + تم -->
@@ -1067,6 +1084,8 @@ const ST = {
   repairing:{label:t('rp.stRepairing'),c:'--repairing'}, done:{label:t('rp.stDone'),c:'--done'},
   delivered:{label:t('rp.stDelivered'),c:'--delivered'}, rejected:{label:t('rp.stRejected'),c:'--rejected'},
   returned:{label:t('rp.stReturned'),c:'--returned'},
+  // 🚗 (ملف 94) حالات الاستقبال اللي ممكن توصلك في العهدة
+  fixed_drawer:{label:'درج الخالص',c:'--done'},
 };
 // "كل أجهزة المحل" = اللي لسه فعلاً في المحل.
 // النظام بيخزّن التسليم كحالة واحدة 'delivered'، والداشبورد بيقسمها
@@ -1098,6 +1117,8 @@ const _demo = [
 ];   // ← بيانات التصميم التجريبية، مش مستخدمة
 
 const TABS = [
+  // 🚗 (ملف 94) اللي في إيدك دلوقتي: جاي للفرع · مستنيك تاخده · رايح بيه للمحل
+  {key:'custody', label:'🚗 عهدتي', filter:d => dpInCarrying(d) || dpOutActive(d)},
   {key:'mine',  label:t('dp.mine'),  filter:d => d.by===ME && IN_SHOP.includes(d.status)},
   {key:'shop',  label:t('dp.all'), filter:d => IN_SHOP.includes(d.status)},
   {key:'out',   label:t('dp.delivered'),      filter:d => d.status==='delivered'},
@@ -1269,6 +1290,9 @@ function adapt(d){
     by:      (d.registeredBy || d.createdBy || '').trim(),
     intake:  d.intakeDate || '',
     pending: (d.pendingApproval && d.pendingApproval.status === 'pending') ? d.pendingApproval : null,
+    // 🚗 (ملف 94) العهدة
+    dispIn:  d.dispIn || null,
+    dispOut: d.dispOut || null,
     _raw:    d
   };
 }
@@ -1351,10 +1375,17 @@ async function loadDevices(){
       .gte('delivered_at', cutoff)
       .order('delivered_at', { ascending:false }));
 
+    // 🚗 (ملف 94) أجهزة الاستقبال سلّمهالك أو معاك وانت رايح تسلّمها —
+    //    دي حالتها «درج الخالص/الرفض» فمش في الطلبين اللي فوق.
+    const custRows = await fetchPaged(() => sb.from('devices_dispatch')
+      .select('id,data')
+      .in('data->dispOut->>state', ['offered', 'carrying'])
+      .order('updated_at', { ascending:false }));
+
     // دمج مع منع التكرار — ترقيم الصفحات ممكن يكرّر صف لو جهاز
     // اتغيّرت حالته بين صفحة وصفحة
     const byId = new Map();
-    for(const r of [...inShopRows, ...outRows])
+    for(const r of [...custRows, ...inShopRows, ...outRows])
       if(r && r.data && !byId.has(r.id)) byId.set(r.id, r.data);
     const rows = [...byId.values()];
     devices = rows.map(adapt); reindexSearch();
@@ -1673,7 +1704,9 @@ function ticketHtml(d){
     ? `<div class="pend">⏳ ${d.pending.type==='return'?t('tp.reqReturn'):t('tp.reqDeliver')} بانتظار اعتماد المحاسب
         <span style="font-weight:700;opacity:.8;">· ${esc(d.pending.requestedBy||'')}</span></div>`
     : '';
-  const actions = d.pending
+  const actions = dpCustodyBusy(d)
+    ? dpCustodyActions(d, true)
+    : d.pending
     ? ''
     : delivered
     ? `<div class="tk-actions"><button class="act act-ret" onclick="event.stopPropagation();requestApproval('${d.id}','return')" data-i18n="rp.returnIco">↩️ ${t('rp.return')}</button><button class="act act-view" onclick="event.stopPropagation();showInfo('${d.id}')" data-i18n="rp.details">تفاصيل</button></div>`
@@ -1688,6 +1721,7 @@ function ticketHtml(d){
       ${d.tech?`<span class="chip">${t('rp.techColon')} <b>${esc(d.tech)}</b></span>`:`<span class="chip" style="color:var(--waiting);" data-i18n="tp.noTechYet">لسه من غير ${t('tp.roleTech')}</span>`}
       <span>· ${fmtDate(d.intake)}</span>
     </div>
+    ${dpCustodyBox(d)}
     ${pend}
     ${actions}
   </div>`;
@@ -1761,7 +1795,9 @@ function showInfo(id){
 
   const row = (k, v) => v ? `<div class="di-row"><span class="di-k">${esc(k)}</span><span class="di-v">${v}</span></div>` : '';
 
-  const actions = d.pending
+  const actions = dpCustodyBusy(d)
+    ? dpCustodyActions(d, false)
+    : d.pending
     ? `<div class="di-pend">⏳ ${d.pending.type === 'return' ? t('tp.reqReturn') : t('tp.reqDeliver')} بانتظار اعتماد المحاسب</div>`
     : delivered
       ? `<button class="di-act di-ret" onclick="closeAct();requestApproval('${d.id}','return')">↩️ ${t('rp.return')}</button>`
@@ -1777,6 +1813,8 @@ function showInfo(id){
         </div>
         <span class="info-chip" style="--st:var(${s.c}); --st-bg:var(${s.c}-bg);">${esc(s.label)}</span>
       </div>
+
+      ${dpCustodyBox(d)}
 
       <!-- العطل — دايماً ظاهر (حتى لو فاضي) عشان زرار التعديل يبقى ليه مكان -->
       <div class="di-issue"><span>🛠️</span>
@@ -2835,7 +2873,7 @@ function dpWaMsg(raw){
   return `أهلاً ${raw.customerName || ''} 👋\nتم استلام جهازك *${dev}* بنجاح في I Fix Team ✅\nرقم المتابعة: *${ref}*${link}\nوهنبعتلك تحديثات أول بأول على الواتساب كمان.`;
 }
 
-const DP_INTAKE_FIELDS = ['f_cust','f_shop','f_bb','f_regby','f_phone','f_type','f_model','f_color','f_serial','f_issue','f_cond'];
+const DP_INTAKE_FIELDS = ['f_cust','f_shop','f_bb','f_regby','f_phone','f_type','f_model','f_color','f_serial','f_issue','f_cond','f_price'];
 
 function openIntake(){
   buildDpSuggest();
@@ -2973,6 +3011,8 @@ async function saveIntake(){
   const color = v('f_color'), serial = v('f_serial'), issue = v('f_issue');
   const bb = v('f_bb'), cond = v('f_cond'), phone = v('f_phone'), shop = v('f_shop');
   const regBy = v('f_regby') || ME;
+  // 💰 (ملف 94) الحساب المتوقع — أرقام بس، ومن غير فوري/آجل
+  const price = dpDigits(v('f_price')).replace(/[^0-9]/g, '');
   // 🔢 السريال مكرر؟ بنسأل (نفس تحذير الاستقبال)
   const dup = devices.find(d => (d.serial || '').trim().toLowerCase() === serial.toLowerCase());
   // ⚠️ الديسباتشر عنده أجهزة المحل + المسلّم في آخر ٣٠ يوم بس،
@@ -3009,6 +3049,7 @@ async function saveIntake(){
     reportedIssue: issue,
     technician:    '',
     registeredBy:  regBy,
+    agreedPrice:   price,              // 💰 94 — السيرفر بياخده من مسؤول الحركة بس
     ...extra                           // 🛵 69 · 🔍 ⏳ 92
   }});
 
@@ -3063,6 +3104,118 @@ async function saveIntake(){
   } else {
     toast(t('dp.logged'));
   }
+}
+
+// ============================================================
+// 🚗 (ملف 94) العهدة بينك وبين الاستقبال
+// ------------------------------------------------------------
+// 🧸 الجهاز «أمانة» بتتسلّم من إيد لإيد:
+//   📥 جاي: انت سجّلته → «🚗 معاك» لحد ما الاستقبال يدوس «استلمته».
+//   📤 راجع: الاستقبال سلّمك جهاز من الدرج → تدوس «✅ استلمته» → تروح
+//      بيه → «📦 سلّمته للمحل» (اتسلّم بانتظار الدفع، زي الاستقبال بالظبط)
+//      أو «↩️ رجّعته للاستقبال» لو ماعرفتش تسلّمه.
+//
+// 💰 الفلوس: بتبان **وانت شايل الجهاز بس**. السيرفر هو اللي بيقرر —
+//    الشاشة devices_dispatch بتبعت الفلوس بس والجهاز «معاك». يعني
+//    مفيش هنا أي «إخفاء» — لو الرقم مش جاي من السيرفر، مش موجود أصلاً.
+// ⚠️ الحركات التلاتة عبر دوال على السيرفر (dispatch_take · dispatch_deliver ·
+//    dispatch_back) — كل دالة بتعمل حركة واحدة بشروطها.
+// ============================================================
+function dpInCarrying(d){ return !!(d && d.dispIn && d.dispIn.state === 'carrying'); }
+function dpOutState(d){ return (d && d.dispOut && d.dispOut.state) || ''; }
+function dpOutActive(d){ return ['offered', 'carrying'].includes(dpOutState(d)); }
+function dpCustodyBusy(d){ return dpInCarrying(d) || dpOutActive(d); }
+
+// 💰 الفلوس (لو السيرفر بعتها)
+function dpMoneyHtml(d){
+  const r = d._raw || {};
+  if(!('agreedPrice' in r)) return '';
+  const num = v => parseInt(dpDigits(String(v == null ? '' : v)).replace(/[^0-9]/g, '')) || 0;
+  const price = num(r.agreedPrice);
+  const fmt = n => n.toLocaleString('en-EG') + ' ج.م';
+  if(dpInCarrying(d)){
+    return `<div class="cu-box cu-money">💰 الحساب المتوقع: <b>${price ? fmt(price) : '—'}</b>
+      <small>بيختفي أول ما الاستقبال يستلم الجهاز</small></div>`;
+  }
+  if(r.paymentStatus === 'paid') return `<div class="cu-box cu-money">✅ الحساب مدفوع — مفيش فلوس تتحصّل</div>`;
+  const dep = r.depositStatus === 'paid' ? num(r.deposit) : 0;
+  const due = Math.max(0, price - dep);
+  if(r.paymentType === 'deferred'){
+    return `<div class="cu-box cu-money">📒 آجل على حساب المحل: <b>${fmt(due)}</b>
+      <small>ماتحصّلش كاش — بيتقيّد على حساب المحل</small></div>`;
+  }
+  if(!price) return `<div class="cu-box cu-off">💰 الجهاز لسه مالوش سعر — اسأل الاستقبال قبل ما تمشي</div>`;
+  return `<div class="cu-box cu-money">💰 المطلوب تحصيله: <b>${fmt(due)}</b>
+    ${dep ? `<small>الحساب ${fmt(price)} — العميل دفع عربون ${fmt(dep)}</small>` : ''}</div>`;
+}
+
+// الصندوق اللي على الكارت وفي التفاصيل
+function dpCustodyBox(d){
+  if(dpInCarrying(d)){
+    return `<div class="cu-box cu-in">🚗 الجهاز معاك — سلّمه للاستقبال، وهو هيدوس «استلمته»</div>${dpMoneyHtml(d)}`;
+  }
+  const st = dpOutState(d);
+  if(st === 'offered'){
+    return `<div class="cu-box cu-off">📤 الاستقبال سلّمك الجهاز ده توصّله${d.shop ? ' لـ«' + esc(d.shop) + '»' : ''} — أكّد إنه وصل إيدك</div>`;
+  }
+  if(st === 'carrying'){
+    return `<div class="cu-box cu-in">🚗 معاك من ${esc(dpAgo(d.dispOut.takenAt))} — رايح ${d.shop ? 'لـ«' + esc(d.shop) + '»' : 'للعميل'}</div>${dpMoneyHtml(d)}`;
+  }
+  return '';
+}
+
+// الأزرار (onCard = على الكارت من برا)
+function dpCustodyActions(d, onCard){
+  const stop = onCard ? 'event.stopPropagation();' : '';
+  const det = onCard ? `<button class="act act-view" onclick="event.stopPropagation();showInfo('${d.id}')">تفاصيل</button>` : '';
+  const cls = onCard ? 'act' : 'di-act';
+  const wrap = h => onCard ? `<div class="tk-actions">${h}</div>` : h;
+  const st = dpOutState(d);
+  if(st === 'offered')
+    return wrap(`<button class="${cls} act-take" onclick="${stop}dpTake('${d.id}')">✅ استلمته من الاستقبال</button>${det}`);
+  if(st === 'carrying')
+    return wrap(`<button class="${cls} act-give" onclick="${stop}dpGive('${d.id}')">📦 سلّمته للمحل</button>
+                 <button class="${cls} act-back" onclick="${stop}dpBack('${d.id}')">↩️ رجّعته</button>${det}`);
+  return onCard ? wrap(det) : '';   // جاي للفرع: مفيش زرار — الاستقبال هو اللي بيأكّد
+}
+
+function dpAgo(iso){
+  const ms = Date.now() - Date.parse(iso || '');
+  if(!(ms >= 0)) return 'شوية';
+  const m = Math.round(ms / 60000);
+  if(m < 60) return m + ' دقيقة';
+  const h = Math.round(m / 60);
+  return h < 48 ? h + ' ساعة' : Math.round(h / 24) + ' يوم';
+}
+
+let dpCustBusy = false;
+async function dpCustodyCall(fn, args, okMsg){
+  if(dpCustBusy) return false;
+  if(!navigator.onLine){ toast(t('rp.offlineEdit')); return false; }
+  dpCustBusy = true;
+  try{
+    const { error } = await sb.rpc(fn, args);
+    if(error){ toast('⚠️ ' + esc(error.message || error)); return false; }
+    closeAct();
+    await loadDevices();
+    render();
+    toast(okMsg);
+    return true;
+  }finally{ dpCustBusy = false; }
+}
+function dpTake(id){
+  return dpCustodyCall('dispatch_take', { p_id: id, p_by: ME }, '✅ الجهاز بقى معاك — الفلوس ظاهرة على الكارت');
+}
+function dpGive(id){
+  const d = devices.find(x => x.id === id); if(!d) return;
+  const name = [d.type, d.model].filter(Boolean).join(' ');
+  if(!confirm('سلّمت «' + name + '» ' + (d.shop ? 'لـ«' + d.shop + '»' : 'للعميل') + ' فعلاً؟')) return;
+  return dpCustodyCall('dispatch_deliver', { p_id: id, p_by: ME }, '📦 اتسلّم — الحساب راح للخزنة');
+}
+function dpBack(id){
+  const reason = prompt('ليه رجّعته؟ (المحل قافل، العميل مش موجود…)', '');
+  if(reason === null) return;
+  return dpCustodyCall('dispatch_back', { p_id: id, p_by: ME, p_reason: reason }, '↩️ اتسجّل إنك رجّعته للاستقبال');
 }
 
 /* ===== توست ===== */

@@ -2877,6 +2877,9 @@ function isPaidDevice(d){ return d && d.paymentStatus === 'paid'; }
 //    بيقوله هو فين بالظبط.
 // ============================================================
 function boardStatus(d){
+  // 🚗 (ملف 94) جهاز لسه مع مسؤول الحركة في الطريق → مش في المحل لسه، فمالوش خانة.
+  //    الاستقبال بيلاقيه في ⋮ «🚗 وارد من الحركة». المحاسب العام بيشوفه عادي بشارة.
+  if(!isSuperAdmin() && dispInCarrying(d)) return 'disp_incoming';
   const st = effStatus(d);
   if(isReception() && RECEPTION_IN_WORKSHOP.includes(st)) return 'sent_to_repair';
   // 🔗 (٢٠٢٦-١٠-١٣) الآجل اللي الاستقبال سلّمه مش شغل أمين الخزنة — المحاسب العام بيقيّده
@@ -5259,6 +5262,15 @@ const NTF_PAGES = [
     on: () => isReception() || isProduction(),
     keys: () => inboxList().map(x => x.d.id + '@' + x.at),
     html: () => inboxPanelHtml() },
+  // 🚗 (ملف 94) العهدة مع مسؤول الحركة
+  { k:'dispin',  label: () => '🚗 وارد من الحركة',
+    on: () => isReception(),
+    keys: () => dispInList().map(d => d.id + '@' + d.dispIn.at),
+    html: () => dispInPanelHtml() },
+  { k:'dispout', label: () => '🚗 مع مسؤول الحركة',
+    on: () => isReception(),
+    keys: () => dispOutList().map(d => d.id + '@' + d.dispOut.state + '@' + (d.dispOut.takenAt || d.dispOut.at || '')),
+    html: () => dispOutPanelHtml() },
   { k:'late',    label: () => '⏰ أجهزة متأخرة في الورشة',
     on: () => isProduction(),
     keys: () => devices.filter(d => lateInfo(d)).map(d => d.id + '@' + d.status),
@@ -7383,6 +7395,174 @@ async function sendDrawerWa(id){
   openWa(fresh.customerPhone, waStatusMsg(fresh, fresh.status));
 }
 
+// ############################################################
+// 🚗 (ملف 94) العهدة بين مسؤول الحركة والاستقبال
+// ------------------------------------------------------------
+// 🧸 الجهاز «أمانة» بتتسلّم من إيد لإيد، وكل مرة اللي استلم يقول
+//    «استلمت» — فدايماً معروف الجهاز مع مين.
+//
+//   📥 جاي: مسؤول الحركة سجّله (dispIn = carrying) → مش في المحل لسه،
+//      فمابيظهرش في أي خانة → الاستقبال يلاقيه في ⋮ «🚗 وارد من الحركة»
+//      → «✅ استلمته» (dispIn = received) → بيدخل «قيد الانتظار» عادي.
+//   📤 راجع: جهاز في الدرج (خالص أو رفض) → «🚗 سلّمه لمسؤول الحركة»
+//      (dispOut = offered) → مسؤول الحركة يأكّد «استلمته» (carrying)
+//      → «📦 سلّمته للمحل» (delivered) = اتسلّم بانتظار الدفع زي الاستقبال.
+//      ماعرفش يسلّمه؟ «↩️ رجّعته» (back) → يرجع الدرج والاستقبال يقدر يعرضه تاني.
+//
+// ⚠️ القفل الحقيقي على السيرفر (ملف 94): كل واحد يحرّك العهدة في دوره بس،
+//    والجهاز اللي مع مسؤول الحركة حالته ماتتحرّكش من هنا لحد ما يرجع.
+// ⚠️ الفلوس عند مسؤول الحركة بتبان وهو شايل الجهاز بس — ده في الشاشة
+//    اللي بيقرا منها (devices_dispatch)، مش هنا.
+// ############################################################
+function dispInCarrying(d){ return !!(d && d.dispIn && d.dispIn.state === 'carrying'); }
+function dispOutState(d){ return (d && d.dispOut && d.dispOut.state) || ''; }
+function dispOutActive(d){ return ['offered', 'carrying'].includes(dispOutState(d)); }
+
+function dispInList(){
+  return devices.filter(dispInCarrying)
+    .sort((a, b) => Date.parse(a.dispIn.at || a.intakeDate) - Date.parse(b.dispIn.at || b.intakeDate));
+}
+function dispOutList(){
+  return devices.filter(dispOutActive)
+    .sort((a, b) => Date.parse(a.dispOut.at || 0) - Date.parse(b.dispOut.at || 0));
+}
+
+// ✅ الاستقبال استلم من مسؤول الحركة (واحد أو أكتر)
+async function dispInReceive(ids){
+  if(!isReception()) return;
+  const set = new Set([].concat(ids).filter(Boolean));
+  const now = new Date().toISOString();
+  let n = 0;
+  devices = devices.map(x => {
+    if(!set.has(x.id) || !dispInCarrying(x)) return x;
+    n++;
+    return { ...x,
+      dispIn: { ...x.dispIn, state: 'received', recvBy: currentUser.name, recvAt: now },
+      lastModifiedAt: now, lastModifiedBy: currentUser.name,
+      activityNotes: [...(x.activityNotes || []), { text: '🚗 الاستقبال استلم الجهاز من مسؤول الحركة (' + (x.dispIn.by || '—') + ')',
+        at: now, by: currentUser.name, role: currentRoleLabel() }] };
+  });
+  if(!n) return;
+  renderDetail(); render();
+  await persist();
+}
+function dispInReceiveAll(){
+  const list = dispInList();
+  if(!list.length) return;
+  if(!confirm('استلمت الـ' + list.length + ' أجهزة كلهم من مسؤول الحركة فعلاً؟')) return;
+  dispInReceive(list.map(d => d.id));
+}
+
+// 🚗 الاستقبال بيسلّم جهاز من الدرج لمسؤول الحركة يوصّله
+async function dispOutOffer(id){
+  if(!isReception()) return;
+  const d = devices.find(x => x.id === id);
+  if(!d || !inDrawer(d) || dispOutActive(d)) return;
+  const now = new Date().toISOString();
+  devices = devices.map(x => x.id === id ? { ...x,
+    dispOut: { state: 'offered', by: currentUser.name, at: now },
+    lastModifiedAt: now, lastModifiedBy: currentUser.name,
+    activityNotes: [...(x.activityNotes || []), { text: '🚗 الاستقبال سلّم الجهاز لمسؤول الحركة يوصّله — مستني يأكّد إنه استلمه',
+      at: now, by: currentUser.name, role: currentRoleLabel() }] } : x);
+  renderDetail(); render();
+  await persist();
+}
+// ↩️ إلغاء — مسؤول الحركة لسه ماخدوش
+async function dispOutCancel(id){
+  if(!isReception()) return;
+  const d = devices.find(x => x.id === id);
+  if(!d || dispOutState(d) !== 'offered') return;
+  const now = new Date().toISOString();
+  devices = devices.map(x => x.id === id ? { ...x,
+    dispOut: { ...x.dispOut, state: 'cancelled', cancelBy: currentUser.name, cancelAt: now },
+    lastModifiedAt: now, lastModifiedBy: currentUser.name,
+    activityNotes: [...(x.activityNotes || []), { text: '↩️ الاستقبال لغى تسليم الجهاز لمسؤول الحركة',
+      at: now, by: currentUser.name, role: currentRoleLabel() }] } : x);
+  renderDetail(); render();
+  await persist();
+}
+
+// صندوق في تفاصيل الجهاز
+function dispBoxHtml(d){
+  const box = (bg, fg, html) => `<div class="rc-where" style="background:${bg};color:${fg};line-height:1.8;">${html}</div>`;
+  if(dispInCarrying(d)){
+    const who = esc(d.dispIn.by || 'مسؤول الحركة');
+    return isReception()
+      ? box('var(--info-bg)', 'var(--info)', `🚗 الجهاز ده لسه مع <b>${who}</b> (سجّله ${esc(splAgoTxt(d.dispIn.at))}) — مش هيدخل الشغل غير لما تستلمه
+          <button class="btn-primary" style="box-shadow:none;width:100%;justify-content:center;margin-top:8px;" onclick="dispInReceive('${d.id}')">✅ استلمته من مسؤول الحركة</button>`)
+      : box('var(--info-bg)', 'var(--info)', `🚗 لسه مع <b>${who}</b> في الطريق — الاستقبال ما استلمهوش`);
+  }
+  const st = dispOutState(d);
+  if(st === 'offered'){
+    return box('var(--warn-bg)', 'var(--warn)', `⏳ مستني مسؤول الحركة يأكّد إنه استلم الجهاز (${esc(splAgoTxt(d.dispOut.at))})
+      ${isReception() ? `<button class="btn-secondary" style="width:100%;justify-content:center;display:flex;margin-top:8px;" onclick="dispOutCancel('${d.id}')">↩️ إلغاء — لسه ماخدوش</button>` : ''}`);
+  }
+  if(st === 'carrying'){
+    return box('var(--info-bg)', 'var(--info)', `🚗 مع <b>${esc(d.dispOut.takenBy || 'مسؤول الحركة')}</b> من ${esc(splAgoTxt(d.dispOut.takenAt))} — رايح يسلّمه للمحل<br>
+      <small>الجهاز مش في المحل — حالته ماتتحرّكش لحد ما يسلّمه أو يرجّعه</small>`);
+  }
+  let h = '';
+  if(st === 'back' && inDrawer(d)){
+    h += box('var(--warn-bg)', 'var(--warn)', `↩️ مسؤول الحركة رجّعه ${esc(splAgoTxt(d.dispOut.backAt))}${d.dispOut.backReason ? ' — ' + esc(d.dispOut.backReason) : ''}`);
+  }
+  if(isReception() && inDrawer(d)){
+    h += `<button class="btn-secondary" style="width:100%;justify-content:center;display:flex;margin-bottom:12px;font-weight:800;" onclick="dispOutOffer('${d.id}')">🚗 سلّمه لمسؤول الحركة يوصّله</button>`;
+  }
+  return h;
+}
+
+// شارة على الكارت
+function dispCardChip(d){
+  if(dispInCarrying(d)) return `<span class="rc-chip" style="background:var(--info-bg);color:var(--info)">🚗 لسه مع الحركة</span> `;
+  const st = dispOutState(d);
+  if(st === 'offered')  return `<span class="rc-chip" style="background:var(--warn-bg);color:var(--warn)">⏳ مستني الحركة تاخده</span> `;
+  if(st === 'carrying') return `<span class="rc-chip" style="background:var(--info-bg);color:var(--info)">🚗 مع الحركة</span> `;
+  return '';
+}
+
+// أوضة «🚗 وارد من الحركة»
+function dispInPanelHtml(){
+  if(!isReception()) return '';
+  const list = dispInList();
+  if(!list.length) return '';
+  const rows = list.map(d => `<div class="spn-row" style="cursor:pointer;" onclick="openDetail('${d.id}')">
+      <div class="spn-info">
+        <div class="spn-t">📱 ${esc(d.deviceType)} ${esc(d.model)}${d.customerName ? ' — ' + esc(d.customerName) : ''}${d.shopName ? ' · 🏪 ' + esc(d.shopName) : ''}</div>
+        <div class="spn-m">🚗 ${esc(d.dispIn.by || '')} · ${waitChip(d.dispIn.at || d.intakeDate)}</div>
+      </div>
+      <button class="spn-ok" onclick="event.stopPropagation();dispInReceive('${d.id}')">✅ استلمته</button>
+    </div>`).join('');
+  return `<div class="spn-panel" style="border-color:var(--info);">
+    <div class="spn-head" style="color:var(--info);">🚗 وارد من الحركة
+      <span class="spn-count" style="background:var(--info);">${list.length}</span>
+      ${list.length > 1 ? `<button class="spn-clear" style="color:var(--info);" onclick="event.stopPropagation();dispInReceiveAll()">✅ استلمت الكل</button>` : ''}</div>
+    <div class="st3-note">أجهزة مسؤول الحركة سجّلها — مش هتدخل «قيد الانتظار» غير لما تأكّد إنها وصلت إيدك.</div>
+    ${rows}
+  </div>`;
+}
+
+// أوضة «🚗 مع مسؤول الحركة»
+function dispOutPanelHtml(){
+  if(!isReception()) return '';
+  const list = dispOutList();
+  if(!list.length) return '';
+  const rows = list.map(d => {
+    const off = dispOutState(d) === 'offered';
+    return `<div class="spn-row" style="cursor:pointer;" onclick="openDetail('${d.id}')">
+      <div class="spn-info">
+        <div class="spn-t">📱 ${esc(d.deviceType)} ${esc(d.model)}${d.customerName ? ' — ' + esc(d.customerName) : ''}${d.shopName ? ' · 🏪 ' + esc(d.shopName) : ''}</div>
+        <div class="spn-m">${off ? `<span class="rc-chip" style="background:var(--warn-bg);color:var(--warn)">⏳ مستني يأكّد</span> ${esc(splAgoTxt(d.dispOut.at))}`
+                               : `<span class="rc-chip" style="background:var(--info-bg);color:var(--info)">🚗 معاه</span> ${esc(d.dispOut.takenBy || '')} · ${esc(splAgoTxt(d.dispOut.takenAt))}`}</div>
+      </div>
+    </div>`;
+  }).join('');
+  return `<div class="spn-panel" style="border-color:var(--info);">
+    <div class="spn-head" style="color:var(--info);">🚗 مع مسؤول الحركة
+      <span class="spn-count" style="background:var(--info);">${list.length}</span></div>
+    ${rows}
+  </div>`;
+}
+
 // ---------- شارات الكارت ----------
 function ph1CardChips(d){
   let h = '';
@@ -7853,6 +8033,7 @@ async function ph2PartArrived(id){
 // ---------- شارات الكارت (المرحلة التانية) ----------
 function ph2CardChips(d){
   let h = dueCardChip(d);   // ⏳ (٢٠٢٦-١٠-١٣) الميعاد مع العميل
+  h += dispCardChip(d);     // 🚗 (ملف 94) العهدة مع مسؤول الحركة
   if(d.partWait && (isProduction() || isReception()))
     h += `<span class="rc-chip" style="background:var(--info-bg);color:var(--info)">🔩 ${esc(d.partWait.part)} · ${esc(splAgoTxt(d.partWait.at))}</span> `;
   if(isProduction()){
@@ -9323,7 +9504,7 @@ function renderDetailNow(){
     <h2 style="font-family:'Cairo',sans-serif;font-size:18px;margin:4px 0 10px;">${esc(d.deviceType)} ${esc(d.model)}</h2>
     ${pendingApprovalText(d) ? `<div class="pending-appr-banner">⏳ ${pendingApprovalText(d)} — ${t('appr.bannerHint')}</div>` : ''}
     ${isReception() ? receptionWhereHtml(d) : ''}
-    ${drawerWaHtml(d)}${rejectReasonShowHtml(d)}${dueBoxHtml(d)}${asBoxHtml(d)}${callLogHtml(d)}${partWaitHtml(d)}${receiptHtml(d)}
+    ${dispBoxHtml(d)}${drawerWaHtml(d)}${rejectReasonShowHtml(d)}${dueBoxHtml(d)}${asBoxHtml(d)}${callLogHtml(d)}${partWaitHtml(d)}${receiptHtml(d)}
 
     <div class="row2">
       <label class="field"><span>${t('det.customerName')}</span><input value="${esc(d.customerName)}"${roC} onblur="editField('customerName', this.value)" /></label>
@@ -10422,6 +10603,15 @@ async function changeStatus(newStatus, paymentChoice, rejectedInShopChoice, opts
   // 🔁 جهاز مرتجع لسه عند الاستقبال (ما اتبعتش للصيانة) → مدير الإنتاج مايلمسوش
   if(isProduction() && d.status === 'returned' && d.returnInbound){
     showError('⏳ الجهاز ده لسه عند الاستقبال — استنى لما يبعته «تم الإرسال للصيانة»');
+    renderDetail();
+    return;
+  }
+  // 🚗 (ملف 94) الجهاز مع مسؤول الحركة → مش في المحل، فحالته ماتتحرّكش من هنا
+  //    (السيرفر بيرجّعها كمان — ده عشان الموظف يفهم السبب بدل ما يلاقيها رجعت لوحدها)
+  if((isReception() || isProduction()) && (dispInCarrying(d) || dispOutState(d) === 'carrying')){
+    showError(dispInCarrying(d)
+      ? '🚗 الجهاز ده لسه مع مسؤول الحركة — دوس «✅ استلمته» الأول'
+      : '🚗 الجهاز ده مع مسؤول الحركة بره — استنى لما يسلّمه للمحل أو يرجّعه');
     renderDetail();
     return;
   }
