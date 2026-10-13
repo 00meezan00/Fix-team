@@ -1628,6 +1628,8 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
     <button id="ntfBtn_sleep"   style="display:none;" onclick="openNtf('sleep')">😴 نايمين في الدرج</button>
     <button id="ntfBtn_appr"    style="display:none;" onclick="openNtf('appr')">✅ طلبات مسؤول الحركة</button>
     <button id="ntfBtn_deposit" style="display:none;" onclick="openNtf('deposit')">💰 العرابين</button>
+    <button id="ntfBtn_await"   style="display:none;" onclick="openNtf('await')">💵 عميل جاي يدفع</button>
+    <button id="ntfBtn_paid"    style="display:none;" onclick="openNtf('paid')">✅ اتدفع</button>
     <button id="ntfBtn_reports" style="display:none;" onclick="openNtf('reports')">📝 تقاريري</button>
 
     <div class="mh mh-shop">🏪 المحل</div>
@@ -2829,6 +2831,10 @@ function isPaidDevice(d){ return d && d.paymentStatus === 'paid'; }
 function boardStatus(d){
   const st = effStatus(d);
   if(isReception() && RECEPTION_IN_WORKSHOP.includes(st)) return 'sent_to_repair';
+  // 🔗 (٢٠٢٦-١٠-١٣) الآجل اللي الاستقبال سلّمه مش شغل أمين الخزنة — المحاسب العام بيقيّده
+  //    (بيلاقيه في «🧾 دفتر المراجعة»). فمابيتعدّش في خانة «بانتظار الدفع» عنده.
+  //    لو دوّر عليه بالبحث هيلاقيه عادي، والتفاصيل بتقوله «المحاسب العام هو اللي بيقيّده».
+  if(isCashier() && st === 'delivered_unpaid' && deferredWaiting(d)) return 'cashier_deferred';
   return st;
 }
 // ============================================================
@@ -4054,6 +4060,156 @@ function render(){
 function ntfOn(){ return isReception() || isProduction() || isCashier(); }
 
 // كل أوضة: مين يشوفها · بتعدّ إيه · كل حاجة جواها ليها «بصمة» (عشان نعرف الجديد)
+// ############################################################
+// 🔗 (٢٠٢٦-١٠-١٣) ربط التلاتة — الخيوط اللي كانت ناقصة
+// ------------------------------------------------------------
+// 🧸 الجهاز زي كورة بتتباصى: الاستقبال ← مدير الإنتاج ← الاستقبال ← أمين الخزنة.
+//    كانت فيه ٣ باصات الكورة فيها بتقع على الأرض ومحدش شايفها:
+//
+//    ١) 💵 «عميل جاي يدفع» — أوضة لأمين الخزنة في ⋮
+//       الاستقبال سلّم جهاز بانتظار الدفع → أمين الخزنة يعرف على طول.
+//       (كان المفروض إشعار موبايل، بس الإشعارات اتأجّلت — فبقى أوضة زي «الوارد»)
+//       ✅ «اتدفع» — أوضة للاستقبال: أمين الخزنة أكد الدفع (آخر ٢٤ ساعة).
+//
+//    ٢) 📒 «آجل مستني يتقيّد» — الاستقبال سلّم جهاز آجل، وأمين الخزنة مايقدرش
+//       يلمسه، والمحاسب العام مكانش حد بيقوله. دلوقتي:
+//       • بيظهر في «🧾 دفتر المراجعة» عند المحاسب العام بزرار «📒 قيّده».
+//       • بيختفي من خانة «بانتظار الدفع» عند أمين الخزنة (مش شغله).
+//
+//    ٣) ⏰ «اتسلّم ومادفعش من أكتر من يوم» — العميل خد الجهاز ومشي.
+//       • عند أمين الخزنة: الجهاز بيبقى أحمر في أوضته، والأوضة بتنوّر تاني.
+//       • عند المحاسب العام: ورقة في «🧾 دفتر المراجعة».
+//
+// ⚠️ من غير SQL — كله محسوب من بيانات الأجهزة اللي موجودة.
+// ⚠️ مفيش «✓ راجعته» على الورقتين الجداد: الورقة بتختفي لوحدها لما
+//    الحاجة تتعمل فعلاً (الآجل اتقيّد / الفلوس اتأكدت).
+// ⚠️ PAY_LATE_FROM: الأجهزة اللي اتسلّمت قبل التاريخ ده مابتطلعش «متأخرة»
+//    (أرشيف قديم) — 🔧 غيّره ليوم الرفع على الإنتاج (زي RETURN_DUE_FROM).
+// ############################################################
+const PAY_LATE_H = 24;
+const PAY_LATE_FROM = '2026-10-01';
+const PAID_SHOW_H = 24;
+
+// 📒 جهاز اتسلّم آجل ولسه ماتقيّدش على حساب المحل (أصلي أو مرتجع)
+function deferredWaiting(d){
+  if(!d || d.status !== 'delivered') return false;
+  if(d.paymentType === 'deferred' && d.paymentStatus !== 'paid' && isPriced(d)) return true;
+  return returnPaymentDue(d) && d.returnPaymentType === 'deferred';
+}
+// 💵 المبلغ اللي المفروض يتحصّل من الجهاز ده دلوقتي
+function payDueAmt(d){
+  let n = 0;
+  if(d.paymentStatus !== 'paid' && d.paymentType !== 'deferred') n += depositDue(d);
+  if(returnPaymentDue(d) && d.returnPaymentType !== 'deferred') n += parseInt(d.returnPrice) || 0;
+  return n;
+}
+// 💵 الأجهزة اللي اتسلّمت ومستنية أمين الخزنة (من غير الآجل — ده المحاسب العام)
+function awaitPayList(){
+  return devices.filter(d => effStatus(d) === 'delivered_unpaid' && !deferredWaiting(d))
+    .map(d => {
+      const at = deliveredDateOf(d) || lastChangeOf(d);
+      const late = hoursSince(at) >= PAY_LATE_H && String(at).slice(0, 10) >= PAY_LATE_FROM;
+      return { d, at, late, amt: payDueAmt(d), priced: isPriced(d) };
+    })
+    .sort((a, b) => Date.parse(a.at) - Date.parse(b.at));   // الأقدم الأول — هو اللي اتأخر
+}
+function payWaitChip(x){
+  return x.late
+    ? `<span class="rc-chip" style="background:var(--danger-bg);color:var(--danger)">⏰ اتسلّم من ${esc(splAgoTxt(x.at))} ومادفعش</span>`
+    : `<span class="rc-chip" style="background:var(--surface-3);color:var(--ink-2)">⏳ اتسلّم ${esc(splAgoTxt(x.at))}</span>`;
+}
+function awaitPayPanelHtml(){
+  if(!isCashier()) return '';
+  const list = awaitPayList();
+  if(!list.length) return '';
+  const late = list.filter(x => x.late).length;
+  const total = list.reduce((a, x) => a + x.amt, 0);
+  const rows = list.map(x => `<div class="spn-row" style="cursor:pointer;${x.late ? 'background:var(--danger-bg);' : ''}" onclick="openDetail('${x.d.id}')">
+      <div class="spn-info">
+        <div class="spn-t">📱 ${esc(x.d.deviceType)} ${esc(x.d.model)}${x.d.customerName ? ' — ' + esc(x.d.customerName) : ''}</div>
+        <div class="spn-m">${payWaitChip(x)} ${x.priced
+          ? `<span class="rc-chip" style="background:var(--unpaid-bg);color:var(--unpaid)">💵 ${x.amt.toLocaleString('en-EG')} ج.م</span>`
+          : `<span class="rc-chip" style="background:var(--warn-bg);color:var(--warn)">⚠️ مالوش سعر — كلّم الاستقبال</span>`}${returnPaymentDue(x.d) ? ' <span class="rc-chip" style="background:var(--returned-bg);color:var(--returned)">🔁 مرتجع</span>' : ''}${x.d.customerPhone ? ' · 📞 ' + esc(x.d.customerPhone) : ''}</div>
+      </div>
+    </div>`).join('');
+  return `<div class="spn-panel" style="border-color:var(--${late ? 'danger' : 'unpaid'});">
+    <div class="spn-head" style="color:var(--${late ? 'danger' : 'unpaid'});">💵 عميل جاي يدفع
+      <span class="spn-count" style="background:var(--${late ? 'danger' : 'unpaid'});">${list.length}</span></div>
+    <div class="st3-note">المفروض يتحصّل: <b>${total.toLocaleString('en-EG')} ج.م</b>${late ? ` · <b style="color:var(--danger)">⏰ ${late} اتسلّموا من أكتر من يوم ومادفعوش</b> — بلّغ المحاسب العام` : ''}</div>
+    ${rows}
+  </div>`;
+}
+
+// ✅ الاستقبال: أمين الخزنة أكد الدفع (آخر ٢٤ ساعة)
+function paidRecentList(){
+  const from = Date.now() - PAID_SHOW_H * 3600000;
+  const out = [];
+  devices.forEach(d => (d.statusHistory || []).forEach(h => {
+    if(!h || !h.date || !(Date.parse(h.date) >= from)) return;
+    let amt = null, ret = false;
+    if(PAY_IN_KEYS.includes(h.labelKey)) amt = payInAmt(d, h);
+    else if(h.labelKey === 'hist.returnPaidCash'){ amt = parseInt(String((h.labelVars || {}).amount || '').replace(/[^0-9]/g, '')) || 0; ret = true; }
+    if(amt === null) return;
+    // اتلغى بعدها؟ (إلغاء تأكيد بالغلط) → مانعرضوش
+    if(!ret && d.paymentStatus !== 'paid') return;
+    if(ret && d.returnPaymentStatus !== 'paid') return;
+    out.push({ d, at: h.date, by: h.by || '', amt, ret });
+  }));
+  return out.sort((a, b) => Date.parse(b.at) - Date.parse(a.at));   // الأحدث الأول
+}
+function paidRecentPanelHtml(){
+  if(!isReception()) return '';
+  const list = paidRecentList();
+  if(!list.length) return '';
+  const rows = list.map(x => `<div class="spn-row" style="cursor:pointer;" onclick="openDetail('${x.d.id}')">
+      <div class="spn-info">
+        <div class="spn-t">📱 ${esc(x.d.deviceType)} ${esc(x.d.model)}${x.d.customerName ? ' — ' + esc(x.d.customerName) : ''}</div>
+        <div class="spn-m"><span class="rc-chip" style="background:var(--paid-bg);color:var(--paid)">✅ ${x.amt.toLocaleString('en-EG')} ج.م${x.ret ? ' (مرتجع)' : ''}</span> 💵 ${esc(x.by)} · ${esc(splAgoTxt(x.at))}</div>
+      </div>
+    </div>`).join('');
+  return `<div class="spn-panel" style="border-color:var(--paid);">
+    <div class="spn-head" style="color:var(--paid);">✅ اتدفع — آخر ${PAID_SHOW_H} ساعة
+      <span class="spn-count" style="background:var(--paid);">${list.length}</span></div>
+    ${rows}
+  </div>`;
+}
+
+// 🧾 دفتر المراجعة — الورقتين الجداد للمحاسب العام
+function linkAuditItems(){
+  if(!isSuperAdmin()) return [];
+  const out = [];
+  devices.forEach(d => {
+    if(deferredWaiting(d)) out.push({ type: 'defer', at: deliveredDateOf(d) || lastChangeOf(d), reviewed: false, d, live: true });
+  });
+  awaitPayList().filter(x => x.late).forEach(x => out.push({ type: 'paylate', at: x.at, reviewed: false, d: x.d, x, live: true }));
+  return out;
+}
+function linkAuditRowHtml(item){
+  const d = item.d;
+  const dev = `📱 ${esc(d.deviceType)} ${esc(d.model)}${d.customerName ? ' — ' + esc(d.customerName) : ''}`;
+  if(item.type === 'defer'){
+    const ret = !(d.paymentType === 'deferred' && d.paymentStatus !== 'paid');
+    const amt = ret ? (parseInt(d.returnPrice) || 0) : depositDue(d);
+    const shop = (ret ? (d.returnBilledShop || d.billedShop) : d.billedShop) || d.shopName || '—';
+    return `<div class="appr-row" style="background:var(--warn-bg);">
+      <div class="appr-row-info" style="cursor:pointer;" onclick="openDetail('${d.id}')">
+        <div class="appr-row-dev"><span class="appr-row-kind" style="background:var(--surface);color:var(--warn);">📒 آجل مستني يتقيّد${ret ? ' (مرتجع)' : ''} — ${amt.toLocaleString('en-EG')} ج.م</span>${dev}</div>
+        <div style="font-size:13px;line-height:1.7;margin-top:5px;">الاستقبال سلّمه آجل على حساب «${esc(shop)}» — لسه مادخلش كشف الحساب.</div>
+        <div class="appr-row-meta">اتسلّم ${esc(splAgoTxt(item.at))}</div>
+      </div>
+      <div class="appr-row-actions"><button class="appr-btn-yes" style="background:var(--warn);" onclick="event.stopPropagation();openDetail('${d.id}')">📒 افتح وقيّده</button></div>
+    </div>`;
+  }
+  const x = item.x;
+  return `<div class="appr-row" style="background:var(--danger-bg);">
+    <div class="appr-row-info" style="cursor:pointer;" onclick="openDetail('${d.id}')">
+      <div class="appr-row-dev"><span class="appr-row-kind" style="background:var(--surface);color:var(--danger);">⏰ اتسلّم ومادفعش — ${x.priced ? x.amt.toLocaleString('en-EG') + ' ج.م' : 'مالوش سعر'}</span>${dev}</div>
+      <div style="font-size:13px;line-height:1.7;margin-top:5px;">اتسلّم من ${esc(splAgoTxt(item.at))} وأمين الخزنة لسه ماأكدش الدفع${d.customerPhone ? ' · 📞 ' + esc(d.customerPhone) : ''}</div>
+      <div class="appr-row-meta">بتختفي لوحدها أول ما الدفع يتأكد أو يتحوّل آجل</div>
+    </div>
+  </div>`;
+}
+
 const NTF_PAGES = [
   { k:'inbox',   label: () => isReception() ? '📥 وصلك من الصيانة' : '📥 وارد من الاستقبال',
     on: () => isReception() || isProduction(),
@@ -4078,6 +4234,16 @@ const NTF_PAGES = [
                   : depRefundStep(d) === 'rec')
                 .map(d => d.id + '@' + (d.depositStatus || '') + '@' + (depRefundStep(d) || '')),
     html: () => isCashier() ? depositPanelHtml() : depositRecPanelHtml() },
+  // 🔗 (٢٠٢٦-١٠-١٣) أمين الخزنة: «عميل جاي يدفع» — والجهاز اللي اتأخر بينوّر الأوضة تاني (@late)
+  { k:'await',   label: () => '💵 عميل جاي يدفع',
+    on: () => isCashier(),
+    keys: () => awaitPayList().map(x => x.d.id + '@' + x.at + (x.late ? '@late' : '')),
+    html: () => awaitPayPanelHtml() },
+  // 🔗 (٢٠٢٦-١٠-١٣) الاستقبال: «اتدفع» — أمين الخزنة أكد الدفع
+  { k:'paid',    label: () => '✅ اتدفع',
+    on: () => isReception(),
+    keys: () => paidRecentList().map(x => x.d.id + '@' + x.at),
+    html: () => paidRecentPanelHtml() },
   { k:'reports', label: () => '📝 تقاريري',
     on: () => isReception() || isCashier(),
     // 🧸 «الجديد» هنا = تقرير المحاسب العام راجعه — والرقم = اللي لسه مستني مراجعة
@@ -7095,6 +7261,9 @@ const AUDIT_TYPES = {
   unpay:   { icon:'↩️', label:'إلغاء دفع' },
   closing: { icon:'🔒', label:'الخزنة' },
   deposit: { icon:'💰', label:'العربون' },   // (ملف 88) رجع ولا لأ — جهاز مرفوض
+  // 🔗 (٢٠٢٦-١٠-١٣) ورق «حي» — بيختفي لوحده لما الحاجة تتعمل (مفيش «✓ راجعته»)
+  defer:   { icon:'📒', label:'آجل مستني يتقيّد' },
+  paylate: { icon:'⏰', label:'اتسلّم ومادفعش' },
 };
 let auditF = { type: 'all', state: 'pending', days: 30 };
 
@@ -7107,11 +7276,13 @@ function auditItems(){
   })));
   closings.forEach(c => out.push({ type: 'closing', at: c.created_at || c.to_at, reviewed: !!c.reviewed, c }));
   depositAuditItems().forEach(x => out.push(x));   // 💰 (ملف 88)
+  linkAuditItems().forEach(x => out.push(x));      // 🔗 📒 آجل مستني · ⏰ اتسلّم ومادفعش
   return out.sort((a, b) => (Date.parse(b.at) || 0) - (Date.parse(a.at) || 0));
 }
 
 function auditRowHtml(x){
   if(x.type === 'deposit') return depositAuditRowHtml(x);   // 💰 (ملف 88)
+  if(x.type === 'defer' || x.type === 'paylate') return linkAuditRowHtml(x);   // 🔗
   const when = x.at ? new Date(x.at).toLocaleString(getLocale()) : '';
   if(x.type === 'closing'){
     const c = x.c, diff = Number(c.diff) || 0;
@@ -7187,7 +7358,8 @@ function renderAudit(){
   if(!body) return;
   const all = auditItems();
   const since = auditF.days ? Date.now() - auditF.days * 86400000 : 0;
-  const inPeriod = all.filter(x => !since || (Date.parse(x.at) || 0) >= since);
+  // 🔗 الورق «الحي» (آجل مستني · اتسلّم ومادفعش) بيظهر دايماً مهما كانت المدة — لسه مستنيك
+  const inPeriod = all.filter(x => x.live || !since || (Date.parse(x.at) || 0) >= since);
   const pendAll = all.filter(x => !x.reviewed);
 
   // 📊 إجماليات المدة
@@ -7217,6 +7389,11 @@ function renderAudit(){
       ${box('🔺 إجمالي الزيادة', over.toLocaleString('en-EG') + ' ج.م', over ? 'warn' : '')}
       ${box('↩️ إلغاء دفع', un.length.toLocaleString('en-EG') + (unAmt ? ` <small style="display:inline;">(${unAmt.toLocaleString('en-EG')} ج.م)</small>` : ''))}
       ${box('💰 تعديل فلوس · 📝 تصحيحات', inPeriod.filter(x => x.type === 'money').length + ' · ' + inPeriod.filter(x => x.type === 'move').length)}
+      ${(() => { const df = pendAll.filter(x => x.type === 'defer'); const n = df.length;
+          return box('📒 آجل مستني يتقيّد', n.toLocaleString('en-EG'), n ? 'warn' : ''); })()}
+      ${(() => { const pl = pendAll.filter(x => x.type === 'paylate');
+          const amt = pl.reduce((a, x) => a + (x.x.amt || 0), 0);
+          return box('⏰ اتسلّم ومادفعش', pl.length.toLocaleString('en-EG') + (amt ? ` <small style="display:inline;">(${amt.toLocaleString('en-EG')} ج.م)</small>` : ''), pl.length ? 'danger' : ''); })()}
     </div>
     <div class="st3-chips">${chip('days', 7, 'آخر ٧ أيام')}${chip('days', 30, 'آخر ٣٠ يوم')}${chip('days', 90, 'آخر ٣ شهور')}${chip('days', 0, 'من الأول')}</div>
     <div class="st3-chips">${chip('type', 'all', 'الكل' + (pendAll.length ? ` <b class="st3-n">${pendAll.length}</b>` : ''))}${Object.keys(AUDIT_TYPES).map(typeChip).join('')}</div>
