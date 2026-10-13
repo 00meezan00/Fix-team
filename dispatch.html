@@ -1056,7 +1056,12 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
       **من غير سعر** (agreedPrice = 0). المحاسب بيحدده بعدين.
 
    🔑 التسليم والإرجاع عبر device_patch — بيسجّلوا **طلب اعتماد**
-      مش تغيير حالة. المحاسب هو اللي بيوافق من الداشبورد.
+      مش تغيير حالة. الاستقبال أو المحاسب العام هما اللي بيوافقوا
+      من الداشبورد (canApprove هناك) — أمين الخزنة لأ.
+
+   🆕 (٢٠٢٦-١٠-١٣) الصفحة بقت تعرف أوض النظام الجديد كلها
+      (اتبعت للورشة · في الورشة · رجع للاستقبال · درج الخالص ·
+      درج الرفض) — قبل كده أي جهاز فيهم كان بيختفي من عندك.
 
    ⚠️ إعداد Supabase مكرّر من dashboard.html — لو غيّرت رابط أو
       مفتاح هناك، غيّره هنا كمان.
@@ -1086,7 +1091,24 @@ const ST = {
   returned:{label:t('rp.stReturned'),c:'--returned'},
   // 🚗 (ملف 94) حالات الاستقبال اللي ممكن توصلك في العهدة
   fixed_drawer:{label:'درج الخالص',c:'--done'},
+  // ============================================================
+  // 🆕 (٢٠٢٦-١٠-١٣) أوض النظام الجديد (statuses.js)
+  // ------------------------------------------------------------
+  // 🧸 قبل كده الصفحة ماكانتش تعرف الأوض دي خالص — فأي جهاز دخلها
+  //    كان بيختفي من عندك ويظهر بالإنجليزي لو ظهر.
+  // ⚠️ «تم الصيانة» و«المرفوض» الاتنين بيبانوا «🔧 لسه في الورشة» —
+  //    زي الاستقبال بالظبط: النتيجة بتتعرف لما مدير الإنتاج يبعته.
+  // ⚠️ «درج الرفض» مش حالة لوحدها: هي 'rejected' + علامة rejectedInShop
+  //    (adapt تحت بيحوّلها لـ rejected_shop عشان تبان صح).
+  // ============================================================
+  sent_to_repair:{label:'اتبعت للورشة',c:'--diagnosing'},
+  received_from_reception:{label:'في الورشة',c:'--diagnosing'},
+  workshop_rejected:{label:'في الورشة',c:'--repairing'},
+  sent_to_reception:{label:'رجع للاستقبال',c:'--done'},
+  rejected_shop:{label:'درج الرفض',c:'--rejected_shop'},
 };
+// 🔧 «تم الصيانة» عند الديسباتشر = لسه في الورشة (زي الاستقبال)
+ST.done = { label:'في الورشة', c:'--done' };
 // "كل أجهزة المحل" = اللي لسه فعلاً في المحل.
 // النظام بيخزّن التسليم كحالة واحدة 'delivered'، والداشبورد بيقسمها
 // عند العرض لـ "تم التسليم والدفع" و"بانتظار الدفع" حسب حالة الدفع —
@@ -1094,7 +1116,14 @@ const ST = {
 // و'rejected' (تم الرفض) مستثنى كمان: الجهاز المرفوض بيرجع للعميل
 // ويخرج من المحل، فمش شغل الديسباتشر.
 // اللي فاضل: 'returned' (المرتجعات) — ده راجع للمحل تاني فعلاً.
-const IN_SHOP = ['waiting','diagnosing','repairing','done','returned'];
+// 🆕 (٢٠٢٦-١٠-١٣) + كل أوض النظام الجديد اللي الجهاز فيها لسه جوه المحل.
+//    و«درج الرفض» (rejected + rejectedInShop) بيتجاب في طلب لوحده
+//    في loadDevices، وبيتحسب هنا باسمه rejected_shop.
+const IN_SHOP = ['waiting','sent_to_repair','received_from_reception','diagnosing','repairing',
+                 'done','workshop_rejected','sent_to_reception','fixed_drawer','returned'];
+const IN_SHOP_VIEW = [...IN_SHOP, 'rejected_shop'];
+// ✋ الاستقبال هو اللي بيوافق على الطلب — فبنكتب اسمه صح في كل حتة
+const APPR_WHO = 'الاستقبال / المحاسب العام';
 
 // نافذة الأجهزة المسلَّمة: شهر. الجهاز اللي عدّى على تسليمه ٣٠ يوم
 // يختفي من عند الديسباتشر — والنافذة بتتحرك لوحدها مع كل تحميل،
@@ -1118,9 +1147,9 @@ const _demo = [
 
 const TABS = [
   // 🚗 (ملف 94) اللي في إيدك دلوقتي: جاي للفرع · مستنيك تاخده · رايح بيه للمحل
-  {key:'custody', label:'🚗 عهدتي', filter:d => dpInCarrying(d) || dpOutActive(d)},
-  {key:'mine',  label:t('dp.mine'),  filter:d => d.by===ME && IN_SHOP.includes(d.status)},
-  {key:'shop',  label:t('dp.all'), filter:d => IN_SHOP.includes(d.status)},
+  {key:'custody', label:'🚗 عهدتي', filter:d => dpMineCarrying(d) || dpOutActive(d)},
+  {key:'mine',  label:t('dp.mine'),  filter:d => d.by===ME && IN_SHOP_VIEW.includes(d.status)},
+  {key:'shop',  label:t('dp.all'), filter:d => IN_SHOP_VIEW.includes(d.status)},
   {key:'out',   label:t('dp.delivered'),      filter:d => d.status==='delivered'},
 ];
 let activeTab = 'mine';
@@ -1285,7 +1314,9 @@ function adapt(d){
     bb:      (d.broughtBy || '').trim(),   // 🛵 المندوب
     cond:    d.conditionNotes || '',       // 🆕 حالة الجهاز الشكلية (زي الاستقبال)
     issue:   d.reportedIssue || '',
-    status:  d.status || 'waiting',
+    // 🗄️ «درج الرفض» = مرفوض ولسه في المحل (ملف 96 بيبعت rejectedInShop)
+    status:  (d.status === 'rejected' && (d.rejectedInShop === true || d.rejectedInShop === 'true'))
+               ? 'rejected_shop' : (d.status || 'waiting'),
     tech:    (d.technician || '').trim(),
     by:      (d.registeredBy || d.createdBy || '').trim(),
     intake:  d.intakeDate || '',
@@ -1382,10 +1413,19 @@ async function loadDevices(){
       .in('data->dispOut->>state', ['offered', 'carrying'])
       .order('updated_at', { ascending:false }));
 
+    // 🗄️ (ملف 96) «درج الرفض» — مرفوض ولسه في المحل.
+    //    ⚠️ لو ملف 96 لسه ما اتشغّلش، العلامة مش بتوصل والطلب ده
+    //       بيرجع فاضي — مش بيوقّع الصفحة.
+    const drawerRows = await fetchPaged(() => sb.from('devices_dispatch')
+      .select('id,data')
+      .eq('status', 'rejected')
+      .eq('data->>rejectedInShop', 'true')
+      .order('updated_at', { ascending:false }));
+
     // دمج مع منع التكرار — ترقيم الصفحات ممكن يكرّر صف لو جهاز
     // اتغيّرت حالته بين صفحة وصفحة
     const byId = new Map();
-    for(const r of [...custRows, ...inShopRows, ...outRows])
+    for(const r of [...custRows, ...inShopRows, ...drawerRows, ...outRows])
       if(r && r.data && !byId.has(r.id)) byId.set(r.id, r.data);
     const rows = [...byId.values()];
     devices = rows.map(adapt); reindexSearch();
@@ -1611,7 +1651,9 @@ async function requestApproval(id, kind){
   const icon   = isRet ? '↩️' : '📦';
   const body = `
     ${actDevBlock(d)}
-    <p class="act-note">${isRet ? t('rp.returnConfirmNote') : t('rp.deliverConfirmNote')}</p>
+    <p class="act-note">${isRet
+      ? 'طلب الإرجاع هيتبعت لـ' + APPR_WHO + ' يوافقوا عليه.'
+      : 'طلب التسليم هيتبعت لـ' + APPR_WHO + ' — هما اللي بيحددوا السعر والدفع.'}</p>
     <button class="act-btn act-primary" style="background:var(${accent});" onclick="doApproval('${d.id}','${kind}')">${icon} ${t('rp.sendRequest')}</button>
     <button class="act-btn act-ghost" onclick="closeAct()">${t('rp.cancel')}</button>`;
   openAct(isRet ? t('rp.return') : t('rp.deliver'), body);
@@ -1635,7 +1677,9 @@ async function doApproval(id, kind){
     decidedBy: null, decidedAt: null, reason: null
   };
   // ⚠️ على نسخة السيرفر مش نسخة الصفحة — شوف dpNotesWith
-  const notes = await dpNotesWith(id, mkNote(t('note.requestPending', { label }), 'note.requestPending', { label }));
+  // ⚠️ (٢٠٢٦-١٠-١٣) نص عادي مش note.requestPending — الترجمة القديمة
+  //    بتقول «المحاسب»، والموافقة دلوقتي من الاستقبال/المحاسب العام.
+  const notes = await dpNotesWith(id, mkNote('⏳ طلب ' + label + ' — بانتظار اعتماد ' + APPR_WHO));
   if(!notes) return;
 
   if(!(await patch(id, { pendingApproval: req, activityNotes: notes,
@@ -1676,7 +1720,7 @@ async function doReject(id, inShop){
     decidedBy: null, decidedAt: null, reason: null
   };
   // ⚠️ على نسخة السيرفر مش نسخة الصفحة — شوف dpNotesWith
-  const notes = await dpNotesWith(id, mkNote(t('note.requestPending', { label: t('rp.reject') }), 'note.requestPending', { label: t('rp.reject') }));
+  const notes = await dpNotesWith(id, mkNote('⏳ طلب رفض — بانتظار اعتماد ' + APPR_WHO));
   if(!notes) return;
 
   if(!(await patch(id, { pendingApproval: req, activityNotes: notes,
@@ -1694,6 +1738,13 @@ const fmtDate = iso => { const d=new Date(iso); if(isNaN(d)) return '—';
   var loc = (function(){ try{ return I18N.getLang()==='en' ? 'en-GB' : 'ar-EG'; }catch(e){ return 'ar-EG'; } })();
   return d.toLocaleDateString(loc,{day:'numeric',month:'short'}) + ' · ' + d.toLocaleTimeString(loc,{hour:'2-digit',minute:'2-digit'}); };
 
+// اسم الطلب المعلّق — كان «طلب تسليم» للرفض كمان بالغلط
+function dpReqLabel(p){
+  return p && p.type === 'return' ? t('tp.reqReturn')
+       : p && p.type === 'reject' ? 'طلب رفض'
+       : t('tp.reqDeliver');
+}
+
 function statusPill(st){ const s=ST[st]||{label:st,c:'--muted'}; return `<span class="tk-status" style="--st:var(${s.c}); --st-bg:var(${s.c}-bg);">${s.label}</span>`; }
 
 function ticketHtml(d){
@@ -1701,13 +1752,16 @@ function ticketHtml(d){
   const delivered = d.status==='delivered';
   // فيه طلب معلّق؟ نوضّحه ونقفل الأزرار — مينفعش طلبين على نفس الجهاز
   const pend = d.pending
-    ? `<div class="pend">⏳ ${d.pending.type==='return'?t('tp.reqReturn'):t('tp.reqDeliver')} بانتظار اعتماد المحاسب
+    ? `<div class="pend">⏳ ${dpReqLabel(d.pending)} بانتظار اعتماد ${APPR_WHO}
         <span style="font-weight:700;opacity:.8;">· ${esc(d.pending.requestedBy||'')}</span></div>`
     : '';
   const actions = dpCustodyBusy(d)
     ? dpCustodyActions(d, true)
     : d.pending
     ? ''
+    // 🗄️ درج الرفض: الجهاز بيخرج بالعهدة (الاستقبال يسلّمهولك) — مفيش طلبات
+    : d.status === 'rejected_shop'
+    ? `<div class="tk-actions"><button class="act act-view" onclick="event.stopPropagation();showInfo('${d.id}')">تفاصيل</button></div>`
     : delivered
     ? `<div class="tk-actions"><button class="act act-ret" onclick="event.stopPropagation();requestApproval('${d.id}','return')" data-i18n="rp.returnIco">↩️ ${t('rp.return')}</button><button class="act act-view" onclick="event.stopPropagation();showInfo('${d.id}')" data-i18n="rp.details">تفاصيل</button></div>`
     : `<div class="tk-actions"><button class="act act-hand" onclick="event.stopPropagation();requestApproval('${d.id}','handover')" data-i18n="rp.deliverIco">📦 ${t('rp.deliver')}</button><button class="act act-rej" onclick="event.stopPropagation();requestReject('${d.id}')" data-i18n="rp.rejectIco">🚫 رفض</button><button class="act act-view" onclick="event.stopPropagation();showInfo('${d.id}')" data-i18n="rp.details">تفاصيل</button></div>`;
@@ -1798,7 +1852,9 @@ function showInfo(id){
   const actions = dpCustodyBusy(d)
     ? dpCustodyActions(d, false)
     : d.pending
-    ? `<div class="di-pend">⏳ ${d.pending.type === 'return' ? t('tp.reqReturn') : t('tp.reqDeliver')} بانتظار اعتماد المحاسب</div>`
+    ? `<div class="di-pend">⏳ ${dpReqLabel(d.pending)} بانتظار اعتماد ${APPR_WHO}</div>`
+    : d.status === 'rejected_shop'
+    ? `<div class="di-pend">🗄️ الجهاز في درج الرفض — لو هتوصّله، الاستقبال هيسلّمهولك</div>`
     : delivered
       ? `<button class="di-act di-ret" onclick="closeAct();requestApproval('${d.id}','return')">↩️ ${t('rp.return')}</button>`
       : `<button class="di-act di-hand" onclick="closeAct();requestApproval('${d.id}','handover')">📦 ${t('rp.deliver')}</button>
@@ -2666,7 +2722,7 @@ function dpCustHistory(){
   const list = dpCustHistoryFor(inp.value);
   if(!list.length){ box.innerHTML = ''; box.style.display = 'none'; return; }
   const rets = list.filter(dpHadReturn).length;
-  const open = list.filter(d => IN_SHOP.includes(d.status)).length;
+  const open = list.filter(d => IN_SHOP_VIEW.includes(d.status)).length;
   const last = list[0];
   const rows = list.slice(0, 5).map(d => {
     const s = ST[d.status] || { label: d.status, c: '--muted' };
@@ -3122,6 +3178,13 @@ async function saveIntake(){
 //    dispatch_back) — كل دالة بتعمل حركة واحدة بشروطها.
 // ============================================================
 function dpInCarrying(d){ return !!(d && d.dispIn && d.dispIn.state === 'carrying'); }
+// 🆕 (ملف 96) المالك كمان بيسجّل أجهزة «في الطريق» — فلازم نفرّق:
+//    الجهاز ده معايا أنا، ولا مع حد تاني (المالك / مسؤول حركة تاني)؟
+function dpMineCarrying(d){
+  if(!dpInCarrying(d)) return false;
+  const by = String(d.dispIn.by || '').trim();
+  return by === ME || d.by === ME;
+}
 function dpOutState(d){ return (d && d.dispOut && d.dispOut.state) || ''; }
 function dpOutActive(d){ return ['offered', 'carrying'].includes(dpOutState(d)); }
 function dpCustodyBusy(d){ return dpInCarrying(d) || dpOutActive(d); }
@@ -3151,6 +3214,10 @@ function dpMoneyHtml(d){
 
 // الصندوق اللي على الكارت وفي التفاصيل
 function dpCustodyBox(d){
+  if(dpInCarrying(d) && !dpMineCarrying(d)){
+    // 🆕 (ملف 96) في الطريق بس مش معاك — من غير فلوس (دي مش عهدتك)
+    return `<div class="cu-box cu-off">🚗 في الطريق مع «${esc(d.dispIn.by || d.by || '—')}» — لسه ما وصلش الاستقبال</div>`;
+  }
   if(dpInCarrying(d)){
     return `<div class="cu-box cu-in">🚗 الجهاز معاك — سلّمه للاستقبال، وهو هيدوس «استلمته»</div>${dpMoneyHtml(d)}`;
   }
@@ -3584,7 +3651,9 @@ function prLinkHtml(id){
 // ⚠️ كل التواريخ بتوقيت القاهرة — مش توقيت الموبايل اللي بيتفرّج.
 // ------------------------------------------------------------
 var PR_TL_ICON = { waiting:'⏳', diagnosing:'🔍', repairing:'🔧', done:'✅',
-                   delivered:'📦', rejected:'🚫', returned:'↩️', trashed:'🗑' };
+                   delivered:'📦', rejected:'🚫', returned:'↩️', trashed:'🗑',
+                   sent_to_repair:'📤', received_from_reception:'🏭', workshop_rejected:'🔴',
+                   sent_to_reception:'🛎️', fixed_drawer:'🟢' };
 
 function prTlDate(iso){
   const d = new Date(iso);
@@ -3886,9 +3955,12 @@ function invInRange(iso){
   return true;
 }
 
-const INV_ACTIVE_STATUSES = ['waiting','diagnosing','repairing','done'];
-const INV_OPEN_STATUSES   = ['waiting','diagnosing','repairing','returned'];
-const INV_TECH_STATUSES   = ['waiting','diagnosing','repairing','returned'];
+// 🆕 (٢٠٢٦-١٠-١٣) + أوض النظام الجديد — من غيرها الجرد كان بيعدّ أقل من الحقيقة
+const INV_ACTIVE_STATUSES = ['waiting','sent_to_repair','received_from_reception','diagnosing','repairing',
+                             'done','workshop_rejected','sent_to_reception','fixed_drawer'];
+const INV_OPEN_STATUSES   = ['waiting','sent_to_repair','received_from_reception','diagnosing','repairing',
+                             'done','workshop_rejected','returned'];
+const INV_TECH_STATUSES   = ['waiting','sent_to_repair','received_from_reception','diagnosing','repairing','returned'];
 
 // آخر حركة على الجهاز — من statusHistory المحفوظ في _raw
 function invLastChange(d){
