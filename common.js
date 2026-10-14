@@ -415,6 +415,28 @@ addEventListener('DOMContentLoaded', function(){
 });
 
 // ============================================================
+// 👥 شؤون العاملين على الـERP — تحميل erp-hr.js
+// ------------------------------------------------------------
+// 🧸 بالبلدي: كل مرتب يتصرف بقى ليه «سند صرف» برقم (ملف SQL رقم 106).
+//    الملف ده بيكتب الرقم على كارت الكشف، وبيزوّد «📋 مسير المرتبات»
+//    في قايمة ⋮ — في hr.html بس، ومن غير ما نلمسها.
+// ⚠️ لو الملف مش مرفوع أو ملف 106 مش متشغّل: مفيش أرقام وخلاص —
+//    ولا صفحة بتقع.
+// ============================================================
+addEventListener('DOMContentLoaded', function(){
+  try{
+    var page = (location.pathname.split('/').pop() || '').toLowerCase().replace(/\.html$/,'');
+    if(page !== 'hr') return;
+    if(window.IFixHrErp || document.getElementById('ehScript')) return;
+    var s = document.createElement('script');
+    s.id = 'ehScript';
+    s.src = 'erp-hr.js';
+    s.onerror = function(){ console.error('فشل تحميل erp-hr.js — أرقام سندات المرتبات مش هتظهر'); };
+    document.head.appendChild(s);
+  }catch(e){ console.error('erp-hr loader:', e); }
+});
+
+// ============================================================
 // 🗂️ ترتيب قايمة التلت نقط — إخفاء العناوين الفاضية
 // ------------------------------------------------------------
 // 🧠 بالبلدي: القايمة متقسّمة مجموعات، فوق كل مجموعة عنوان صغير
