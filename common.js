@@ -437,6 +437,31 @@ addEventListener('DOMContentLoaded', function(){
 });
 
 // ============================================================
+// 📒 مركز الأستاذ — زرار في قايمة الداشبورد (ملف SQL رقم 107)
+// ------------------------------------------------------------
+// 🧸 بالبلدي: بنحط زرار «📒 مركز الأستاذ» تحت «📒 حسابات العملاء»
+//    على طول — من غير ما نلمس الداشبورد. الزرار واخد نفس class
+//    بتاع «حسابات العملاء» (cust-menu-item)، فالداشبورد نفسه بيظهّره
+//    للمحاسب العام بس ويخبّيه عن الباقي.
+// ⚠️ الصفحة نفسها (gl.html) بتسأل السيرفر «إنت المحاسب العام؟»
+//    وأي حد تاني بيترجع للداشبورد — والقيود مقفولة على السيرفر كمان.
+// ============================================================
+addEventListener('DOMContentLoaded', function(){
+  try{
+    var page = (location.pathname.split('/').pop() || '').toLowerCase().replace(/\.html$/,'') || 'index';
+    if(page !== 'dashboard' || document.getElementById('glMenuBtn')) return;
+    var cust = document.querySelector('#menuDropdown .cust-menu-item') || document.querySelector('.cust-menu-item');
+    if(!cust) return;
+    var b = document.createElement('button');
+    b.id = 'glMenuBtn';
+    b.className = 'cust-menu-item';
+    b.textContent = '📒 مركز الأستاذ';
+    b.onclick = function(){ location.href = 'gl.html'; };
+    cust.parentNode.insertBefore(b, cust.nextSibling);
+  }catch(e){ console.error('gl menu:', e); }
+});
+
+// ============================================================
 // 🗂️ ترتيب قايمة التلت نقط — إخفاء العناوين الفاضية
 // ------------------------------------------------------------
 // 🧠 بالبلدي: القايمة متقسّمة مجموعات، فوق كل مجموعة عنوان صغير

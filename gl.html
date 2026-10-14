@@ -1,0 +1,1085 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<script>
+/* 🔒 اللغة متثبّتة على العربي — نفس باقي الصفحات */
+try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
+</script>
+<script>
+/* المظهر قبل أي رسم — نفس مفتاح باقي الصفحات (ifix-theme). من غير ده فيه ومضة بيضا. */
+(function(){
+  try{
+    var m = localStorage.getItem('ifix-theme') || 'auto';
+    var h = new Date().getHours();
+    var d = m === 'dark' || (m === 'auto' && (h >= 19 || h < 7));
+    document.documentElement.setAttribute('data-theme', d ? 'dark' : 'light');
+    var mt = document.querySelector('meta[name="theme-color"]');
+    if(mt) mt.setAttribute('content', d ? '#0F1823' : '#16233A');
+  }catch(e){}
+})();
+</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>مركز الأستاذ — I Fix Team</title>
+<meta name="theme-color" content="#16233A">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="مركز الأستاذ">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="common.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;800;900&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+  /* ============================================================
+     📒 مركز الأستاذ — نفس ألوان باقي النظام بالحرف (زي customers.html)
+     ============================================================ */
+  :root{
+    --chrome:#16233A; --on-chrome:#FFFFFF;
+    --paper:#EBEEF2; --card:#FFFFFF; --line:#E4E9EF; --soft:#F2F5F8;
+    --ink:#17222E; --ink-2:#475569; --muted:#6B7A8C; --faint:#94A3B4;
+    --red:#DC2626; --red-bg:#FEF2F2;
+    --done:#15803D; --done-bg:#EAF6EE;
+    --wait:#B5651D; --wait-bg:#FBF2E9;
+    --blue:#2B6CB0; --blue-bg:#EAF1F8;
+    --violet:#6E56CF; --violet-bg:#F1EEFB;
+    --accent:#0891A8;
+  }
+  [data-theme="dark"]{
+    color-scheme:dark;
+    --chrome:#0F1823; --on-chrome:#F2F5F8;
+    --paper:#0E1620; --card:#16202C; --line:#233040; --soft:#1D2937;
+    --ink:#E9EEF4; --ink-2:#B7C3D0; --muted:#8A99A9; --faint:#67788A;
+    --red:#F87171; --red-bg:rgba(248,113,113,.14);
+    --done:#4ADE80; --done-bg:rgba(74,222,128,.13);
+    --wait:#F0A552; --wait-bg:rgba(240,165,82,.14);
+    --blue:#7FB2E5; --blue-bg:rgba(127,178,229,.14);
+    --violet:#A78BFA; --violet-bg:rgba(167,139,250,.15);
+    --accent:#2AB5CE;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  body{margin:0; background:var(--paper); color:var(--ink); font-family:'Tajawal',system-ui,sans-serif; min-height:100dvh;}
+  button{font-family:inherit; cursor:pointer;}
+
+  .topbar{background:var(--chrome); color:var(--on-chrome); position:sticky; top:0; z-index:20;
+    padding:calc(env(safe-area-inset-top,0px) + 12px) 16px 0;}
+  .tb-row{display:flex; align-items:center; justify-content:space-between; gap:10px;}
+  .topbar h1{font-family:'Cairo',sans-serif; font-size:17px; margin:0; font-weight:900;}
+  .who{font-family:'Cairo',sans-serif; font-size:12.5px; font-weight:700; opacity:.85; margin-top:1px;}
+  .back-btn{border:none; border-radius:11px; background:rgba(255,255,255,.12); color:var(--on-chrome);
+    padding:9px 12px; font-weight:800; font-size:13px; white-space:nowrap;}
+  .tabs{display:flex; gap:6px; overflow-x:auto; padding:12px 0 10px; scrollbar-width:none;}
+  .tabs::-webkit-scrollbar{display:none;}
+  .tab{flex:none; border:none; border-radius:999px; padding:8px 13px; font-weight:800; font-size:13px;
+    background:rgba(255,255,255,.10); color:var(--on-chrome); white-space:nowrap;}
+  .tab.on{background:var(--on-chrome); color:var(--chrome);}
+  .tab .n{display:inline-block; min-width:18px; margin-inline-start:4px; border-radius:9px; padding:0 5px;
+    background:var(--red); color:#fff; font-size:11px; line-height:18px; text-align:center;}
+
+  .wrap{padding:14px 14px calc(env(safe-area-inset-bottom,0px) + 90px); max-width:880px; margin:0 auto;}
+  .sec-h{display:flex; align-items:center; gap:8px; margin:16px 2px 9px; font-family:'Cairo',sans-serif;
+    font-weight:900; font-size:14.5px;}
+  .sec-h .c{font-family:system-ui; font-size:12px; font-weight:800; color:var(--muted); background:var(--card);
+    border:1px solid var(--line); border-radius:20px; padding:1px 9px;}
+  .sec-h .rule{flex:1; height:1px; background:var(--line);}
+  .hint{font-size:12.5px; color:var(--muted); line-height:1.8; margin:-2px 2px 10px;}
+  .empty{background:var(--card); border:1px dashed var(--line); border-radius:13px; padding:26px 14px;
+    text-align:center; color:var(--muted); font-size:13.5px; line-height:1.9;}
+  .err{background:var(--red-bg); color:var(--red); border-radius:12px; padding:12px 14px; font-size:13px;
+    font-weight:700; line-height:1.8; margin-bottom:12px; word-break:break-word;}
+  .warnbox{background:var(--wait-bg); color:var(--wait); border-radius:11px; padding:10px 12px; font-size:13px;
+    font-weight:700; line-height:1.8; margin-bottom:10px;}
+  .okbox{background:var(--done-bg); color:var(--done); border-radius:11px; padding:10px 12px; font-size:13px;
+    font-weight:700; line-height:1.8; margin-bottom:10px;}
+  .warnbox button,.okbox button{margin-top:6px;}
+
+  .stats{display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:8px; margin-bottom:12px;}
+  .stat{background:var(--card); border:1px solid var(--line); border-radius:13px; padding:10px 11px; text-align:start;
+    color:var(--ink); min-width:0;}
+  button.stat{cursor:pointer;}
+  .stat .k{font-size:11.5px; font-weight:800; color:var(--muted);}
+  .stat .v{font-family:'Cairo',sans-serif; font-weight:900; font-size:18px; margin-top:2px; white-space:nowrap;
+    overflow:hidden; text-overflow:ellipsis;}
+  .stat .s{font-size:11px; color:var(--muted); margin-top:1px;}
+  .stat.good .v{color:var(--done);} .stat.warn .v{color:var(--wait);} .stat.bad .v{color:var(--red);}
+  @media (max-width:560px){ .stats{grid-template-columns:repeat(2, minmax(0,1fr));} }
+
+  .search{width:100%; border:1px solid var(--line); background:var(--card); color:var(--ink); border-radius:12px;
+    padding:12px 13px; font-family:inherit; font-size:15px; margin-bottom:9px;}
+  .chips{display:flex; flex-wrap:wrap; gap:6px;}
+  .chip{border:1.5px solid var(--line); background:var(--card); color:var(--ink); border-radius:999px;
+    padding:8px 13px; font-weight:800; font-size:12.5px;}
+  .chip.on{border-color:var(--blue); background:var(--blue-bg); color:var(--blue);}
+  .range{display:flex; flex-wrap:wrap; gap:8px; align-items:flex-end; margin-bottom:10px;}
+  .range label{display:flex; flex-direction:column; gap:3px; font-size:11.5px; font-weight:800; color:var(--muted); flex:1 1 130px;}
+  .range input,.range select{border:1px solid var(--line); background:var(--card); color:var(--ink); border-radius:10px;
+    padding:9px 10px; font-family:inherit; font-size:14px; font-weight:700; width:100%;}
+
+  .card{background:var(--card); border:1px solid var(--line); border-inline-start:4px solid var(--edge,var(--line));
+    border-radius:13px; padding:11px 13px; margin-bottom:8px;}
+  button.card{display:block; width:100%; text-align:start; color:var(--ink);}
+  .card.k-auto{--edge:var(--blue);} .card.k-cogs{--edge:var(--violet);} .card.k-manual,.card.k-adjust{--edge:var(--wait);}
+  .card.k-opening{--edge:var(--done);} .card.k-reversal{--edge:var(--red);} .card.k-closing{--edge:var(--ink-2);}
+  .card.off{opacity:.62;}
+  .c-top{display:flex; align-items:flex-start; justify-content:space-between; gap:8px;}
+  .c-t{font-family:'Cairo',sans-serif; font-weight:900; font-size:14.5px; line-height:1.45; min-width:0; word-break:break-word;}
+  .c-s{font-size:12.5px; color:var(--muted); margin-top:2px; line-height:1.7;}
+  .code{font-family:ui-monospace,Menlo,monospace; font-size:12px; font-weight:700; color:var(--muted); direction:ltr; unicode-bidi:isolate;}
+  .pill{flex:none; font-size:11.5px; font-weight:800; border-radius:20px; padding:3px 9px; white-space:nowrap;
+    background:var(--soft); color:var(--ink-2);}
+  .pill.red{background:var(--red-bg); color:var(--red);} .pill.blue{background:var(--blue-bg); color:var(--blue);}
+  .pill.green{background:var(--done-bg); color:var(--done);} .pill.wait{background:var(--wait-bg); color:var(--wait);}
+  .pill.violet{background:var(--violet-bg); color:var(--violet);}
+  .money{font-family:'Cairo',sans-serif; font-weight:900; white-space:nowrap; direction:ltr; unicode-bidi:isolate;}
+  .money.dr{color:var(--blue);} .money.cr{color:var(--wait);} .money.pos{color:var(--done);} .money.neg{color:var(--red);}
+  .acts{display:flex; gap:7px; flex-wrap:wrap; margin-top:10px;}
+  .btn{flex:1 1 auto; border:1px solid var(--line); background:var(--soft); color:var(--ink); border-radius:10px;
+    padding:10px 10px; font-size:13px; font-weight:800; white-space:nowrap;}
+  .btn.pri{background:var(--accent); border-color:var(--accent); color:#fff;}
+  .btn.bad{color:var(--red); border-color:var(--red);}
+  .btn.ghost{background:none;}
+  .btn.sm{flex:0 0 auto; padding:7px 10px; font-size:12px;}
+  .btn:disabled{opacity:.5; cursor:default;}
+  [data-theme="dark"] .btn.pri{color:#0E1620;}
+  .more{display:block; width:100%; margin-top:6px;}
+
+  /* ===== سطور القيد ===== */
+  .jl{display:grid; grid-template-columns:1fr auto auto; gap:2px 10px; font-size:12.5px; padding:5px 0;
+    border-top:1px dashed var(--line); align-items:baseline;}
+  .jl:first-of-type{border-top:none;}
+  .jl .a{min-width:0; word-break:break-word; line-height:1.55;}
+  .jl .a small{color:var(--muted); display:block;}
+  .jl .d,.jl .cc{font-family:'Cairo',sans-serif; font-weight:800; min-width:64px; text-align:end; direction:ltr; unicode-bidi:isolate;}
+  .jl .d{color:var(--blue);} .jl .cc{color:var(--wait);}
+  .jl.cr .a{padding-inline-start:16px;}
+  .jl.head{font-size:11px; font-weight:800; color:var(--muted); border-top:none; padding-top:8px;}
+  .jl.head .d,.jl.head .cc{font-family:inherit; color:var(--muted); font-size:11px;}
+
+  /* ===== الجداول (الميزان والقوايم) ===== */
+  .tbl{width:100%; border-collapse:collapse; background:var(--card); border-radius:13px; overflow:hidden;
+    border:1px solid var(--line); font-size:12.5px;}
+  .tbl th{background:var(--soft); color:var(--ink-2); font-weight:800; padding:8px 7px; text-align:start; font-size:11.5px; white-space:nowrap;}
+  .tbl td{padding:7px 7px; border-top:1px solid var(--line); vertical-align:top;}
+  .tbl td.n,.tbl th.n{text-align:end; font-family:'Cairo',sans-serif; font-weight:800; white-space:nowrap; direction:ltr;}
+  .tbl tr.g td{font-weight:900; background:var(--soft);}
+  .tbl tr.g1 td{font-weight:900; background:var(--blue-bg);}
+  .tbl tr.tot td{font-weight:900; background:var(--chrome); color:var(--on-chrome);}
+  .tbl tr.click{cursor:pointer;}
+  .tbl tr.click:active td{background:var(--blue-bg);}
+  .tbl td.ind1{padding-inline-start:18px;} .tbl td.ind2{padding-inline-start:30px;} .tbl td.ind3{padding-inline-start:42px;}
+  .tscroll{overflow-x:auto; border-radius:13px;}
+  .tscroll .tbl td:first-child{min-width:150px;}
+  .tbl .zero{color:var(--faint);}
+
+  /* ===== الشيت ===== */
+  .ov{position:fixed; inset:0; z-index:60; background:rgba(8,14,20,.55); display:flex; align-items:flex-end; justify-content:center;}
+  .sheet{width:100%; max-width:720px; max-height:94dvh; overflow-y:auto; background:var(--paper);
+    border-radius:18px 18px 0 0; padding:0 0 calc(env(safe-area-inset-bottom,0px) + 22px);}
+  .sh-h{position:sticky; top:0; z-index:2; background:var(--paper); display:flex; align-items:center; gap:10px;
+    padding:14px 16px 10px; border-bottom:1px solid var(--line);}
+  .sh-h h3{flex:1; margin:0; font-family:'Cairo',sans-serif; font-size:16px; font-weight:900; min-width:0; word-break:break-word;}
+  .sh-x{border:none; background:var(--card); color:var(--ink); width:36px; height:36px; border-radius:10px; font-size:18px; flex:none;}
+  .sh-b{padding:14px 16px;}
+  .f{display:block; margin-bottom:12px;}
+  .f > span{display:block; font-size:12.5px; font-weight:800; color:var(--ink-2); margin-bottom:5px;}
+  .f input,.f textarea,.f select{width:100%; border:1px solid var(--line); background:var(--card); color:var(--ink);
+    border-radius:11px; padding:11px 12px; font-family:inherit; font-size:15px;}
+  .f2{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  .note-in{font-size:12px; color:var(--muted); line-height:1.8; margin-top:5px;}
+  .big{width:100%; border:none; border-radius:13px; padding:15px; background:var(--accent); color:#fff;
+    font-family:'Cairo',sans-serif; font-weight:900; font-size:15.5px;}
+  .big:disabled{opacity:.5;}
+  [data-theme="dark"] .big{color:#0E1620;}
+
+  /* ===== محرر القيد ===== */
+  .le{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:10px; margin-bottom:8px;}
+  .le select,.le input{width:100%; border:1px solid var(--line); background:var(--soft); color:var(--ink);
+    border-radius:9px; padding:9px 10px; font-family:inherit; font-size:14px;}
+  .le .r2{display:grid; grid-template-columns:1fr 1fr auto; gap:6px; margin-top:6px; align-items:center;}
+  .le .r1{display:grid; grid-template-columns:1fr; gap:6px;}
+  .le .x{border:none; background:var(--red-bg); color:var(--red); width:36px; height:36px; border-radius:9px; font-size:15px;}
+  .le .dIn{border-color:var(--blue) !important;} .le .cIn{border-color:var(--wait) !important;}
+  .baltag{position:sticky; bottom:0; background:var(--paper); padding:10px 0 4px; display:flex; gap:8px; align-items:center;
+    justify-content:space-between; font-weight:800; font-size:13px; border-top:1px solid var(--line); margin-top:6px;}
+
+  .fab{position:fixed; inset-inline-start:16px; bottom:calc(env(safe-area-inset-bottom,0px) + 18px); z-index:15;
+    border:none; border-radius:16px; padding:14px 18px; background:var(--accent); color:#fff;
+    font-family:'Cairo',sans-serif; font-weight:900; font-size:14.5px; box-shadow:0 10px 26px rgba(8,145,168,.38);}
+  [data-theme="dark"] .fab{color:#0E1620;}
+  .toast{position:fixed; left:50%; transform:translateX(-50%) translateY(20px); bottom:calc(env(safe-area-inset-bottom,0px) + 22px);
+    z-index:100000; background:var(--chrome); color:var(--on-chrome); border-radius:12px; padding:12px 16px; font-weight:800;
+    font-size:13.5px; box-shadow:0 12px 30px rgba(0,0,0,.3); opacity:0; pointer-events:none; transition:.25s; max-width:90vw; text-align:center;}
+  .toast.on{opacity:1; transform:translateX(-50%) translateY(0);}
+  .toast.bad{background:var(--red); color:#fff;}
+
+  /* 📱 قاعدة الآيفون — متشيلهاش: خط الخانات ١٦px على الموبايل */
+  @media (max-width:820px){
+    input, textarea, select{ font-size:16px !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="tb-row">
+    <div>
+      <h1>📒 مركز الأستاذ</h1>
+      <div class="who" id="whoLbl">…</div>
+    </div>
+    <button class="back-btn" onclick="location.href='dashboard.html'">→ رجوع</button>
+  </div>
+  <div class="tabs" id="tabs"></div>
+</div>
+
+<div class="wrap" id="app"><div class="empty">⏳ جاري التحميل…</div></div>
+<div id="fabHost"></div>
+<div class="toast" id="toast"></div>
+<datalist id="dlCust"></datalist>
+<datalist id="dlSup"></datalist>
+<datalist id="dlEmp"></datalist>
+
+<script>
+// ============================================================
+// 📒 مركز الأستاذ (ملف SQL رقم 107) — المحاسب العام بس
+// ------------------------------------------------------------
+// 🧸 الحكاية:
+//   كل ورقة فلوس في النظام (فاتورة تسليم · عربون · فاتورة تاجر ·
+//   سند مرتب · دفعة محل …) السيرفر بيكتب لها «قيد» لوحده:
+//   فلوس دخلت درج (مدين) وطلعت من درج تاني (دائن) — والاتنين متساويين.
+//   الصفحة دي بتوريك الكشكول ده من كل الزوايا:
+//     🩺 الملخص · ✍️ القيود · 📚 الدليل · ⚖️ ميزان المراجعة
+//     📊 أرباح وخسائر · 🏦 الميزانية · 🔗 مطابقة العملاء · 🔒 الفترات
+//
+// ⚠️ كل كتابة من دوال السيرفر (gl_post_manual · gl_reverse · …) —
+//    الشاشة مابتكتبش في جداول القيود خالص.
+// ⚠️ القيد مابيتمسحش ولا بيتعدّل: الغلط = «قيد عكسي» أو «قيد تسوية».
+// ============================================================
+const $ = id => document.getElementById(id);
+const S = { tab:'home', from:'', to:'', q:'', kind:'', asOf:'', limit:80 };
+let H = null, ACC = [], ACCM = {}, CUST = [], SUP = [], EMPS = [];
+let J = null, TB = null, REC = null, loadErr = '', loaded = false, busy = false, ME = '';
+
+const TYPE = { asset:'الأصول', liability:'الخصوم', equity:'حقوق الملكية', revenue:'الإيرادات', expense:'المصروفات' };
+const KIND = {
+  auto:['🤖 تلقائي','blue'], cogs:['🔧 تكلفة قطع','violet'], manual:['✍️ يدوي','wait'], adjust:['🛠️ تسوية','wait'],
+  opening:['📌 افتتاحي','green'], reversal:['↩️ عكسي','red'], closing:['📅 إقفال سنة','']
+};
+const MONTHS = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+
+// ---------- أدوات ----------
+function fmt(n){ const v = Math.round((Number(n) || 0) * 100) / 100; return v.toLocaleString('en-EG', { minimumFractionDigits: v % 1 ? 2 : 0, maximumFractionDigits:2 }); }
+function num(v){
+  const s = String(v == null ? '' : v).replace(/[٠-٩]/g, d => d.charCodeAt(0) - 0x0660)
+    .replace(/[۰-۹]/g, d => d.charCodeAt(0) - 0x06F0).replace(/[^\d.\-]/g, '');
+  const n = parseFloat(s); return Number.isFinite(n) ? n : null;
+}
+function r2(n){ return Math.round((Number(n) || 0) * 100) / 100; }
+function dt(d){ if(!d) return '—'; const [y, m, x] = String(d).slice(0, 10).split('-'); return `${+x}/${+m}/${y.slice(2)}`; }
+function cairoDay(d){ try{ return new Intl.DateTimeFormat('en-CA', { timeZone:'Africa/Cairo' }).format(d ? new Date(d) : new Date()); }catch(e){ return new Date().toISOString().slice(0, 10); } }
+function monthLbl(ym){ const [y, m] = String(ym).slice(0, 7).split('-'); return MONTHS[+m - 1] + ' ' + y; }
+function escH(s){ return (typeof esc === 'function') ? esc(s) : String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c])); }
+function addDays(d, n){ const x = new Date(d + 'T12:00:00Z'); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); }
+
+let toastT;
+function toast(msg, bad){
+  const el = $('toast'); el.textContent = msg; el.classList.toggle('bad', !!bad); el.classList.add('on');
+  clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('on'), bad ? 5600 : 2800);
+}
+// ⚠️ Supabase مابيرميش خطأ — بيرجّعه في .error. الدوال دي بترميه بصوت عالي.
+async function rpc(name, args){
+  if(!navigator.onLine) throw new Error('مفيش نت — العملية دي محتاجة اتصال');
+  const { data, error } = await sb.rpc(name, args || {});
+  if(error) throw error;
+  return data;
+}
+async function sel(table, cols, build){
+  let all = [], from = 0;
+  for(;;){
+    let q = sb.from(table).select(cols).range(from, from + 999);
+    if(build) q = build(q);
+    const { data, error } = await q;
+    if(error) throw error;
+    all = all.concat(data || []);
+    if(!data || data.length < 1000) break;
+    from += 1000;
+  }
+  return all;
+}
+function errMsg(e){
+  const m = (e && (e.message || e.hint)) || String(e);
+  if(/gl_|schema cache|does not exist|PGRST20/i.test(m)) return m + ' — (ملف SQL رقم 107 لسه ما اتشغّلش؟)';
+  return m;
+}
+
+// ============================================================
+// 🚪 الدخول — المحاسب العام بس
+// ============================================================
+(async function boot(){
+  const { data:{ session } } = await sb.auth.getSession();
+  if(!session){ location.replace('index.html'); return; }
+  try{ await rpc('erp_need_super'); }
+  catch(e){
+    const m = errMsg(e);
+    if(/المحاسب العام بس/.test(m)){ location.replace('dashboard.html'); return; }
+    loadErr = m; render(); return;
+  }
+  try{ ME = await rpc('erp_my_name'); }catch(e){ ME = session.user.email || ''; }
+  $('whoLbl').textContent = ME + ' — المحاسب العام';
+  await load();
+  document.addEventListener('visibilitychange', () => { if(!document.hidden && !$('sheetOv')) load(); });
+})();
+
+async function load(manual){
+  if(busy) return;
+  busy = true;
+  try{
+    const [h, a, c, s, e] = await Promise.all([
+      rpc('gl_health'),
+      sel('gl_accounts', 'code,name,type,normal,parent,is_group,sys_key,party,active,note', q => q.order('code')),
+      sel('customers', 'id,code,name,kind,merged_into', q => q.is('merged_into', null).order('code')),
+      sel('suppliers', 'id,name', q => q.order('name')),
+      sel('gl_lines', 'employee_email', q => q.not('employee_email', 'is', null))
+    ]);
+    H = h; ACC = a.slice().sort((x, y) => x.code < y.code ? -1 : x.code > y.code ? 1 : 0); ACCM = {}; a.forEach(x => { ACCM[x.code] = x; });
+    CUST = c; SUP = s; EMPS = [...new Set(e.map(x => x.employee_email))].sort();
+    $('dlCust').innerHTML = CUST.map(x => `<option value="${escH(x.code + ' · ' + x.name)}">`).join('');
+    $('dlSup').innerHTML = SUP.map(x => `<option value="${escH(x.name)}">`).join('');
+    $('dlEmp').innerHTML = EMPS.map(x => `<option value="${escH(x)}">`).join('');
+    if(!S.from){
+      const today = cairoDay();
+      const y0 = today.slice(0, 4) + '-01-01';
+      S.from = H.start > y0 ? H.start : y0;
+      S.to = today; S.asOf = today;
+    }
+    J = null; TB = null; REC = null;
+    loadErr = ''; loaded = true;
+    if(manual) toast('اتحدّث ✅');
+  }catch(e){
+    console.error('[الأستاذ] التحميل فشل:', e);
+    loadErr = errMsg(e);
+  }finally{ busy = false; }
+  render();
+}
+
+// ============================================================
+// 🧮 حسابات الدليل
+// ============================================================
+const leafs = () => ACC.filter(a => !a.is_group);
+const accName = code => (ACCM[code] || {}).name || code;
+function ancestors(code){ const out = []; let p = (ACCM[code] || {}).parent; while(p){ out.push(p); p = (ACCM[p] || {}).parent; } return out; }
+function depth(code){ return ancestors(code).length; }
+// الرصيد في اتجاهه الطبيعي (موجب = طبيعي)
+function natural(a, d, c){ return (a.normal === 'D' ? 1 : -1) * ((Number(d) || 0) - (Number(c) || 0)); }
+// بيجمّع الفرعيات على الرئيسية: {code: {od,oc,pd,pc}}
+function rollup(rows){
+  const m = {};
+  ACC.forEach(a => { m[a.code] = { od:0, oc:0, pd:0, pc:0 }; });
+  (rows || []).forEach(r => {
+    [r.code, ...ancestors(r.code)].forEach(k => {
+      const t = m[k] || (m[k] = { od:0, oc:0, pd:0, pc:0 });
+      t.od += +r.od; t.oc += +r.oc; t.pd += +r.pd; t.pc += +r.pc;
+    });
+  });
+  return m;
+}
+async function needTB(from, to){
+  const key = from + '|' + to;
+  if(TB && TB.key === key) return TB;
+  const rows = await rpc('gl_trial_balance', { p_from:from, p_to:to });
+  TB = { key, rows, sum: rollup(rows) };
+  return TB;
+}
+
+// ============================================================
+// 🖼️ الرسم
+// ============================================================
+function tabsList(){
+  if(!loaded) return [];
+  const warn = (H.errors || 0) + (H.missing_docs || 0) + (H.unbalanced || 0);
+  return [
+    { k:'home', l:'🩺 الملخص', n: warn },
+    { k:'journal', l:'✍️ القيود' },
+    { k:'chart', l:'📚 الدليل' },
+    { k:'tb', l:'⚖️ ميزان المراجعة' },
+    { k:'pl', l:'📊 أرباح وخسائر' },
+    { k:'bs', l:'🏦 الميزانية' },
+    { k:'rec', l:'🔗 مطابقة العملاء' },
+    { k:'periods', l:'🔒 الفترات' }
+  ];
+}
+function render(){
+  const tl = tabsList();
+  $('tabs').innerHTML = tl.map(x => `<button class="tab${S.tab === x.k ? ' on' : ''}" onclick="go('${x.k}')">${x.l}${x.n ? `<span class="n">${x.n}</span>` : ''}</button>`).join('');
+  const app = $('app');
+  if(!loaded){
+    app.innerHTML = loadErr ? `<div class="err">⚠️ ${escH(loadErr)}</div><button class="big" onclick="load(true)">↻ جرّب تاني</button>` : '<div class="empty">⏳ جاري التحميل…</div>';
+    $('fabHost').innerHTML = '';
+    return;
+  }
+  const head = loadErr ? `<div class="err">⚠️ آخر تحديث فشل: ${escH(loadErr)}</div>` : '';
+  const V = { home:viewHome, journal:viewJournal, chart:viewChart, tb:viewTB, pl:viewPL, bs:viewBS, rec:viewRec, periods:viewPeriods };
+  app.innerHTML = head + (V[S.tab] || viewHome)();
+  $('fabHost').innerHTML = ['home','journal','chart'].includes(S.tab) ? `<button class="fab" onclick="openEntry('manual')">✍️ قيد جديد</button>` : '';
+  if(S.tab === 'journal' && !J) loadJournal();
+  if(['tb','pl','bs','chart'].includes(S.tab)) fillReport();
+  if(S.tab === 'home') homePL();
+  if(S.tab === 'rec' && !REC) loadRec();
+}
+function go(k){ S.tab = k; S.limit = 80; render(); window.scrollTo(0, 0); }
+function rangeHtml(onch, withAsOf){
+  if(withAsOf) return `<div class="range"><label>📅 الميزانية في يوم<input type="date" value="${S.asOf}" onchange="S.asOf=this.value;${onch}"></label>
+    <button class="btn sm" onclick="S.asOf='${cairoDay()}';${onch}">النهارده</button></div>`;
+  const today = cairoDay(), m0 = today.slice(0, 8) + '01', y0 = today.slice(0, 4) + '-01-01';
+  const pm = addDays(m0, -1), pm0 = pm.slice(0, 8) + '01';
+  return `<div class="range">
+    <label>من<input type="date" value="${S.from}" onchange="S.from=this.value;${onch}"></label>
+    <label>لحد<input type="date" value="${S.to}" onchange="S.to=this.value;${onch}"></label></div>
+    <div class="chips" style="margin:-2px 0 12px;">
+      <button class="chip" onclick="S.from='${m0 < H.start ? H.start : m0}';S.to='${today}';${onch}">الشهر ده</button>
+      <button class="chip" onclick="S.from='${pm0 < H.start ? H.start : pm0}';S.to='${pm}';${onch}">الشهر اللي فات</button>
+      <button class="chip" onclick="S.from='${y0 < H.start ? H.start : y0}';S.to='${today}';${onch}">السنة دي</button>
+      <button class="chip" onclick="S.from='${H.start}';S.to='${today}';${onch}">من البداية</button></div>`;
+}
+
+// ---------- 🩺 الملخص ----------
+function viewHome(){
+  const h = H;
+  const today = cairoDay();
+  const started = today >= h.start;
+  const bal = r2(h.td) === r2(h.tc) && !h.unbalanced;
+  const msgs = [];
+  if(!started) msgs.push(`<div class="warnbox">📅 الدفاتر بتبدأ <b>${dt(h.start)}</b> — لحد اليوم ده مفيش ورق بيتقيد (هو جوّه الرصيد الافتتاحي).
+    عايز تجرّب دلوقتي على التجربة؟ رجّع البداية لأول الشهر ده من «⚙️» تحت.</div>`);
+  if(!h.has_opening) msgs.push(`<div class="warnbox">📌 لسه مفيش <b>قيد افتتاحي</b> — اللي معانا وعلينا يوم البداية (الخزنة · المحافظ · المخزن · الأصول · العملاء · التجار · رأس المال).
+    <br><button class="btn sm pri" onclick="openEntry('opening')">📌 اكتب القيد الافتتاحي</button></div>`);
+  if(h.errors) msgs.push(`<div class="err">⚠️ فيه ${h.errors} ورقة ماتقيّدتش بسبب خطأ — دوس «🔁 قيّد الناقص». لو فضلت، ابعتلي الرسالة دي:
+    <div style="font-weight:500;font-size:12px;margin-top:6px;">${(h.last_errors || []).map(x => escH(x.source + ' — ' + x.message)).join('<br>')}</div></div>`);
+  if(h.missing_docs) msgs.push(`<div class="warnbox">🧾 فيه ${h.missing_docs} ورقة بفلوس من غير قيد. <button class="btn sm" onclick="backfill()">🔁 قيّد الناقص</button></div>`);
+  if(h.unpriced_dl) msgs.push(`<div class="warnbox">🏷️ ${h.unpriced_dl} جهاز اتسلّم من غير سعر — مالوش قيد لحد ما يتسعّر.</div>`);
+  if(Math.abs(h.suspense) >= 1) msgs.push(`<div class="warnbox">🗂️ «حساب وسيط تحت التسوية» فيه ${fmt(h.suspense)} ج.م (ديون موظفين جديدة) — وجّههم للحساب الصح بقيد تسوية.
+    <br><button class="btn sm" onclick="openStatement('2190')">📒 شوف الحساب</button></div>`);
+  if(h.has_opening && Math.abs(h.opening_left) >= 1) msgs.push(`<div class="warnbox">📌 «أرصدة افتتاحية تحت التسوية» فيه ${fmt(h.opening_left)} ج.م — حوّله لرأس المال (3100) بقيد تسوية لما تتأكد من الأرقام.</div>`);
+  if(!msgs.length) msgs.push('<div class="okbox">✅ كله تمام — كل الورق متقيّد والقيود متوازنة.</div>');
+  return `<div class="stats">
+      <div class="stat ${bal ? 'good' : 'bad'}"><div class="k">⚖️ التوازن</div><div class="v">${bal ? '✅ متوازن' : '❌ مش متوازن'}</div><div class="s">مدين ${fmt(h.td)} · دائن ${fmt(h.tc)}</div></div>
+      <button class="stat" onclick="go('journal')"><div class="k">✍️ القيود</div><div class="v">${h.entries}</div><div class="s">${h.lines} سطر</div></button>
+      <div class="stat"><div class="k">📅 البداية</div><div class="v">${dt(h.start)}</div><div class="s">السنة: ${MONTHS[(h.fy_start_month || 1) - 1]} ← ${MONTHS[((h.fy_start_month || 1) + 10) % 12]}</div></div>
+      <div class="stat ${h.errors ? 'bad' : 'good'}"><div class="k">⚠️ أخطاء</div><div class="v">${h.errors || 0}</div></div>
+    </div>
+    ${msgs.join('')}
+    <div class="sec-h">📊 الشهر ده<span class="rule"></span></div>
+    <div id="homePL"><div class="empty">⏳ …</div></div>
+    <div class="sec-h">🧸 إزاي الكشكول بيشتغل<span class="rule"></span></div>
+    <div class="card"><div class="c-s" style="font-size:13px;line-height:2;">
+      كل ورقة فلوس بتطلع في النظام، السيرفر بيكتب لها <b>قيد</b> لوحده:<br>
+      📦 فاتورة تسليم فوري ← <b>خزنة أمين الخزنة</b> زادت · <b>إيراد الصيانة</b> زاد<br>
+      📦 فاتورة تسليم آجل ← <b>العملاء</b> (المحل) عليه · <b>إيراد الصيانة</b> زاد<br>
+      💰 عربون ← الخزنة زادت · <b>عربون العملاء</b> (أمانة لحد التسليم)<br>
+      🧾 فاتورة تاجر ← <b>مخزون القطع</b> زاد · <b>التاجر</b> ليه فلوس<br>
+      🔧 الجهاز اتسلّم ← القطع المتفوترة اللي اتركّبت فيه بتتنقل من المخزن لـ<b>تكلفة القطع</b><br>
+      💼 سند مرتب ← <b>مرتبات</b> · والصافي من الخزنة العامة · والمسحوبات والديون والخصومات كل واحد في درجه<br>
+      💵 دفعة محل ← الخزنة العامة زادت · المحل اللي عليه نقص<br>
+      ↩️ أي ورقة اتلغت ← <b>قيد عكسي</b> بيرجّع كل حاجة مكانها — مفيش حاجة بتتمسح.
+    </div></div>
+    <div class="sec-h">⚙️ أدوات<span class="rule"></span></div>
+    <div class="acts" style="margin-top:0;">
+      <button class="btn" onclick="backfill()">🔁 قيّد الناقص</button>
+      <button class="btn" onclick="openStart()">📅 تاريخ البداية</button>
+      <button class="btn" onclick="load(true)">↻ حدّث</button>
+    </div>`;
+}
+async function homePL(){
+  const host = $('homePL'); if(!host) return;
+  try{
+    const today = cairoDay(), m0 = today.slice(0, 8) + '01';
+    const from = m0 < H.start ? H.start : m0;
+    if(today < H.start){ host.innerHTML = '<div class="empty">الدفاتر لسه مابدأتش</div>'; return; }
+    const rows = await rpc('gl_trial_balance', { p_from:from, p_to:today });
+    const p = plCalc(rows);
+    host.innerHTML = `<div class="stats">
+      <button class="stat" onclick="S.from='${from}';S.to='${today}';go('pl')"><div class="k">💰 الإيرادات</div><div class="v">${fmt(p.rev)}</div></button>
+      <button class="stat" onclick="S.from='${from}';S.to='${today}';go('pl')"><div class="k">🔧 تكلفة القطع</div><div class="v">${fmt(p.cogs)}</div></button>
+      <button class="stat" onclick="S.from='${from}';S.to='${today}';go('pl')"><div class="k">🧾 المصروفات</div><div class="v">${fmt(p.exp - p.cogs)}</div></button>
+      <button class="stat ${p.net >= 0 ? 'good' : 'bad'}" onclick="S.from='${from}';S.to='${today}';go('pl')"><div class="k">${p.net >= 0 ? '📈 صافي الربح' : '📉 صافي الخسارة'}</div><div class="v">${fmt(Math.abs(p.net))}</div></button>
+    </div>`;
+  }catch(e){ host.innerHTML = `<div class="err">${escH(errMsg(e))}</div>`; }
+}
+async function backfill(){
+  try{
+    toast('⏳ بنقيّد…');
+    const r = await rpc('gl_backfill');
+    toast(r.new_entries ? `✅ اتكتب ${r.new_entries} قيد جديد` : '✅ مفيش حاجة ناقصة');
+    load();
+  }catch(e){ toast(errMsg(e), true); }
+}
+function openStart(){
+  sheet('📅 تاريخ بداية الدفاتر', `
+    <div class="hint">يوم البداية = اليوم اللي بنكتب فيه <b>الرصيد الافتتاحي</b>. أي ورقة قبله مابتتقيدش (هي جوّه الافتتاحي)، وأي ورقة من أوله بتتقيد لوحدها.</div>
+    <div class="warnbox">⚠️ القرار الرسمي: <b>1/11/2026</b>. على <b>التجربة</b> ممكن ترجّعها لأول الشهر ده عشان تجرّب — والسيرفر بيقيّد الورق اللي فات لوحده.
+      <br>التأخير لقدّام مسموح بس لو لسه مفيش قيود.</div>
+    <label class="f"><span>📅 أول يوم في شهر</span><input id="stDate" type="month" value="${H.start.slice(0, 7)}"></label>
+    <button class="big" onclick="startGo()">💾 احفظ</button>`);
+}
+async function startGo(){
+  const v = $('stDate').value; if(!v){ toast('اختار الشهر', true); return; }
+  const d = v + '-01';
+  if(!confirm('بداية الدفاتر هتبقى ' + dt(d) + '\nنكمّل؟')) return;
+  try{
+    const r = await rpc('gl_set_start', { p_date:d });
+    closeSheet(); S.from = ''; toast('✅ البداية بقت ' + dt(d) + ' — اتكتب ' + ((r.backfill || {}).new_entries || 0) + ' قيد');
+    load();
+  }catch(e){ toast(errMsg(e), true); }
+}
+
+// ---------- ✍️ القيود ----------
+function viewJournal(){
+  const kinds = [['','الكل'], ['auto','🤖 تلقائي'], ['cogs','🔧 تكلفة'], ['manual','✍️ يدوي'], ['adjust','🛠️ تسوية'], ['opening','📌 افتتاحي'], ['reversal','↩️ عكسي'], ['closing','📅 إقفال']];
+  return `${rangeHtml('J=null;render()')}
+    <input class="search" type="search" placeholder="🔍 رقم قيد · رقم ورقة (DL-…) · كود عميل · رقم حساب · كلمة" value="${escH(S.q)}"
+      onkeydown="if(event.key==='Enter'){S.q=this.value;J=null;render();}" onchange="S.q=this.value;J=null;render()">
+    <div class="chips" style="margin-bottom:12px;">${kinds.map(([k, l]) => `<button class="chip${S.kind === k ? ' on' : ''}" onclick="S.kind='${k}';J=null;render()">${l}</button>`).join('')}</div>
+    <div id="jHost">${J ? journalHtml() : '<div class="empty">⏳ …</div>'}</div>`;
+}
+async function loadJournal(){
+  try{
+    J = await rpc('gl_journal', { p_from:S.from, p_to:S.to, p_q:S.q, p_kind:S.kind, p_limit:S.limit });
+  }catch(e){ J = { err: errMsg(e) }; }
+  const h = $('jHost'); if(h) h.innerHTML = journalHtml();
+}
+function journalHtml(){
+  if(!J) return '<div class="empty">⏳ …</div>';
+  if(J.err) return `<div class="err">${escH(J.err)}</div>`;
+  if(!J.length) return '<div class="empty">مفيش قيود في الفترة دي</div>';
+  return `<div class="hint">${J.length} قيد${J.length >= S.limit ? ' — ظاهر أحدث ' + S.limit : ''} · الأحدث فوق</div>`
+    + J.map(entryCard).join('')
+    + (J.length >= S.limit ? `<button class="btn more" onclick="S.limit+=200;loadJournal()">⬇️ اعرض أقدم</button>` : '');
+}
+function entryCard(e){
+  const k = KIND[e.kind] || [e.kind, ''];
+  const off = !!e.reversed_by;
+  const canRev = ['manual','adjust','opening'].includes(e.kind) && !off;
+  return `<div class="card k-${e.kind}${off ? ' off' : ''}">
+    <div class="c-top"><div class="c-t">${escH(e.memo || '—')}</div><div class="money">${fmt(e.total)}</div></div>
+    <div class="c-s"><span class="pill ${k[1]}">${k[0]}</span> <span class="code">${escH(e.no)}</span> · ${dt(e.date)}
+      ${e.doc ? ` · 📑 <span class="code">${escH(e.doc)}</span>` : ''} · ${escH(e.by || '')}
+      ${e.reverses ? ` · ↩️ بيعكس <span class="code">${escH(e.reverses)}</span>` : ''}
+      ${e.reversed_by ? ` · <span style="color:var(--red)">اتعكس بـ <span class="code">${escH(e.reversed_by)}</span>${e.why ? ' — ' + escH(e.why) : ''}</span>` : ''}</div>
+    <div style="margin-top:6px;">
+      <div class="jl head"><div class="a">الحساب</div><div class="d">مدين</div><div class="cc">دائن</div></div>
+      ${(e.lines || []).map(l => `<div class="jl${+l.c ? ' cr' : ''}"><div class="a">${+l.c ? 'إلى ' : 'من '}<span class="code">${escH(l.acc)}</span> ${escH(l.name)}
+        ${l.party || l.memo ? `<small>${escH([l.party, l.memo].filter(Boolean).join(' · '))}</small>` : ''}</div>
+        <div class="d">${+l.d ? fmt(l.d) : ''}</div><div class="cc">${+l.c ? fmt(l.c) : ''}</div></div>`).join('')}
+    </div>
+    ${canRev ? `<div class="acts"><button class="btn bad sm" onclick="reverseEntry('${e.id}','${escH(e.no)}')">↩️ اعكس القيد ده</button></div>` : ''}
+  </div>`;
+}
+async function reverseEntry(id, no){
+  const why = prompt(`↩️ عكس ${no}\nهيتكتب قيد عكسي بيرجّع كل سطر مكانه — والاتنين هيفضلوا ظاهرين.\n\nاكتب السبب:`);
+  if(why === null) return;
+  try{ const r = await rpc('gl_reverse', { p_id:id, p_reason:why }); toast('↩️ اتعكس بـ ' + r.entry_no); load(); }
+  catch(e){ toast(errMsg(e), true); }
+}
+
+// ---------- 📚 الدليل ----------
+function viewChart(){
+  const q = (S.cq || '').trim();
+  return `<div class="hint">كل الأدراج (الحسابات) وأرصدتها لحد النهارده. دوس على أي حساب يفتحلك كشفه.
+    الحسابات اللي جنبها ⚙️ بيستخدمها النظام في القيود التلقائية.</div>
+    <div class="acts" style="margin:0 0 12px;"><button class="btn" onclick="openAccount()">➕ حساب جديد</button></div>
+    <input class="search" type="search" placeholder="🔍 رقم الحساب أو اسمه" value="${escH(q)}" oninput="S.cq=this.value;fillReport()">
+    <div id="rHost"><div class="empty">⏳ …</div></div>`;
+}
+function chartHtml(t){
+  const q = (S.cq || '').trim();
+  const show = ACC.filter(a => !q || a.code.startsWith(q) || a.name.includes(q));
+  return `<div class="tscroll"><table class="tbl"><tr><th>الحساب</th><th class="n">الرصيد</th></tr>
+    ${show.map(a => {
+      const s = t.sum[a.code] || { pd:0, pc:0 };
+      const v = natural(a, s.pd, s.pc);
+      const d = depth(a.code);
+      return `<tr class="${a.is_group ? (d === 0 ? 'g1' : 'g') : 'click'}" ${a.is_group ? '' : `onclick="openStatement('${a.code}')"`}>
+        <td class="ind${Math.min(d, 3)}"><span class="code">${a.code}</span> ${escH(a.name)}${a.sys_key ? ' <span title="حساب نظام">⚙️</span>' : ''}
+          ${a.party ? ` <span class="pill">${{ customer:'👤 بالعميل', supplier:'🏪 بالتاجر', employee:'👥 بالموظف' }[a.party]}</span>` : ''}
+          ${!a.active ? ' <span class="pill">موقوف</span>' : ''}
+          ${!a.is_group ? ` <button class="btn ghost sm" style="padding:2px 7px;" onclick="event.stopPropagation();openAccount('${a.code}')">✏️</button>` : ''}</td>
+        <td class="n ${Math.abs(v) < .005 ? 'zero' : v < 0 ? 'money neg' : ''}">${Math.abs(v) < .005 ? '—' : fmt(v)}</td></tr>`;
+    }).join('')}</table></div>`;
+}
+function openAccount(code){
+  const a = code ? ACCM[code] : null;
+  const groups = ACC.filter(x => x.is_group);
+  sheet(a ? '✏️ ' + a.code + ' · ' + a.name : '➕ حساب جديد', `
+    ${a && a.sys_key ? '<div class="warnbox">⚙️ ده حساب بيستخدمه النظام في القيود التلقائية — تقدر تغيّر اسمه بس.</div>' : ''}
+    <label class="f"><span>📂 تحت أنهي مجموعة</span><select id="aPar">${groups.map(g => `<option value="${g.code}"${(a ? a.parent : '52') === g.code ? ' selected' : ''}>${'— '.repeat(depth(g.code))}${g.code} · ${escH(g.name)}</option>`).join('')}</select></label>
+    <div class="f2">
+      <label class="f"><span>🔢 رقم الحساب</span><input id="aCode" inputmode="numeric" value="${a ? a.code : ''}" ${a ? 'disabled' : ''} placeholder="مثال: 5295"></label>
+      <label class="f"><span>👤 بيتقيد بـ</span><select id="aParty" ${a && a.sys_key ? 'disabled' : ''}>
+        ${[['','مفيش'],['customer','العميل'],['supplier','التاجر'],['employee','الموظف']].map(([k, l]) => `<option value="${k}"${(a ? a.party : '') === k ? ' selected' : ''}>${l}</option>`).join('')}</select></label>
+    </div>
+    <label class="f"><span>🏷️ الاسم</span><input id="aName" value="${a ? escH(a.name) : ''}" maxlength="80"></label>
+    <label class="f"><span>📝 ملاحظة</span><input id="aNote" value="${a ? escH(a.note || '') : ''}"></label>
+    <label class="f" style="display:flex;align-items:center;gap:8px;"><input id="aActive" type="checkbox" style="width:auto;"${!a || a.active ? ' checked' : ''}${a && a.sys_key ? ' disabled' : ''}> <span style="margin:0;">شغّال (بيظهر في القيود)</span></label>
+    <div class="note-in" style="margin-bottom:12px;">💡 رقم الحساب لازم يبدأ بنفس أول رقم في المجموعة (١ أصول · ٢ خصوم · ٣ ملكية · ٤ إيرادات · ٥ مصروفات).</div>
+    <button class="big" onclick="accountGo(${a ? `'${a.code}'` : 'null'})">💾 حفظ</button>`);
+}
+async function accountGo(code){
+  const par = ACCM[$('aPar').value];
+  try{
+    await rpc('gl_account_save', { p_code: code || $('aCode').value.trim(), p_name:$('aName').value, p_type: par ? par.type : null,
+      p_parent:$('aPar').value, p_party:$('aParty').value, p_active:$('aActive').checked, p_note:$('aNote').value, p_normal:null });
+    closeSheet(); toast('💾 اتحفظ'); load();
+  }catch(e){ toast(errMsg(e), true); }
+}
+
+// ---------- ⚖️ ميزان المراجعة ----------
+function viewTB(){
+  return `${rangeHtml('fillReport()')}
+    <div class="acts" style="margin:0 0 12px;"><button class="btn" onclick="tbExcel()">📊 Excel</button>
+      <button class="chip${S.tbAll ? ' on' : ''}" onclick="S.tbAll=!S.tbAll;fillReport()">${S.tbAll ? 'كل الحسابات' : 'اللي عليها حركة بس'}</button></div>
+    <div id="rHost"><div class="empty">⏳ …</div></div>`;
+}
+function tbRows(t){
+  return ACC.filter(a => {
+    const s = t.sum[a.code];
+    return S.tbAll || (s && (Math.abs(s.od - s.oc) > .004 || s.pd > .004 || s.pc > .004));
+  }).map(a => {
+    const s = t.sum[a.code];
+    const ob = s.od - s.oc, cb = ob + s.pd - s.pc;
+    return { a, d: depth(a.code), odr: ob > 0 ? ob : 0, ocr: ob < 0 ? -ob : 0, pd: s.pd, pc: s.pc, cdr: cb > 0 ? cb : 0, ccr: cb < 0 ? -cb : 0 };
+  });
+}
+function tbHtml(t){
+  const R = tbRows(t);
+  const tot = R.filter(r => !r.a.is_group).reduce((x, r) => { ['odr','ocr','pd','pc','cdr','ccr'].forEach(k => x[k] += r[k]); return x; }, { odr:0, ocr:0, pd:0, pc:0, cdr:0, ccr:0 });
+  const ok = r2(tot.cdr) === r2(tot.ccr) && r2(tot.pd) === r2(tot.pc);
+  const c = v => v > .004 ? fmt(v) : '<span class="zero">—</span>';
+  return `${ok ? '<div class="okbox">✅ الميزان متوازن — المدين = الدائن</div>' : '<div class="err">❌ الميزان مش متوازن — ابعتلي صورة</div>'}
+    <div class="tscroll"><table class="tbl"><tr><th rowspan="2">الحساب</th><th class="n" colspan="2">أول المدة</th><th class="n" colspan="2">حركة الفترة</th><th class="n" colspan="2">آخر المدة</th></tr>
+    <tr><th class="n">مدين</th><th class="n">دائن</th><th class="n">مدين</th><th class="n">دائن</th><th class="n">مدين</th><th class="n">دائن</th></tr>
+    ${R.map(r => `<tr class="${r.a.is_group ? (r.d === 0 ? 'g1' : 'g') : 'click'}" ${r.a.is_group ? '' : `onclick="openStatement('${r.a.code}')"`}>
+      <td class="ind${Math.min(r.d, 3)}"><span class="code">${r.a.code}</span> ${escH(r.a.name)}</td>
+      <td class="n">${c(r.odr)}</td><td class="n">${c(r.ocr)}</td><td class="n">${c(r.pd)}</td><td class="n">${c(r.pc)}</td><td class="n">${c(r.cdr)}</td><td class="n">${c(r.ccr)}</td></tr>`).join('')}
+    <tr class="tot"><td>الإجمالي</td><td class="n">${fmt(tot.odr)}</td><td class="n">${fmt(tot.ocr)}</td><td class="n">${fmt(tot.pd)}</td><td class="n">${fmt(tot.pc)}</td><td class="n">${fmt(tot.cdr)}</td><td class="n">${fmt(tot.ccr)}</td></tr>
+    </table></div><div class="hint" style="margin-top:8px;">💡 دوس على أي حساب فرعي يفتح كشفه. الرئيسية (الملونة) = مجموع اللي تحتها.</div>`;
+}
+async function tbExcel(){
+  try{
+    const t = await needTB(S.from, S.to);
+    const R = tbRows(t);
+    await excel('ميزان-المراجعة', `ميزان المراجعة من ${S.from} لحد ${S.to}`,
+      ['رقم الحساب','الحساب','أول المدة مدين','أول المدة دائن','حركة مدين','حركة دائن','آخر المدة مدين','آخر المدة دائن'],
+      R.map(r => [r.a.code, '  '.repeat(r.d) + r.a.name, r.odr, r.ocr, r.pd, r.pc, r.cdr, r.ccr]), [2,3,4,5,6,7], R.map(r => r.a.is_group));
+  }catch(e){ toast(errMsg(e), true); }
+}
+
+// ---------- 📊 أرباح وخسائر ----------
+function plCalc(rows){
+  let rev = 0, exp = 0, cogs = 0;
+  (rows || []).forEach(r => {
+    if(r.type === 'revenue') rev += (+r.pc) - (+r.pd);
+    if(r.type === 'expense'){ exp += (+r.pd) - (+r.pc); if(String(r.code).startsWith('51')) cogs += (+r.pd) - (+r.pc); }
+  });
+  return { rev, exp, cogs, net: rev - exp };
+}
+function viewPL(){
+  return `${rangeHtml('fillReport()')}
+    <div class="acts" style="margin:0 0 12px;"><button class="btn" onclick="plExcel()">📊 Excel</button></div>
+    <div id="rHost"><div class="empty">⏳ …</div></div>`;
+}
+function stmtSection(t, rootType, sign){
+  // sign: +1 للإيرادات (دائن − مدين) · −1 للمصروفات
+  const rows = ACC.filter(a => a.type === rootType && a.parent && (t.sum[a.code].pd || t.sum[a.code].pc));
+  return rows.map(a => {
+    const s = t.sum[a.code];
+    const v = sign > 0 ? s.pc - s.pd : s.pd - s.pc;
+    return { a, d: depth(a.code), v };
+  });
+}
+function plHtml(t){
+  const root = { revenue: ACC.find(a => a.type === 'revenue' && !a.parent), expense: ACC.find(a => a.type === 'expense' && !a.parent) };
+  const R = stmtSection(t, 'revenue', 1), E = stmtSection(t, 'expense', -1);
+  const rev = root.revenue ? t.sum[root.revenue.code].pc - t.sum[root.revenue.code].pd : 0;
+  const exp = root.expense ? t.sum[root.expense.code].pd - t.sum[root.expense.code].pc : 0;
+  const net = rev - exp;
+  const row = r => `<tr class="${r.a.is_group ? 'g' : 'click'}" ${r.a.is_group ? '' : `onclick="openStatement('${r.a.code}')"`}><td class="ind${Math.min(r.d, 3)}"><span class="code">${r.a.code}</span> ${escH(r.a.name)}</td><td class="n">${fmt(r.v)}</td></tr>`;
+  return `<div class="stats">
+      <div class="stat"><div class="k">💰 الإيرادات</div><div class="v">${fmt(rev)}</div></div>
+      <div class="stat"><div class="k">🧾 المصروفات</div><div class="v">${fmt(exp)}</div></div>
+      <div class="stat ${net >= 0 ? 'good' : 'bad'}"><div class="k">${net >= 0 ? '📈 صافي الربح' : '📉 صافي الخسارة'}</div><div class="v">${fmt(Math.abs(net))}</div></div>
+      <div class="stat"><div class="k">📐 هامش الربح</div><div class="v">${rev ? Math.round(net / rev * 100) + '%' : '—'}</div></div></div>
+    <div class="tscroll"><table class="tbl">
+      <tr class="g1"><td>💰 الإيرادات</td><td class="n">${fmt(rev)}</td></tr>${R.map(row).join('') || '<tr><td colspan="2" class="zero">مفيش</td></tr>'}
+      <tr class="g1"><td>🧾 المصروفات</td><td class="n">${fmt(exp)}</td></tr>${E.map(row).join('') || '<tr><td colspan="2" class="zero">مفيش</td></tr>'}
+      <tr class="tot"><td>${net >= 0 ? '📈 صافي الربح' : '📉 صافي الخسارة'}</td><td class="n">${fmt(net)}</td></tr>
+    </table></div>
+    <div class="hint" style="margin-top:8px;">⚠️ المصروفات اللي في الإكسل (إيجار · كهربا · مسحوبات …) لسه مابتدخلش لوحدها — هتدخل لما «استيراد الإكسل» يتعمل، أو اكتبها بقيد يدوي.</div>`;
+}
+async function plExcel(){
+  try{
+    const t = await needTB(S.from, S.to);
+    const R = stmtSection(t, 'revenue', 1), E = stmtSection(t, 'expense', -1);
+    const rows = [['', 'الإيرادات', null], ...R.map(r => [r.a.code, '  '.repeat(r.d) + r.a.name, r.v]),
+                  ['', 'المصروفات', null], ...E.map(r => [r.a.code, '  '.repeat(r.d) + r.a.name, r.v])];
+    const p = plCalc(t.rows);
+    rows.push(['', p.net >= 0 ? 'صافي الربح' : 'صافي الخسارة', p.net]);
+    await excel('أرباح-وخسائر', `قائمة الأرباح والخسائر من ${S.from} لحد ${S.to}`, ['رقم الحساب','البند','المبلغ'], rows, [2],
+      rows.map(r => !r[0]));
+  }catch(e){ toast(errMsg(e), true); }
+}
+
+// ---------- 🏦 الميزانية ----------
+function viewBS(){
+  return `${rangeHtml('fillReport()', true)}
+    <div class="acts" style="margin:0 0 12px;"><button class="btn" onclick="bsExcel()">📊 Excel</button></div>
+    <div id="rHost"><div class="empty">⏳ …</div></div>`;
+}
+function bsCalc(t){
+  const sec = type => ACC.filter(a => a.type === type && (Math.abs(t.sum[a.code].pd - t.sum[a.code].pc) > .004))
+    .map(a => ({ a, d: depth(a.code), v: (type === 'asset' ? 1 : -1) * (t.sum[a.code].pd - t.sum[a.code].pc) }));
+  const tot = type => { const r = ACC.find(a => a.type === type && !a.parent); return r ? (type === 'asset' ? 1 : -1) * (t.sum[r.code].pd - t.sum[r.code].pc) : 0; };
+  const p = plCalc(t.rows);
+  return { A: sec('asset'), L: sec('liability'), E: sec('equity'), ta: tot('asset'), tl: tot('liability'), te: tot('equity'), earn: p.net };
+}
+function bsHtml(t){
+  const b = bsCalc(t);
+  const right = b.tl + b.te + b.earn;
+  const ok = r2(b.ta) === r2(right);
+  const row = r => `<tr class="${r.a.is_group ? (r.d === 0 ? 'g1' : 'g') : 'click'}" ${r.a.is_group ? '' : `onclick="openStatement('${r.a.code}')"`}><td class="ind${Math.min(r.d, 3)}"><span class="code">${r.a.code}</span> ${escH(r.a.name)}</td><td class="n">${fmt(r.v)}</td></tr>`;
+  return `${ok ? '<div class="okbox">✅ الميزانية متوازنة: الأصول = الخصوم + حقوق الملكية</div>' : '<div class="err">❌ الميزانية مش متوازنة — ابعتلي صورة</div>'}
+    <div class="tscroll"><table class="tbl">
+      ${b.A.map(row).join('') || '<tr class="g1"><td>الأصول</td><td class="n">0</td></tr>'}
+      <tr class="tot"><td>إجمالي الأصول</td><td class="n">${fmt(b.ta)}</td></tr>
+      ${b.L.map(row).join('') || '<tr class="g1"><td>الخصوم</td><td class="n">0</td></tr>'}
+      ${b.E.map(row).join('') || '<tr class="g1"><td>حقوق الملكية</td><td class="n">0</td></tr>'}
+      <tr class="g"><td class="ind1">📈 أرباح لسه ماتقفلتش (الإيرادات − المصروفات)</td><td class="n">${fmt(b.earn)}</td></tr>
+      <tr class="tot"><td>إجمالي الخصوم وحقوق الملكية</td><td class="n">${fmt(right)}</td></tr>
+    </table></div>`;
+}
+async function bsExcel(){
+  try{
+    const t = await needTB('1900-01-01', S.asOf);
+    const b = bsCalc(t);
+    const rows = [...b.A.map(r => [r.a.code, '  '.repeat(r.d) + r.a.name, r.v]), ['', 'إجمالي الأصول', b.ta],
+                  ...b.L.map(r => [r.a.code, '  '.repeat(r.d) + r.a.name, r.v]), ...b.E.map(r => [r.a.code, '  '.repeat(r.d) + r.a.name, r.v]),
+                  ['', 'أرباح لسه ماتقفلتش', b.earn], ['', 'إجمالي الخصوم وحقوق الملكية', b.tl + b.te + b.earn]];
+    await excel('الميزانية', 'الميزانية في ' + S.asOf, ['رقم الحساب','البند','المبلغ'], rows, [2],
+      rows.map(r => !r[0] || (ACCM[r[0]] || {}).is_group));
+  }catch(e){ toast(errMsg(e), true); }
+}
+
+async function fillReport(){
+  const h = $('rHost'); if(!h) { if(S.tab === 'home') homePL(); return; }
+  try{
+    const bs = S.tab === 'bs', ch = S.tab === 'chart';
+    const t = await needTB(bs || ch ? '1900-01-01' : S.from, bs ? S.asOf : ch ? cairoDay() : S.to);
+    const hh = $('rHost'); if(!hh) return;
+    hh.innerHTML = S.tab === 'tb' ? tbHtml(t) : S.tab === 'pl' ? plHtml(t) : bs ? bsHtml(t) : chartHtml(t);
+  }catch(e){ const hh = $('rHost'); if(hh) hh.innerHTML = `<div class="err">${escH(errMsg(e))}</div>`; }
+}
+
+// ---------- 🔗 مطابقة العملاء ----------
+function viewRec(){
+  return `<div class="hint">بنقارن رصيد كل عميل في «📒 حسابات العملاء» برصيده في الأستاذ (حساب 1200).
+    المفروض يبقوا زي بعض. الفرق بيحصل لما:<br>
+    • لسه مفيش قيد افتتاحي (المديونيات القديمة قبل البداية) ←  اكتبه من «📌 القيد الافتتاحي»<br>
+    • جهاز آجل اتسجّل في الدفتر من غير فاتورة تسليم (أو العكس) · أو مبلغ الجهاز اتعدّل في مكان واحد بس</div>
+    <div id="recHost">${recHtml()}</div>`;
+}
+async function loadRec(){
+  try{ REC = await rpc('gl_ar_reconcile'); }catch(e){ REC = { err: errMsg(e) }; }
+  const h = $('recHost'); if(h) h.innerHTML = recHtml();
+}
+function recHtml(){
+  if(!REC) return '<div class="empty">⏳ …</div>';
+  if(REC.err) return `<div class="err">${escH(REC.err)}</div>`;
+  if(!REC.length) return '<div class="okbox">✅ كل العملاء متطابقين</div>';
+  const tot = REC.reduce((t, r) => t + (+r.diff), 0);
+  return `<div class="warnbox">⚠️ ${REC.length} عميل مختلفين — إجمالي الفرق ${fmt(tot)} ج.م</div>
+    <div class="tscroll"><table class="tbl"><tr><th>العميل</th><th class="n">حسابات العملاء</th><th class="n">الأستاذ</th><th class="n">الفرق</th></tr>
+    ${REC.slice(0, 300).map(r => `<tr class="click" onclick="openStatement('1200',{customer:'${r.id}',label:'${escH(r.code + ' · ' + r.name).replace(/'/g, '')}'})">
+      <td><span class="code">${escH(r.code)}</span> ${escH(r.name)}</td><td class="n">${fmt(r.sub)}</td><td class="n">${fmt(r.gl)}</td>
+      <td class="n money ${+r.diff > 0 ? 'neg' : 'dr'}">${fmt(r.diff)}</td></tr>`).join('')}</table></div>`;
+}
+
+// ---------- 🔒 الفترات ----------
+function viewPeriods(){
+  const today = cairoDay();
+  const cur = today.slice(0, 7);
+  const P = {}; (H.periods || []).forEach(p => { P[String(p.ym).slice(0, 7)] = p; });
+  const months = [];
+  let m = H.start.slice(0, 7);
+  while(m <= cur && months.length < 120){ months.push(m); const [y, x] = m.split('-').map(Number); m = x === 12 ? (y + 1) + '-01' : y + '-' + String(x + 1).padStart(2, '0'); }
+  const fm = H.fy_start_month || 1;
+  const years = [];
+  for(let y = +H.start.slice(0, 4); ; y++){
+    const end = (fm === 1 ? y : y + 1) + '-' + String(fm === 1 ? 12 : fm - 1).padStart(2, '0') + '-' + (fm === 1 ? '31' : '28');
+    if(end >= today) break;
+    years.push(y);
+    if(years.length > 20) break;
+  }
+  return `<div class="hint">🔒 الشهر المقفول ماحدش يقدر يكتب فيه قيد بإيده. الورق التلقائي اللي يخصّه بيتقيد بتاريخ النهارده (وبيتكتب جنبه كده).
+    اقفل الشهر لما تخلّص مراجعته.</div>
+    ${months.length ? months.slice().reverse().map(ym => {
+      const p = P[ym]; const closed = p && p.status === 'closed'; const isCur = ym === cur;
+      return `<div class="card${closed ? '' : ''}" style="--edge:${closed ? 'var(--ink-2)' : 'var(--done)'}">
+        <div class="c-top"><div class="c-t">${monthLbl(ym)}</div><span class="pill ${closed ? '' : 'green'}">${closed ? '🔒 مقفول' : '🔓 مفتوح'}</span></div>
+        ${p && p.closed_by ? `<div class="c-s">${closed ? 'اتقفل' : 'اتفتح'} بواسطة ${escH(p.closed_by)}${p.note ? ' · ' + escH(p.note) : ''}</div>` : ''}
+        <div class="acts">${isCur ? '<span class="c-s">الشهر الحالي — بيتقفل بعد ما يخلص</span>'
+          : closed ? `<button class="btn sm" onclick="periodSet('${ym}-01',false)">🔓 افتح</button>`
+                   : `<button class="btn sm pri" onclick="periodSet('${ym}-01',true)">🔒 اقفل</button>`}
+          <button class="btn ghost sm" onclick="S.from='${ym}-01';S.to='${lastDay(ym)}';go('tb')">⚖️ الميزان</button></div></div>`;
+    }).join('') : '<div class="empty">الدفاتر لسه مابدأتش</div>'}
+    <div class="sec-h">📅 إقفال السنة<span class="rule"></span></div>
+    <div class="hint">آخر السنة: الإيرادات والمصروفات بتتصفّر، وصافي الربح (أو الخسارة) بيروح «الأرباح المحتجزة» (3400). بيتعمل مرة واحدة بس.</div>
+    ${years.length ? years.map(y => {
+      const done = (H.years_closed || []).map(String).includes(String(y));
+      return `<div class="card"><div class="c-top"><div class="c-t">السنة المالية ${y}</div>
+        ${done ? '<span class="pill green">✅ اتقفلت</span>' : `<button class="btn sm pri" onclick="yearClose(${y})">📅 اقفل السنة</button>`}</div></div>`;
+    }).join('') : '<div class="empty">لسه مفيش سنة خلصت</div>'}`;
+}
+function lastDay(ym){ const [y, m] = ym.split('-').map(Number); return ym + '-' + String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, '0'); }
+async function periodSet(d, closed){
+  let note = '';
+  if(!closed){ note = prompt('🔓 ليه بتفتح ' + monthLbl(d) + '؟'); if(note === null) return; }
+  else if(!confirm('🔒 نقفل ' + monthLbl(d) + '؟\nمحدش هيقدر يكتب فيه قيد بإيده بعد كده.')) return;
+  try{ await rpc('gl_period_set', { p_ym:d, p_closed:closed, p_note:note }); toast(closed ? '🔒 اتقفل' : '🔓 اتفتح'); load(); }
+  catch(e){ toast(errMsg(e), true); }
+}
+async function yearClose(y){
+  if(!confirm(`📅 إقفال السنة المالية ${y}\nالإيرادات والمصروفات هتتصفّر وصافي الربح يروح «الأرباح المحتجزة».\nمتأكد؟`)) return;
+  try{ const r = await rpc('gl_year_close', { p_year:y }); toast('📅 اتقفلت — ' + r.entry_no); load(); }
+  catch(e){ toast(errMsg(e), true); }
+}
+
+// ============================================================
+// 📒 كشف حساب
+// ============================================================
+let ST = null;
+function openStatement(code, party){
+  const a = ACCM[code]; if(!a) return;
+  ST = { code, from:S.from, to:S.to, party: party || null, data:null };
+  sheet('📒 ' + a.code + ' · ' + a.name, stHtml());
+  loadSt();
+}
+function stHtml(){
+  const a = ACCM[ST.code];
+  const pty = a.party ? `<label class="f" style="margin-bottom:8px;"><span>${{ customer:'👤 العميل', supplier:'🏪 التاجر', employee:'👥 الموظف' }[a.party]} (فاضي = الكل)</span>
+      <input id="stParty" list="${{ customer:'dlCust', supplier:'dlSup', employee:'dlEmp' }[a.party]}" value="${escH(ST.party ? ST.party.label : '')}"
+        onchange="stPartyPick(this.value)" placeholder="اكتب واختار"></label>` : '';
+  return `<div class="range"><label>من<input type="date" value="${ST.from}" onchange="ST.from=this.value;loadSt()"></label>
+      <label>لحد<input type="date" value="${ST.to}" onchange="ST.to=this.value;loadSt()"></label></div>
+    ${pty}
+    <div class="acts" style="margin:0 0 10px;"><button class="btn sm" onclick="stExcel()">📊 Excel</button></div>
+    <div id="stBody"><div class="empty">⏳ …</div></div>`;
+}
+function stPartyPick(v){
+  const a = ACCM[ST.code]; v = String(v || '').trim();
+  if(!v){ ST.party = null; loadSt(); return; }
+  if(a.party === 'customer'){ const c = CUST.find(x => (x.code + ' · ' + x.name) === v || x.code === v.split(' ')[0]); if(!c){ toast('اختار عميل من القايمة', true); return; } ST.party = { customer:c.id, label:c.code + ' · ' + c.name }; }
+  if(a.party === 'supplier'){ const s = SUP.find(x => x.name === v); if(!s){ toast('اختار تاجر من القايمة', true); return; } ST.party = { supplier:s.id, label:s.name }; }
+  if(a.party === 'employee'){ ST.party = { employee:v, label:v }; }
+  loadSt();
+}
+async function loadSt(){
+  const p = ST.party || {};
+  try{
+    ST.data = await rpc('gl_statement', { p_code:ST.code, p_from:ST.from, p_to:ST.to,
+      p_customer:p.customer || null, p_supplier:p.supplier || null, p_employee:p.employee || null });
+  }catch(e){ ST.data = { err: errMsg(e) }; }
+  const h = $('stBody'); if(h) h.innerHTML = stBody();
+}
+function stBody(){
+  const a = ACCM[ST.code], D = ST.data;
+  if(!D) return '<div class="empty">⏳ …</div>';
+  if(D.err) return `<div class="err">${escH(D.err)}</div>`;
+  const sg = a.normal === 'D' ? 1 : -1;
+  let bal = sg * (+D.opening);
+  const rows = D.lines.map(l => { bal += sg * ((+l.d) - (+l.c)); return Object.assign({ bal }, l); });
+  const td = D.lines.reduce((t, l) => t + (+l.d), 0), tc = D.lines.reduce((t, l) => t + (+l.c), 0);
+  return `<div class="stats">
+      <div class="stat"><div class="k">أول المدة</div><div class="v">${fmt(sg * D.opening)}</div></div>
+      <div class="stat"><div class="k">مدين</div><div class="v money dr">${fmt(td)}</div></div>
+      <div class="stat"><div class="k">دائن</div><div class="v money cr">${fmt(tc)}</div></div>
+      <div class="stat"><div class="k">آخر المدة</div><div class="v">${fmt(bal)}</div></div></div>
+    <div class="hint">الرصيد في اتجاهه الطبيعي (${a.normal === 'D' ? 'مدين' : 'دائن'}) — بالسالب يعني عكس الطبيعي. الأحدث تحت.</div>
+    ${rows.length ? `<div class="tscroll"><table class="tbl"><tr><th>التاريخ</th><th>البيان</th><th class="n">مدين</th><th class="n">دائن</th><th class="n">الرصيد</th></tr>
+      ${rows.map(l => `<tr${l.rev ? ' style="opacity:.7"' : ''}><td style="white-space:nowrap">${dt(l.date)}<br><span class="code">${escH(l.no)}</span></td>
+        <td>${escH(l.memo || l.emo)}${l.party ? `<div class="c-s">${escH(l.party)}</div>` : ''}${l.doc ? `<div class="c-s">📑 <span class="code">${escH(l.doc)}</span></div>` : ''}${l.kind === 'reversal' ? '<div class="c-s" style="color:var(--red)">↩️ عكسي</div>' : ''}</td>
+        <td class="n">${+l.d ? fmt(l.d) : ''}</td><td class="n">${+l.c ? fmt(l.c) : ''}</td><td class="n">${fmt(l.bal)}</td></tr>`).join('')}</table></div>`
+      : '<div class="empty">مفيش حركة في الفترة دي</div>'}`;
+}
+async function stExcel(){
+  const a = ACCM[ST.code], D = ST.data; if(!D || D.err) return;
+  const sg = a.normal === 'D' ? 1 : -1; let bal = sg * (+D.opening);
+  const rows = [['', '', 'رصيد أول المدة', null, null, bal], ...D.lines.map(l => { bal += sg * ((+l.d) - (+l.c));
+    return [l.date, l.no, (l.memo || l.emo) + (l.party ? ' — ' + l.party : '') + (l.doc ? ' (' + l.doc + ')' : ''), +l.d || null, +l.c || null, bal]; })];
+  await excel('كشف-' + a.code, `كشف حساب ${a.code} · ${a.name}${ST.party ? ' — ' + ST.party.label : ''} من ${ST.from} لحد ${ST.to}`,
+    ['التاريخ','رقم القيد','البيان','مدين','دائن','الرصيد'], rows, [3,4,5], rows.map((r, i) => i === 0));
+}
+
+// ============================================================
+// ✍️ قيد جديد (يدوي · تسوية · افتتاحي)
+// ============================================================
+let EN = null;
+const EN_K = { manual:['✍️ قيد يدوي','مصروف · تحويل بين خزنتين · أي حركة مالهاش ورقة'], adjust:['🛠️ قيد تسوية','تصحيح · توجيه حساب وسيط · إهلاك · مخصص'], opening:['📌 قيد افتتاحي','اللي معانا وعلينا يوم البداية'] };
+function openEntry(kind){
+  if(kind === 'opening' && H.has_opening && !confirm('فيه قيد افتتاحي خلاص. عايز تكتب قيد افتتاحي تاني (إضافة عليه)؟')) return;
+  EN = { kind, date: kind === 'opening' ? H.start : cairoDay(), memo: kind === 'opening' ? 'القيد الافتتاحي — أرصدة ' + dt(H.start) : '',
+         lines: [newLine(), newLine()], busy:false };
+  sheet(EN_K[kind][0], enHtml());
+}
+function newLine(acc){ return { acc: acc || '', d:'', c:'', party:'', memo:'' }; }
+function accOptions(sel){
+  // كل الفرعيات مجمّعة تحت أبوها المباشر
+  const byParent = {};
+  leafs().filter(a => a.active || a.code === sel).forEach(a => { (byParent[a.parent] = byParent[a.parent] || []).push(a); });
+  return '<option value="">— اختار الحساب —</option>' + Object.keys(byParent).sort().map(p =>
+    `<optgroup label="${escH(p + ' · ' + accName(p))}">${byParent[p].map(a => `<option value="${a.code}"${a.code === sel ? ' selected' : ''}>${a.code} · ${escH(a.name)}</option>`).join('')}</optgroup>`).join('');
+}
+function enHtml(){
+  const k = EN_K[EN.kind];
+  return `<div class="hint">${k[1]}. كل سطر يا <b style="color:var(--blue)">مدين</b> يا <b style="color:var(--wait)">دائن</b> — والمجموعين لازم يبقوا زي بعض.</div>
+    <div class="chips" style="margin-bottom:12px;">${Object.entries(EN_K).map(([x, v]) => `<button class="chip${EN.kind === x ? ' on' : ''}" onclick="enSave();EN.kind='${x}';if(EN.kind==='opening')EN.date=H.start;setSheetBody(enHtml())">${v[0]}</button>`).join('')}</div>
+    <div class="f2">
+      <label class="f"><span>📅 التاريخ</span><input id="enDate" type="date" value="${EN.date}" ${EN.kind === 'opening' ? 'disabled' : ''} max="${cairoDay()}" min="${H.start}"></label>
+      <label class="f"><span>📝 البيان</span><input id="enMemo" value="${escH(EN.memo)}" placeholder="مثال: إيجار أكتوبر"></label>
+    </div>
+    ${EN.kind === 'opening' ? `<div class="warnbox">📌 القيد الافتتاحي = صورة يوم ${dt(H.start)}: الخزنة · المحافظ · المخزن (بالجرد) · الأصول · العملاء · التجار · الديون … والفرق كله بيروح «أرصدة افتتاحية تحت التسوية» (3900) لحد ما تحوّله لرأس المال.
+      <br><button class="btn sm" onclick="enSuggest()">💡 هات أرصدة العملاء والتجار من النظام</button></div>` : ''}
+    <div id="enLines">${EN.lines.map((l, i) => lineHtml(l, i)).join('')}</div>
+    <div class="acts" style="margin:0 0 6px;"><button class="btn" onclick="enSave();EN.lines.push(newLine());setSheetBody(enHtml())">➕ سطر</button>
+      ${EN.kind === 'opening' ? `<button class="btn" onclick="enPlug()">⚖️ وازن على 3900</button>` : ''}</div>
+    <div class="baltag" id="enBal">${balTag()}</div>
+    <button class="big" onclick="enGo()" ${EN.busy ? 'disabled' : ''}>${EN.busy ? '⏳ …' : '✅ سجّل القيد'}</button>
+    <div class="note-in">🔒 القيد بيتسجّل باسمك ومابيتمسحش ولا بيتعدّل — لو طلع غلط بتعكسه.</div>`;
+}
+function lineHtml(l, i){
+  const a = ACCM[l.acc];
+  const pl = a && a.party ? { customer:['dlCust','👤 العميل'], supplier:['dlSup','🏪 التاجر'], employee:['dlEmp','👥 الموظف (الإيميل)'] }[a.party] : null;
+  return `<div class="le"><div class="r1"><select onchange="enSave();EN.lines[${i}].acc=this.value;EN.lines[${i}].party='';setSheetBody(enHtml())">${accOptions(l.acc)}</select>
+      ${pl ? `<input id="lp${i}" list="${pl[0]}" value="${escH(l.party)}" placeholder="${pl[1]}" oninput="EN.lines[${i}].party=this.value">` : ''}</div>
+    <div class="r2"><input id="ld${i}" class="dIn" inputmode="decimal" placeholder="مدين" value="${escH(l.d)}" oninput="EN.lines[${i}].d=this.value;if(this.value)EN.lines[${i}].c='',document.getElementById('lc${i}').value='';updBal()">
+      <input id="lc${i}" class="cIn" inputmode="decimal" placeholder="دائن" value="${escH(l.c)}" oninput="EN.lines[${i}].c=this.value;if(this.value)EN.lines[${i}].d='',document.getElementById('ld${i}').value='';updBal()">
+      <button class="x" onclick="enSave();EN.lines.splice(${i},1);if(EN.lines.length<2)EN.lines.push(newLine());setSheetBody(enHtml())">✕</button></div>
+    <input style="margin-top:6px;" placeholder="ملاحظة السطر (اختياري)" value="${escH(l.memo)}" oninput="EN.lines[${i}].memo=this.value"></div>`;
+}
+function enTotals(){ let d = 0, c = 0; EN.lines.forEach(l => { d += num(l.d) || 0; c += num(l.c) || 0; }); return { d:r2(d), c:r2(c) }; }
+function balTag(){
+  const t = enTotals(), diff = r2(t.d - t.c);
+  return `<span>مدين <b class="money dr">${fmt(t.d)}</b></span><span>دائن <b class="money cr">${fmt(t.c)}</b></span>
+    <span>${diff === 0 && t.d ? '✅ متوازن' : `<b style="color:var(--red)">فرق ${fmt(diff)}</b>`}</span>`;
+}
+function updBal(){ const b = $('enBal'); if(b) b.innerHTML = balTag(); }
+function enSave(){
+  const d = $('enDate'); if(d && !d.disabled) EN.date = d.value;
+  const m = $('enMemo'); if(m) EN.memo = m.value;
+}
+async function enSuggest(){
+  try{
+    const s = await rpc('gl_opening_suggest');
+    enSave();
+    const keep = EN.lines.filter(l => l.acc && (num(l.d) || num(l.c)));
+    const ar = s.customers.map(x => ({ acc:'1200', d: x.amt > 0 ? String(x.amt) : '', c: x.amt < 0 ? String(-x.amt) : '', party: x.code + ' · ' + x.name, memo:'رصيد ' + x.code }));
+    const ap = s.suppliers.map(x => ({ acc:'2101', d: x.amt > 0 ? String(x.amt) : '', c: x.amt < 0 ? String(-x.amt) : '', party: x.name, memo:'رصيد التاجر' }));
+    EN.lines = keep.concat(ar, ap);
+    if(EN.lines.length < 2) EN.lines.push(newLine());
+    setSheetBody(enHtml());
+    toast(`💡 اتضاف ${ar.length} عميل و ${ap.length} تاجر — راجعهم وكمّل الباقي (الخزنة · المخزن · الأصول)`);
+  }catch(e){ toast(errMsg(e), true); }
+}
+function enPlug(){
+  enSave();
+  const t = enTotals(), diff = r2(t.d - t.c);
+  if(!diff){ toast('القيد متوازن خلاص'); return; }
+  EN.lines = EN.lines.filter(l => l.acc !== '3900');
+  const t2 = enTotals(), d2 = r2(t2.d - t2.c);
+  EN.lines.push({ acc:'3900', d: d2 < 0 ? String(-d2) : '', c: d2 > 0 ? String(d2) : '', party:'', memo:'الفرق — لحد ما يتحوّل لرأس المال' });
+  setSheetBody(enHtml());
+}
+function partyArgs(a, raw){
+  const v = String(raw || '').trim();
+  if(!a || !a.party) return {};
+  if(!v) throw new Error(`الحساب ${a.code} (${a.name}) محتاج تختار ${{ customer:'العميل', supplier:'التاجر', employee:'الموظف' }[a.party]}`);
+  if(a.party === 'customer'){ const c = CUST.find(x => (x.code + ' · ' + x.name) === v) || CUST.find(x => x.code === v.split(' ')[0]); if(!c) throw new Error(`«${v}» مش عميل في القايمة`); return { customer_id:c.id }; }
+  if(a.party === 'supplier'){ const s = SUP.find(x => x.name === v); if(!s) throw new Error(`«${v}» مش تاجر في القايمة`); return { supplier_id:s.id }; }
+  if(!/^\S+@\S+\.\S+$/.test(v)) throw new Error('اكتب إيميل الموظف');
+  return { employee_email:v.toLowerCase() };
+}
+async function enGo(){
+  if(EN.busy) return;
+  enSave();
+  let lines;
+  try{
+    lines = EN.lines.filter(l => l.acc || num(l.d) || num(l.c)).map((l, i) => {
+      const a = ACCM[l.acc];
+      if(!a) throw new Error(`سطر ${i + 1}: اختار الحساب`);
+      const d = num(l.d) || 0, c = num(l.c) || 0;
+      if(!d && !c) throw new Error(`سطر ${i + 1}: اكتب المبلغ`);
+      if(d < 0 || c < 0) throw new Error(`سطر ${i + 1}: المبلغ مايبقاش بالسالب`);
+      return Object.assign({ acc:a.code, amt: r2(d - c), memo:l.memo || '' }, partyArgs(a, l.party));
+    });
+  }catch(e){ toast(e.message, true); return; }
+  const t = enTotals();
+  if(lines.length < 2){ toast('القيد محتاج سطرين على الأقل', true); return; }
+  if(r2(t.d - t.c) !== 0){ toast('القيد مش متوازن — فرق ' + fmt(t.d - t.c), true); return; }
+  if(String(EN.memo || '').trim().length < 3){ toast('اكتب البيان', true); return; }
+  if(!confirm(`${EN_K[EN.kind][0]} بـ ${fmt(t.d)} ج.م\n${EN.memo}\nنسجّل؟`)) return;
+  EN.busy = true; setSheetBody(enHtml());
+  try{
+    const e = await rpc('gl_post_manual', { p_kind:EN.kind, p_date:EN.date, p_memo:EN.memo, p_lines:lines });
+    closeSheet(); toast('✅ اتسجّل ' + e.entry_no); S.tab = 'journal'; load();
+  }catch(e){ EN.busy = false; setSheetBody(enHtml()); toast(errMsg(e), true); }
+}
+
+// ============================================================
+// 📊 Excel
+// ============================================================
+async function excel(file, title, head, rows, moneyCols, boldRows){
+  if(typeof ExcelJS === 'undefined'){ toast('مكتبة الإكسل ماتحمّلتش — جرّب تاني', true); return; }
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('الأستاذ', { views:[{ rightToLeft:true }] });
+  const border = { top:{style:'thin',color:{argb:'FFCBD5E1'}}, bottom:{style:'thin',color:{argb:'FFCBD5E1'}},
+                   left:{style:'thin',color:{argb:'FFCBD5E1'}}, right:{style:'thin',color:{argb:'FFCBD5E1'}} };
+  ws.mergeCells(1, 1, 1, head.length);
+  ws.getCell(1, 1).value = title; ws.getCell(1, 1).font = { size:15, bold:true, color:{argb:'FF1F3864'} };
+  ws.getCell(1, 1).alignment = { horizontal:'center' };
+  ws.mergeCells(2, 1, 2, head.length);
+  ws.getCell(2, 1).value = 'I Fix Team — مركز الأستاذ — اتطبع ' + new Date().toLocaleString('ar-EG');
+  ws.getCell(2, 1).font = { size:10, color:{argb:'FF6B7280'} }; ws.getCell(2, 1).alignment = { horizontal:'center' };
+  const h = ws.getRow(4); h.values = head;
+  h.eachCell(c => { c.font = { bold:true, color:{argb:'FFFFFFFF'} }; c.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FF1F3864'} }; c.border = border; c.alignment = { horizontal:'center' }; });
+  rows.forEach((r, i) => {
+    const row = ws.addRow(r);
+    row.eachCell({ includeEmpty:true }, c => { c.border = border; });
+    (moneyCols || []).forEach(k => { row.getCell(k + 1).numFmt = '#,##0.00'; });
+    if(boldRows && boldRows[i]) row.eachCell({ includeEmpty:true }, c => { c.font = { bold:true }; c.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFF1F5F9'} }; });
+  });
+  head.forEach((x, i) => { ws.getColumn(i + 1).width = i === 1 || i === 2 ? 38 : 16; });
+  const buf = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buf], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = file + '-' + cairoDay() + '.xlsx';
+  document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+}
+
+// ============================================================
+// 🪟 الشيت
+// ============================================================
+function sheet(title, body){
+  const old = $('sheetOv'); if(old) old.remove();
+  const ov = document.createElement('div');
+  ov.className = 'ov'; ov.id = 'sheetOv';
+  ov.onclick = e => { if(e.target === ov) closeSheet(); };
+  ov.innerHTML = `<div class="sheet" dir="rtl"><div class="sh-h"><h3>${escH(title)}</h3><button class="sh-x" onclick="closeSheet()">✕</button></div><div class="sh-b" id="shBody">${body}</div></div>`;
+  document.body.appendChild(ov);
+  document.body.style.overflow = 'hidden';
+}
+function setSheetBody(html){ const b = $('shBody'); if(b) b.innerHTML = html; }
+function closeSheet(){ const o = $('sheetOv'); if(o) o.remove(); document.body.style.overflow = ''; }
+document.addEventListener('keydown', e => { if(e.key === 'Escape') closeSheet(); });
+</script>
+</body>
+</html>
