@@ -126,6 +126,8 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
   .pill.green{background:var(--done-bg); color:var(--done);}
   .pill.wait{background:var(--wait-bg); color:var(--wait);}
   .pill.violet{background:var(--violet-bg); color:var(--violet);}
+  /* 📑 (ملف 104) رقم المستند — PI / SP / PR */
+  .pill.doc{font-family:monospace; direction:ltr; background:var(--soft); color:var(--ink); border:1px solid var(--line);}
   .box{margin-top:8px; background:var(--soft); border-radius:9px; padding:8px 10px; font-size:13px; line-height:1.7;
     color:var(--ink-2); word-break:break-word;}
   .acts{display:flex; gap:7px; flex-wrap:wrap; margin-top:10px;}
@@ -170,6 +172,7 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
   .f > span{display:block; font-size:12.5px; font-weight:800; color:var(--ink-2); margin-bottom:5px;}
   .f input,.f textarea,.f select{width:100%; border:1px solid var(--line); background:var(--card); color:var(--ink);
     border-radius:11px; padding:11px 12px; font-family:inherit; font-size:15px;}
+  .f input:disabled{opacity:.6;}
   .f textarea{resize:vertical; min-height:56px;}
   .f2{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
   .chips{display:flex; flex-wrap:wrap; gap:6px;}
@@ -261,19 +264,23 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
 
 <script>
 // ============================================================
-// 🛵🔩 صفحة مسؤول قطع الغيار (ملف SQL رقم 95)
+// 🛵🔩 صفحة مسؤول قطع الغيار (ملفات SQL رقم 95 و 104)
 // ------------------------------------------------------------
 // 🧸 الحكاية:
 //   الفني / مدير الإنتاج يطلب قطعة → المسؤول يدوس «🚶 رايح أجيبها»
 //   (الطلب يتقفل باسمه) → يشتريها ويكتب التاجر، والسعر لو يعرفه (وإلا ⏳)
-//   → الفني يستلم → الفاتورة توصل (يومي أو أسبوعي) → تتطابق مع القطع ⏳
-//   فالأسعار تنزل → المحاسب العام يدفع للتاجر من الخزنة.
+//   → الفني يستلم → الفاتورة توصل (يومي أو أسبوعي) → **المحاسب العام**
+//   يراجعها مع التاجر ويدخّلها فالأسعار تنزل → المحاسب العام يدفع للتاجر.
 //
 // 👀 مين بيفتح الصفحة دي:
-//   🛵 مسؤول القطع (parts)   → كل حاجة بالأسعار، من غير دفعات
-//   🧾 المحاسب العام          → كل حاجة + 💸 الدفعات + ⚖️ المطابقة + ⚠️ التنبيهات
+//   🛵 مسؤول القطع (parts)   → الطلبات والشراء والقطع بالأسعار — من غير فواتير ولا دفعات
+//   🧾 المحاسب العام          → كل حاجة + 🧾 الفواتير + 💸 الدفعات + ⚖️ المطابقة + ⚠️ التنبيهات
 //   🏭 مدير الإنتاج           → الطلبات + ⚖️ المطابقة + التكرار — **من غير أي سعر**
-//   (السيرفر هو اللي بيشيل الأسعار قبل ما توصل — مش الشاشة اللي بتخبّيها)
+//   (السيرفر هو اللي بيشيل الأسعار ويقفل الفواتير — مش الشاشة اللي بتخبّيها)
+//
+// 📑 (ملف 104) الورق بقى ليه أرقام في كشكول الـERP:
+//   🧾 PI فاتورة مشتريات · 💸 SP سند صرف لتاجر · ↩️ PR مرتجع مشتريات
+//   وبعد ما القطعة تدخل فاتورة، سعرها بيتعدّل من المحاسب العام بس.
 //
 // ⚠️ الصفحة مابتقراش جدول الأجهزة خالص. كل حاجة من دالة parts_board
 //    على السيرفر — بتدّي رقم التذكرة والموديل والعطل بس (مفيش عميل ولا تليفون).
@@ -313,6 +320,8 @@ function ago(iso){
 function dt(iso){ try{ return new Date(iso).toLocaleString('ar-EG', { day:'numeric', month:'numeric', hour:'numeric', minute:'2-digit', timeZone:'Africa/Cairo' }); }catch(e){ return ''; } }
 function dOnly(v){ try{ return new Date(v + (String(v).length === 10 ? 'T12:00:00' : '')).toLocaleDateString('ar-EG', { day:'numeric', month:'numeric', year:'2-digit', timeZone:'Africa/Cairo' }); }catch(e){ return v || ''; } }
 const DOW = ['الأحد','الاتنين','التلات','الأربع','الخميس','الجمعة','السبت'];
+// 📑 (ملف 104) شارة رقم المستند
+function docPill(no){ return no ? ` <span class="pill doc">${esc(no)}</span>` : ''; }
 
 let toastT;
 function toast(msg, bad){
@@ -440,8 +449,10 @@ function alerts(){
   (B.suppliers || []).forEach(s => {
     const due = invoiceDue(s);
     // 🧾 المحاسب العام بيعرف بعد يوم زيادة (أسبوعي) أو يومين (يومي)
+    //    🛵 المسؤول بيعرف على طول — عشان يفكّر التاجر يبعتها
     if(due && due.late > 0 && (isRunner() || due.late >= (s.cycle === 'daily' ? 2 : 1)))
-      a.push({ k:'inv', s, txt: '🧾 ' + s.name + ': ' + due.txt + ' (' + s.pending_n + ' قطعة مستنية)' });
+      a.push({ k:'inv', s, txt: '🧾 ' + s.name + ': ' + due.txt + ' (' + s.pending_n + ' قطعة مستنية)'
+                                + (isRunner() ? ' — فكّر التاجر يبعتها للمحاسب العام' : '') });
     if(s.credit_limit != null && Number(s.balance) > Number(s.credit_limit))
       a.push({ k:'limit', s, txt: '💳 ' + s.name + ': الحساب ' + fmt(s.balance) + ' عدّى الحد ' + fmt(s.credit_limit) });
   });
@@ -468,7 +479,8 @@ function tabsList(){
   const t = [{ k:'req', l:'📥 الطلبات', n: B.requests.filter(q => q.status === 'new').length }];
   if(money()){
     t.push({ k:'unk', l:'⏳ من غير سعر', n: unpriced().length, soft: true });
-    t.push({ k:'inv', l:'🧾 الفواتير' });
+    // 🔒 (ملف 104) الفواتير عند المحاسب العام بس
+    if(isBoss()) t.push({ k:'inv', l:'🧾 الفواتير' });
     t.push({ k:'sup', l:'🏪 التجار' });
     t.push({ k:'ret', l:'↩️ ترجيع', n: badOnes().length });
     t.push({ k:'buys', l:'🛒 القطع' });
@@ -488,7 +500,7 @@ function render(){
   app.innerHTML = head + (V[S.tab] || viewReq)();
   $('fabHost').innerHTML = money() && ['req','buys','unk'].includes(S.tab)
     ? `<button class="fab" onclick="openBuy(null)">➕ قطعة من غير طلب</button>`
-    : (money() && S.tab === 'inv' ? `<button class="fab" onclick="openInvoice(null)">🧾 فاتورة جديدة</button>` : '');
+    : (isBoss() && S.tab === 'inv' ? `<button class="fab" onclick="openInvoice(null)">🧾 فاتورة جديدة</button>` : '');
 }
 function go(k){ S.tab = k; render(); window.scrollTo(0, 0); }
 
@@ -608,7 +620,7 @@ function buyHtml(){
         <button class="chip add" onclick="newSupplier(true)">➕ تاجر جديد</button></div></label>
     <label class="f"><span>📝 ملاحظة (اختياري)</span><input id="bNote" value="${esc(BUY.note)}" oninput="BUY.note=this.value" placeholder="مثال: الضمان أسبوع"></label>
     <button class="big" id="bGo" onclick="buyGo(false)" ${BUY.busy ? 'disabled' : ''}>${BUY.busy ? '⏳ …' : '✅ سجّل'}</button>
-    <div class="note-in">🧾 لو مش عارف السعر، سيبه ⏳ — هيتملي لوحده لما فاتورة التاجر توصل.</div>`;
+    <div class="note-in">🧾 لو مش عارف السعر، سيبه ⏳ — هيتملي لوحده لما المحاسب العام يدخّل فاتورة التاجر.</div>`;
 }
 function reBuy(){
   // نحفظ اللي اتكتب قبل ما نعيد الرسم
@@ -717,7 +729,7 @@ function buyRow(p, opts){
   const where = p.device_id ? '📱 ' + esc(p.device_label) : '📦 للمخزن';
   const tags = [];
   if(p.status === 'bad') tags.push('<span class="pill red">🔧 بايظة — ترجع</span>');
-  if(p.status === 'returned') tags.push('<span class="pill">↩️ رجعت</span>');
+  if(p.status === 'returned') tags.push('<span class="pill">↩️ رجعت</span>' + docPill(p.return_no));
   if(p.dup_state === 'open') tags.push('<span class="pill red">🔴 تكرار</span>');
   if(p.dest === 'stock' && p.device_id) tags.push('<span class="pill violet">📦 دخلت المخزن</span>');
   if(p.invoice_id) tags.push('<span class="pill green">🧾 في فاتورة</span>');
@@ -734,7 +746,9 @@ function viewUnk(){
   if(!list.length) return '<div class="empty">✅ كل القطع متسعّرة — مفيش حاجة مستنية فاتورة</div>';
   const by = {};
   list.forEach(p => { (by[p.supplier_id] = by[p.supplier_id] || []).push(p); });
-  return `<div class="hint">القطع دي اتجابت ولسه سعرها مش معروف. لما فاتورة التاجر توصل دوس «🧾 دخّل الفاتورة» — الأسعار هتنزل عليها لوحدها.</div>` +
+  return `<div class="hint">${isBoss()
+      ? 'القطع دي اتجابت ولسه سعرها مش معروف. لما فاتورة التاجر توصل دوس «🧾 دخّل الفاتورة» — الأسعار هتنزل عليها لوحدها.'
+      : 'القطع دي اتجابت ولسه سعرها مش معروف. الأسعار هتنزل لوحدها لما المحاسب العام يراجع فاتورة التاجر ويدخّلها — فكّر التاجر يبعتها.'}</div>` +
     Object.keys(by).map(sid => {
       const s = supById(sid) || { name:'؟' };
       const due = invoiceDue(s);
@@ -742,7 +756,7 @@ function viewUnk(){
         <div class="c-top"><div class="c-t">🏪 ${esc(s.name)}</div><span class="pill wait">⏳ ${by[sid].length}</span></div>
         <div class="c-s">${s.cycle === 'daily' ? 'فاتورة يومية' : s.cycle === 'weekly' ? 'فاتورة أسبوعية' + (s.inv_dow != null ? ' — يوم ' + DOW[s.inv_dow] : '') : ''}${due ? ' · <b>' + due.txt + '</b>' : ''}</div>
         <div style="margin-top:6px;">${by[sid].map(p => buyRow(p, { noSup:true })).join('')}</div>
-        <div class="acts"><button class="btn pri" onclick="openInvoice('${sid}')">🧾 دخّل فاتورة ${esc(s.name)}</button></div>
+        ${isBoss() ? `<div class="acts"><button class="btn pri" onclick="openInvoice('${sid}')">🧾 دخّل فاتورة ${esc(s.name)}</button></div>` : ''}
       </div>`;
     }).join('');
 }
@@ -751,16 +765,20 @@ function viewUnk(){
 function editBuy(id){
   const p = P().find(x => x.id === id); if(!p) return;
   const sups = activeSups();
+  // 🔒 (ملف 104) القطعة دخلت فاتورة → السعر والكمية للمحاسب العام بس
+  const lockMoney = !!p.invoice_id && !isBoss();
   sheet('✏️ ' + p.part, `
-    ${p.invoice_id ? '<div class="warnbox">🧾 القطعة دي دخلت فاتورة — أي تغيير في السعر بيتسجّل وبيوصل للمحاسب العام.</div>' : ''}
+    ${p.invoice_id ? (lockMoney
+        ? '<div class="warnbox">🔒 القطعة دي دخلت فاتورة التاجر — السعر والكمية بيتعدّلوا من المحاسب العام بس. تقدر تصلّح الاسم.</div>'
+        : '<div class="warnbox">🧾 القطعة دي دخلت فاتورة — أي تغيير في السعر بيتسجّل (ومبيعدّلش رقم الفاتورة نفسها).</div>') : ''}
     <label class="f"><span>🔩 القطعة</span><input id="eName" value="${esc(p.part)}"></label>
     <div class="f2">
-      <label class="f"><span>🔢 الكمية</span><input id="eQty" type="number" min="1" inputmode="numeric" value="${esc(p.qty)}"></label>
-      <label class="f"><span>💰 سعر الواحدة (فاضي = ⏳)</span><input id="ePrice" inputmode="decimal" value="${p.unit_price == null ? '' : esc(p.unit_price)}"></label>
+      <label class="f"><span>🔢 الكمية</span><input id="eQty" type="number" min="1" inputmode="numeric" value="${esc(p.qty)}" ${lockMoney ? 'disabled' : ''}></label>
+      <label class="f"><span>💰 سعر الواحدة (فاضي = ⏳)</span><input id="ePrice" inputmode="decimal" value="${p.unit_price == null ? '' : esc(p.unit_price)}" ${lockMoney ? 'disabled' : ''}></label>
     </div>
     <label class="f"><span>🏪 التاجر</span><select id="eSup" ${p.invoice_id ? 'disabled' : ''}>${sups.concat(sups.some(s => s.id === p.supplier_id) ? [] : [supById(p.supplier_id) || { id:p.supplier_id, name:p.supplier }])
       .map(s => `<option value="${s.id}"${s.id === p.supplier_id ? ' selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>
-    <label class="f"><span>📝 سبب التعديل ${p.unit_price != null ? '(إجباري لو السعر اتغيّر)' : ''}</span><input id="eWhy" placeholder="مثال: التاجر قال السعر غلط"></label>
+    <label class="f"><span>📝 سبب التعديل ${p.unit_price != null && !lockMoney ? '(إجباري لو السعر اتغيّر)' : ''}</span><input id="eWhy" placeholder="مثال: التاجر قال السعر غلط"></label>
     <button class="big" onclick="saveBuy('${p.id}')">💾 حفظ</button>
     <div class="acts" style="margin-top:14px;">
       ${p.status === 'active' ? `<button class="btn bad" onclick="markBuy('${p.id}','bad')">🔧 القطعة بايظة</button>` : ''}
@@ -789,8 +807,10 @@ async function markBuy(id, a){
   if(a === 'bad'){ why = prompt('🔧 إيه اللي فيها؟'); if(why === null) return; }
   if(a === 'returned'){ why = prompt('↩️ رجّعتها للتاجر — هتنزل من حسابه. ملاحظة (اختياري):', ''); if(why === null) return; }
   if(a === 'unreturn'){ why = prompt('↩️ ليه الترجيع اتلغى؟'); if(why === null) return; }
-  try{ await rpc('part_purchase_mark', { p_id:id, p_action:a, p_reason:why || '' }); closeSheet();
-    toast({ bad:'🔧 اتعلّمت بايظة — في «↩️ ترجيع»', returned:'↩️ رجعت للتاجر ونزلت من حسابه', unbad:'✅ رجعت سليمة', unreturn:'↩️ الترجيع اتلغى' }[a]); load();
+  try{ const r = await rpc('part_purchase_mark', { p_id:id, p_action:a, p_reason:why || '' }); closeSheet();
+    toast({ bad:'🔧 اتعلّمت بايظة — في «↩️ ترجيع»',
+            returned:'↩️ رجعت للتاجر ونزلت من حسابه' + (r && r.return_no ? ' — مرتجع ' + r.return_no : ''),
+            unbad:'✅ رجعت سليمة', unreturn:'↩️ الترجيع اتلغى' }[a]); load();
   }catch(e){ toast(errMsg(e), true); }
 }
 
@@ -798,7 +818,7 @@ async function markBuy(id, a){
 function viewRet(){
   const bad = badOnes();
   const done = P().filter(p => p.status === 'returned').slice(0, 20);
-  return `<div class="hint">قطع الفني قال إنها بايظة (أو قرار التكرار قال ترجع). رجّعها للتاجر ودوس «↩️ رجّعتها» — هتنزل من حسابه.</div>
+  return `<div class="hint">قطع الفني قال إنها بايظة (أو قرار التكرار قال ترجع). رجّعها للتاجر ودوس «↩️ رجّعتها» — هتنزل من حسابه وتاخد رقم مرتجع.</div>
     <div class="sec-h">🔧 لازم ترجع <span class="c">${bad.length}</span><span class="rule"></span></div>
     ${bad.length ? bad.map(p => `<div class="card new">${buyRow(p, { noEdit:true })}<div class="acts">
         <button class="btn pri" onclick="markBuy('${p.id}','returned')">↩️ رجّعتها للتاجر</button>
@@ -833,7 +853,7 @@ function viewSup(){
         ${over ? `<div class="c-s" style="color:var(--red);font-weight:800;">💳 عدّى الحد</div>` : ''}
         <div class="acts">
           <button class="btn" onclick="openStatement('${s.id}')">📒 كشف الحساب</button>
-          ${s.pending_n ? `<button class="btn pri" onclick="openInvoice('${s.id}')">🧾 فاتورة</button>` : ''}
+          ${isBoss() && s.pending_n ? `<button class="btn pri" onclick="openInvoice('${s.id}')">🧾 فاتورة</button>` : ''}
           ${isBoss() ? `<button class="btn ok" onclick="payOpen('${s.id}')">💸 دفعة</button>` : ''}
           <button class="btn ghost sm" onclick="editSupplier('${s.id}')">✏️</button>
         </div></div>`;
@@ -858,13 +878,13 @@ async function openStatement(id){
         if(p.unit_price == null && p.status !== 'returned') unk++;
         bal += amt;
         return `<div class="row${p.status === 'returned' ? ' strike' : ''}"><div class="m"><div class="t">${esc(p.part)}${Number(p.qty) > 1 ? ' ×' + fmt(p.qty) : ''}</div>
-          <div class="s">${dt(p.bought_at)} · ${p.device_label ? esc(p.device_label) : '📦'}${p.status === 'returned' ? ' · ↩️ رجعت' : ''}${p.invoice_id ? ' · 🧾' : ''}</div></div>
+          <div class="s">${dt(p.bought_at)} · ${p.device_label ? esc(p.device_label) : '📦'}${p.status === 'returned' ? ' · ↩️ رجعت' + docPill(p.return_no) : ''}${p.invoice_id ? ' · 🧾' : ''}</div></div>
           <div style="text-align:end;">${p.unit_price == null ? '<span class="unk">⏳</span>' : '<span class="money">+' + fmt(Number(p.qty) * Number(p.unit_price)) + '</span>'}
           <div class="s">${fmt(bal)}</div></div></div>`;
       }
       const y = r.y;
       if(!y.voided) bal -= Number(y.amount);
-      return `<div class="row${y.voided ? ' strike' : ''}"><div class="m"><div class="t">💸 دفعة${y.note ? ' — ' + esc(y.note) : ''}</div>
+      return `<div class="row${y.voided ? ' strike' : ''}"><div class="m"><div class="t">💸 دفعة${docPill(y.erp_no)}${y.note ? ' — ' + esc(y.note) : ''}</div>
         <div class="s">${dt(y.paid_at)} · ${esc(y.by_name)}${y.voided ? ' · اتلغت: ' + esc(y.void_reason) : ''}</div></div>
         <div style="text-align:end;"><span class="money neg">−${fmt(y.amount)}</span><div class="s">${fmt(bal)}</div>
         ${isBoss() && !y.voided ? `<button class="btn ghost sm" onclick="payVoid('${y.id}','${id}')">لغي</button>` : ''}</div></div>`;
@@ -885,7 +905,7 @@ function payOpen(id){
     <label class="f"><span>💵 المبلغ</span><input id="payAmt" inputmode="decimal" placeholder="بالجنيه"></label>
     <div class="chips" style="margin:-4px 0 12px;"><button class="chip" onclick="$('payAmt').value='${Math.max(0, Math.round(Number(s.balance) || 0))}'">الحساب كله</button></div>
     <label class="f"><span>📝 ملاحظة</span><input id="payNote" placeholder="مثال: حساب الأسبوع"></label>
-    <div class="warnbox">🔒 المبلغ ده بيتخصم من «المفروض في الخزنة» عند أمين الخزنة في التقفيل الجاي.</div>
+    <div class="warnbox">🔒 المبلغ ده بيتخصم من «المفروض في الخزنة» عند أمين الخزنة في التقفيل الجاي — وبياخد رقم سند صرف.</div>
     <button class="big" onclick="payGo('${id}')">💸 سجّل الدفعة</button>`);
 }
 async function payGo(id){
@@ -893,8 +913,8 @@ async function payGo(id){
   if(!(a > 0)){ toast('اكتب المبلغ', true); return; }
   const s = supById(id);
   if(!confirm('💸 دفعة ' + fmt(a) + ' ج.م لـ ' + (s ? s.name : '') + ' من الخزنة؟')) return;
-  try{ await rpc('supplier_pay', { p_supplier_id:id, p_amount:a, p_note:$('payNote').value || '' });
-    closeSheet(); toast('💸 الدفعة اتسجّلت'); load(); }
+  try{ const y = await rpc('supplier_pay', { p_supplier_id:id, p_amount:a, p_note:$('payNote').value || '' });
+    closeSheet(); toast('💸 الدفعة اتسجّلت' + (y && y.erp_no ? ' — سند صرف ' + y.erp_no : '')); load(); }
   catch(e){ toast(errMsg(e), true); }
 }
 async function payVoid(pid, sid){
@@ -953,7 +973,7 @@ function viewAlert(){
   const mism = isBoss() ? (B.match || []).filter(m => m.decision === 'mismatch' && !m.stale) : [];
   return `${a.length ? a.map(x => `<div class="card new"><div class="c-t" style="font-size:14px;">${esc(x.txt)}</div>
       <div class="acts">${x.k === 'jump' ? `<button class="btn sm" onclick="editBuy('${x.p.id}')">✏️ افتح القطعة</button><button class="btn ok sm" onclick="flagSeen('${x.p.id}')">✓ شفته</button>` : ''}
-      ${x.k === 'inv' ? `<button class="btn pri sm" onclick="openInvoice('${x.s.id}')">🧾 دخّل الفاتورة</button>` : ''}
+      ${x.k === 'inv' && isBoss() ? `<button class="btn pri sm" onclick="openInvoice('${x.s.id}')">🧾 دخّل الفاتورة</button>` : ''}
       ${x.k === 'limit' ? `<button class="btn sm" onclick="openStatement('${x.s.id}')">📒 كشف الحساب</button>` : ''}
       ${x.k === 'old' ? `<button class="btn sm" onclick="go('unk')">⏳ افتحهم</button>` : ''}</div></div>`).join('') : '<div class="empty">✨ مفيش تنبيهات</div>'}
     ${mism.length ? `<div class="sec-h">🔴 أجهزة مش مطابقة<span class="rule"></span></div>${mism.map(m => `<div class="card new"><div class="c-t">📱 ${esc(m.label)}</div><div class="c-s">${esc(m.decision_note)} — ${esc(m.decision_by)}</div></div>`).join('')}` : ''}`;
@@ -961,18 +981,18 @@ function viewAlert(){
 async function flagSeen(id){ try{ await rpc('part_flag_clear', { p_id:id }); toast('✓ تمام'); load(); }catch(e){ toast(errMsg(e), true); } }
 
 // ============================================================
-// 🧾 الفواتير
+// 🧾 الفواتير — 🔒 (ملف 104) المحاسب العام بس
 // ============================================================
 function viewInv(){
   const list = (B.invoices || []);
   const sups = (B.suppliers || []).filter(s => s.pending_n);
-  return `<div class="hint">صوّر فاتورة التاجر (أو اكتبها بإيدك) — السيستم بيطابق كل سطر مع القطع اللي اتجابت منه وبينزّل السعر عليها، والقطع بتدخل المخزن مربوطة بأجهزتها.</div>
+  return `<div class="hint">صوّر فاتورة التاجر (أو اكتبها بإيدك) بعد ما تراجعها معاه — السيستم بيطابق كل سطر مع القطع اللي اتجابت منه وبينزّل السعر عليها، والقطع بتدخل المخزن مربوطة بأجهزتها، والفاتورة بتاخد رقم 🧾 PI.</div>
     ${sups.length ? `<div class="sec-h">⏳ تجار مستنيين فاتورة<span class="rule"></span></div>
       <div class="chips" style="margin-bottom:6px;">${sups.map(s => `<button class="chip" onclick="openInvoice('${s.id}')">🏪 ${esc(s.name)} <b style="color:var(--wait)">${s.pending_n}</b></button>`).join('')}</div>` : ''}
     <div class="sec-h">🧾 آخر الفواتير <span class="c">${list.length}</span><span class="rule"></span></div>
     ${list.length ? list.map(i => {
       const ps = P().filter(p => p.invoice_id === i.id);
-      return `<div class="card"><div class="c-top"><div class="c-t">🏪 ${esc(i.supplier_name)}${i.invoice_number ? ' <span style="color:var(--muted);font-size:13px;">#' + esc(i.invoice_number) + '</span>' : ''}</div>
+      return `<div class="card"><div class="c-top"><div class="c-t">🏪 ${esc(i.supplier_name)}${i.invoice_number ? ' <span style="color:var(--muted);font-size:13px;">#' + esc(i.invoice_number) + '</span>' : ''}${docPill(i.erp_no)}</div>
         <div class="money">${fmt(i.grand_total)} ج.م</div></div>
         <div class="c-s">${dOnly(i.invoice_date)} · دخّلها ${esc(i.created_by_name || '')} · ${ps.length} قطعة</div>
         ${ps.length ? `<div style="margin-top:6px;">${ps.map(p => buyRow(p, { noSup:true, noEdit:true })).join('')}</div>` : ''}
@@ -990,6 +1010,8 @@ async function showInvImg(path){
 // ---------- 🧾 فاتورة جديدة ----------
 const INV = { sid:'', date:'', no:'', total:'', adjust:false, lines:[], file:null, url:'', mime:'', model:'manual', raw:null, busy:false, reading:false, pickFor:null, uid:0 };
 function openInvoice(sid){
+  // 🔒 (ملف 104) الفاتورة بتتراجع وتتقفل مع التاجر عند المحاسب العام بس
+  if(!isBoss()){ toast('🧾 فواتير التجار بقت عند المحاسب العام — هو اللي بيراجعها مع التاجر ويدخّلها', true); return; }
   if(INV.url){ try{ URL.revokeObjectURL(INV.url); }catch(e){} }
   Object.assign(INV, { sid: sid || '', date: cairoDay(), no:'', total:'', adjust:false, lines:[], file:null, url:'', mime:'',
     model:'manual', raw:null, busy:false, reading:false, pickFor:null });
@@ -1081,7 +1103,7 @@ function invHtml(){
       <div class="card">${left.map(p => `<div class="row"><div class="m"><div class="t">${esc(p.part)}${Number(p.qty) > 1 ? ' ×' + fmt(p.qty) : ''}${inPeriod(p) ? '' : ' <span class="pill">أقدم</span>'}</div><div class="s">${p.device_id ? '📱 ' + esc(p.device_label) : '📦'} · ${dt(p.bought_at)} · ${esc(p.bought_by_name)}</div></div><div>${priceTxt(p)}</div></div>`).join('')}</div>` : ''}
     ${needOk ? `<div class="warnbox">🟡 فيه ${needOk} سطر محتاج تأكيد — دوس «✓ تمام» على كل واحد بعد ما تراجعه.</div>` : ''}
     <button class="big" onclick="invSave()" ${INV.busy || needOk || !INV.lines.length ? 'disabled' : ''}>${INV.busy ? '⏳ بنحفظ…' : '💾 احفظ الفاتورة'}</button>
-    <div class="note-in">✅ متطابق · 🟡 محتاج تأكيد · 🔴 مالوش قطعة مسجّلة (هيدخل المخزن ويتسجّل على حساب التاجر ويوصل للمحاسب العام)</div>
+    <div class="note-in">✅ متطابق · 🟡 محتاج تأكيد · 🔴 مالوش قطعة مسجّلة (هيدخل المخزن ويتسجّل على حساب التاجر)</div>
     ` : '<div class="hint">اختار التاجر الأول.</div>'}
     <input type="file" id="invCam" accept="image/*" capture="environment" style="display:none" onchange="invPick(this)">
     <input type="file" id="invFile" accept="image/*,application/pdf" style="display:none" onchange="invPick(this)">`;
@@ -1205,6 +1227,7 @@ async function parseInvoice(mime, b64){
 
 async function invSave(){
   if(INV.busy) return;
+  if(!isBoss()){ toast('🧾 فواتير التجار عند المحاسب العام بس', true); return; }
   if(!INV.sid){ toast('اختار التاجر', true); return; }
   if(!INV.lines.length){ toast('الفاتورة فاضية', true); return; }
   for(const [i, l] of INV.lines.entries()){
@@ -1231,7 +1254,7 @@ async function invSave(){
       p_total: num(INV.total), p_image_path: path, p_lines: lines, p_adjust: !!INV.adjust,
       p_ai_model: INV.model || 'manual', p_ai_raw: INV.raw });
     closeSheet();
-    toast('🧾 اتحفظت — ' + r.priced + ' قطعة اتسعّرت' + (r.extra ? ' · ' + r.extra + ' زيادة دخلت المخزن' : ''));
+    toast('🧾 اتحفظت' + (r.erp_no ? ' — ' + r.erp_no : '') + ' · ' + r.priced + ' قطعة اتسعّرت' + (r.extra ? ' · ' + r.extra + ' زيادة دخلت المخزن' : ''));
     load();
   }catch(e){ INV.busy = false; reInv(); toast(errMsg(e), true); }
 }
