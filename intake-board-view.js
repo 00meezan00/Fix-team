@@ -99,6 +99,8 @@
     try{
       if(S.admin === null){
         try{ var a = await sb.rpc('is_super_admin'); S.admin = (a && a.data === true); }catch(x){ S.admin = false; }
+        // 👑 (ملف 114) المالك بيشوف فلوس الكل زي المحاسب العام — والسيرفر هو اللي بيقرر فعلاً
+        if(!S.admin && /(^|\/)owner(\.html)?$/i.test(location.pathname.replace(/\/$/, ''))) S.admin = true;
       }
       var r = range();
       var res = await sb.rpc('intake_board', { p_from: r[0].toISOString(), p_to: r[1].toISOString() });
@@ -125,12 +127,15 @@
     var sh = document.getElementById('ibvSheet'); if(!sh) return;
     var rows = S.rows || [];
     var me = rows.filter(function(r){ return r.is_me; })[0];
+    // 🔓 بيشوف فلوس الكل؟ — بنصدّق السيرفر: لو بعت فلوس حد غيري يبقى أيوه
+    var seeAll = rows.some(function(r){ return !r.is_me && r.amount !== null && r.amount !== undefined; })
+              || (S.admin && !rows.some(function(r){ return !r.is_me; }));
 
     function chip(m, l){ return '<button class="chip' + (S.mode === m ? ' on' : '') + '" onclick="IFixIntakeBoard.mode(\'' + m + '\')">' + l + '</button>'; }
     var n = new Date(), pm = new Date(n.getFullYear(), n.getMonth() - 1, 1);
     // 📅 المحاسب العام: أي شهر في أي سنة — كلام ظاهر والخانة الحقيقية شفافة فوقه
     //    (الأيفون كان بيرسم <input type=month> فاضي = مربع من غير كلام)
-    var picker = S.admin
+    var picker = (S.admin || seeAll)
       ? '<label class="mpick' + (S.mode === 'ym' ? ' on' : '') + '">📅 ' + (S.mode === 'ym' ? e(periodLabel()) : 'اختار شهر')
         + '<input type="month" value="' + e(S.ym) + '" max="' + n.getFullYear() + '-' + String(n.getMonth() + 1).padStart(2, '0') + '"'
         + ' onchange="IFixIntakeBoard.ym(this.value)" aria-label="اختار أي شهر"></label>'
@@ -140,7 +145,7 @@
     if(me) meBox = '<div class="me"><div class="r">' + (medal(me.rank) || '#' + me.rank) + '</div>'
       + '<div style="flex:1;"><div class="mut" style="font-size:12px;font-weight:700;">ترتيبك ' + me.rank + ' من ' + rows.length
       + ' · ' + me.devices + ' جهاز اتسلّم</div><div class="m">💰 ' + money(me.amount) + '</div></div></div>';
-    else if(S.rows && !S.admin) meBox = '<div class="sub">لسه مفيش أجهزة سجّلتها واتسلّمت في الفترة دي.</div>';
+    else if(S.rows && !seeAll) meBox = '<div class="sub">لسه مفيش أجهزة سجّلتها واتسلّمت في الفترة دي.</div>';
 
     var body;
     if(S.loading && !S.rows) body = '<div class="empty">لحظة…</div>';
@@ -158,7 +163,7 @@
               + '<td>' + (r.amount === null || r.amount === undefined ? '<span class="mut">🔒</span>' : '<span class="cash">' + money(r.amount) + '</span>') + '</td>'
               + '</tr>';
           }).join('')
-        + (S.admin ? '<tr><td></td><td class="n">∑ الإجمالي</td><td style="font-weight:900;">' + cnt + '</td><td class="cash">' + money(total) + '</td></tr>' : '')
+        + (seeAll ? '<tr><td></td><td class="n">∑ الإجمالي</td><td style="font-weight:900;">' + cnt + '</td><td class="cash">' + money(total) + '</td></tr>' : '')
         + '</table>';
     }
 
@@ -168,7 +173,7 @@
       +   '<button class="x" onclick="IFixIntakeBoard.close()" aria-label="قفل">✕</button></div>'
       + '<div class="wrap">'
       + '<div class="sub">بمجموع سعر الأجهزة اللي سجّلتها واتسلّمت — المرفوض مابيتحسبش.'
-      +   (S.admin ? '' : ' فلوس زمايلك 🔒 — كل واحد بيشوف فلوسه بس.') + '</div>'
+      +   (seeAll ? '' : ' فلوس زمايلك 🔒 — كل واحد بيشوف فلوسه بس.') + '</div>'
       + '<div class="chips">' + chip('today', 'النهارده') + chip('cm', 'الشهر الحالي') + chip('pm', 'الشهر السابق') + picker + '</div>'
       + '<div class="mut" style="font-size:12.5px;font-weight:800;margin:-4px 2px 10px;">📅 ' + e(periodLabel()) + '</div>'
       + meBox + body
