@@ -566,6 +566,67 @@ addEventListener('DOMContentLoaded', function(){
 });
 
 // ============================================================
+// 🖥️ «حساب جهاز ثابت» — كمبيوتر المحل (ملف SQL رقم 117)
+// ------------------------------------------------------------
+// 🧸 بالبلدي: حساب لوظيفة متركّب على كمبيوتر الشركة وثابت مكانه —
+//    مالوش موظف، فمالوش حضور ولا انصراف ولا مرتب، وعمره ما بيتقفل
+//    برّه الشيفت.
+//
+// ① لوحة الأدمن: تحت كل حساب (ما عدا الفني والمالك وHR) زرار
+//    «🖥️ حساب جهاز ثابت» — زي زراير الصلاحيات بالظبط.
+//    العلامة بتتخزّن كلمة 'station' جوه caps بتاعة الحساب
+//    (نفس مكان الصلاحيات) — والسيرفر بيقرا نفس الكلمة.
+// ② hr.html: قوايم الموظفين (المواعيد والإعدادات والمرتبات) من غير
+//    الأجهزة الثابتة — من غير ما نلمس الصفحة.
+// ⚠️ لوحة الموظفين و«الحضور النهارده» بتتشال منهم على السيرفر (117).
+// ============================================================
+function ifxIsStationEntry(v){
+  return !!(v && typeof v === 'object' && Array.isArray(v.caps) && v.caps.indexOf('station') !== -1);
+}
+addEventListener('DOMContentLoaded', function(){
+  try{
+    var page = (location.pathname.split('/').pop() || '').toLowerCase().replace(/\.html$/,'') || 'index';
+
+    // ① لوحة الأدمن
+    if(page === 'admin' && typeof CAPS !== 'undefined' && Array.isArray(CAPS)
+       && !CAPS.some(function(c){ return c && c.key === 'station'; })){
+      CAPS.push({
+        key:'station', icon:'🖥️', label:'حساب جهاز ثابت (كمبيوتر المحل)',
+        hint:'مالوش حضور ولا انصراف ولا مرتب · مابيظهرش في شؤون العاملين · مابيتقفلش برّه الشيفت',
+        forRoles:['reception','accountant','callcenter','parts','tester','dispatcher','production','staff']
+      });
+      setTimeout(function(){
+        try{ if(document.querySelector('#wrap .sec') && typeof render === 'function') render(); }catch(e){}
+      }, 0);
+    }
+
+    // ② شؤون العاملين
+    if(page === 'hr'){
+      var wrapList = function(name){
+        try{
+          var fn = window[name];
+          if(typeof fn !== 'function' || fn.__st) return;
+          var w = function(){
+            var list = fn.apply(this, arguments) || [];
+            try{
+              var map = (typeof ROLES_MAP !== 'undefined' && ROLES_MAP) || {};
+              return list.filter(function(em){
+                var v = map[em] || map[String(em || '').toLowerCase()];
+                return !ifxIsStationEntry(v);
+              });
+            }catch(e){ return list; }
+          };
+          w.__st = 1;
+          window[name] = w;
+        }catch(e){ console.error('station hr ' + name + ':', e); }
+      };
+      wrapList('allEmployees');
+      wrapList('allPeople');
+    }
+  }catch(e){ console.error('station:', e); }
+});
+
+// ============================================================
 // 👥 شؤون العاملين على الـERP — تحميل erp-hr.js
 // ------------------------------------------------------------
 // 🧸 بالبلدي: كل مرتب يتصرف بقى ليه «سند صرف» برقم (ملف SQL رقم 106).

@@ -26,6 +26,9 @@
 //    و«ترتيب الاستلامات» (9301) بالظبط، فبيطلعوا فوقها ولما يتقفلوا
 //    يرجع يلاقي القفل.
 //
+// 🖥️ (ملف 117) «حساب جهاز ثابت» (كمبيوتر المحل): مابيتقفلش خالص، وزراير
+//    «المواعيد» و«مرتبك» بتستخبى من عنده — مالوش موظف يحضر أو ياخد مرتب.
+//
 // 📍 common.js بيحمّله في: dashboard · dispatch · parts · tester · staff
 // ⚠️ ملف 116 مااتشغّلش؟ → الملف بيسكت خالص (ولا بيقفل على حد).
 // ⚠️ النت فصل وهو مقفول؟ → بيفضل مقفول (مانفتحش بسبب غلطة نت).
@@ -129,6 +132,11 @@
       + '#ifxShiftLock .sl-err{color:var(--sl-red);font-size:12.5px;font-weight:800;min-height:18px;margin-bottom:6px;}'
       + '#ifxShiftLock .sl-ok{text-align:center;font:900 16px/1.8 Tajawal,sans-serif;color:var(--sl-green);padding:30px 10px;}'
 
+      // ===== 🖥️ حساب جهاز ثابت (ملف 117): من غير مواعيد ولا مرتب =====
+      // ⚠️ !important عشان attendance.js و payroll.js بيظهّروا الزراير بنفسهم كل شوية
+      + 'html.ifx-station .att-menu-btn,html.ifx-station .pay-menu-btn,html.ifx-station .pay-self-menu-btn,'
+      +   'html.ifx-station #payBanner,html.ifx-station .pay-dot{display:none !important;}'
+
       // ===== شارة «مفتوح مؤقت» =====
       + '#slChip{position:fixed;inset-inline-start:12px;bottom:calc(44px + env(safe-area-inset-bottom));z-index:9290;'
       +   'background:var(--sl-card);color:var(--sl-ink);border:1px solid var(--sl-ember);border-radius:999px;'
@@ -204,6 +212,9 @@
 
   function apply(){
     var st = S.st || {};
+    // 🖥️ (ملف 117) حساب جهاز ثابت: مالوش مواعيد ولا مرتب — الزراير تستخبى
+    document.documentElement.classList.toggle('ifx-station', !!st.station);
+    if(st.station){ css(); hideLock(); paintChip(); return; }
     if(st.role === 'super_admin'){
       if(PAGE === 'dashboard') adminBoot();
       return;
