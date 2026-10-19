@@ -1170,6 +1170,135 @@ const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
 })();
 
 // ============================================================
+// ⏻ «متأكد إنك عايز تخرج؟» — قبل تسجيل الخروج في كل الشاشات
+// ------------------------------------------------------------
+// 🧸 بالبلدي: زي حارس واقف على باب الخروج. أي زرار «تسجيل الخروج»
+//    في أي شاشة (المحاسب العام · أمين الخزنة · الاستقبال · مدير
+//    الإنتاج · الكول سنتر · HR · المالك · مسؤول الحركة · الفني ·
+//    مسؤول القطع · التيستر · الموظف) — أول ما تدوس عليه الحارس بيوقفك
+//    ويسألك: «متأكد؟». «أيوه، اخرج» → بيسيبك تخرج عادي.
+//    «لأ، خلّيني» (أو دوسة برّه الرسالة أو زرار Esc) → مفيش حاجة حصلت.
+//
+// 🔍 الحارس بيعرف زرار الخروج إزاي؟ بحاجة من الاتنين:
+//    ① الزرار مكتوب في onclick بتاعه كلمة logout
+//       (logout() · doLogout() · kebabLogout() · closeMenu(); doLogout())
+//    ② أو زرار/لينك مكتوب عليه «تسجيل الخروج»
+//    فأي شاشة جديدة بعد كده بتاخد الحارس لوحدها — من غير ما نلمسها.
+//
+// ⚠️ شاشات كانت بتسأل بنفسها (رسالة المتصفح الرمادي) — المالك ·
+//    مسؤول الحركة · الفني · القطع · التيستر: بعد ما تدوس «أيوه»
+//    بنقول لسؤالها القديم «هو وافق خلاص» — فمش بيتسأل مرتين.
+// ⚠️ الخروج اللي بيحصل لوحده (الاشتراك خلص · إيميل مش متسجّل)
+//    مش دوسة على زرار — فالحارس مابيقفلوش.
+// ⚠️ بنمسك الدوسة في أول الطريق (capture على document) — قبل ما
+//    توصل للزرار نفسه. وبعد «أيوه» بندوس الزرار تاني بإيدنا والحارس
+//    واخد إجازة اللحظة دي بس (bypass) — فكود الصفحة بيشتغل زي ما هو.
+// ============================================================
+(function(){
+  if(window.__ifxLogoutGuard) return;
+  window.__ifxLogoutGuard = true;
+
+  var bypass = false;         // إحنا اللي بندوس الزرار بعد «أيوه» → عدّي
+  var passConfirm = false;    // سؤال الصفحة القديم يعدّي من غير ما يظهر
+
+  // ① سؤال الصفحة القديم (confirm) — بيعدّي لوحده بعد «أيوه» بتاعتنا بس
+  try{
+    var nativeConfirm = window.confirm;
+    window.confirm = function(){
+      if(passConfirm){ passConfirm = false; return true; }
+      return nativeConfirm.apply(window, arguments);
+    };
+  }catch(e){}
+
+  // ② ده زرار خروج؟
+  function isLogoutEl(el){
+    if(!el || el.nodeType !== 1) return false;
+    if(el.hasAttribute('data-ifx-out-skip')) return false;
+    if(/logout/i.test(el.getAttribute('onclick') || '')) return true;
+    if(el.tagName === 'BUTTON' || el.tagName === 'A'){
+      var tx = (el.textContent || '').replace(/\s+/g, ' ');
+      if(tx.indexOf('تسجيل الخروج') !== -1) return true;
+    }
+    return false;
+  }
+
+  // ③ الرسالة نفسها — ألوانها مكتوبة ثابتة جوّاها عن قصد (زي شريط التحديث):
+  //    كل شاشة ليها أسماء ألوان مختلفة، والرسالة لازم تبان واحدة في الكل.
+  function ask(onYes){
+    if(document.getElementById('ifxOutOv') || !document.body) return;
+    var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    var C = dark
+      ? { card:'#17171A', ink:'#F2F2F0', sub:'#B4B6BC', line:'#2B2C31', no:'#232327', noInk:'#F2F2F0' }
+      : { card:'#FFFFFF', ink:'#0C0C0E', sub:'#5B5D64', line:'#E3E3DE', no:'#F2F2F0', noInk:'#0C0C0E' };
+
+    var ov = document.createElement('div');
+    ov.id = 'ifxOutOv';
+    ov.setAttribute('dir', 'rtl');
+    ov.setAttribute('role', 'dialog');
+    ov.setAttribute('aria-modal', 'true');
+    ov.style.cssText = 'position:fixed;inset:0;z-index:2147483600;background:rgba(8,10,14,.62);'
+      + 'display:flex;align-items:center;justify-content:center;padding:20px;'
+      + 'font-family:Tajawal,system-ui,-apple-system,"Segoe UI",sans-serif;';
+    ov.innerHTML =
+        '<div style="width:100%;max-width:360px;box-sizing:border-box;background:' + C.card + ';color:' + C.ink + ';'
+      +   'border-radius:18px;border-top:4px solid #FC6818;padding:22px 18px 16px;text-align:center;'
+      +   'box-shadow:0 22px 60px rgba(0,0,0,.4);">'
+      +   '<div style="width:58px;height:58px;margin:0 auto 12px;border-radius:50%;'
+      +     'background:rgba(252,104,24,.14);color:#FC6818;display:flex;align-items:center;'
+      +     'justify-content:center;font-size:28px;line-height:1;font-weight:900;">⏻</div>'
+      +   '<div style="font-family:Cairo,Tajawal,sans-serif;font-weight:900;font-size:18px;margin-bottom:8px;">تسجيل الخروج؟</div>'
+      +   '<div style="font-size:14px;line-height:1.9;color:' + C.sub + ';margin-bottom:18px;">'
+      +     'متأكد إنك عايز تخرج من حسابك؟<br>هتحتاج تدخل بالإيميل والباسورد تاني.</div>'
+      +   '<div style="display:flex;gap:10px;">'
+      +     '<button type="button" id="ifxOutNo" data-ifx-out-skip style="flex:1;border:1px solid ' + C.line + ';'
+      +       'background:' + C.no + ';color:' + C.noInk + ';border-radius:12px;padding:13px 10px;'
+      +       'font-family:inherit;font-weight:800;font-size:14.5px;cursor:pointer;">لأ، خلّيني</button>'
+      +     '<button type="button" id="ifxOutYes" data-ifx-out-skip style="flex:1;border:none;'
+      +       'background:#DC2626;color:#fff;border-radius:12px;padding:13px 10px;'
+      +       'font-family:inherit;font-weight:900;font-size:14.5px;cursor:pointer;">أيوه، اخرج ⏻</button>'
+      +   '</div>'
+      + '</div>';
+    document.body.appendChild(ov);
+
+    function close(){
+      document.removeEventListener('keydown', onKey, true);
+      if(ov.parentNode) ov.parentNode.removeChild(ov);
+    }
+    function onKey(e){
+      if(e.key === 'Escape'){ e.preventDefault(); e.stopPropagation(); close(); }
+    }
+    document.addEventListener('keydown', onKey, true);
+    ov.addEventListener('click', function(e){ if(e.target === ov) close(); });
+    document.getElementById('ifxOutNo').onclick = close;
+    document.getElementById('ifxOutYes').onclick = function(){ close(); onYes(); };
+    // «لأ» هو اللي عليه الدور — عشان Enter بالغلط مايخرّجكش
+    try{ document.getElementById('ifxOutNo').focus(); }catch(e){}
+  }
+
+  // ④ الحارس نفسه
+  document.addEventListener('click', function(e){
+    if(bypass) return;
+    var t = e.target;
+    var el = (t && t.closest) ? t.closest('button, a, [onclick]') : null;
+    if(!isLogoutEl(el)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+    ask(function(){
+      bypass = true;
+      passConfirm = true;
+      try{ el.click(); }
+      catch(err){ console.error('logout guard:', err); }
+      finally{
+        bypass = false;
+        // سؤال الصفحة القديم بيتسأل جوه الدوسة على طول — فلو ماتسألش، نقفل الباب
+        passConfirm = false;
+      }
+    });
+  }, true);
+})();
+
+// ============================================================
 // 🎨 (٢٠٢٦-١٠-١٩) هوية FIX TEAM — كل الشاشات من مكان واحد
 // ------------------------------------------------------------
 // 🧸 بالبلدي: اللوجو عبارة عن موبايل نايم على ضهره، شايل فوقه مفكّين
