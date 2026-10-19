@@ -936,28 +936,34 @@ const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
 })();
 
 // ============================================================
-// 🎨 (٢٠٢٦-١٠-١٩) ألوان لوجو FIX TEAM — لكل الشاشات من مكان واحد
+// 🎨 (٢٠٢٦-١٠-١٩) هوية FIX TEAM — كل الشاشات من مكان واحد
 // ------------------------------------------------------------
-// 🧸 بالبلدي: كل شاشة في النظام مدهونة بأسامي ألوان (متغيّرات) جوه
-//    ملفها هي. بدل ما نفتح كل شاشة وندهنها لوحدها (الداشبورد لوحده
-//    ميجا!)، الكود ده «بيدهن فوق» الأسامي دي من هنا — وcommon.js
-//    محمّل في كل الشاشات، فكلهم بيتلوّنوا مرة واحدة.
+// 🧸 بالبلدي: اللوجو عبارة عن موبايل نايم على ضهره، شايل فوقه مفكّين
+//    وترسين كأنه ترابيزة. التصميم ماشي على نفس الفكرة:
 //
-//    الألوان جاية من اللوجو نفسه:
-//      ⬛ أسود اللوجو   #0C0C0E → الشريط اللي فوق في كل الشاشات
-//      🟧 برتقالي اللوجو #FC6818 → خط رفيع تحت الشريط + الزراير
-//      ⬜ أبيض الترس    #F2F2F1 → الكلام على الأسود
-//    والوضع الغامق بقى رمادي فحمي (زي خلفية اللوجو) بدل الكحلي.
+//    ⭐ الشريط اللي فوق (أسود اللوجو) قاعد على «حرف موبايل» أبيض
+//       بفتحات السماعة الرمادي — زي ما العدة قاعدة على الموبايل في
+//       اللوجو بالظبط. ده توقيع التصميم في كل الشاشات.
+//    🔤 اسم FIX TEAM في الشريط مكتوب بخط عريض ممدود زي اللوجو:
+//       FIX أبيض و TEAM برتقالي.
+//    🛠️ مربع اللوجو الصغير بقى «العدة» بس (logo-mark.png) — الكلام
+//       في المقاس الصغير ده كان بيبقى مش مقري.
 //
-// ⚠️ ألوان الحالات (أخضر اتصلح · أحمر مرفوض · بنفسجي كشف …) **ماتغيّرتش**
-//    عن قصد — دي بتقول معلومة للموظف، مش ديكور.
-// ⚠️ على الفاتح، الزرار البرتقالي أغمق درجة (#D9530A) عن برتقالي
-//    اللوجو — الأبيض على البرتقالي الأصلي بيتقري بالعافية (تباين ٢٫٩).
-//    على الأسود بنستخدم البرتقالي الأصلي زي ما هو (تباين ٦٫٦).
-// ⚠️ ليه [data-ifx-brand] في الأسماء؟ عشان قاعدتنا «تكسب» قاعدة الشاشة
+//    الألوان من اللوجو نفسه (متاخدة بالقطّارة من الصورة):
+//      ⬛ #0C0C0E  أسود اللوجو  → الشريط + خلفية الغامق
+//      ⬜ #F2F2F0  أبيض الترس   → خلفية الفاتح + حرف الموبايل
+//      🟧 #FC6818  برتقالي العدة → الزراير (والكلام عليها أسود — زي
+//                                 TEAM البرتقالي على الأسود في اللوجو)
+//      🩶 #7F828B  رمادي السماعة → الكلام الثانوي والحدود
+//    على الفاتح البرتقالي درجة أعمق شوية (#EE5B10)، والأرقام والكلام
+//    البرتقالي على الأبيض أعمق كمان (#B8460A) عشان يتقري.
+//
+// ⚠️ ألوان الحالات (أخضر اتصلح · أحمر مرفوض · بنفسجي كشف …) زي ما هي
+//    عن قصد — دي معلومة للموظف، مش ديكور.
+// ⚠️ ليه [data-ifx-brand] في الأسماء؟ عشان قاعدتنا تكسب قاعدة الشاشة
 //    نفسها (الشاشة بتتكتب بعدنا في الصفحة، فلازم نبقى أقوى منها).
 // ⚠️ صفحة الدخول (index.html) مش بتحمّل common.js — اتلوّنت لوحدها.
-// 🔙 عايز ترجع الألوان القديمة؟ امسح البلوك ده كله. خلاص.
+// 🔙 عايز ترجع الشكل القديم؟ امسح البلوك ده كله. خلاص.
 // ============================================================
 (function(){
   if(window.__ifxBrand) return;
@@ -967,85 +973,164 @@ const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
     var root = document.documentElement;
     root.setAttribute('data-ifx-brand', '');
 
+    // 🔤 خط اسم المحل — Archivo الممدود (أقرب خط مجاني لحروف اللوجو)
+    try{
+      var fl = document.createElement('link');
+      fl.rel = 'stylesheet';
+      fl.href = 'https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@125,800;125,900&display=swap';
+      (document.head || root).appendChild(fl);
+    }catch(e){}
+
     var L = 'html[data-ifx-brand]:not([data-theme="dark"])';
     var D = 'html[data-ifx-brand][data-theme="dark"]';
     var A = 'html[data-ifx-brand]';
 
     // 🔴 «--red» في شاشات الفني والحركة والمالك كان لون اللوجو القديم
-    //    (التروس الحمرا) — فبقى برتقالي. في الشاشات التانية «--red»
-    //    معناه «خطر» فبيفضل أحمر.
+    //    (التروس الحمرا) — فبقى برتقالي. في الشاشات التانية معناه «خطر»
+    //    فبيفضل أحمر.
     var redIsBrand = ['my-devices','dispatch','owner'].indexOf(page) !== -1;
 
+    var NIGHT = '#0C0C0E', GEAR = '#F2F2F0', EMBER = '#FC6818', SLOT = '#7F828B';
+
     var css =
-      // ===== ☀️ الفاتح =====
+      // ===== ☀️ الفاتح — ورق بلون الترس الأبيض =====
       L + '{'
-      + '--ifx-orange:#FC6818;'
-      // عيلة الداشبورد
-      + '--bg:#E9E9E6;--surface:#FFFFFF;--surface-2:#F7F7F5;--surface-3:#F0F0EE;--surface-alt:#EEEEEC;'
-      + '--border:#E2E2DE;--border-strong:#CFCFC9;'
-      + '--ink:#141416;--ink-2:#4A4A50;--ink-3:#2E2E33;--muted:#6B6B72;--muted-2:#6B6B72;'
-      + '--accent:#D9530A;--accent-dark:#B8460A;--on-accent:#FFFFFF;'
-      + '--chrome:#0C0C0E;--chrome-ink:#F2F2F1;'
-      // عيلة الفني/الحركة/المالك + الصفحات الجديدة
-      + '--on-chrome:#F2F2F1;--steel:#0C0C0E;--steel-2:#1F1F23;--steel-ink:#F2F2F1;'
-      + '--paper:#E9E9E6;--card:#FFFFFF;--line:#E2E2DE;--soft:#F3F3F1;--faint:#96969C;'
-      + '--brand:#D9530A;'
-      + (redIsBrand ? '--red:#D9530A;--red-dark:#B8460A;' : '')
+      + '--bg:#ECECE9;--surface:#FFFFFF;--surface-2:#F6F6F4;--surface-3:#EFEFEC;--surface-alt:#EFEFEC;'
+      + '--border:#DEDED9;--border-strong:#C9C9C3;'
+      + '--ink:#0C0C0E;--ink-2:#45464C;--ink-3:#2A2B30;--muted:#6A6C73;--muted-2:#6A6C73;'
+      + '--accent:#EE5B10;--accent-dark:#D44F0B;--on-accent:#0C0C0E;--ifx-ember-ink:#B8460A;'
+      + '--chrome:' + NIGHT + ';--chrome-ink:' + GEAR + ';'
+      + '--on-chrome:' + GEAR + ';--steel:' + NIGHT + ';--steel-2:#1E1E22;--steel-ink:' + GEAR + ';'
+      + '--paper:#ECECE9;--card:#FFFFFF;--line:#DEDED9;--soft:#F4F4F1;--faint:#8E9097;'
+      + '--brand:#EE5B10;'
+      + (redIsBrand ? '--red:#E04F07;--red-dark:#B8460A;' : '')
       + '}'
-      // ===== 🌙 الغامق =====
+      // ===== 🌙 الغامق — خلفية اللوجو نفسها =====
       + D + '{'
-      + '--ifx-orange:#FC6818;'
-      + '--bg:#0E0E10;--surface:#18181B;--surface-2:#202024;--surface-3:#28282D;--surface-alt:#202024;'
-      + '--border:#2D2D33;--border-strong:#3C3C43;'
-      + '--ink:#F2F2F1;--ink-2:#C9C9CD;--ink-3:#DADADD;--muted:#9A9AA2;--muted-2:#7C7C84;'
-      + '--accent:#FF7A2E;--accent-dark:#FF904F;--on-accent:#140A04;'
-      + '--chrome:#09090A;--chrome-ink:#F2F2F1;'
-      + '--on-chrome:#F2F2F1;--on-color:#0C0C0E;--steel:#09090A;--steel-2:#18181B;--steel-ink:#F2F2F1;'
-      + '--paper:#0E0E10;--card:#18181B;--line:#2D2D33;--soft:#202024;--faint:#74747C;'
-      + '--brand:#FF7A2E;'
-      + (redIsBrand ? '--red:#FF7A2E;--red-dark:#FF904F;' : '')
+      + '--bg:' + NIGHT + ';--surface:#17171A;--surface-2:#1F1F23;--surface-3:#27272C;--surface-alt:#1F1F23;'
+      + '--border:#2B2C31;--border-strong:#3A3B41;'
+      + '--ink:' + GEAR + ';--ink-2:#C6C7CB;--ink-3:#DCDDDF;--muted:#9A9CA3;--muted-2:' + SLOT + ';'
+      + '--accent:' + EMBER + ';--accent-dark:#FF8040;--on-accent:' + NIGHT + ';--ifx-ember-ink:#FF8A4C;'
+      + '--chrome:#060607;--chrome-ink:' + GEAR + ';'
+      + '--on-chrome:' + GEAR + ';--on-color:' + NIGHT + ';--steel:#060607;--steel-2:#17171A;--steel-ink:' + GEAR + ';'
+      + '--paper:' + NIGHT + ';--card:#17171A;--line:#2B2C31;--soft:#1F1F23;--faint:' + SLOT + ';'
+      + '--brand:' + EMBER + ';'
+      + (redIsBrand ? '--red:' + EMBER + ';--red-dark:#FF8040;' : '')
       + '}'
 
-      // ===== ⭐ التوقيع: خط برتقالي رفيع تحت الشريط الأسود — زي اللوجو بالظبط =====
-      + A + ' .topbar{box-shadow:inset 0 -3px 0 #FC6818, 0 2px 10px rgba(0,0,0,.22) !important;}'
+      // ===== ⭐ التوقيع: الشريط قاعد على حرف الموبايل =====
+      // من تحت لفوق: جسم الموبايل الأبيض (٦px) وفيه ٣ فتحات سماعة رمادي
+      // (قصيرة + طويلة + طويلة — زي اللوجو) · فراغ أسود · خط رفيع أبيض.
+      // كله رسم خلفية — من غير ولا عنصر زيادة في الصفحة.
+      // ⚠️ قطعة مرسومة (::after) لازقة في قاع الشريط — مش عنصر في الصفحة.
+      //    حواف مدوّرة من تحت زي الموبايل · خط رفيع فوقه (حرف الشاشة) ·
+      //    ٣ فتحات سماعة: قصيرة + طويلة + طويلة — من ناحية الشمال زي اللوجو.
+      + A + ' .topbar{background:var(--chrome) !important;padding-bottom:26px !important;'
+      +   'border-bottom:none !important;box-shadow:0 8px 20px rgba(12,12,14,.16) !important;}'
+      + A + ' .topbar::after{content:"";position:absolute;inset-inline:12px;bottom:6px;height:9px;'
+      +   'pointer-events:none;border-radius:2px 2px 7px 7px;'
+      +   'background-color:' + GEAR + ';'
+      +   'background-image:linear-gradient(' + SLOT + ',' + SLOT + '),linear-gradient(' + SLOT + ',' + SLOT + '),linear-gradient(' + SLOT + ',' + SLOT + ');'
+      +   'background-size:10px 3px,22px 3px,22px 3px;'
+      +   'background-position:left 18px center,left 36px center,left 66px center;'
+      +   'background-repeat:no-repeat;border-radius:2px 2px 7px 7px;'
+      +   'box-shadow:0 -5px 0 -3px ' + GEAR + ';}'
 
-      // ===== الزراير البرتقالي في الغامق: الكلام عليها أسود (الأبيض مش باين) =====
-      + D + ' .btn-primary,' + D + ' .tv-ok,' + D + ' .acc-save,' + D + ' .due-chip.on,'
-      + D + ' .pr-q.on,' + D + ' .oh-back,' + D + ' .tv-sw.on{color:var(--on-accent);}'
+      // ===== 🔤 اسم FIX TEAM زي اللوجو =====
+      + '.ifx-wm{font-family:"Archivo","Cairo",sans-serif;font-stretch:125%;font-weight:900;'
+      +   'letter-spacing:.02em;direction:ltr;unicode-bidi:isolate;color:' + GEAR + ';}'
+      + '.ifx-wm b{color:' + EMBER + ';font-weight:inherit;}'
+      // 🛠️ مربع اللوجو → العدة بس، عريضة زي اللوجو
+      + A + ' .topbar .brand .logo.ifx-mark{width:66px;height:32px;flex:0 0 66px;aspect-ratio:auto;'
+      +   'background:none !important;border-radius:0;overflow:visible;}'
+      + A + ' .topbar .brand .logo.ifx-mark img{object-fit:contain !important;border-radius:0 !important;}'
+      + A + ' .topbar .brand p{color:#9CA0A8;}'
 
-      // ===== لمسات كانت مكتوبة باللون الفيروزي القديم بالإيد =====
-      + A + ' .topbar-actions .btn-primary{box-shadow:0 3px 12px rgba(217,83,10,.32);}'
-      + A + ' .tech-select:focus{box-shadow:0 0 0 3px rgba(252,104,24,.18);}'
+      // ===== 🟧 الزرار البرتقالي: الكلام عليه أسود — زي TEAM على الأسود =====
+      + A + ' .btn-primary,' + A + ' .tv-ok,' + A + ' .acc-save,' + A + ' .due-chip.on,'
+      + A + ' .pr-q.on,' + A + ' .oh-back{color:var(--on-accent) !important;}'
+      + A + ' .btn-primary{font-weight:800;}'
+      + A + ' .btn-primary:disabled{color:var(--muted) !important;}'
+      + A + ' .topbar-actions .btn-primary{box-shadow:0 0 0 1px rgba(252,104,24,.35), 0 4px 14px rgba(252,104,24,.28);}'
+      // الزراير الشفافة على الشريط الأسود — إطار رمادي السماعة
+      + A + ' .topbar .btn-secondary,' + A + ' .topbar .menu-btn{background:rgba(242,242,240,.06);border-color:rgba(127,130,139,.55);}'
+      + A + ' .topbar .btn-secondary:hover,' + A + ' .topbar .menu-btn:hover{background:rgba(242,242,240,.12);}'
+
+      // ===== الكلام البرتقالي على الأبيض = درجة أعمق عشان يتقري =====
+      + A + ' .card-price,' + A + ' .timeline-duration,' + A + ' .ip-nums,' + A + ' .pr-back,'
+      + A + ' .iv-act,' + A + ' .set-opt.active .sub{color:var(--ifx-ember-ink) !important;}'
+      + A + ' .timeline-item{border-right-color:var(--accent);}'
+
+      // ===== لمسات كانت فيروزي ثابت =====
+      + A + ' .tech-select:focus{box-shadow:0 0 0 3px rgba(252,104,24,.20);}'
       + A + ' .gs-box:focus-within{box-shadow:0 3px 16px rgba(252,104,24,.16);}'
-      + A + ' .field input:focus,' + A + ' .field textarea:focus{outline-color:rgba(252,104,24,.35);}'
+      + A + ' .field input:focus,' + A + ' .field textarea:focus{outline-color:rgba(252,104,24,.40);}'
+      + A + ' :focus-visible{outline-color:' + EMBER + ';}'
       + A + ' .set-opt.active{background:rgba(252,104,24,.08);}'
       + A + ' .inv-card.open{box-shadow:0 4px 16px rgba(252,104,24,.20);}'
       + A + ' .ip-fill{background:var(--accent);}'
-      + L + ' .tv-mode-btn.sel{background:#FFF1E8;}'
-      + D + ' .tv-mode-btn.sel{background:rgba(255,122,46,.14);}'
-      // الحدود الرمادي المزرقّة في الفاتح (الداشبورد) → رمادي محايد زي ورق اللوجو
-      + L + ' .column{border-inline-color:#D9D9D3;border-bottom-color:#D9D9D3;}'
-      + L + ' .day-column,' + L + ' .menu-dropdown{border-color:#D9D9D3;}'
+      + A + ' .tv-mode-btn.sel{background:rgba(252,104,24,.10);color:var(--ifx-ember-ink);}'
+      + A + ' .inv-chip.active{box-shadow:inset 0 -2px 0 ' + EMBER + ';}'
+      // الحدود الرمادي المزرقّة في الفاتح → رمادي محايد زي الترس
+      + L + ' .column{border-inline-color:#D6D6D0;border-bottom-color:#D6D6D0;}'
+      + L + ' .day-column,' + L + ' .menu-dropdown{border-color:#D6D6D0;}'
+      // عناوين مجموعات القايمة ⋮ بلون السماعة
+      + A + ' .menu-dropdown .mh{color:' + SLOT + ';}'
 
-      // ===== حاجات common.js نفسه (كانت فيروزي ثابت) =====
-      + '#ifxUpdBar{background:#0C0C0E !important;border:1px solid #FC6818;}'
-      + '#ifxUpdGo{background:#FC6818 !important;color:#0C0C0E !important;}'
-      + '#svcStopOv{background:#0C0C0E !important;}'
-      + '#svcStopOk{background:#FC6818 !important;color:#0C0C0E !important;}'
-      + '#accSharedOv button[onclick^="saveAccountShared"]{background:#FC6818 !important;color:#0C0C0E !important;}';
+      // ===== حاجات common.js نفسه =====
+      + '#ifxUpdBar{background:' + NIGHT + ' !important;box-shadow:inset 0 -3px 0 ' + EMBER + ', 0 12px 32px rgba(0,0,0,.35) !important;}'
+      + '#ifxUpdGo{background:' + EMBER + ' !important;color:' + NIGHT + ' !important;}'
+      + '#svcStopOv{background:' + NIGHT + ' !important;}'
+      + '#svcStopOk{background:' + EMBER + ' !important;color:' + NIGHT + ' !important;}'
+      + '#accSharedOv button[onclick^="saveAccountShared"]{background:' + EMBER + ' !important;color:' + NIGHT + ' !important;}';
 
     var st = document.createElement('style');
     st.id = 'ifxBrandCss';
     st.textContent = css;
     (document.head || root).appendChild(st);
 
-    // ===== لون شريط الساعة على الموبايل = لون الشريط اللي فوق =====
+    // ===== 🔤 + 🛠️ اسم المحل وشعاره في الشريط =====
+    // ⚠️ بنلمس بس العنصر اللي كلامه «FIX TEAM» بالظبط ومالوش ولاد —
+    //    أي عنوان تاني في الشريط (زي «أجهزتي») مابيتلمسش.
+    function swapMark(lg, img){
+      if(lg.dataset.ifxProbe) return;
+      lg.dataset.ifxProbe = '1';
+      var probe = new Image();
+      probe.onload = function(){ lg.classList.add('ifx-mark'); img.src = 'logo-mark.png'; };
+      probe.src = 'logo-mark.png';   // الملف مش مرفوع؟ → الأيقونة القديمة تفضل زي ما هي
+    }
+    function dressHeader(){
+      try{
+        var bars = document.querySelectorAll('.topbar');
+        for(var b = 0; b < bars.length; b++){
+          var els = bars[b].querySelectorAll('h1, h2, .brand-name, .brand-title, span, div, b, strong');
+          for(var i = 0; i < els.length; i++){
+            var el = els[i];
+            if(el.children.length || el.dataset.ifxWm) continue;
+            if(!/^\s*FIX\s+TEAM\s*$/i.test(el.textContent || '')) continue;
+            el.dataset.ifxWm = '1';
+            el.innerHTML = '<span class="ifx-wm">FIX <b>TEAM</b></span>';
+          }
+          // ::after محتاج الشريط يكون «متموضع» — لو static بنخليه relative
+          if(getComputedStyle(bars[b]).position === 'static') bars[b].style.position = 'relative';
+          var lg = bars[b].querySelector('.brand .logo');
+          if(lg && !lg.classList.contains('ifx-mark')){
+            var img = lg.querySelector('img');
+            if(img) swapMark(lg, img);
+          }
+        }
+      }catch(e){ console.warn('ifx header:', e); }
+    }
+    if(document.readyState === 'loading') addEventListener('DOMContentLoaded', dressHeader);
+    else dressHeader();
+    setTimeout(dressHeader, 1500);   // شاشات بترسم الشريط متأخر
+
+    // ===== لون شريط الساعة على الموبايل = أسود الشريط =====
     // ⚠️ كل شاشة بتحط لونها القديم (كحلي) وقت ما الثيم يتغيّر —
     //    فبنراقب ونرجّعه أسود كل مرة.
     function syncBar(){
       try{
-        var dark = root.getAttribute('data-theme') === 'dark';
-        var want = dark ? '#09090A' : '#0C0C0E';
+        var want = root.getAttribute('data-theme') === 'dark' ? '#060607' : NIGHT;
         var metas = document.querySelectorAll('meta[name="theme-color"]');
         for(var i = 0; i < metas.length; i++){
           if(metas[i].getAttribute('content') !== want) metas[i].setAttribute('content', want);
