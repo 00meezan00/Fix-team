@@ -415,6 +415,29 @@ addEventListener('DOMContentLoaded', function(){
 });
 
 // ============================================================
+// 🏆 ترتيب الفنيين عند المالك — تحميل tech-board-view.js
+// ------------------------------------------------------------
+// 🧸 بالبلدي: الفني بيشوف «🏆 ترتيب الفنيين» في صفحته من زمان.
+//    المالك ماكانش عنده. الملف الصغير ده بيحط الزرار في قايمة ⋮
+//    عند المالك ويعرض نفس الترتيب اللي الداشبورد بينشره — من غير
+//    ما نلمس owner.html الكبيرة.
+// ⚠️ مفيش SQL: درج «tech-board» مفتوح للقراية لكل اللي داخل النظام.
+// ⚠️ لو الملف مش مرفوع: الزرار مابيظهرش وخلاص — ولا صفحة بتقع.
+// ============================================================
+addEventListener('DOMContentLoaded', function(){
+  try{
+    var page = (location.pathname.split('/').pop() || '').toLowerCase().replace(/\.html$/,'');
+    if(page !== 'owner') return;
+    if(window.IFixTechBoard || document.getElementById('tbvScript')) return;
+    var s = document.createElement('script');
+    s.id = 'tbvScript';
+    s.src = 'tech-board-view.js';
+    s.onerror = function(){ console.error('فشل تحميل tech-board-view.js — «ترتيب الفنيين» مش هيظهر عند المالك'); };
+    document.head.appendChild(s);
+  }catch(e){ console.error('tech-board loader:', e); }
+});
+
+// ============================================================
 // 👥 شؤون العاملين على الـERP — تحميل erp-hr.js
 // ------------------------------------------------------------
 // 🧸 بالبلدي: كل مرتب يتصرف بقى ليه «سند صرف» برقم (ملف SQL رقم 106).
