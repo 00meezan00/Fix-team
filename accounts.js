@@ -1,5 +1,5 @@
 // ============================================================
-// I Fix Team — شاشة الحسابات المشتركة (accounts.js)
+// FIX TEAM — شاشة الحسابات المشتركة (accounts.js)
 // ------------------------------------------------------------
 // الملف ده فيه **الجزء اللي بيعرض بس** من شاشة "آجل المحلات":
 // القراءة · البحث · الكروت · كشف المحل · تصدير PDF.
@@ -1044,9 +1044,9 @@ function accPdfPage(data, rows, pageNo, pageCount, colW, withHead){
     }
     c.textAlign = 'left';
     c.font = accPdfFont(15, 900);
-    c.fillText('I FIX TEAM', P + 18 * S, y + 32 * S);
+    c.fillText('FIX TEAM', P + 18 * S, y + 32 * S);
     c.font = accPdfFont(9.5, 400);
-    c.fillText('FOR MOBILE SERVICES', P + 18 * S, y + 50 * S);
+    c.fillText('ALL MOBILE SERVICES', P + 18 * S, y + 50 * S);
     y += bh + 14 * S;
 
     if(data.cards.length){
@@ -1112,7 +1112,7 @@ function accPdfPage(data, rows, pageNo, pageCount, colW, withHead){
   c.fillStyle = '#6B7280';
   c.font = accPdfFont(10, 400);
   c.textAlign = 'right';
-  c.fillText('نظام I Fix Team لإدارة الصيانة', W - P, H - P / 2);
+  c.fillText('نظام FIX TEAM لإدارة الصيانة', W - P, H - P / 2);
   c.textAlign = 'left';
   c.fillText('صفحة ' + pageNo + ' من ' + pageCount, P, H - P / 2);
   return cv;
@@ -1377,7 +1377,7 @@ function exportShopPdf(shop){
   </style></head><body>
     <div class="head">
       <div><h1>كشف حساب: ${esc(shop)}</h1><div class="sub">تاريخ الكشف: ${new Date().toLocaleDateString('ar-EG')} — ${new Date().toLocaleTimeString('ar-EG')}</div></div>
-      <div class="brand">I FIX TEAM<br><small style="font-weight:400;font-size:11px;">FOR MOBILE SERVICES</small></div>
+      <div class="brand">FIX TEAM<br><small style="font-weight:400;font-size:11px;">ALL MOBILE SERVICES</small></div>
     </div>
     <div class="totals">
       <div class="tcard" style="background:#B45309;"><div class="lbl">إجمالي الآجل (عليه)</div><div class="num">${debit.toLocaleString('en-EG')} ج.م</div></div>
@@ -1388,7 +1388,7 @@ function exportShopPdf(shop){
       <tr><th style="width:12%;">تاريخ الدخول</th><th style="width:12%;">تاريخ الخروج</th><th style="width:21%;">البيان</th><th style="width:17%;">العطل</th><th style="width:8%;">اللون</th><th style="width:10%;">${esc(ACC_BB_LABEL)}</th><th>عليه (آجل)</th><th>له (دفعات)</th></tr>
       ${rowsHtml || '<tr><td colspan="8">مفيش حركات متسجلة</td></tr>'}
     </table>
-    <div class="foot"><span>نظام I Fix Team لإدارة الصيانة</span><span>عدد الحركات: ${realCount}</span></div>
+    <div class="foot"><span>نظام FIX TEAM لإدارة الصيانة</span><span>عدد الحركات: ${realCount}</span></div>
   </body></html>`, 'كشف حساب — ' + shop);
 }
 
@@ -1489,7 +1489,7 @@ function accWithRange(r, fn){
 // 📊 كتابة الفترة في ملف الإكسل
 // ------------------------------------------------------------
 // دوال الإكسل مكتوبة في الداشبورد، وكلها بتكتب في الخانة A2 سطر
-// «I Fix Team … تاريخ الكشف». عايزين نزوّد عليه «الفترة: …».
+// «FIX TEAM … تاريخ الكشف». عايزين نزوّد عليه «الفترة: …».
 //
 // 🧠 بالبلدي: بنقف على باب «اعمل ورقة جديدة» لحظة واحدة بس.
 //    أول ما الداشبورد يعمل الورقة، بنعلّم عليها: «قبل ما
