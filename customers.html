@@ -20,7 +20,7 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
 })();
 </script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>حسابات العملاء — I Fix Team</title>
+<title>حسابات العملاء — FIX TEAM</title>
 <meta name="theme-color" content="#16233A">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -970,7 +970,7 @@ async function exportShopExcel(shop){
   ws.getCell('A1').font = { size:16, bold:true, color:{argb:'FF1F3864'} };
   ws.getCell('A1').alignment = { horizontal:'center' };
   ws.mergeCells('A2:H2');
-  ws.getCell('A2').value = 'I Fix Team for Mobile Services — تاريخ الكشف: ' + new Date().toLocaleDateString('ar-EG');
+  ws.getCell('A2').value = 'FIX TEAM — All Mobile Services — تاريخ الكشف: ' + new Date().toLocaleDateString('ar-EG');
   ws.getCell('A2').font = { size:11, color:{argb:'FF6B7280'} };
   ws.getCell('A2').alignment = { horizontal:'center' };
   ws.getCell('A3').value = 'إجمالي الآجل (عليه)';
@@ -1077,7 +1077,7 @@ async function waBalance(){
   const debit = act.filter(l => Number(l.signed_amount) > 0).reduce((t, l) => t + Number(l.signed_amount), 0);
   const credit = act.filter(l => Number(l.signed_amount) < 0).reduce((t, l) => t - Number(l.signed_amount), 0);
   openWa(ph,
-    `السلام عليكم 🌹\nده ملخص حسابكم عندنا في *I Fix Team* لغاية ${new Date().toLocaleDateString('ar-EG')}:\n\n` +
+    `السلام عليكم 🌹\nده ملخص حسابكم عندنا في *FIX TEAM* لغاية ${new Date().toLocaleDateString('ar-EG')}:\n\n` +
     `إجمالي الأجهزة الآجلة: *${fmt(debit)} ج.م*\n` +
     `إجمالي المدفوع: *${fmt(credit)} ج.م*\n` +
     `المتبقي: *${fmt(debit - credit)} ج.م*\n\n` +
@@ -1090,7 +1090,7 @@ async function sendPaymentNotice(c, amount, balance){
   try{ day = new Date().toLocaleDateString('ar-EG', { weekday:'long', year:'numeric', month:'long', day:'numeric' }); }
   catch(e){ day = new Date().toLocaleDateString('ar-EG'); }
   const L = ['السلام عليكم 🌹'];
-  L.push(`تم استلام دفعة بمبلغ *${fmt(amount)} ج.م* من حسابكم لدى *شركة Fix Team للصيانة* يوم ${day} ✅`);
+  L.push(`تم استلام دفعة بمبلغ *${fmt(amount)} ج.م* من حسابكم لدى *شركة FIX TEAM للصيانة* يوم ${day} ✅`);
   if(balance > 0)      L.push(`📒 المتبقي على حسابكم: *${fmt(balance)} ج.م*`);
   else if(balance < 0) L.push(`📒 حسابكم خالص، وليكم رصيد عندنا *${fmt(-balance)} ج.م* 💚`);
   else                 L.push('📒 حسابكم بقى *خالص تمامًا* 🎉 متشكرين جدًا على التزامكم');

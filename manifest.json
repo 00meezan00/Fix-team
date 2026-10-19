@@ -1,6 +1,6 @@
 {
-  "name": "I Fix Team — نظام إدارة الصيانة",
-  "short_name": "I Fix Team",
+  "name": "FIX TEAM — نظام إدارة الصيانة",
+  "short_name": "FIX TEAM",
   "description": "نظام إدارة صيانة الموبايلات — استقبال أجهزة، تتبع الحالات، الحسابات والجرد",
   "start_url": "index.html",
   "scope": ".",

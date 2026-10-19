@@ -1,5 +1,5 @@
 /* ============================================================
-   I Fix Team — طبقة تعدد اللغات (i18n)
+   FIX TEAM — طبقة تعدد اللغات (i18n)
    ملف واحد مشترك بين كل صفحات النظام.
    الاستخدام:
      t('btn.newDevice')                  → النص حسب اللغة الحالية
@@ -19,7 +19,7 @@
   const STRINGS = {
     ar: {
       /* الهوية والرأس */
-      'app.name': 'I Fix Team',
+      'app.name': 'FIX TEAM',
       'app.subtitle': 'نظام إدارة الصيانة',
       'app.loading': 'جارٍ التحميل...',
       'app.langName': 'العربية',
@@ -233,7 +233,7 @@
       'rp.noResults': 'مفيش نتيجة للبحث ده',
       'rp.offlineEdit': 'مفيش نت — التعديل مش هيتحفظ 📴',
       'rp.offlineBar': '📴 مفيش نت — بتشوف آخر نسخة محفوظة، والتعديل مش هيتحفظ',
-      'tp.title': 'أجهزتي — I Fix Team',
+      'tp.title': 'أجهزتي — FIX TEAM',
       'tp.hello': 'أهلاً بيك 👋',
       'tp.myWork': 'شغلي دلوقتي',
       'tp.assisting': 'بشارك في صيانتها',
@@ -269,7 +269,7 @@
       'tp.reqReturn': 'طلب إرجاع',
       'tp.roleTech': 'فني',
       'tp.noTechYet': 'لسه من غير فني',
-      'dp.title': 'مسؤول الحركة — I Fix Team',
+      'dp.title': 'مسؤول الحركة — FIX TEAM',
       'dp.role': 'مسؤول الحركة',
       'dp.newDevice': 'جهاز جديد',
       'dp.refresh': '🔄 تحديث',
@@ -524,7 +524,7 @@
 
       /* لوحة الأدمن */
       'adm.title': 'لوحة تحكم الأدمن',
-      'adm.subtitle': 'I Fix Team — إدارة النظام',
+      'adm.subtitle': 'FIX TEAM — إدارة النظام',
       'adm.checking': 'جارٍ التحقق…',
       'adm.currentMode': 'الوضع الحالي للنظام',
       'adm.modeBeta': 'وضع البيتا',
@@ -636,7 +636,7 @@
       'acc.deleteEntry': 'حذف',
       'sys.betaBanner': 'فترة تجريبية قبل إطلاق النسخة الكاملة من التطبيق',
       'sys.trialBanner': 'فترة مجانية — متبقّي {n} يوماً على الاشتراك',
-      'sys.betaTitle': 'مرحباً بك في I Fix Team!',
+      'sys.betaTitle': 'مرحباً بك في FIX TEAM!',
       'sys.betaBody': 'أنت تستخدم حالياً النسخة التجريبية (Beta) قبل الإطلاق الرسمي للنسخة الكاملة من التطبيق.',
       'sys.trialTitle': 'بدأت فترتك المجانية',
       'sys.trialBody': 'أنت الآن في الفترة المجانية ({d} يوماً). متبقّي {n} يوماً، وبعدها يلزم الاشتراك للاستمرار في استخدام النظام.',
@@ -724,7 +724,7 @@
     },
 
     en: {
-      'app.name': 'I Fix Team',
+      'app.name': 'FIX TEAM',
       'app.subtitle': 'Repair Management System',
       'app.loading': 'Loading...',
       'app.langName': 'English',
@@ -928,7 +928,7 @@
       'rp.noResults': 'No results for this search',
       'rp.offlineEdit': 'No connection — changes won\'t be saved 📴',
       'rp.offlineBar': '📴 No connection — showing the last saved copy; changes won\'t be saved',
-      'tp.title': 'My devices — I Fix Team',
+      'tp.title': 'My devices — FIX TEAM',
       'tp.hello': 'Welcome 👋',
       'tp.myWork': 'My work now',
       'tp.assisting': 'Assisting on',
@@ -964,7 +964,7 @@
       'tp.reqReturn': 'Return request',
       'tp.roleTech': 'Technician',
       'tp.noTechYet': 'No technician yet',
-      'dp.title': 'Dispatcher — I Fix Team',
+      'dp.title': 'Dispatcher — FIX TEAM',
       'dp.role': 'Dispatcher',
       'dp.newDevice': 'New device',
       'dp.refresh': '🔄 Refresh',
@@ -1219,7 +1219,7 @@
 
       /* Admin panel */
       'adm.title': 'Admin Control Panel',
-      'adm.subtitle': 'I Fix Team — System Administration',
+      'adm.subtitle': 'FIX TEAM — System Administration',
       'adm.checking': 'Verifying…',
       'adm.currentMode': 'Current system mode',
       'adm.modeBeta': 'Beta Mode',
@@ -1328,7 +1328,7 @@
       'acc.deleteEntry': 'Delete',
       'sys.betaBanner': 'Beta period before the full app release',
       'sys.trialBanner': 'Free trial — {n} days left before subscription',
-      'sys.betaTitle': 'Welcome to I Fix Team!',
+      'sys.betaTitle': 'Welcome to FIX TEAM!',
       'sys.betaBody': 'You are currently using the Beta version, ahead of the official full release.',
       'sys.trialTitle': 'Your free trial has started',
       'sys.trialBody': 'You are in the free trial ({d} days). {n} days remain, after which a subscription is required to continue.',

@@ -1,5 +1,5 @@
 // ============================================================
-// I Fix Team — محرك طباعة الليبل المشترك (label.js)
+// FIX TEAM — محرك طباعة الليبل المشترك (label.js)
 // ------------------------------------------------------------
 // اتنقل من dashboard.html عشان صفحة الديسباتشر تستخدمه كمان.
 // الطباعة الحرارية شغل دقيق (مقاسات ومليمترات وهامش الباركود)،
@@ -157,7 +157,7 @@ function getLabelSize(){
     const v = JSON.parse(localStorage.getItem(LABEL_SIZE_KEY));
     if(v && v.w > 0 && v.h > 0) return v;
   }catch(e){}
-  return { w: 37, h: 25 };   // مقاس ليبل I Fix Team — عدّله من الخانات لو اتغير
+  return { w: 37, h: 25 };   // مقاس ليبل FIX TEAM — عدّله من الخانات لو اتغير
 }
 
 function saveLabelSize(){
@@ -190,7 +190,7 @@ function renderLabelInto(containerId, d){
         : (d.reportedIssue ? `<div class="label-row">${esc(d.reportedIssue)}</div>` : '')}
       <div class="label-row">${esc(lblShortDate(d.intakeDate))}</div>
       <div id="qrHolder"></div>
-      <div style="font-family:'Cairo',-apple-system,'SF Arabic',sans-serif; font-weight:900; font-size:13px; letter-spacing:.5px;">I FIX TEAM</div>
+      <div style="font-family:'Cairo',-apple-system,'SF Arabic',sans-serif; font-weight:900; font-size:13px; letter-spacing:.5px;">FIX TEAM</div>
       ${d.conditionNotes ? `<div style="border-top:1px solid var(--border-strong); margin-top:8px; padding-top:6px; font-size:${d.conditionNotes.length > 60 ? 9 : d.conditionNotes.length > 30 ? 10 : 11}px; font-weight:700; line-height:1.5; text-align:right;">${esc(d.conditionNotes)}</div>` : ''}
     </div>
     <div class="label-size-row">
@@ -441,7 +441,7 @@ async function renderLabelImage(d, sz, qrDataUrl){
   setFont(900, fBrand, 'Cairo');
   x.direction = 'ltr'; x.textAlign = 'center';
   try{ x.letterSpacing = mm(0.15).toFixed(2) + 'px'; }catch(e){}
-  x.fillText('I FIX TEAM', qrX + qrSz / 2, qrY + qrSz + brandMargin + fBrand / 2);
+  x.fillText('FIX TEAM', qrX + qrSz / 2, qrY + qrSz + brandMargin + fBrand / 2);
   try{ x.letterSpacing = '0px'; }catch(e){}
 
   // النصوص على الشمال (المسافة بين العمودين = نفس الحشو)
@@ -685,7 +685,7 @@ function browserPrintLabel(){
   const fDev  = Math.max(1.9, sz.h * 0.122 * k).toFixed(2);   // نوع الجهاز والموديل
   const fIssue= Math.max(1.7, sz.h * 0.100 * k).toFixed(2);   // المشكلة
   const fDate = Math.max(1.5, sz.h * 0.090 * k).toFixed(2);   // تاريخ الدخول
-  const fBrand= Math.max(1.4, sz.h * 0.088 * k).toFixed(2);   // اسم I FIX TEAM تحت الباركود
+  const fBrand= Math.max(1.4, sz.h * 0.088 * k).toFixed(2);   // اسم FIX TEAM تحت الباركود
 
   // الهامش الأبيض حوالين الكود — نفس معادلة renderLabelImage بالحرف.
   // ⚠️ أي تعديل هنا لازم يتعمل في المكانين وإلا الليبل يطلع مختلف
@@ -772,7 +772,7 @@ function browserPrintLabel(){
   <div class="top">
   <div class="qrbox">
     ${qr ? `<div class="qr"><img src="${qr}" alt=""></div>` : ''}
-    <div class="brand">I FIX TEAM</div>
+    <div class="brand">FIX TEAM</div>
   </div>
   <div class="info">
     <div class="shop">${esc(d.shopName || '')}</div>

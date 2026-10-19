@@ -16,10 +16,10 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="I Fix Team">
+<meta name="apple-mobile-web-app-title" content="FIX TEAM">
 <meta name="theme-color" content="#1A2332">
 <link rel="manifest" href="manifest.json">
-<title>I Fix Team — نظام إدارة الصيانة</title>
+<title>FIX TEAM — نظام إدارة الصيانة</title>
 <!-- ⚠️ سكريبت الإقلاع لازم يفضل فوق وسوم الأيقونات. لو نزل تحتها،
      المتصفح بيبدأ يحمّل أيقونة النظام قبل ما التحويل يحصل — والفني
      يشوف لمحة أيقونة غلط قبل أيقونة صفحته. -->
@@ -1617,7 +1617,7 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
   <div class="brand">
     <div class="logo"><img src="icon-192.png" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block;"></div>
     <div>
-      <h1>I Fix Team</h1>
+      <h1>FIX TEAM</h1>
       <p data-i18n="app.subtitle">نظام إدارة الصيانة</p>
     </div>
   </div>
@@ -4731,7 +4731,7 @@ function dueWa(id){
   const a = d.dueAsk;
   const dev = `${d.deviceType || ''} ${d.model || ''}`.trim();
   const why = String(a.reason || '').replace(/^[^\s]+\s/, '');   // من غير الإيموجي
-  openWa(d.customerPhone, `أهلاً ${d.customerName || ''} 👋\nبخصوص جهازك *${dev}* (${devRef(d)}):\nالفني محتاج وقت زيادة شوية (${a.extraLabel}) — ${why}${a.note ? '، ' + a.note : ''}.\nالميعاد الجديد المتوقع: *${dueWhenTxt(a.proposedAt)}*\nلو موافق رد علينا بـ «موافق» 🙏 ولو حابب تستلم الجهاز كده قولنا.\nI Fix Team`);
+  openWa(d.customerPhone, `أهلاً ${d.customerName || ''} 👋\nبخصوص جهازك *${dev}* (${devRef(d)}):\nالفني محتاج وقت زيادة شوية (${a.extraLabel}) — ${why}${a.note ? '، ' + a.note : ''}.\nالميعاد الجديد المتوقع: *${dueWhenTxt(a.proposedAt)}*\nلو موافق رد علينا بـ «موافق» 🙏 ولو حابب تستلم الجهاز كده قولنا.\nFIX TEAM`);
 }
 
 // ---------- 🔔 السؤال لمدير الإنتاج (نافذة بتطلع لوحدها) ----------
@@ -5052,7 +5052,7 @@ function asToggleTag(i){
 function asWa(id){
   const d = devices.find(x => x.id === id);
   if(!d || !d.customerPhone) return;
-  openWa(d.customerPhone, `أهلاً ${d.customerName || ''} 👋\nمعاك I Fix Team — بنطمّن على جهازك *${`${d.deviceType || ''} ${d.model || ''}`.trim()}* اللي صلّحناه من شهر 🙏\nالجهاز شغال كويس؟ ورأيك في الخدمة كان إيه؟`);
+  openWa(d.customerPhone, `أهلاً ${d.customerName || ''} 👋\nمعاك FIX TEAM — بنطمّن على جهازك *${`${d.deviceType || ''} ${d.model || ''}`.trim()}* اللي صلّحناه من شهر 🙏\nالجهاز شغال كويس؟ ورأيك في الخدمة كان إيه؟`);
 }
 async function asSave(id){
   if(!isCallCenter()) return;
@@ -7202,9 +7202,9 @@ function ph1Toast(msg, devId){
     if('Notification' in window && Notification.permission === 'granted' && document.hidden){
       const o = { body: msg, icon: 'icon-192.png', dir: 'rtl', lang: 'ar', tag: 'ifx-' + (devId || Date.now()), data: { url: 'dashboard.html' } };
       if(navigator.serviceWorker && navigator.serviceWorker.ready)
-        navigator.serviceWorker.ready.then(r => r.showNotification('I Fix Team', o))
-          .catch(() => { try{ new Notification('I Fix Team', o); }catch(e){} });
-      else new Notification('I Fix Team', o);
+        navigator.serviceWorker.ready.then(r => r.showNotification('FIX TEAM', o))
+          .catch(() => { try{ new Notification('FIX TEAM', o); }catch(e){} });
+      else new Notification('FIX TEAM', o);
     }
   }catch(e){}
 }
@@ -7823,7 +7823,7 @@ function sleepReminderMsg(d){
   const ref = devRef(d), dev = `${d.deviceType || ''} ${d.model || ''}`.trim(), days = drawerDays(d);
   const price = parseInt(d.agreedPrice) || 0;
   return d.status === 'fixed_drawer'
-    ? `أهلاً ${d.customerName || ''} 👋\nتذكير: جهازك *${dev}* (${ref}) جاهز ومستنيك في المحل من ${days} يوم 🎉${price ? `\nتكلفة الصيانة: *${price.toLocaleString('en-EG')} ج.م*` : ''}\nمستنيينك في I Fix Team 🙏`
+    ? `أهلاً ${d.customerName || ''} 👋\nتذكير: جهازك *${dev}* (${ref}) جاهز ومستنيك في المحل من ${days} يوم 🎉${price ? `\nتكلفة الصيانة: *${price.toLocaleString('en-EG')} ج.م*` : ''}\nمستنيينك في FIX TEAM 🙏`
     : `أهلاً ${d.customerName || ''} 👋\nتذكير: جهازك *${dev}* (${ref}) لسه عندنا في المحل من ${days} يوم.${d.rejectReason ? `\nللأسف تعذّرت صيانته — السبب: ${d.rejectReason}` : ''}\nتقدر تعدّي تستلمه في أي وقت 🙏`;
 }
 async function ph2MarkCalled(id, how){
@@ -7922,13 +7922,13 @@ function ph2PrintReceipt(id){
     td{padding:3px 0;border-bottom:1px dashed #999;vertical-align:top;} td:first-child{color:#444;white-space:nowrap;padding-inline-end:6px;}
     .tot{font-size:16px;text-align:center;border:2px solid #000;padding:6px;margin:8px 0;font-weight:bold;}
     .w{border:1px solid #000;padding:6px;text-align:center;font-weight:bold;margin:6px 0;} .s{font-size:10.5px;color:#333;text-align:center;}</style></head>
-    <body><h1>I Fix Team</h1><div class="c">🧾 إيصال تسليم جهاز</div><div class="c"><b>${esc(r.ref)}</b></div>
+    <body><h1>FIX TEAM</h1><div class="c">🧾 إيصال تسليم جهاز</div><div class="c"><b>${esc(r.ref)}</b></div>
     <table>${row('العميل', r.cust)}${row('المحل', r.shop)}${row('التليفون', r.phone)}${row('الجهاز', r.dev)}${row('العطل', r.issue)}
     ${row('تاريخ الاستلام', r.intake)}${row('تاريخ التسليم', r.out)}${row('الدفع', r.pay)}</table>
     <div class="tot">تكلفة الصيانة: ${r.price.toLocaleString('en-EG')} ج.م${r.dep ? `<br><span style="font-size:13px;">عربون مدفوع: ${r.dep.toLocaleString('en-EG')} · الباقي: ${r.due.toLocaleString('en-EG')} ج.م</span>` : ''}${r.rp !== null ? `<br>صيانة المرتجع: ${r.rp.toLocaleString('en-EG')} ج.م` : ''}</div>
     ${r.warranty ? `<div class="w">🛡️ ${esc(r.warranty)}</div>` : ''}
     <div class="s">الضمان على نفس العطل بس، ومايشملش الكسر أو المياه أو فتح الجهاز برّه المحل.</div>
-    <div class="s" style="margin-top:6px;">شكراً لثقتك في I Fix Team 🌟</div></body></html>`;
+    <div class="s" style="margin-top:6px;">شكراً لثقتك في FIX TEAM 🌟</div></body></html>`;
   ph2PrintHtml(html);
 }
 // ⚠️ الطباعة من iframe جوه الصفحة — window.open على الأيفون المثبّت بيبوظ (درس قديم)
@@ -7947,7 +7947,7 @@ function ph2WaReceipt(id){
   const d = devices.find(x => x.id === id);
   if(!d || !d.customerPhone) return;
   const r = receiptData(d);
-  const msg = `🧾 *إيصال تسليم — I Fix Team*\nرقم الجهاز: *${r.ref}*\nالجهاز: ${r.dev}${r.issue ? `\nالعطل: ${r.issue}` : ''}\nتاريخ التسليم: ${r.out}\n`
+  const msg = `🧾 *إيصال تسليم — FIX TEAM*\nرقم الجهاز: *${r.ref}*\nالجهاز: ${r.dev}${r.issue ? `\nالعطل: ${r.issue}` : ''}\nتاريخ التسليم: ${r.out}\n`
     + `تكلفة الصيانة: *${r.price.toLocaleString('en-EG')} ج.م*${r.dep ? `\nعربون مدفوع: ${r.dep.toLocaleString('en-EG')} ج.م · الباقي: *${r.due.toLocaleString('en-EG')} ج.م*` : ''}${r.rp !== null ? `\nصيانة المرتجع: *${r.rp.toLocaleString('en-EG')} ج.م*` : ''}\nالدفع: ${r.pay}`
     + (r.warranty ? `\n🛡️ ${r.warranty}` : '') + `\n\nشكراً لثقتك فينا 🌟`;
   openWa(d.customerPhone, msg);
@@ -12417,15 +12417,15 @@ function waStatusMsg(d, statusKey){
   const price = parseInt(d.agreedPrice) || 0;
   const priceLine = price ? `\nتكلفة الصيانة: *${price.toLocaleString('en-EG')} ج.م*` : '';
   const M = {
-    waiting:    `أهلاً ${d.customerName} 👋\nتم استلام جهازك *${dev}* بنجاح في I Fix Team ✅\nرقم المتابعة: *${ref}*${priceLine}\nتقدر تتابع حالة جهازك لحظة بلحظة من اللينك ده:\n${trackUrl(d)}\nوهنبعتلك تحديثات أول بأول على الواتساب كمان.`,
+    waiting:    `أهلاً ${d.customerName} 👋\nتم استلام جهازك *${dev}* بنجاح في FIX TEAM ✅\nرقم المتابعة: *${ref}*${priceLine}\nتقدر تتابع حالة جهازك لحظة بلحظة من اللينك ده:\n${trackUrl(d)}\nوهنبعتلك تحديثات أول بأول على الواتساب كمان.`,
     diagnosing: `تحديث جهازك *${dev}* (${ref}) 🔍\nبدأنا الكشف على الجهاز لتحديد العطل بدقة.\nهنوافيك بالتفاصيل أول ما الكشف يخلص.`,
     repairing:  `تحديث جهازك *${dev}* (${ref}) 🔧\nتم تحديد العطل وبدأنا الصيانة فعلياً.${priceLine}`,
     sent_to_repair: `تحديث جهازك *${dev}* (${ref}) 📤\nالجهاز اتبعت لقسم الصيانة وهيتكشف عليه في أقرب وقت.`,
     received_from_reception: `تحديث جهازك *${dev}* (${ref}) 🔧\nقسم الصيانة استلم الجهاز وهيبدأ الكشف عليه.`,
     rejected:   `تحديث جهازك *${dev}* (${ref})\nللأسف تعذّرت صيانة الجهاز 🙏${d.rejectReason ? `\nالسبب: ${d.rejectReason}` : ''}\nتقدر تستلمه من المحل في أي وقت.`,
-    sent_to_reception: `خبر حلو! 🎉\nجهازك *${dev}* (${ref}) خلصت صيانته وجاهز للاستلام من المحل.${priceLine}\nمنتظرينك في I Fix Team 🙏`,
-    done:       `خبر حلو! 🎉\nجهازك *${dev}* (${ref}) خلصت صيانته وجاهز للاستلام من المحل.${priceLine}\nمنتظرينك في I Fix Team 🙏`,
-    delivered:  `تم تسليم جهازك *${dev}* (${ref}) ✅\nشكراً لثقتك في I Fix Team 🌟\nلو حصلت أي ملاحظة بعد الاستلام كلمنا فوراً.`,
+    sent_to_reception: `خبر حلو! 🎉\nجهازك *${dev}* (${ref}) خلصت صيانته وجاهز للاستلام من المحل.${priceLine}\nمنتظرينك في FIX TEAM 🙏`,
+    done:       `خبر حلو! 🎉\nجهازك *${dev}* (${ref}) خلصت صيانته وجاهز للاستلام من المحل.${priceLine}\nمنتظرينك في FIX TEAM 🙏`,
+    delivered:  `تم تسليم جهازك *${dev}* (${ref}) ✅\nشكراً لثقتك في FIX TEAM 🌟\nلو حصلت أي ملاحظة بعد الاستلام كلمنا فوراً.`,
     price:      `تحديث جهازك *${dev}* (${ref}) 💰\nتم تحديد تكلفة الصيانة: *${price.toLocaleString('en-EG')} ج.م*\nلو عندك أي استفسار كلمنا، ولو موافق هنكمل الصيانة على طول.`,
   };
   // 📥 صندوق الاستلام فيه الاتنين — الرسالة حسب نتيجة الورشة
@@ -12461,7 +12461,7 @@ async function waShop(shop){
   if(!ph){ ph = await setShopPhone(shop); if(!ph) return; }
   const { debit, credit, balance } = shopStatementRows(shop);
   const msg =
-    `السلام عليكم 🌹\nده ملخص حسابكم عندنا في *I Fix Team* لغاية ${new Date().toLocaleDateString('ar-EG')}:\n\n` +
+    `السلام عليكم 🌹\nده ملخص حسابكم عندنا في *FIX TEAM* لغاية ${new Date().toLocaleDateString('ar-EG')}:\n\n` +
     `إجمالي الأجهزة الآجلة: *${debit.toLocaleString('en-EG')} ج.م*\n` +
     `إجمالي المدفوع: *${credit.toLocaleString('en-EG')} ج.م*\n` +
     `المتبقي: *${balance.toLocaleString('en-EG')} ج.م*\n\n` +
@@ -12963,8 +12963,8 @@ function shopNoticeMsg(items, shop, asOf){
 
   const L = ['السلام عليكم 🌹'];
   L.push(items.length > 1
-    ? `تم تسجيل ${items.length === 2 ? 'جهازين' : items.length + ' أجهزة'} على حسابكم لدى *شركة Fix Team للصيانة* يوم ${day}: ${items.map(devName).join('، ')}.`
-    : `تم تسجيل جهاز *${devName(items[0])}* على حسابكم لدى *شركة Fix Team للصيانة* يوم ${day}.`);
+    ? `تم تسجيل ${items.length === 2 ? 'جهازين' : items.length + ' أجهزة'} على حسابكم لدى *شركة FIX TEAM للصيانة* يوم ${day}: ${items.map(devName).join('، ')}.`
+    : `تم تسجيل جهاز *${devName(items[0])}* على حسابكم لدى *شركة FIX TEAM للصيانة* يوم ${day}.`);
   L.push(`💰 قيمة الصيانة: *${sum.toLocaleString('en-EG')} ج.م*`);
   if(bal > 0) L.push(`📒 إجمالي المستحق على حسابكم: *${bal.toLocaleString('en-EG')} ج.م*`);
   L.push('نشكر ثقتكم، ولأي ملاحظة على الجهاز يُرجى التواصل معنا فورًا 🙏');
@@ -13208,7 +13208,7 @@ function paymentNoticeMsg(shop, amount, balance){
   const n = v => Number(v || 0).toLocaleString('en-EG');
 
   const L = ['السلام عليكم 🌹'];
-  L.push(`تم استلام دفعة بمبلغ *${n(amount)} ج.م* من حسابكم لدى *شركة Fix Team للصيانة* يوم ${day} ✅`);
+  L.push(`تم استلام دفعة بمبلغ *${n(amount)} ج.م* من حسابكم لدى *شركة FIX TEAM للصيانة* يوم ${day} ✅`);
   if(balance > 0)      L.push(`📒 المتبقي على حسابكم: *${n(balance)} ج.م*`);
   else if(balance < 0) L.push(`📒 حسابكم خالص، وليكم رصيد عندنا *${n(-balance)} ج.م* 💚`);
   else                 L.push('📒 حسابكم بقى *خالص تمامًا* 🎉 متشكرين جدًا على التزامكم');
@@ -13343,7 +13343,7 @@ async function exportShopExcel(shop){
   ws.getCell('A1').font = { size:16, bold:true, color:{argb:'FF1F3864'} };
   ws.getCell('A1').alignment = { horizontal:'center' };
   ws.mergeCells('A2:H2');
-  ws.getCell('A2').value = 'I Fix Team for Mobile Services — تاريخ الكشف: ' + new Date().toLocaleDateString('ar-EG');
+  ws.getCell('A2').value = 'FIX TEAM — All Mobile Services — تاريخ الكشف: ' + new Date().toLocaleDateString('ar-EG');
   ws.getCell('A2').font = { size:11, color:{argb:'FF6B7280'} };
   ws.getCell('A2').alignment = { horizontal:'center' };
 
@@ -14031,7 +14031,7 @@ async function exportDeliveredUnpaidExcel(list){
   ws.getCell('A1').font = { size:16, bold:true, color:{argb:'FF9A6A0C'} };
   ws.getCell('A1').alignment = { horizontal:'center' };
   ws.mergeCells('A2:I2');
-  ws.getCell('A2').value = 'I Fix Team for Mobile Services — تاريخ التصدير: ' + new Date().toLocaleDateString('ar-EG');
+  ws.getCell('A2').value = 'FIX TEAM — All Mobile Services — تاريخ التصدير: ' + new Date().toLocaleDateString('ar-EG');
   ws.getCell('A2').font = { size:11, color:{argb:'FF6B7280'} };
   ws.getCell('A2').alignment = { horizontal:'center' };
 
@@ -14117,7 +14117,7 @@ function exportDeliveredUnpaidPdf(list){
   </style></head><body>
     <div class="head">
       <div><h1>تم التسليم بانتظار الدفع</h1><div class="sub">تاريخ التصدير: ${new Date().toLocaleDateString('ar-EG')} — ${new Date().toLocaleTimeString('ar-EG')}</div></div>
-      <div class="brand">I FIX TEAM<br><small style="font-weight:400;font-size:11px;">FOR MOBILE SERVICES</small></div>
+      <div class="brand">FIX TEAM<br><small style="font-weight:400;font-size:11px;">ALL MOBILE SERVICES</small></div>
     </div>
     <div class="totals">
       <div class="tcard"><div class="lbl">عدد الأجهزة</div><div class="num">${rows.length}</div></div>
@@ -14127,7 +14127,7 @@ function exportDeliveredUnpaidPdf(list){
       <tr><th>الجهاز</th><th>العطل</th><th>العميل</th><th>المحل</th><th>${esc(ACC_BB_LABEL)}</th><th>الهاتف</th><th>الفني</th><th>تاريخ التسليم</th><th>المبلغ</th></tr>
       ${rowsHtml || '<tr><td colspan="9">مفيش أجهزة حالياً</td></tr>'}
     </table>
-    <div class="foot"><span>نظام I Fix Team لإدارة الصيانة</span><span>عدد الأجهزة: ${rows.length}</span></div>
+    <div class="foot"><span>نظام FIX TEAM لإدارة الصيانة</span><span>عدد الأجهزة: ${rows.length}</span></div>
   </body></html>`, 'تم التسليم بانتظار الدفع');
 }
 
@@ -14994,7 +14994,7 @@ function toggleTeTech(i){
 }
 
 function sendThanks(phone, name){
-  const msg = `أهلاً ${name || 'يا فندم'} 🌟\nكل الشكر لثقتك المستمرة في I Fix Team — وجودك من أهم عملائنا شرف لينا.\nأي جهاز محتاج صيانة، إحنا دايماً في خدمتك 🙏`;
+  const msg = `أهلاً ${name || 'يا فندم'} 🌟\nكل الشكر لثقتك المستمرة في FIX TEAM — وجودك من أهم عملائنا شرف لينا.\nأي جهاز محتاج صيانة، إحنا دايماً في خدمتك 🙏`;
   openWa(phone, msg);
 }
 

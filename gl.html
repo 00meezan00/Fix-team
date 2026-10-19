@@ -20,7 +20,7 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
 })();
 </script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>مركز الأستاذ — I Fix Team</title>
+<title>مركز الأستاذ — FIX TEAM</title>
 <meta name="theme-color" content="#16233A">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -1461,7 +1461,7 @@ async function excel(file, title, head, rows, moneyCols, boldRows){
   ws.getCell(1, 1).value = title; ws.getCell(1, 1).font = { size:15, bold:true, color:{argb:'FF1F3864'} };
   ws.getCell(1, 1).alignment = { horizontal:'center' };
   ws.mergeCells(2, 1, 2, head.length);
-  ws.getCell(2, 1).value = 'I Fix Team — مركز الأستاذ — اتطبع ' + new Date().toLocaleString('ar-EG');
+  ws.getCell(2, 1).value = 'FIX TEAM — مركز الأستاذ — اتطبع ' + new Date().toLocaleString('ar-EG');
   ws.getCell(2, 1).font = { size:10, color:{argb:'FF6B7280'} }; ws.getCell(2, 1).alignment = { horizontal:'center' };
   const h = ws.getRow(4); h.values = head;
   h.eachCell(c => { c.font = { bold:true, color:{argb:'FFFFFFFF'} }; c.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FF1F3864'} }; c.border = border; c.alignment = { horizontal:'center' }; });
