@@ -1077,6 +1077,22 @@ const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
       // عناوين مجموعات القايمة ⋮ بلون السماعة
       + A + ' .menu-dropdown .mh{color:' + SLOT + ';}'
 
+      // ===== 💬 شريط الشات اللي على الجنب (dock.js + dock-tools.js) =====
+      // ⚠️ dock-tools.js بيفرض ألوانه القديمة (كحلي/فيروزي) على #dkRail
+      //    و#dkPanel بنفسه — فاسمنا هنا أقوى من اسمه عشان يكسب.
+      //    الشريط لونه بين أسود اللوجو والكروت، وحرفه رمادي السماعة،
+      //    والأيقونة المفتوحة عليها شَرطة برتقالي زي المفك.
+      + L + ' #dkRail,' + L + ' #dkPanel{'
+      +   '--surface:#FFFFFF;--surface-2:#F6F6F4;--surface-3:#EFEFEC;--border:#DEDED9;'
+      +   '--ink:#0C0C0E;--muted:#6A6C73;--muted-2:#6A6C73;--accent:#EE5B10;--danger:#DC2626;}'
+      + D + ' #dkRail,' + D + ' #dkPanel{'
+      +   '--surface:#17171A;--surface-2:#111113;--surface-3:#27272C;--border:#2B2C31;'
+      +   '--ink:' + GEAR + ';--muted:#9A9CA3;--muted-2:' + SLOT + ';--accent:' + EMBER + ';--danger:#F87171;}'
+      + A + ' #dkRail{border-inline-start-color:var(--border);box-shadow:inset 1px 0 0 rgba(127,130,139,.12);}'
+      + A + ' #dkRail .dk-ico:hover{border-color:rgba(252,104,24,.45);}'
+      + A + ' #dkPanel .sc-btn.pri{color:' + NIGHT + ';}'
+      + A + ' #dkPanel .sc-row:hover{border-color:var(--accent);}'
+
       // ===== حاجات common.js نفسه =====
       + '#ifxUpdBar{background:' + NIGHT + ' !important;box-shadow:inset 0 -3px 0 ' + EMBER + ', 0 12px 32px rgba(0,0,0,.35) !important;}'
       + '#ifxUpdGo{background:' + EMBER + ' !important;color:' + NIGHT + ' !important;}'
