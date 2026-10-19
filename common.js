@@ -1128,6 +1128,13 @@ const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
       + A + ' #bootVeil .bv-logo{width:150px;height:101px;border-radius:0;overflow:visible;box-shadow:none;background:none;}'
       + A + ' #bootVeil .bv-logo img{object-fit:contain;}'
       + A + ' #veil img[src*="icon"]{width:150px !important;height:auto !important;border-radius:0 !important;box-shadow:none !important;background:none !important;object-fit:contain;}'
+      // 🐛 (٢٠٢٦-١٠-١٩) الحركة والفني: اللوجو كان مقصوص (الترس من الشمال
+      //    وكلمة TEAM من تحت). 🧸 السبب: الصورة الجديدة عرضها ١٥٠ بس كانت
+      //    محطوطة جوه علبة صغيرة ٩٦×٩٦ في الصفحة نفسها (#veil .mk) وواخدة
+      //    أمر «اللي يطلع برّه العلبة يتقص» — زي صورة كبيرة في برواز صغير.
+      //    ✅ بنفك العلبة: مقاسها على قد الصورة · من غير قص · من غير خلفية
+      //    ولا ضل — فاللوجو يبان كامل زي الداشبورد والمالك.
+      + A + ' #veil .mk{width:auto !important;height:auto !important;border-radius:0 !important;overflow:visible !important;box-shadow:none !important;background:none !important;}'
       + L + ' #bootVeil .bv-logo img,' + L + ' #veil img[src*="icon"]{content:url("boot-logo-light.png");}'
       + D + ' #bootVeil .bv-logo img,' + D + ' #veil img[src*="icon"]{content:url("boot-logo-dark.png");}'
 
