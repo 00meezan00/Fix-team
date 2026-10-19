@@ -8735,9 +8735,9 @@ function renderAudit(){
 // ⚠️ المفتاح ده «عام» عادي يتكتب هنا. المفتاح السري في أسرار notify-push بس.
 // ============================================================
 // 🔌 مفتاح التشغيل: false = الإشعارات مقفولة خالص (زرار القايمة مستخبي ومفيش أي نداء للسيرفر).
-//    اتأجّلت (١٢ أكتوبر) — لما نرجعلها: مفاتيح جديدة + ملف 87 + notify-push، وبعدين خليه true.
-const PUSH_ENABLED = false;
-const IFX_VAPID_PUBLIC = 'BCYetPSKxO6b3vTuWIi9UPx2hbXvCgXUsGmNfPqcKc-L_UgbWBrRrEQxu9fiqnUPp-l0kCXxQvyogJmg4X0nH80';
+//    ✅ اتفتحت (١٩ أكتوبر) بمفاتيح جديدة. المفتاح ده لازم يطابق VAPID_PUBLIC_KEY في أسرار notify-push.
+const PUSH_ENABLED = true;
+const IFX_VAPID_PUBLIC = 'BEjpukAJU-_VQyQE8BKqpRp8Q2Gjj7n_WNozgyhEIDKDQKLVLaPyjQyQbVC4Kue-L1gBzY9AOPAUkGYA32bXCgY';
 const PUSH_KINDS = [
   { k:'inbox',     icon:'📥', label:'وصلك جهاز',               hint:'مدير الإنتاج: وارد من الاستقبال · الاستقبال: راجع من الصيانة', roles:['reception', 'production'] },
   { k:'await_pay', icon:'💵', label:'عميل جاي يدفع',            hint:'جهاز اتسلّم ومستني تأكيد الدفع',                               roles:['accountant'] },
