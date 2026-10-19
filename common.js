@@ -991,6 +991,8 @@ const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
     var redIsBrand = ['my-devices','dispatch','owner'].indexOf(page) !== -1;
 
     var NIGHT = '#0C0C0E', GEAR = '#F2F2F0', EMBER = '#FC6818', SLOT = '#7F828B';
+    // ⚙️ ترس اللوجو البرتقالي (٨ سنان) — مرسوم بالكود، من غير ملف صورة
+    var GEAR_ICON = "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='%23FC6818' fill-rule='evenodd' d='M19.99 9.40 L22.74 9.64 L22.74 14.36 L19.99 14.60 L19.48 15.81 L21.26 17.93 L17.93 21.26 L15.81 19.48 L14.60 19.99 L14.36 22.74 L9.64 22.74 L9.40 19.99 L8.19 19.48 L6.07 21.26 L2.74 17.93 L4.52 15.81 L4.01 14.60 L1.26 14.36 L1.26 9.64 L4.01 9.40 L4.52 8.19 L2.74 6.07 L6.07 2.74 L8.19 4.52 L9.40 4.01 L9.64 1.26 L14.36 1.26 L14.60 4.01 L15.81 4.52 L17.93 2.74 L21.26 6.07 L19.48 8.19Z M15.2 12 A3.2 3.2 0 1 0 8.8 12 A3.2 3.2 0 1 0 15.2 12Z'/></svg>\")";
 
     var css =
       // ===== ☀️ الفاتح — ورق بلون الترس الأبيض =====
@@ -1092,6 +1094,39 @@ const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
       + A + ' #dkRail .dk-ico:hover{border-color:rgba(252,104,24,.45);}'
       + A + ' #dkPanel .sc-btn.pri{color:' + NIGHT + ';}'
       + A + ' #dkPanel .sc-row:hover{border-color:var(--accent);}'
+
+      // ===== 🔔 شرايط «حصل تحديث في شاشة …» =====
+      // 🧸 كانت لوح برتقالي محروق مليان من الحيطة للحيطة — بيتعب العين.
+      //    بقت «ورقة شغل» هادية: سطح فحمي/أبيض بلمسة برتقالي خفيفة،
+      //    وإطار برتقالي رفيع، والجرس بقى ⚙️ ترس اللوجو البرتقالي —
+      //    بيلف «سِنّة واحدة» كل ٤ ثواني (حركة ميكانيكية هادية بدل
+      //    الجرس اللي بيرن). زرار «افتح» هو البرتقالي المليان الوحيد.
+      // ⚠️ نفس الشكل لشريط «مرتبك» (#payBanner من payroll.js).
+      + '#ntfBanners:not(:empty){display:flex;flex-direction:column;gap:8px;padding:10px 14px 2px;}'
+      + A + ' .ntf-banner,' + A + ' #payBanner{'
+      +   'display:flex;align-items:center;gap:11px;cursor:pointer;margin:0;'
+      +   'padding:11px 12px 11px 11px;border-radius:13px;'
+      +   'border:1px solid rgba(252,104,24,.38);border-inline-start:4px solid ' + EMBER + ';'
+      +   'font:700 13.5px/1.65 "Tajawal",system-ui,sans-serif;text-align:start;'
+      +   'transition:border-color .15s, transform .1s;}'
+      + A + ' #payBanner{margin:10px 14px 2px;}'
+      + L + ' .ntf-banner,' + L + ' #payBanner{background:#FFF6F0;color:#2A2B30;box-shadow:0 2px 10px rgba(252,104,24,.08);}'
+      + D + ' .ntf-banner,' + D + ' #payBanner{background:#1A1411;color:#E6E6E3;box-shadow:none;}'
+      + A + ' .ntf-banner:hover,' + A + ' #payBanner:hover{border-color:rgba(252,104,24,.7);}'
+      + A + ' .ntf-banner:active,' + A + ' #payBanner:active{transform:scale(.99);}'
+      + A + ' .ntf-banner b,' + A + ' #payBanner b{color:var(--ifx-ember-ink);font-weight:900;}'
+      // ⚙️ الجرس → ترس
+      + A + ' .ntf-banner .ntf-bell,' + A + ' #payBanner .pay-bell{'
+      +   'flex:none;width:22px;height:22px;font-size:0;color:transparent;overflow:hidden;'
+      +   'background:' + GEAR_ICON + ' center/contain no-repeat;'
+      +   'animation:ifxGearTick 4s cubic-bezier(.5,0,.3,1) infinite;}'
+      + '@keyframes ifxGearTick{0%,82%{transform:rotate(0)}100%{transform:rotate(45deg)}}'
+      + '@media (prefers-reduced-motion:reduce){' + A + ' .ntf-banner .ntf-bell,' + A + ' #payBanner .pay-bell{animation:none;}}'
+      + A + ' .ntf-banner .ntf-bn-txt,' + A + ' #payBanner .pay-bn-txt{flex:1;min-width:0;}'
+      // زرار «افتح ›» — برتقالي اللوجو والكلام أسود
+      + A + ' .ntf-banner .ntf-bn-go,' + A + ' #payBanner .pay-bn-go{'
+      +   'flex:none;background:' + EMBER + ';color:' + NIGHT + ';border-radius:9px;'
+      +   'padding:6px 12px;font:900 12.5px/1.2 "Tajawal",system-ui,sans-serif;white-space:nowrap;}'
 
       // ===== حاجات common.js نفسه =====
       + '#ifxUpdBar{background:' + NIGHT + ' !important;box-shadow:inset 0 -3px 0 ' + EMBER + ', 0 12px 32px rgba(0,0,0,.35) !important;}'
