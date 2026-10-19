@@ -58,14 +58,17 @@
     var st = document.createElement('style');
     st.id = 'tbvCss';
     st.textContent =
-        '#tbvBg{position:fixed;inset:0;z-index:9300;background:rgba(8,10,14,.55);}'
-      + '#tbvSheet{position:fixed;left:0;right:0;bottom:0;z-index:9301;max-height:88vh;overflow-y:auto;'
-      +   'background:var(--card,#fff);color:var(--ink,#111);border-radius:20px 20px 0 0;'
-      +   'padding:16px 16px calc(24px + env(safe-area-inset-bottom));box-shadow:0 -10px 40px rgba(0,0,0,.3);'
+        // 📄 (٢٠٢٦-١٠-١٩) صفحة كاملة بدل الشيت اللي بيطلع من تحت — زي «ترتيب الاستلامات»
+        '#tbvSheet{position:fixed;inset:0;z-index:9301;overflow-y:auto;-webkit-overflow-scrolling:touch;'
+      +   'overscroll-behavior:contain;background:var(--paper,var(--bg,#fff));color:var(--ink,#111);'
       +   'font-family:Tajawal,system-ui,sans-serif;}'
-      + '#tbvSheet .h{display:flex;align-items:center;gap:10px;margin-bottom:12px;}'
-      + '#tbvSheet .h b{flex:1;font:900 16px/1.4 Cairo,sans-serif;}'
-      + '#tbvSheet .x{border:none;background:var(--paper,#eee);color:var(--ink,#111);width:34px;height:34px;'
+      + '#tbvSheet .wrap{max-width:720px;margin:0 auto;padding:16px 16px calc(70px + env(safe-area-inset-bottom));}'
+      // الرأس لازق فوق — وتحت نتش الأيفون (env(safe-area-inset-top))
+      + '#tbvSheet .h{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:10px;'
+      +   'background:var(--chrome,#0C0C0E);color:var(--on-chrome,#F2F2F0);'
+      +   'padding:calc(12px + env(safe-area-inset-top)) 16px 12px;box-shadow:0 4px 14px rgba(0,0,0,.18);}'
+      + '#tbvSheet .h b{flex:1;font:900 17px/1.4 Cairo,sans-serif;}'
+      + '#tbvSheet .x{border:none;background:rgba(242,242,240,.10);color:inherit;width:34px;height:34px;'
       +   'border-radius:10px;font-size:17px;cursor:pointer;}'
       + '#tbvSheet .chips{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;}'
       + '#tbvSheet .chip{border:1px solid var(--line,#ddd);background:transparent;color:var(--ink,#111);'
@@ -171,7 +174,8 @@
     sh.innerHTML =
         '<div class="h"><b>🏆 ترتيب الفنيين</b>'
       +   '<button class="x" onclick="IFixTechBoard.reload()" title="تحديث">🔄</button>'
-      +   '<button class="x" onclick="IFixTechBoard.close()">✕</button></div>'
+      +   '<button class="x" onclick="IFixTechBoard.close()" aria-label="قفل">✕</button></div>'
+      + '<div class="wrap">'
       + '<div class="chips">'
       +   chip('today', 'النهارده', '')
       +   chip('cm', 'الشهر الحالي', cmL)
@@ -179,22 +183,26 @@
       + '</div>'
       + (stale ? '<div class="stale">⏸️ التحديثات موقوفة لحين حضور المحاسبين<br><span style="font-weight:500;">الشغل متسجّل ومحفوظ — الترتيب هيتحدّث أول ما يفتحوا النظام</span></div>' : '')
       + body
-      + (at ? '<div class="foot">آخر تحديث: ' + e(new Date(at).toLocaleString('ar-EG')) + '</div>' : '');
+      + (at ? '<div class="foot">آخر تحديث: ' + e(new Date(at).toLocaleString('ar-EG')) + '</div>' : '')
+      + '</div>';
   }
 
   function open(){
     try{ if(typeof closeKebab === 'function') closeKebab(); }catch(x){}
     css();
     if(!document.getElementById('tbvSheet')){
-      var bg = document.createElement('div'); bg.id = 'tbvBg'; bg.onclick = close;
       var sh = document.createElement('div'); sh.id = 'tbvSheet'; sh.setAttribute('dir', 'rtl');
-      document.body.appendChild(bg); document.body.appendChild(sh);
+      document.body.appendChild(sh);
+      // الصفحة اللي ورا ماتتحركش وإحنا فاتحين الصفحة دي
+      try{ document.body.dataset.tbvOv = document.body.style.overflow || ''; document.body.style.overflow = 'hidden'; }catch(x){}
     }
     paint();
     load();          // كل فتحة بتقرا من جديد — الترتيب بيتغيّر طول اليوم
   }
   function close(){
-    ['tbvBg', 'tbvSheet'].forEach(function(id){ var el = document.getElementById(id); if(el) el.remove(); });
+    var el = document.getElementById('tbvSheet'); if(!el) return;
+    el.remove();
+    try{ document.body.style.overflow = document.body.dataset.tbvOv || ''; delete document.body.dataset.tbvOv; }catch(x){}
   }
 
   // ---------- 👑 المالك: زرار جديد في قايمة ⋮ ----------
