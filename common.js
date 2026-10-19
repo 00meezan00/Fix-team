@@ -1095,6 +1095,20 @@ const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
       + A + ' #dkPanel .sc-btn.pri{color:' + NIGHT + ';}'
       + A + ' #dkPanel .sc-row:hover{border-color:var(--accent);}'
 
+      // ===== ⏳ شاشة التحميل: اللوجو من غير علبة — ماشي مع الخلفية =====
+      // 🧸 قبل كده كانت أيقونة التطبيق (مربع أسود) قاعدة في النص —
+      //    على الأبيض كانت باينة «علبة» لوحدها.
+      //    دلوقتي اللوجو نفسه من غير مربع:
+      //      🌙 الغامق → اللوجو الأصلي (أبيض + برتقالي) على الأسود
+      //      ☀️ الفاتح → نسخة معكوسة: الأبيض بقى أسود فحمي والبرتقالي زي ما هو
+      // ⚠️ content:url() بيبدّل الصورة من غير ما نلمس الصفحة.
+      //    #bootVeil = الداشبورد · #veil = المالك/الحركة/الفني.
+      + A + ' #bootVeil .bv-logo{width:150px;height:101px;border-radius:0;overflow:visible;box-shadow:none;background:none;}'
+      + A + ' #bootVeil .bv-logo img{object-fit:contain;}'
+      + A + ' #veil img[src*="icon"]{width:150px !important;height:auto !important;border-radius:0 !important;box-shadow:none !important;background:none !important;object-fit:contain;}'
+      + L + ' #bootVeil .bv-logo img,' + L + ' #veil img[src*="icon"]{content:url("boot-logo-light.png");}'
+      + D + ' #bootVeil .bv-logo img,' + D + ' #veil img[src*="icon"]{content:url("boot-logo-dark.png");}'
+
       // ===== 🔔 شرايط «حصل تحديث في شاشة …» =====
       // 🧸 كانت لوح برتقالي محروق مليان من الحيطة للحيطة — بيتعب العين.
       //    بقت «ورقة شغل» هادية: سطح فحمي/أبيض بلمسة برتقالي خفيفة،
@@ -1134,6 +1148,14 @@ const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
       + '#svcStopOv{background:' + NIGHT + ' !important;}'
       + '#svcStopOk{background:' + EMBER + ' !important;color:' + NIGHT + ' !important;}'
       + '#accSharedOv button[onclick^="saveAccountShared"]{background:' + EMBER + ' !important;color:' + NIGHT + ' !important;}';
+
+    // ⏳ لوجو شاشة التحميل يتحمّل بدري عشان يظهر مع أول رسمة
+    try{
+      ['boot-logo-light.png','boot-logo-dark.png'].forEach(function(u){
+        var pl = document.createElement('link'); pl.rel = 'preload'; pl.as = 'image'; pl.href = u;
+        (document.head || root).appendChild(pl);
+      });
+    }catch(e){}
 
     var st = document.createElement('style');
     st.id = 'ifxBrandCss';
