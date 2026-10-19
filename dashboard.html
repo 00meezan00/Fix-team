@@ -268,6 +268,28 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
     padding:11px 5px 4px; margin:4px 8px 0; border-top:1px solid var(--border); user-select:none;}
   .menu-dropdown .mh.first{border-top:none; margin-top:0; padding-top:6px;}
   .menu-dropdown .sep{height:1px; background:var(--border); margin:5px 8px;}
+  /* 📱 (١٩-١٠) القايمة على الأيفون:
+     ⚠️ السحب جوه القايمة كان بيعدّي للصفحة اللي ورا فالقايمة «ترجع تنزل».
+        overscroll-behavior:contain بيخلي السحب جوه القايمة بس.
+     ⚠️ الطول بيتحسب بالـJS وقت الفتح (dbFitMenu) — من مكان القايمة
+        لحد فوق شريط STAGING ونتش الأيفون اللي تحت. */
+  .menu-dropdown{overscroll-behavior:contain;}
+  /* ⏻ تسجيل الخروج لازق في آخر القايمة — باين دايماً من غير سكرول */
+  #menuDropdown > .logout-menu-item{position:sticky; bottom:-6px; z-index:2;
+    background:var(--surface); border-top:1px solid var(--border);
+    border-radius:0 0 8px 8px; margin-top:2px; font-weight:800;}
+
+  /* 🧾 (١٩-١٠) «للمراجعة» بقت سطر إشعار مقفول */
+  .audit-note{display:flex; align-items:center; gap:10px; width:100%; margin:0 0 10px;
+    padding:11px 14px; border-radius:12px; cursor:pointer; text-align:right; font-family:inherit;
+    background:var(--surface); color:var(--ink); border:1px solid var(--border);
+    border-inline-start:4px solid #F26A1B; box-shadow:0 1px 3px rgba(0,0,0,.08);}
+  .audit-note:active{transform:scale(.99);}
+  .audit-note .an-ic{flex:none; font-size:20px;}
+  .audit-note .an-tx{flex:1; min-width:0; display:flex; flex-direction:column; gap:2px;}
+  .audit-note .an-tx b{font-size:14px; font-weight:800;}
+  .audit-note .an-tx small{font-size:12px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .audit-note .an-go{flex:none; font-size:12.5px; font-weight:800; color:#F26A1B;}
   /* قايمة اختيار الفني — شكلها زي حقول الإدخال بالظبط عشان
      الواجهة ما تبانش متفككة بعد التحويل من input لـ select */
   .tech-select{
@@ -8632,12 +8654,15 @@ function auditPanelHtml(){
   if(!isSuperAdmin()) return '';
   const list = auditItems().filter(x => !x.reviewed);
   if(!list.length) return '';
-  return `<div class="appr-panel">
-    <div class="appr-panel-head">🧾 للمراجعة <span class="appr-count">${list.length}</span>
-      <button class="spn-clear" style="margin-inline-start:auto;" onclick="openAudit()">📒 افتح الدفتر كله</button></div>
-    ${list.slice(0, AUDIT_SHOW).map(auditRowHtml).join('')}
-    ${list.length > AUDIT_SHOW ? `<button class="spn-ok" style="width:100%;margin-top:4px;" onclick="openAudit()">و ${list.length - AUDIT_SHOW} كمان — افتح الدفتر</button>` : ''}
-  </div>`;
+  // 🔔 (١٩-١٠) اللوحة بقت **سطر إشعار مقفول** — مش كروت مفتوحة على الشاشة.
+  //    الدوسة بتفتح الدفتر كله. نوع آخر حاجة جت بيتكتب صغير تحت.
+  const last = list[0], t = AUDIT_TYPES[last.type] || { icon:'🧾', label:'' };
+  return `<button class="audit-note" onclick="openAudit()">
+    <span class="an-ic">🧾</span>
+    <span class="an-tx"><b>عندك ${list.length.toLocaleString('en-EG')} ${list.length === 1 ? 'حاجة' : 'حاجات'} للمراجعة</b>
+      <small>آخرهم: ${t.icon} ${esc(t.label)}</small></span>
+    <span class="an-go">افتح ‹</span>
+  </button>`;
 }
 function syncAuditBadge(){
   const el = document.getElementById('auditMenuCount');
@@ -11272,7 +11297,43 @@ function toggleMenu(){
     if(typeof ifxTidyMenu === 'function') ifxTidyMenu(dd);
   }
   dd.classList.toggle('hidden');
+  if(!dd.classList.contains('hidden')){ dd.scrollTop = 0; dbFitMenu(dd); }
 }
+
+// ============================================================
+// 📏 (١٩-١٠) طول القايمة على قد الشاشة بالظبط
+// ------------------------------------------------------------
+// 🧸 القايمة بتبدأ تحت الشريط الأسود، بس طولها كان محسوب كأنها
+//    بتبدأ من أول الشاشة — فآخرها (تسجيل الخروج) كان بيقع تحت
+//    شريط STAGING وتحت حافة الأيفون. هنا بنقيس: من أول القايمة
+//    لحد فوق أي شريط لازق تحت (STAGING) + مسافة صغيرة.
+// ============================================================
+function dbFitMenu(dd){
+  try{
+    const top = dd.getBoundingClientRect().top;
+    const vh = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
+    let bottomBar = 0;
+    // أي شريط ثابت لازق في آخر الشاشة (زي STAGING) — بناخد أعلاه
+    Array.prototype.forEach.call(document.body.children, el => {
+      if(el === dd || !el.offsetHeight || el.offsetHeight > 90) return;
+      const cs = getComputedStyle(el);
+      if(cs.position !== 'fixed' || cs.display === 'none') return;
+      const r = el.getBoundingClientRect();
+      if(r.bottom >= vh - 2 && r.width > window.innerWidth * 0.6) bottomBar = Math.max(bottomBar, vh - r.top);
+    });
+    // 📱 خط الأيفون اللي تحت (home indicator) — بنقيسه بمسطرة مخفية
+    let safeB = 0;
+    const pr = document.createElement('div');
+    pr.style.cssText = 'position:fixed;visibility:hidden;padding-bottom:env(safe-area-inset-bottom);';
+    document.body.appendChild(pr); safeB = pr.offsetHeight || 0; pr.remove();
+    const h = Math.max(220, Math.floor(vh - top - Math.max(bottomBar, safeB) - 14));
+    dd.style.maxHeight = h + 'px';
+  }catch(e){ console.warn('dbFitMenu:', e); }
+}
+addEventListener('resize', () => {
+  const dd = document.getElementById('menuDropdown');
+  if(dd && !dd.classList.contains('hidden')) dbFitMenu(dd);
+});
 
 // ============================================================
 // 🗂️ كل زرار في درجه — بيتنده كل ما القايمة تتفتح
