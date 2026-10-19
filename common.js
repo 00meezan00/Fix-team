@@ -653,32 +653,54 @@ const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
   //    (ج) نعيد فتح الصفحة — فتيجي كلها طازة من السيرفر
   //    ⚠️ تعديلات الأوفلاين اللي لسه ما اترفعتش متخزّنة في localStorage
   //       مش في الدرج ده — فمش بتتلمس.
+  // ④ التحديث نفسه:
+  //    (أ) نقول للحارس «روح هات النسخة الجديدة»
+  //    (ب) **نستنى** الحارس الجديد لحد ما يستلم الشغل فعلاً
+  //    (ج) وبعدين بس نعيد فتح الصفحة
+  //
+  // 🐛 (٢٠٢٦-١٠-١٩) قبل كده كنا بنرمي كل الدرج ونعيد الفتح **على طول**.
+  //    على الآيفون الصفحة كانت بتتفتح في نفس لحظة ما الحارس القديم
+  //    بيسلّم للجديد — الطلبات اللي في النص بتقع، والدرج متشال فمفيش
+  //    نسخة احتياطية → common.js مايتحمّلش → الشاشة بالشكل القديم
+  //    وواقفة على «جارٍ التحميل» لحد ما الموظف يقفل التطبيق ويفتحه.
+  //    دلوقتي: بنستنى الحارس الجديد يبقى «شغّال» (activated) قبل الفتح،
+  //    ومش بنرمي الدرج بإيدنا — الحارس الجديد بيمسح القديم لوحده
+  //    (activate في sw.js) بعد ما يكون خزّن الجديد.
+  //    ⚠️ تعديلات الأوفلاين اللي لسه ما اترفعتش متخزّنة في localStorage
+  //       مش في الدرج — فمش بتتلمس.
   function apply(){
     if(busy) return;
     busy = true;
     hideBanner();
     showBusy();
-    var keep = NEW_VER;   // درج النسخة الجديدة (لو الحارس الجديد لحق يعمله) — مانرميهوش
-    var p = Promise.resolve();
-    try{
-      if('serviceWorker' in navigator){
-        p = navigator.serviceWorker.getRegistration().then(function(reg){
-          return reg ? reg.update().catch(function(){}) : null;
-        }).catch(function(){});
-      }
-    }catch(e){}
-    p.then(function(){
-      if(!window.caches) return;
-      return caches.keys().then(function(keys){
-        return Promise.all(keys.filter(function(k){
-          return k.indexOf('ifixteam-') === 0 && k !== keep;
-        }).map(function(k){ return caches.delete(k); }));
-      });
-    }).catch(function(){}).then(function(){
+    var done = false;
+    function go(){
+      if(done) return;
+      done = true;
       location.reload();
-    });
-    // شبكة أمان: لو حاجة علّقت، نعيد الفتح بعد ٨ ثواني برضه
-    setTimeout(function(){ location.reload(); }, 8000);
+    }
+    function soon(){ setTimeout(go, 300); }   // ثانية صغيرة عشان التسليم يخلص
+    try{
+      if(!('serviceWorker' in navigator)){ go(); return; }
+      var swc = navigator.serviceWorker;
+      // الحارس الجديد مسك الصفحة → خلاص، افتح
+      swc.addEventListener('controllerchange', soon);
+      swc.getRegistration().then(function(reg){
+        if(!reg){ go(); return; }
+        return reg.update().catch(function(){}).then(function(){
+          var nw = reg.installing || reg.waiting;
+          // مفيش حارس جديد بيتجهّز (يا إما مفيش جديد، يا إما استلم من بدري) → افتح
+          if(!nw){ go(); return; }
+          if(nw.state === 'activated'){ soon(); return; }
+          nw.addEventListener('statechange', function(){
+            if(nw.state === 'activated') soon();
+            else if(nw.state === 'redundant') go();
+          });
+        });
+      }).catch(go);
+    }catch(e){ go(); }
+    // شبكة أمان: لو حاجة علّقت، نعيد الفتح بعد ١٢ ثانية برضه
+    setTimeout(go, 12000);
   }
 
   // ===== الشريط اللي تحت =====
