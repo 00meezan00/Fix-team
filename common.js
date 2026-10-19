@@ -439,6 +439,28 @@ addEventListener('DOMContentLoaded', function(){
 });
 
 // ============================================================
+// 📥 ترتيب الاستلامات — تحميل intake-board-view.js (ملف SQL رقم 113)
+// ------------------------------------------------------------
+// 🧸 بالبلدي: كل اللي بيسجّل أجهزة (الاستقبال · مسؤول الحركة · المالك ·
+//    المحاسب العام) بيلاقي «📥 ترتيب الاستلامات» في قايمة ⋮.
+//    الترتيب بمجموع سعر الأجهزة اللي اتسلّمت. كل واحد بيشوف فلوسه بس —
+//    والسيرفر هو اللي بيقفل فلوس الباقيين.
+// ⚠️ لو الملف مش مرفوع: الزرار مابيظهرش وخلاص — ولا صفحة بتقع.
+// ============================================================
+addEventListener('DOMContentLoaded', function(){
+  try{
+    var page = (location.pathname.split('/').pop() || '').toLowerCase().replace(/\.html$/,'') || 'index';
+    if(['dashboard','dispatch','owner'].indexOf(page) === -1) return;
+    if(window.IFixIntakeBoard || document.getElementById('ibvScript')) return;
+    var s = document.createElement('script');
+    s.id = 'ibvScript';
+    s.src = 'intake-board-view.js';
+    s.onerror = function(){ console.error('فشل تحميل intake-board-view.js — «ترتيب الاستلامات» مش هيظهر'); };
+    document.head.appendChild(s);
+  }catch(e){ console.error('intake-board loader:', e); }
+});
+
+// ============================================================
 // 👥 شؤون العاملين على الـERP — تحميل erp-hr.js
 // ------------------------------------------------------------
 // 🧸 بالبلدي: كل مرتب يتصرف بقى ليه «سند صرف» برقم (ملف SQL رقم 106).
