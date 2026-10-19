@@ -254,6 +254,22 @@ let denyMsg = '';
 // بتروح للصفحة — أو بتطلّع الحساب وتكتب السبب لو مالوش دخول
 async function goByRole(email){
   const dest = await landingByRole(email);
+  // 🔁 (١٩-١٠) حارس اللفّة: لو الصفحة دي مش مرفوعة على السيرفر، Cloudflare
+  //    بيرجّع صفحة الدخول بدالها → الدخول يحوّل تاني → تفضل الشاشة «تتهز» للأبد.
+  //    لو حوّلنا لنفس الصفحة ٣ مرات في أقل من ١٥ ثانية → نقف ونقول السبب.
+  if(dest && dest !== 'dashboard.html'){
+    let h = {};
+    try{ h = JSON.parse(sessionStorage.getItem('ifix-land') || '{}') || {}; }catch(e){ h = {}; }
+    const now = Date.now();
+    h = (h.dest === dest && now - (h.t || 0) < 15000) ? { dest, t: now, n: (h.n || 0) + 1 } : { dest, t: now, n: 1 };
+    try{ sessionStorage.setItem('ifix-land', JSON.stringify(h)); }catch(e){}
+    if(h.n >= 3){
+      try{ sessionStorage.removeItem('ifix-land'); }catch(e){}
+      const el = document.getElementById('loginError');
+      if(el) el.textContent = '⚠️ صفحة «' + dest + '» مش موجودة على السيرفر — ارفعها على نفس الفرع وجرّب تاني';
+      return;
+    }
+  }
   if(dest){ window.location.href = dest; return; }
   try{ await sb.auth.signOut(); }catch(e){}
   const el = document.getElementById('loginError');
