@@ -55,13 +55,22 @@
     var st = document.createElement('style');
     st.id = 'ibvCss';
     st.textContent =
-        '#ibvBg{position:fixed;inset:0;z-index:9300;background:rgba(8,10,14,.55);}'
-      + '#ibvSheet{position:fixed;left:0;right:0;bottom:0;z-index:9301;max-height:88vh;overflow-y:auto;'
-      +   'background:var(--card,var(--surface,#fff));color:var(--ink,#111);border-radius:20px 20px 0 0;'
-      +   'padding:16px 16px calc(24px + env(safe-area-inset-bottom));box-shadow:0 -10px 40px rgba(0,0,0,.3);'
-      +   'font-family:Tajawal,system-ui,sans-serif;max-width:640px;margin:0 auto;}'
-      + '#ibvSheet .h{display:flex;align-items:center;gap:10px;margin-bottom:6px;}'
-      + '#ibvSheet .h b{flex:1;font:900 16px/1.4 Cairo,sans-serif;}'
+        // 📄 (٢٠٢٦-١٠-١٩) صفحة كاملة بدل الشيت اللي بيطلع من تحت
+        '#ibvSheet{position:fixed;inset:0;z-index:9301;overflow-y:auto;-webkit-overflow-scrolling:touch;'
+      +   'overscroll-behavior:contain;background:var(--paper,var(--bg,#fff));color:var(--ink,#111);'
+      +   'font-family:Tajawal,system-ui,sans-serif;}'
+      + '#ibvSheet .wrap{max-width:720px;margin:0 auto;padding:14px 16px calc(70px + env(safe-area-inset-bottom));}'
+      // الرأس لازق فوق — وتحت نتش الأيفون (env(safe-area-inset-top))
+      + '#ibvSheet .h{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:10px;'
+      +   'background:var(--chrome,#0C0C0E);color:var(--on-chrome,#F2F2F0);'
+      +   'padding:calc(12px + env(safe-area-inset-top)) 16px 12px;box-shadow:0 4px 14px rgba(0,0,0,.18);}'
+      + '#ibvSheet .h b{flex:1;font:900 17px/1.4 Cairo,sans-serif;}'
+      + '#ibvSheet .h .x{background:rgba(242,242,240,.10);color:inherit;}'
+      + '#ibvSheet .mpick{position:relative;display:inline-flex;align-items:center;gap:6px;border:1px dashed var(--line,var(--border,#ccc));'
+      +   'border-radius:999px;padding:7px 14px;font:800 12.5px/1.3 inherit;color:var(--ink,#111);cursor:pointer;overflow:hidden;}'
+      + '#ibvSheet .mpick.on{border-style:solid;border-color:var(--accent,#EE5B10);color:var(--ifx-ember-ink,#B8460A);}'
+      // الخانة الحقيقية شفافة فوق الكلام — الدوسة بتفتح منتقي الشهر بتاع الموبايل
+      + '#ibvSheet .mpick input{position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer;font-size:16px;}'
       + '#ibvSheet .sub{color:var(--muted,#666);font-size:12px;line-height:1.8;margin-bottom:12px;}'
       + '#ibvSheet .x{border:none;background:var(--paper,var(--surface-2,#eee));color:var(--ink,#111);width:34px;height:34px;'
       +   'border-radius:10px;font-size:17px;cursor:pointer;}'
@@ -69,8 +78,6 @@
       + '#ibvSheet .chip{border:1px solid var(--line,var(--border,#ddd));background:transparent;color:var(--ink,#111);'
       +   'border-radius:999px;padding:7px 14px;font:800 12.5px/1.3 inherit;cursor:pointer;}'
       + '#ibvSheet .chip.on{background:var(--accent,#EE5B10);border-color:var(--accent,#EE5B10);color:var(--on-accent,#0C0C0E);}'
-      + '#ibvSheet input[type=month]{border:1px solid var(--line,var(--border,#ddd));background:transparent;color:var(--ink,#111);'
-      +   'border-radius:999px;padding:6px 12px;font:700 16px/1.2 inherit;}'
       + '#ibvSheet .me{border:1.5px solid var(--accent,#EE5B10);background:rgba(252,104,24,' + '.08);border-radius:14px;'
       +   'padding:12px 14px;margin-bottom:14px;display:flex;align-items:center;gap:12px;}'
       + '#ibvSheet .me .r{font:900 26px/1 Cairo,sans-serif;color:var(--ifx-ember-ink,#B8460A);min-width:44px;text-align:center;}'
@@ -121,9 +128,12 @@
 
     function chip(m, l){ return '<button class="chip' + (S.mode === m ? ' on' : '') + '" onclick="IFixIntakeBoard.mode(\'' + m + '\')">' + l + '</button>'; }
     var n = new Date(), pm = new Date(n.getFullYear(), n.getMonth() - 1, 1);
+    // 📅 المحاسب العام: أي شهر في أي سنة — كلام ظاهر والخانة الحقيقية شفافة فوقه
+    //    (الأيفون كان بيرسم <input type=month> فاضي = مربع من غير كلام)
     var picker = S.admin
-      ? '<input type="month" value="' + e(S.ym) + '" max="' + n.getFullYear() + '-' + String(n.getMonth() + 1).padStart(2, '0') + '"'
-        + ' onchange="IFixIntakeBoard.ym(this.value)" title="اختار أي شهر">'
+      ? '<label class="mpick' + (S.mode === 'ym' ? ' on' : '') + '">📅 ' + (S.mode === 'ym' ? e(periodLabel()) : 'اختار شهر')
+        + '<input type="month" value="' + e(S.ym) + '" max="' + n.getFullYear() + '-' + String(n.getMonth() + 1).padStart(2, '0') + '"'
+        + ' onchange="IFixIntakeBoard.ym(this.value)" aria-label="اختار أي شهر"></label>'
       : '';
 
     var meBox = '';
@@ -155,12 +165,14 @@
     sh.innerHTML =
         '<div class="h"><b>📥 ترتيب الاستلامات</b>'
       +   '<button class="x" onclick="IFixIntakeBoard.reload()" title="تحديث">🔄</button>'
-      +   '<button class="x" onclick="IFixIntakeBoard.close()">✕</button></div>'
+      +   '<button class="x" onclick="IFixIntakeBoard.close()" aria-label="قفل">✕</button></div>'
+      + '<div class="wrap">'
       + '<div class="sub">بمجموع سعر الأجهزة اللي سجّلتها واتسلّمت — المرفوض مابيتحسبش.'
       +   (S.admin ? '' : ' فلوس زمايلك 🔒 — كل واحد بيشوف فلوسه بس.') + '</div>'
       + '<div class="chips">' + chip('today', 'النهارده') + chip('cm', 'الشهر الحالي') + chip('pm', 'الشهر السابق') + picker + '</div>'
       + '<div class="mut" style="font-size:12.5px;font-weight:800;margin:-4px 2px 10px;">📅 ' + e(periodLabel()) + '</div>'
-      + meBox + body;
+      + meBox + body
+      + '</div>';
   }
 
   function open(){
@@ -168,15 +180,17 @@
     try{ var md = document.getElementById('menuDropdown'); if(md) md.classList.add('hidden'); }catch(x){}
     css();
     if(!document.getElementById('ibvSheet')){
-      var bg = document.createElement('div'); bg.id = 'ibvBg'; bg.onclick = close;
       var sh = document.createElement('div'); sh.id = 'ibvSheet'; sh.setAttribute('dir', 'rtl');
-      document.body.appendChild(bg); document.body.appendChild(sh);
+      document.body.appendChild(sh);
     }
+    // الصفحة اللي ورا ماتتحركش وإحنا فاتحين الصفحة دي
+    try{ document.body.dataset.ibvOv = document.body.style.overflow || ''; document.body.style.overflow = 'hidden'; }catch(x){}
     paint();
     load();
   }
   function close(){
-    ['ibvBg', 'ibvSheet'].forEach(function(id){ var el = document.getElementById(id); if(el) el.remove(); });
+    var el = document.getElementById('ibvSheet'); if(el) el.remove();
+    try{ document.body.style.overflow = document.body.dataset.ibvOv || ''; delete document.body.dataset.ibvOv; }catch(x){}
   }
 
   // ---------- الزرار في قايمة ⋮ ----------
