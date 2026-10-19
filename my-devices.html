@@ -37,6 +37,7 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
 <meta name="theme-color" content="#1B2A3A">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="common.js"></script>
+<script src="qc-view.js"></script><!-- 🧪 (ملف 110) نتيجة فحص الجهاز -->
 <script src="attendance.js"></script>
 <script src="payroll.js"></script>
 <script src="i18n.js"></script>
@@ -2455,6 +2456,15 @@ function renderSheet(){
       </div>
 
       ${techPartsPanel(d)}
+
+      ${(() => {
+        // 🧪 (ملف 110) نتيجة فحص التيستر — وقت الاستلام (والتسليم لو اتعمل).
+        //    عشان الفني يعرف حالة الجهاز قبل ما يفتحه. السيرفر بيرجّع أجهزته بس.
+        //    ⚠️ لما النتيجة توصل بنرسم تاني بـ renderSheetKeepNote عشان الملاحظة اللي بيكتبها ماتتمسحش.
+        if(typeof QC === 'undefined') return '';
+        try{ return QC.panelHtml(d, () => { if(sheetId === d.id && $('sheet').classList.contains('on')) renderSheetKeepNote(); }); }
+        catch(e){ return ''; }
+      })()}
 
       <div class="panel">
         <div class="panel-h" data-i18n="tp.notes">📝 ملاحظات الفني</div>

@@ -347,7 +347,8 @@ async function landingByRole(email){
       //    **أي دور جديد لازم يتضاف هنا كمان**، مش في ROLES بس.
       // 🛎️🏭📞 reception و production و callcenter بيروحوا dashboard.html (الافتراضي تحت)
       // 🛵 parts = مسؤول قطع الغيار (ملف 95) → parts.html
-      if(['super_admin','accountant','dispatcher','technician','hr','staff','owner','reception','production','callcenter','parts'].includes(found)) role = found;
+      // 🧪 tester = مسؤول الفحص (ملف 110) → tester.html
+      if(['super_admin','accountant','dispatcher','technician','hr','staff','owner','reception','production','callcenter','parts','tester'].includes(found)) role = found;
     }
   }catch(err){ denyMsg = 'تعذّر التحقق من حسابك — جرّب تاني'; return null; }
 
@@ -376,6 +377,8 @@ async function landingByRole(email){
   if(role === 'owner')      return 'owner.html';
   // 🛵 مسؤول قطع الغيار: صفحته لوحده — طلبات القطع والتجار والفواتير
   if(role === 'parts')      return 'parts.html';
+  // 🧪 مسؤول الفحص: صفحته لوحده — فحص الجهاز وقت الاستلام ووقت التسليم
+  if(role === 'tester')     return 'tester.html';
   return 'dashboard.html';
 }
 if(APP_ENV === "staging"){

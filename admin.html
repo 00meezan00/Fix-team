@@ -460,6 +460,7 @@ function render(){
         <option value="production">🏭 مديرين الإنتاج بس</option>
         <option value="callcenter">📞 الكول سنتر بس</option>
         <option value="parts">🛵 مسؤولي قطع الغيار بس</option>
+        <option value="tester">🧪 مسؤولي الفحص بس</option>
         <option value="user">👤 شخص بعينه…</option>
       </select>
       <select id="bcUser" style="display:none;">
@@ -762,7 +763,9 @@ async function toggleFlag(key){
 //    بيكلّم العملاء بس (وقت أطول · الدرج · ما بعد البيع)، ومابيحرّكش أجهزة.
 // 🛵 parts = مسؤول قطع الغيار (ملف 95) — صفحته parts.html: بيجيب القطع من التجار
 //    وبيسجّلها على حساباتهم. مايشوفش الأجهزة ولا العملاء ولا الفلوس بتاعة الزباين.
-const ROLES = ['super_admin', 'accountant', 'dispatcher', 'technician', 'hr', 'staff', 'owner', 'reception', 'production', 'callcenter', 'parts'];
+// 🧪 tester = مسؤول الفحص (ملف 110) — صفحته tester.html: بيفحص الجهاز وقت الاستلام
+//    ووقت التسليم. بيشوف الموديل والعطل بس — مفيش عميل ولا سعر.
+const ROLES = ['super_admin', 'accountant', 'dispatcher', 'technician', 'hr', 'staff', 'owner', 'reception', 'production', 'callcenter', 'parts', 'tester'];
 const ROLE_LABEL_KEYS = {
   super_admin: 'adm.roleSuper',
   accountant:  'adm.roleAcc',
@@ -775,7 +778,7 @@ const ROLE_LABEL_KEYS = {
 };
 // الأدوار اللي لسه مالهاش مفتاح ترجمة — من غير ده بيظهر الاسم
 // الإنجليزي الخام (staff) قدّام الأدمن.
-const ROLE_LABEL_FALLBACK = { staff: 'موظف', owner: 'المالك', reception: 'موظف الاستقبال', production: 'مدير الإنتاج', callcenter: 'الكول سنتر', parts: 'مسؤول قطع الغيار' };
+const ROLE_LABEL_FALLBACK = { staff: 'موظف', owner: 'المالك', reception: 'موظف الاستقبال', production: 'مدير الإنتاج', callcenter: 'الكول سنتر', parts: 'مسؤول قطع الغيار', tester: 'مسؤول الفحص' };
 function roleLabel(r){
   const k = ROLE_LABEL_KEYS[r];
   try{ return k ? t(k) : (ROLE_LABEL_FALLBACK[r] || r); }
@@ -927,7 +930,8 @@ const BC_AUDIENCE = {
   reception:  'موظفين الاستقبال بس',
   production: 'مديرين الإنتاج بس',
   callcenter: 'الكول سنتر بس',
-  parts:      'مسؤولي قطع الغيار بس'
+  parts:      'مسؤولي قطع الغيار بس',
+  tester:     'مسؤولي الفحص بس'
 };
 
 // علامة إن المنشور اللي هيتبعت هو منشور خطط الاشتراك تحديداً.
