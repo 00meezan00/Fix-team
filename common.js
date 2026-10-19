@@ -934,3 +934,134 @@ const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
     if(wouldLeak(scrollerIn(menu, e.target), -e.deltaY)) e.preventDefault();
   }, { passive:false, capture:true });
 })();
+
+// ============================================================
+// 🎨 (٢٠٢٦-١٠-١٩) ألوان لوجو FIX TEAM — لكل الشاشات من مكان واحد
+// ------------------------------------------------------------
+// 🧸 بالبلدي: كل شاشة في النظام مدهونة بأسامي ألوان (متغيّرات) جوه
+//    ملفها هي. بدل ما نفتح كل شاشة وندهنها لوحدها (الداشبورد لوحده
+//    ميجا!)، الكود ده «بيدهن فوق» الأسامي دي من هنا — وcommon.js
+//    محمّل في كل الشاشات، فكلهم بيتلوّنوا مرة واحدة.
+//
+//    الألوان جاية من اللوجو نفسه:
+//      ⬛ أسود اللوجو   #0C0C0E → الشريط اللي فوق في كل الشاشات
+//      🟧 برتقالي اللوجو #FC6818 → خط رفيع تحت الشريط + الزراير
+//      ⬜ أبيض الترس    #F2F2F1 → الكلام على الأسود
+//    والوضع الغامق بقى رمادي فحمي (زي خلفية اللوجو) بدل الكحلي.
+//
+// ⚠️ ألوان الحالات (أخضر اتصلح · أحمر مرفوض · بنفسجي كشف …) **ماتغيّرتش**
+//    عن قصد — دي بتقول معلومة للموظف، مش ديكور.
+// ⚠️ على الفاتح، الزرار البرتقالي أغمق درجة (#D9530A) عن برتقالي
+//    اللوجو — الأبيض على البرتقالي الأصلي بيتقري بالعافية (تباين ٢٫٩).
+//    على الأسود بنستخدم البرتقالي الأصلي زي ما هو (تباين ٦٫٦).
+// ⚠️ ليه [data-ifx-brand] في الأسماء؟ عشان قاعدتنا «تكسب» قاعدة الشاشة
+//    نفسها (الشاشة بتتكتب بعدنا في الصفحة، فلازم نبقى أقوى منها).
+// ⚠️ صفحة الدخول (index.html) مش بتحمّل common.js — اتلوّنت لوحدها.
+// 🔙 عايز ترجع الألوان القديمة؟ امسح البلوك ده كله. خلاص.
+// ============================================================
+(function(){
+  if(window.__ifxBrand) return;
+  window.__ifxBrand = true;
+  try{
+    var page = (location.pathname.split('/').pop() || '').toLowerCase().replace(/\.html$/,'') || 'index';
+    var root = document.documentElement;
+    root.setAttribute('data-ifx-brand', '');
+
+    var L = 'html[data-ifx-brand]:not([data-theme="dark"])';
+    var D = 'html[data-ifx-brand][data-theme="dark"]';
+    var A = 'html[data-ifx-brand]';
+
+    // 🔴 «--red» في شاشات الفني والحركة والمالك كان لون اللوجو القديم
+    //    (التروس الحمرا) — فبقى برتقالي. في الشاشات التانية «--red»
+    //    معناه «خطر» فبيفضل أحمر.
+    var redIsBrand = ['my-devices','dispatch','owner'].indexOf(page) !== -1;
+
+    var css =
+      // ===== ☀️ الفاتح =====
+      L + '{'
+      + '--ifx-orange:#FC6818;'
+      // عيلة الداشبورد
+      + '--bg:#E9E9E6;--surface:#FFFFFF;--surface-2:#F7F7F5;--surface-3:#F0F0EE;--surface-alt:#EEEEEC;'
+      + '--border:#E2E2DE;--border-strong:#CFCFC9;'
+      + '--ink:#141416;--ink-2:#4A4A50;--ink-3:#2E2E33;--muted:#6B6B72;--muted-2:#6B6B72;'
+      + '--accent:#D9530A;--accent-dark:#B8460A;--on-accent:#FFFFFF;'
+      + '--chrome:#0C0C0E;--chrome-ink:#F2F2F1;'
+      // عيلة الفني/الحركة/المالك + الصفحات الجديدة
+      + '--on-chrome:#F2F2F1;--steel:#0C0C0E;--steel-2:#1F1F23;--steel-ink:#F2F2F1;'
+      + '--paper:#E9E9E6;--card:#FFFFFF;--line:#E2E2DE;--soft:#F3F3F1;--faint:#96969C;'
+      + '--brand:#D9530A;'
+      + (redIsBrand ? '--red:#D9530A;--red-dark:#B8460A;' : '')
+      + '}'
+      // ===== 🌙 الغامق =====
+      + D + '{'
+      + '--ifx-orange:#FC6818;'
+      + '--bg:#0E0E10;--surface:#18181B;--surface-2:#202024;--surface-3:#28282D;--surface-alt:#202024;'
+      + '--border:#2D2D33;--border-strong:#3C3C43;'
+      + '--ink:#F2F2F1;--ink-2:#C9C9CD;--ink-3:#DADADD;--muted:#9A9AA2;--muted-2:#7C7C84;'
+      + '--accent:#FF7A2E;--accent-dark:#FF904F;--on-accent:#140A04;'
+      + '--chrome:#09090A;--chrome-ink:#F2F2F1;'
+      + '--on-chrome:#F2F2F1;--on-color:#0C0C0E;--steel:#09090A;--steel-2:#18181B;--steel-ink:#F2F2F1;'
+      + '--paper:#0E0E10;--card:#18181B;--line:#2D2D33;--soft:#202024;--faint:#74747C;'
+      + '--brand:#FF7A2E;'
+      + (redIsBrand ? '--red:#FF7A2E;--red-dark:#FF904F;' : '')
+      + '}'
+
+      // ===== ⭐ التوقيع: خط برتقالي رفيع تحت الشريط الأسود — زي اللوجو بالظبط =====
+      + A + ' .topbar{box-shadow:inset 0 -3px 0 #FC6818, 0 2px 10px rgba(0,0,0,.22) !important;}'
+
+      // ===== الزراير البرتقالي في الغامق: الكلام عليها أسود (الأبيض مش باين) =====
+      + D + ' .btn-primary,' + D + ' .tv-ok,' + D + ' .acc-save,' + D + ' .due-chip.on,'
+      + D + ' .pr-q.on,' + D + ' .oh-back,' + D + ' .tv-sw.on{color:var(--on-accent);}'
+
+      // ===== لمسات كانت مكتوبة باللون الفيروزي القديم بالإيد =====
+      + A + ' .topbar-actions .btn-primary{box-shadow:0 3px 12px rgba(217,83,10,.32);}'
+      + A + ' .tech-select:focus{box-shadow:0 0 0 3px rgba(252,104,24,.18);}'
+      + A + ' .gs-box:focus-within{box-shadow:0 3px 16px rgba(252,104,24,.16);}'
+      + A + ' .field input:focus,' + A + ' .field textarea:focus{outline-color:rgba(252,104,24,.35);}'
+      + A + ' .set-opt.active{background:rgba(252,104,24,.08);}'
+      + A + ' .inv-card.open{box-shadow:0 4px 16px rgba(252,104,24,.20);}'
+      + A + ' .ip-fill{background:var(--accent);}'
+      + L + ' .tv-mode-btn.sel{background:#FFF1E8;}'
+      + D + ' .tv-mode-btn.sel{background:rgba(255,122,46,.14);}'
+      // الحدود الرمادي المزرقّة في الفاتح (الداشبورد) → رمادي محايد زي ورق اللوجو
+      + L + ' .column{border-inline-color:#D9D9D3;border-bottom-color:#D9D9D3;}'
+      + L + ' .day-column,' + L + ' .menu-dropdown{border-color:#D9D9D3;}'
+
+      // ===== حاجات common.js نفسه (كانت فيروزي ثابت) =====
+      + '#ifxUpdBar{background:#0C0C0E !important;border:1px solid #FC6818;}'
+      + '#ifxUpdGo{background:#FC6818 !important;color:#0C0C0E !important;}'
+      + '#svcStopOv{background:#0C0C0E !important;}'
+      + '#svcStopOk{background:#FC6818 !important;color:#0C0C0E !important;}'
+      + '#accSharedOv button[onclick^="saveAccountShared"]{background:#FC6818 !important;color:#0C0C0E !important;}';
+
+    var st = document.createElement('style');
+    st.id = 'ifxBrandCss';
+    st.textContent = css;
+    (document.head || root).appendChild(st);
+
+    // ===== لون شريط الساعة على الموبايل = لون الشريط اللي فوق =====
+    // ⚠️ كل شاشة بتحط لونها القديم (كحلي) وقت ما الثيم يتغيّر —
+    //    فبنراقب ونرجّعه أسود كل مرة.
+    function syncBar(){
+      try{
+        var dark = root.getAttribute('data-theme') === 'dark';
+        var want = dark ? '#09090A' : '#0C0C0E';
+        var metas = document.querySelectorAll('meta[name="theme-color"]');
+        for(var i = 0; i < metas.length; i++){
+          if(metas[i].getAttribute('content') !== want) metas[i].setAttribute('content', want);
+        }
+      }catch(e){}
+    }
+    syncBar();
+    addEventListener('DOMContentLoaded', syncBar);
+    try{
+      new MutationObserver(syncBar).observe(root, { attributes:true, attributeFilter:['data-theme'] });
+      addEventListener('DOMContentLoaded', function(){
+        var metas = document.querySelectorAll('meta[name="theme-color"]');
+        for(var i = 0; i < metas.length; i++){
+          new MutationObserver(syncBar).observe(metas[i], { attributes:true, attributeFilter:['content'] });
+        }
+      });
+    }catch(e){}
+  }catch(e){ console.warn('ifx brand:', e); }
+})();

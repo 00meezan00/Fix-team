@@ -25,7 +25,7 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
     else d = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches;
     document.documentElement.setAttribute('data-theme', d ? 'dark' : 'light');
     var mt = document.querySelector('meta[name="theme-color"]');
-    if(mt) mt.setAttribute('content', d ? '#131E29' : '#F2F2F1');
+    if(mt) mt.setAttribute('content', d ? '#0E0E10' : '#F2F2F1');
   }catch(e){}
 })();
 </script>
@@ -71,12 +71,13 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
     color-scheme:dark;
     --brand:#FF6A1A; --brand-hover:#FF8240; --on-brand:#0C0C0E;
     --red:#F0554A; --red-dark:#D13B2E; --blue:#8B9BFF; --gold:#E3B85C;
-    --ink:#E9EFF5; --paper:#131E29;
-    --card:rgba(27,42,58,.88); --card-bd:rgba(255,255,255,.10);
-    --sub:#92A6B8; --field:#22323F; --field-bd:#2F4356;
+    /* 🎨 (٢٠٢٦-١٠-١٩) رمادي فحمي زي خلفية اللوجو بدل الكحلي */
+    --ink:#F2F2F1; --paper:#0E0E10;
+    --card:rgba(24,24,27,.90); --card-bd:rgba(255,255,255,.08);
+    --sub:#9A9AA2; --field:#202024; --field-bd:#2D2D33;
     --renew-bg:rgba(234,203,132,.13); --renew-bd:rgba(234,203,132,.38); --renew-ink:#F0CE84;
     --wallet-bg:rgba(255,255,255,.06); --wallet-bd:#C9A24E;
-    --btn-off:#2F4356; --btn-off-ink:#92A6B8;
+    --btn-off:#2D2D33; --btn-off-ink:#9A9AA2;
     --on-red:#FFFFFF;
   }
   *{box-sizing:border-box;}
