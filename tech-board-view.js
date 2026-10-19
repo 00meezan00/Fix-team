@@ -1,32 +1,37 @@
 // ============================================================
-// 🏆 tech-board-view.js — «ترتيب الفنيين» في صفحة المالك
+// 🏆 tech-board-view.js — «ترتيب الفنيين» (المالك + الفني)
 // ------------------------------------------------------------
 // 🧸 بالبلدي: الداشبورد (المحاسب العام) بيحسب ترتيب الفنيين وبينشره
-//    كل ٥ دقايق في درج اسمه «tech-board». الفني بيقراه من صفحته من
-//    زمان. الملف ده بيخلّي المالك يقراه هو كمان — من غير ما نلمس
-//    owner.html الكبيرة: common.js بيحمّله في صفحة المالك بس.
+//    كل ٥ دقايق في درج اسمه «tech-board». الملف ده هو اللي بيعرضه —
+//    نفس الشاشة في الصفحتين، فالشكل والفترات واحدين:
+//      👑 owner.html      → زرار جديد في ⋮ تحت «👥 الموظفين»
+//      🔧 my-devices.html → زرار «🏆 ترتيب الفنيين» القديم بيفتح الشاشة دي
+//    common.js هو اللي بيحمّله في الصفحتين — من غير ما نلمسهم.
 //
-// ✅ بيعمل إيه؟
-//    • بيحط زرار «🏆 ترتيب الفنيين» في قايمة ⋮ تحت «👥 الموظفين».
-//    • الدوسة بتفتح شيت من تحت: النهارده · آخر ٣٠ يوم — النقاط ·
-//      الأجهزة · متوسط المدة · المرتجعات.
-//    • المالك صاحب المحل، فبيشوف **لقب كل فني** (🥇 المتصدر · الأخير…)
-//      — مش لقبه هو بس زي الفني. وصفّه هو (لو بيشتغل فني) متعلّم.
-//    • لو مفيش داشبورد فاتح من ٢٥ دقيقة → سطر «⏸️ التحديثات موقوفة».
+// 🗓️ الفترات (٢٠٢٦-١٠-١٩): النهارده · الشهر الحالي · الشهر السابق
+//    (بدل «آخر ٣٠ يوم»). أسامي الشهور جاية جاهزة من الداشبورد
+//    (cmLabel · pmLabel) عشان تطابق الأرقام اللي اتحسبت.
+//
+// 🏷️ الألقاب (🥇 المتصدر … الأخير):
+//    • المالك صاحب المحل → بيشوف لقب **كل** فني.
+//    • الفني → بيشوف لقبه **هو بس** — اللقب حافز شخصي، ولو الكل شايف
+//      مين «الأخير» بيتحوّل لإحراج قدام الزمايل.
 //
 // ⚠️ مفيش أي SQL: «tech-board» مفتوح للقراية لكل اللي داخل النظام
 //    (app_data_key_readable — اتأكدنا بملف 111-check).
 // ⚠️ الحساب نفسه **مش هنا** — هو في الداشبورد بس (techBoardFor).
 //    منطق النقاط في مكان واحد = مستحيل يطلع رقمين مختلفين.
-// ⚠️ الملف قايم بنفسه: ألوانه من متغيرات الصفحة وليها احتياطي،
-//    ومابيعتمدش على أي دالة من owner.html غير MY_TECH (لو موجود).
+// ⚠️ الداشبورد لسه ماتحدّثش؟ (الدرج فيه today + d30 بس) → «الشهر
+//    الحالي» بيقول «لسه» بدل ما يطلع رقم غلط.
 // ============================================================
 (function(){
   if(window.IFixTechBoard) return;
 
   var KEY = 'tech-board';
-  var STALE_MS = 25 * 60 * 1000;   // نفس رقم صفحة الفني
-  var S = { data:null, mode:'month', loading:false, err:'' };
+  var STALE_MS = 25 * 60 * 1000;   // نفس رقم صفحة الفني القديم
+  var PAGE = (location.pathname.split('/').pop() || '').toLowerCase().replace(/\.html$/,'');
+  var IS_OWNER = PAGE === 'owner';
+  var S = { data:null, mode:'cm', loading:false, err:'' };
 
   function e(s){
     return (typeof esc === 'function') ? esc(s)
@@ -35,9 +40,16 @@
         });
   }
   function dark(){ return document.documentElement.getAttribute('data-theme') === 'dark'; }
+  // اسمي كفني: المالك = MY_TECH · الفني = ME (متغيّرات صفحاتهم)
   function myName(){
     try{ if(typeof MY_TECH !== 'undefined' && MY_TECH) return String(MY_TECH).trim(); }catch(x){}
+    try{ if(typeof ME !== 'undefined' && ME) return String(ME).trim(); }catch(x){}
     return '';
+  }
+  // اسم الشهر — من الداشبورد لو موجود، وإلا من ساعة الموبايل
+  function monthName(off){
+    var n = new Date();
+    return new Date(n.getFullYear(), n.getMonth() + off, 1).toLocaleDateString('ar-EG', { month:'long' });
   }
 
   // ---------- الستايل (مرة واحدة) ----------
@@ -55,9 +67,10 @@
       + '#tbvSheet .h b{flex:1;font:900 16px/1.4 Cairo,sans-serif;}'
       + '#tbvSheet .x{border:none;background:var(--paper,#eee);color:var(--ink,#111);width:34px;height:34px;'
       +   'border-radius:10px;font-size:17px;cursor:pointer;}'
-      + '#tbvSheet .chips{display:flex;gap:8px;margin-bottom:14px;}'
+      + '#tbvSheet .chips{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;}'
       + '#tbvSheet .chip{border:1px solid var(--line,#ddd);background:transparent;color:var(--ink,#111);'
-      +   'border-radius:999px;padding:7px 15px;font:800 12.5px/1 inherit;cursor:pointer;}'
+      +   'border-radius:999px;padding:7px 14px;font:800 12.5px/1.3 inherit;cursor:pointer;}'
+      + '#tbvSheet .chip small{display:block;font-size:10.5px;font-weight:600;opacity:.75;}'
       + '#tbvSheet .chip.on{background:var(--accent,#EE5B10);border-color:var(--accent,#EE5B10);color:var(--on-accent,#0C0C0E);}'
       + '#tbvSheet table{width:100%;border-collapse:collapse;font-size:12.5px;}'
       + '#tbvSheet th{color:var(--muted,#666);font-size:11.5px;padding:7px 6px;font-weight:800;}'
@@ -118,25 +131,35 @@
   function paint(){
     var sh = document.getElementById('tbvSheet'); if(!sh) return;
     var d = S.data || {};
-    var rows = (S.mode === 'today' ? d.today : d.d30) || [];
+    var cmL = d.cmLabel || monthName(0), pmL = d.pmLabel || monthName(-1);
+    var rows = (S.mode === 'today' ? d.today : S.mode === 'pm' ? d.pm : d.cm);
+    // الداشبورد لسه بالنسخة القديمة؟ (مفيش cm/pm في الدرج)
+    var oldBoard = !!S.data && S.mode !== 'today' && !Array.isArray(rows);
+    rows = rows || [];
     var me = myName();
     var at = d.at;
     var stale = at && (Date.now() - new Date(at).getTime() > STALE_MS);
 
-    function chip(m, l){ return '<button class="chip' + (S.mode === m ? ' on' : '') + '" onclick="IFixTechBoard.mode(\'' + m + '\')">' + l + '</button>'; }
+    function chip(m, l, sub){
+      return '<button class="chip' + (S.mode === m ? ' on' : '') + '" onclick="IFixTechBoard.mode(\'' + m + '\')">'
+        + l + (sub ? '<small>' + e(sub) + '</small>' : '') + '</button>';
+    }
 
     var body;
     if(S.loading && !S.data) body = '<div class="empty">لحظة…</div>';
     else if(S.err) body = '<div class="empty">⚠️ مقدرناش نجيب الترتيب<br><small>' + e(S.err) + '</small></div>';
+    else if(oldBoard) body = '<div class="empty">⏳ الفترة دي لسه بتتجهّز<br><small>هتظهر أول ما المحاسب العام يفتح النظام بالتحديث الجديد</small></div>';
     else if(!rows.length) body = '<div class="empty">لسه مفيش ترتيب في الفترة دي<br><small>بيظهر أول ما المحاسب العام يفتح النظام</small></div>';
     else body =
         '<div style="overflow-x:auto;"><table>'
       + '<tr><th style="text-align:start;">#</th><th style="text-align:start;">الفني</th><th>⭐ النقاط</th><th>أجهزة</th><th>متوسط المدة</th><th>مرتجع</th></tr>'
       + rows.map(function(r, i){
           var mine = me && r.t === me;
+          // 🏷️ المالك: لقب الكل · الفني: لقبه هو بس
+          var showBadge = IS_OWNER || mine;
           return '<tr style="' + (mine ? 'background:rgba(252,104,24,' + (dark() ? '.14' : '.09') + ');' : '') + '">'
             + '<td class="mut" style="text-align:start;">' + (i + 1) + '</td>'
-            + '<td class="n">' + e(r.t) + (mine ? ' <span class="mut" style="font-weight:600;">(إنت)</span>' : '') + badge(i, rows.length) + '</td>'
+            + '<td class="n">' + e(r.t) + (mine ? ' <span class="mut" style="font-weight:600;">(إنت)</span>' : '') + (showBadge ? badge(i, rows.length) : '') + '</td>'
             + '<td class="pts">' + e(r.points) + '</td>'
             + '<td>' + e(r.count) + '</td>'
             + '<td class="mut">' + avgTxt(r.avg) + '</td>'
@@ -149,7 +172,11 @@
         '<div class="h"><b>🏆 ترتيب الفنيين</b>'
       +   '<button class="x" onclick="IFixTechBoard.reload()" title="تحديث">🔄</button>'
       +   '<button class="x" onclick="IFixTechBoard.close()">✕</button></div>'
-      + '<div class="chips">' + chip('today', 'النهارده') + chip('month', 'آخر ٣٠ يوم') + '</div>'
+      + '<div class="chips">'
+      +   chip('today', 'النهارده', '')
+      +   chip('cm', 'الشهر الحالي', cmL)
+      +   chip('pm', 'الشهر السابق', pmL)
+      + '</div>'
       + (stale ? '<div class="stale">⏸️ التحديثات موقوفة لحين حضور المحاسبين<br><span style="font-weight:500;">الشغل متسجّل ومحفوظ — الترتيب هيتحدّث أول ما يفتحوا النظام</span></div>' : '')
       + body
       + (at ? '<div class="foot">آخر تحديث: ' + e(new Date(at).toLocaleString('ar-EG')) + '</div>' : '');
@@ -170,10 +197,9 @@
     ['tbvBg', 'tbvSheet'].forEach(function(id){ var el = document.getElementById(id); if(el) el.remove(); });
   }
 
-  // ---------- الزرار في قايمة ⋮ ----------
+  // ---------- 👑 المالك: زرار جديد في قايمة ⋮ ----------
   // 📍 تحت «👥 الموظفين» (#sbOwnerBtn) في مجموعة «🏪 المحل».
-  //    ولو الزرار ده مش موجود → بعد أول عنوان «المحل»، وإلا آخر القايمة قبل الخط.
-  function mount(){
+  function mountOwner(){
     if(document.getElementById('tbvMenuBtn')) return;
     var menu = document.getElementById('kebabMenu'); if(!menu) return;
     var b = document.createElement('button');
@@ -192,6 +218,19 @@
       if(sep) menu.insertBefore(b, sep); else menu.appendChild(b);
     }
   }
+
+  // ---------- 🔧 الفني: الزرار القديم يفتح الشاشة الجديدة ----------
+  // 🧸 my-devices.html فيها زرار «🏆 ترتيب الفنيين» بيندَه openTechBoard().
+  //    بنحط نسختنا مكان الدالة القديمة — فنفس الزرار بيفتح الشاشة الجديدة
+  //    بالتلات فترات، من غير ما نلمس الصفحة.
+  // ⚠️ renderTechBoard كمان: refresh() في الصفحة بتندهها لو شاشتها القديمة
+  //    مفتوحة. بقت مابتعملش حاجة غير إنها تحدّث شاشتنا لو مفتوحة.
+  function mountTech(){
+    window.openTechBoard = open;
+    window.renderTechBoard = function(){ if(document.getElementById('tbvSheet')) load(); };
+  }
+
+  function mount(){ if(IS_OWNER) mountOwner(); else if(PAGE === 'my-devices') mountTech(); }
   if(document.readyState === 'loading') addEventListener('DOMContentLoaded', mount); else mount();
   setTimeout(mount, 2000);   // احتياطي لو القايمة اتبنت متأخر
 

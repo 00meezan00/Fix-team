@@ -415,7 +415,7 @@ addEventListener('DOMContentLoaded', function(){
 });
 
 // ============================================================
-// 🏆 ترتيب الفنيين عند المالك — تحميل tech-board-view.js
+// 🏆 ترتيب الفنيين (المالك + الفني) — تحميل tech-board-view.js
 // ------------------------------------------------------------
 // 🧸 بالبلدي: الفني بيشوف «🏆 ترتيب الفنيين» في صفحته من زمان.
 //    المالك ماكانش عنده. الملف الصغير ده بيحط الزرار في قايمة ⋮
@@ -427,7 +427,8 @@ addEventListener('DOMContentLoaded', function(){
 addEventListener('DOMContentLoaded', function(){
   try{
     var page = (location.pathname.split('/').pop() || '').toLowerCase().replace(/\.html$/,'');
-    if(page !== 'owner') return;
+    // 🆕 (٢٠٢٦-١٠-١٩) + my-devices: الفني بقى يشوف نفس الشاشة (التلات فترات)
+    if(['owner','my-devices'].indexOf(page) === -1) return;
     if(window.IFixTechBoard || document.getElementById('tbvScript')) return;
     var s = document.createElement('script');
     s.id = 'tbvScript';

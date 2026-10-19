@@ -68,13 +68,14 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
       }
     }
 
-    if(!bounced && sameUser && (last === 'dispatcher' || last === 'technician' || last === 'hr' || last === 'staff' || last === 'owner' || last === 'parts')){
+    if(!bounced && sameUser && (last === 'dispatcher' || last === 'technician' || last === 'hr' || last === 'staff' || last === 'owner' || last === 'parts' || last === 'tester')){
       sessionStorage.setItem('ifix-bounced', '1');
       location.replace(last === 'dispatcher' ? 'dispatch.html'
                      : last === 'hr'         ? 'hr.html'
                      : last === 'staff'      ? 'staff.html'
                      : last === 'owner'      ? 'owner.html'
                      : last === 'parts'      ? 'parts.html'     // 🛵 (ملف 95)
+                     : last === 'tester'     ? 'tester.html'    // 🧪 (ملف 110)
                      : 'my-devices.html');
       return;
     }
@@ -109,6 +110,7 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="common.js"></script>
+<script src="qc-view.js"></script><!-- 🧪 (ملف 110) ورقة فحص الجهاز -->
 <script src="points.js"></script>
 <script src="statuses.js"></script>
 <script src="accounts.js"></script>
@@ -472,6 +474,9 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
   /* 🛵 (ملف 95) زرار صفحة مسؤول القطع — المحاسب العام ومدير الإنتاج بس */
   .runner-menu-item{display:none !important;}
   body.role-super_admin .runner-menu-item, body.role-production .runner-menu-item{display:block !important;}
+  /* 🧪 (ملف 110) صفحة الفحص — المحاسب العام بس */
+  .tester-menu-item{display:none !important;}
+  body.role-super_admin .tester-menu-item{display:block !important;}
   /* 📒 (ملفات 98 و 99) زرار «حسابات العملاء» — المحاسب العام بس، وبيحل محل «📒 الحسابات» القديم عنده */
   .cust-menu-item{display:none !important;}
   body.role-super_admin .cust-menu-item{display:block !important;}
@@ -1727,6 +1732,7 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
     <div class="mh mh-parts">🔩 قطع الغيار</div>
     <!-- 🛵 (ملف 95) طلبات القطع · التجار وحساباتهم · الفواتير · المطابقة — للمحاسب العام ومدير الإنتاج -->
     <button class="runner-menu-item" onclick="location.href='parts.html'">🛵 مسؤول القطع والتجار</button>
+    <button class="tester-menu-item" onclick="location.href='tester.html'">🧪 الفحص (التيستر)</button>
     <!-- 📍 فواتير المشتريات · مخزن قطع الغيار · مراجعة قطع الغيار بيتحطوا هنا -->
     <span id="slotParts" hidden></span>
 
@@ -2252,7 +2258,7 @@ const ADMIN_EMAIL_SET = ADMIN_EMAILS.length > 0;
 const ROLES_KEY = 'user-roles';
 // 🛎️ reception = موظف الاستقبال — بيفضل على الداشبورد ده (مفيش تحويل لصفحة تانية)
 // 🏭 production = مدير الإنتاج — برضه على الداشبورد ده
-const ROLES = ['super_admin', 'accountant', 'dispatcher', 'technician', 'hr', 'staff', 'owner', 'reception', 'production', 'callcenter', 'parts'];   // 📞 (ملف 91) · 🛵 (ملف 95)
+const ROLES = ['super_admin', 'accountant', 'dispatcher', 'technician', 'hr', 'staff', 'owner', 'reception', 'production', 'callcenter', 'parts', 'tester'];   // 📞 (ملف 91) · 🛵 (ملف 95) · 🧪 (ملف 110)
 let userRoles = {};   // { "email": "super_admin" }  أو  { "email": {role, techName} }
 
 // rolesLoadOk = قدرنا نقرا الأدوار من السيرفر فعلاً؟
@@ -2436,6 +2442,8 @@ function applyRoleVisibility(){
   if(myRole() === 'owner'){ location.replace('owner.html'); return; }
   // 🛵 (ملف 95) مسؤول قطع الغيار: صفحته parts.html — مالوش دعوة بالأجهزة ولا الفلوس هنا
   if(myRole() === 'parts'){ location.replace('parts.html'); return; }
+  // 🧪 (ملف 110) مسؤول الفحص: صفحته tester.html — بيشوف الموديل والعطل بس
+  if(myRole() === 'tester'){ location.replace('tester.html'); return; }
 
   // الدور اتحدد → نحفظه ونحدّث الكلاسات
   try{
@@ -7112,10 +7120,49 @@ function toRecBoxHtml(d){
   </div>`;
 }
 
+// ============================================================
+// 🧪 (ملف 110) فحص الجهاز — التيستر بيفحصه وقت الاستلام ووقت التسليم
+// ------------------------------------------------------------
+// 🧸 • كارت «🧪 فحص الجهاز» في التفاصيل: الاستقبال · مدير الإنتاج · المحاسب العام
+//      (الورقة نفسها والرسم في qc-view.js — الملف ده بيندهه بس).
+//    • 🛎️ الاستقبال بيبعت للورشة من غير فحص استلام؟ → تقرير للمحاسب العام.
+//    • 📦 الاستقبال بيسلّم جهاز راجع من الورشة من غير فحص تسليم؟ → تقرير.
+//    • ⚠️ الفحص لقى حاجة كانت سليمة وقت الاستلام وبقت فيها مشكلة؟
+//      → تحذير بس (يقدر يسلّم)، والتسليم بيتسجّل تقرير للمحاسب العام.
+// ⚠️ ده على الشاشة بس — السيرفر مابيمنعش الحركة (التقرير هو الحماية).
+// ============================================================
+function qcSees(){ return typeof QC !== 'undefined' && (isSuperAdmin() || isReception() || isProduction()); }
+function qcPanelFor(d){
+  if(!qcSees()) return '';
+  try{ return QC.panelHtml(d, () => { if(selectedId === d.id) renderDetail(); }); }
+  catch(e){ console.warn('qc panel:', e); return ''; }
+}
+// الحركة دي محتاجة فحص؟ → 'intake' / 'delivery' / null
+function qcGatePhase(d, newStatus){
+  if(!isReception() || typeof QC === 'undefined') return null;
+  if(newStatus === 'sent_to_repair' && (d.status === 'waiting' || (d.status === 'returned' && d.returnInbound))) return 'intake';
+  if(newStatus === 'delivered' && ['sent_to_reception', 'fixed_drawer'].includes(d.status)) return 'delivery';
+  return null;
+}
+const QC_PH_TXT = { intake: 'فحص الاستلام', delivery: 'فحص التسليم' };
+
 // 📝 تقرير الاستقبال — لما الجهاز يخرج من غير ما يعدّي على مدير الإنتاج
 function reportBoxHtml(d){
   if(!reportAsk || reportAsk.id !== d.id) return '';
   const to = statusInfo(reportAsk.to);
+  // 🧪 (ملف 110) التقرير ده سببه إن الجهاز ما اتفحصش
+  if(reportAsk.qc){
+    return `<div class="rfr-box" style="background:var(--warn-bg);border-color:var(--warn);">
+      <div class="rfr-q">🧪 الجهاز لسه ما اتعملّوش <b>${QC_PH_TXT[reportAsk.qc]}</b>.
+      الطبيعي تستنى التيستر يفحصه${reportAsk.qc === 'intake' ? ' قبل ما يتبعت للورشة' : ' قبل ما يتسلّم للعميل'}.
+      لو مش هتستنى، اكتب ليه — التقرير هيوصل للمحاسب العام.</div>
+      <textarea id="recReportText" rows="3" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:14px;font-family:inherit;background:var(--surface);color:var(--ink);" placeholder="مثال: التيستر مش موجود النهارده والعميل مستعجل"></textarea>
+      <div class="pay-choice" style="margin-top:8px;">
+        <button type="button" class="pay-btn" style="border-color:var(--warn);background:var(--warn);color:#fff;" onclick="submitReceptionReport()">📤 ابعت التقرير وكمّل من غير فحص</button>
+        <button type="button" class="pay-btn" style="border-color:var(--border);color:var(--ink-2);background:var(--surface);" onclick="reportAsk=null;renderDetail();">⏳ هستنى الفحص</button>
+      </div>
+    </div>`;
+  }
   return `<div class="rfr-box" style="background:var(--warn-bg);border-color:var(--warn);">
     ${(typeof RECEPTION_UNDO !== 'undefined' && (RECEPTION_UNDO[d.status] || []).includes(reportAsk.to))
       ? `<div class="rfr-q">↩️ بتصحّح حركة: «${esc(stLabel(statusInfo(effStatus(d))) || d.status)}» ← «${esc(to ? stLabel(to) : reportAsk.to)}».
@@ -8596,6 +8643,7 @@ const AUDIT_TYPES = {
   paylate: { icon:'⏰', label:'اتسلّم ومادفعش' },
   overdue: { icon:'⏳', label:'عدّى الميعاد مع العميل' },   // ⏳ (٢٠٢٦-١٠-١٣)
   complaint: { icon:'😕', label:'شكاوى العملاء' },          // 📞 (٢٠٢٦-١٠-١٣) من ما بعد البيع
+  qc:      { icon:'🧪', label:'الفحص' },                    // 🧪 (ملف 110) من غير فحص / حاجات باظت
 };
 let auditF = { type: 'all', state: 'pending', days: 30 };
 
@@ -8603,7 +8651,7 @@ function auditItems(){
   const out = [];
   devices.forEach(d => Object.keys(REPORT_SRC).forEach(src => (d[src] || []).forEach(r => {
     if(!r) return;
-    const type = src === 'cashierReports' ? 'unpay' : (r.kind === 'money' ? 'money' : 'move');
+    const type = src === 'cashierReports' ? 'unpay' : (r.kind === 'money' ? 'money' : r.kind === 'qc' ? 'qc' : 'move');
     out.push({ type, at: r.at, reviewed: !!r.reviewed, d, r, src });
   })));
   closings.forEach(c => out.push({ type: 'closing', at: c.created_at || c.to_at, reviewed: !!c.reviewed, c }));
@@ -8637,6 +8685,7 @@ function auditRowHtml(x){
   const lbl = k => { const s = statusInfo(k); return k === 'delivered' ? 'تم التسليم' : (s ? stLabel(s) : k); };
   const kind = x.type === 'unpay' ? '↩️ إلغاء تأكيد دفع بالغلط'
              : x.type === 'money' ? '💰 تعديل فلوس بعد الدفع'
+             : x.type === 'qc'    ? '🧪 ' + esc(lbl(r.from)) + ' ← ' + esc(lbl(r.to))
              : '📝 ' + esc(lbl(r.from)) + ' ← ' + esc(lbl(r.to));
   return `<div class="appr-row" style="${x.reviewed ? 'opacity:.75;' : ''}">
     <div class="appr-row-info" style="cursor:pointer;" onclick="openDetail('${d.id}')">
@@ -9725,6 +9774,7 @@ function renderDetailNow(){
       ` : `<div style="font-size:12px;color:var(--muted-2);">${t('det.wholesaleNote')}</div>`}
     </div>`}
 
+    ${qcPanelFor(d)}
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
       <span style="font-size:12px;color:var(--muted);">${t('det.changeStatus')}</span>
       <button class="btn-secondary" style="color:var(--info);border-color:var(--info-border);padding:5px 10px;font-size:11px;" onclick="copyTrackLink('${d.id}')">🔗 ${t('det.trackLink')}</button>
@@ -10675,10 +10725,24 @@ async function changeStatus(newStatus, paymentChoice, rejectedInShopChoice, opts
     return;
   }
 
+  // 🧪 (ملف 110) الحركة دي محتاجة فحص؟ بنقرا آخر فحص من السيرفر دلوقتي (مش من الكاش)
+  let qcSkip = null, qcRegs = [];
+  const qcPh = qcGatePhase(d, newStatus);
+  if(qcPh){
+    try{
+      await QC.load([d.id], true);
+      const qs = QC.state(d.id);
+      if(qs && !(qcPh === 'intake' ? qs.intakeOk : qs.deliveryOk)) qcSkip = qcPh;
+      if(qs && qcPh === 'delivery' && qs.deliveryOk) qcRegs = qs.regress || [];
+      if(!qs && QC.lastError()) console.warn('qc gate:', QC.lastError());   // ملف 110 مش متركّب؟ → منقفلش الشغل
+    }catch(e){ console.warn('qc gate:', e); }
+  }
+
   // 📝 الاستقبال خارج بالجهاز من غير ما يعدّي على مدير الإنتاج؟ → تقرير الأول
-  const needsReport = isReception() && (RECEPTION_NEEDS_REPORT[d.status] || []).includes(newStatus);
+  //    🧪 أو الجهاز ما اتفحصش (qcSkip) → نفس التقرير
+  const needsReport = (isReception() && (RECEPTION_NEEDS_REPORT[d.status] || []).includes(newStatus)) || !!qcSkip;
   if(needsReport && !(opts.report && String(opts.report).trim())){
-    reportAsk = { id: d.id, to: newStatus };
+    reportAsk = { id: d.id, to: newStatus, qc: qcSkip };
     toRecAskId = null;
     renderDetail();
     setTimeout(() => { const el = document.getElementById('recReportText'); if(el) el.focus(); }, 60);
@@ -10695,6 +10759,15 @@ async function changeStatus(newStatus, paymentChoice, rejectedInShopChoice, opts
       renderDetail();
       return;
     }
+  }
+
+  // 🧪 (ملف 110) فحص التسليم لقى حاجات كانت سليمة وقت الاستلام وبقت فيها مشكلة
+  //    → تحذير بس. لو كمّل، التسليم بيتسجّل تقرير للمحاسب العام (تحت).
+  if(qcRegs.length && !opts.qcRegOk){
+    const names = qcRegs.map(it => '• ' + QC.label(it.k) + (it.n ? ' — ' + it.n : '')).join('\n');
+    if(!confirm('⚠️ فحص التسليم لقى حاجات كانت سليمة وقت الاستلام وبقت فيها مشكلة:\n\n' + names
+      + '\n\nلو هتسلّم كده، المحاسب العام هيوصله تقرير بده.\nتكمّل التسليم؟')){ renderDetail(); return; }
+    opts.qcRegOk = true;
   }
 
   // 🚫 الاستقبال بيسلّم جهاز الورشة قالت عليه «مرفوض» — نسأل، ولو أكّد نسجّل
@@ -10884,13 +10957,16 @@ async function changeStatus(newStatus, paymentChoice, rejectedInShopChoice, opts
   // 📝 تقرير الاستقبال — بيتخزّن جوه الجهاز ويظهر للمحاسب العام في «تقارير الاستقبال»
   if(needsReport){
     const nowR = new Date().toISOString();
+    // 🧪 (ملف 110) لو السبب إن الجهاز ما اتفحصش، بنكتب ده في أول التقرير
+    const repText = (qcSkip ? '🧪 من غير ' + QC_PH_TXT[qcSkip] + ' — ' : '') + String(opts.report).trim();
     extra.receptionReports = [...(d.receptionReports || []), {
       id: 'rep_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
-      text: String(opts.report).trim(), from: fromStatus, to: newStatus,
+      text: repText, from: fromStatus, to: newStatus,
+      ...(qcSkip ? { kind: 'qc' } : {}),
       by: currentUser.name, byEmail: currentUser.email || '', at: nowR, reviewed: false
     }];
     extra.activityNotes = [...(d.activityNotes || []), {
-      text: '📝 تقرير للمحاسب العام: ' + String(opts.report).trim(),
+      text: '📝 تقرير للمحاسب العام: ' + repText,
       at: nowR, by: currentUser.name, role: currentRoleLabel() }];
     // طلب مسؤول الحركة على نفس الحركة؟ اتنفّذ خلاص → يتشال
     const pa = d.pendingApproval;
@@ -10901,6 +10977,19 @@ async function changeStatus(newStatus, paymentChoice, rejectedInShopChoice, opts
   }
 
   if(deliverRejectedNote) extra.activityNotes = [...(extra.activityNotes || d.activityNotes || []), deliverRejectedNote];
+
+  // 🧪 (ملف 110) اتسلّم رغم إن الفحص لقى حاجات باظت → تقرير تلقائي للمحاسب العام
+  if(qcRegs.length && opts.qcRegOk){
+    const nowQ = new Date().toISOString();
+    const txt = '🧪 اتسلّم وفحص التسليم لقى حاجات كانت سليمة وقت الاستلام وبقت فيها مشكلة: '
+      + qcRegs.map(it => QC.label(it.k) + (it.n ? ' (' + it.n + ')' : '')).join(' · ');
+    extra.receptionReports = [...(extra.receptionReports || d.receptionReports || []), {
+      id: 'rep_' + Date.now() + '_' + Math.random().toString(36).slice(2,6) + 'q',
+      kind: 'qc', text: txt, from: fromStatus, to: newStatus,
+      by: currentUser.name, byEmail: currentUser.email || '', at: nowQ, reviewed: false }];
+    extra.activityNotes = [...(extra.activityNotes || d.activityNotes || []), {
+      text: '📝 ' + txt, at: nowQ, by: currentUser.name, role: currentRoleLabel() }];
+  }
 
   showError('');
   if(newStatus === 'rejected' && d.status !== 'rejected') extra.rejectedInShop = (rejectedInShopChoice !== undefined) ? !!rejectedInShopChoice : true;   // رفض جديد → درج الرفض افتراضياً (أو حسب اختيار الديسباتشر)
@@ -14507,7 +14596,138 @@ function openTechEval(){
 }
 function closeTechEval(){ document.getElementById('techEvalOverlay').classList.add('hidden'); }
 
-function setTePeriod(mode){ tePeriod.mode = mode; teOpenTech = null; renderTechEval(); }
+function setTePeriod(mode){ tePeriod.mode = mode; teOpenTech = null; teView = 'table'; renderTechEval(); }
+
+// ============================================================
+// 📅 (٢٠٢٦-١٠-١٩) أي شهر في أي سنة + 📊 المقارنة — للمحاسب العام
+// ------------------------------------------------------------
+// 🧸 قايمتين جنب زراير الفترة: «السنة» و«الشهر» (أو «السنة كلها»).
+//    وزرار «📊 مقارنة»: جدول كل فني × كل شهور السنة (أو كل السنين)
+//    + الإجمالي — أعلى رقم في كل عمود متلوّن، والدوسة على أي خانة
+//    بتفتح الفترة دي بالتفصيل.
+// ⚠️ الحساب نفسه **ماتغيّرش بحرف**: teRowsFor بتشغّل renderTechEval
+//    زي ما هي على فترة واحدة «في السر» (_teSilent) وتاخد الأرقام.
+// ============================================================
+let teView = 'table';        // 'table' = الجدول العادي · 'compare' = المقارنة
+let teCmp  = 'months';       // 'months' = شهور سنة واحدة · 'years' = كل السنين
+let _teSilent = false;       // true = احسب بس ومترسمش (للمقارنة والنشر)
+
+const TE_MONTH = m => new Date(2026, m, 1).toLocaleDateString('ar-EG', { month:'long' });
+
+// السنين اللي فيها شغل — من أقدم جهاز لحد السنة دي
+function teYears(){
+  const now = new Date().getFullYear();
+  let min = now;
+  (devices || []).forEach(d => {
+    const y = new Date(d.intakeDate || 0).getFullYear();
+    if(y > 2000 && y < min) min = y;
+  });
+  const out = [];
+  for(let y = now; y >= min; y--) out.push(y);
+  return out;
+}
+
+function setTeYM(){
+  const ys = document.getElementById('teYear'), ms = document.getElementById('teMonth');
+  const y = parseInt(ys && ys.value, 10) || new Date().getFullYear();
+  const mv = ms ? ms.value : '';
+  tePeriod.year  = y;
+  tePeriod.month = (mv === '' ? -1 : parseInt(mv, 10));
+  if(teView === 'compare'){ renderTechEval(); return; }   // في المقارنة: السنة بس هي اللي بتفرق
+  tePeriod.mode = 'ym';
+  teOpenTech = null;
+  renderTechEval();
+}
+// من خانة في جدول المقارنة → الفترة دي بالتفصيل
+function teOpenYM(y, m){
+  tePeriod.mode = 'ym'; tePeriod.year = y; tePeriod.month = m;
+  teView = 'table'; teOpenTech = null;
+  renderTechEval();
+}
+function setTeView(v){ teView = v; teOpenTech = null; renderTechEval(); }
+function setTeCmp(c){ teCmp = c; renderTechEval(); }
+
+// أرقام فترة واحدة من غير ما نرسم حاجة
+function teRowsFor(p){
+  const save = Object.assign({}, tePeriod), saveOpen = teOpenTech, saveRows = teRows, saveSilent = _teSilent;
+  let rows = [];
+  try{
+    Object.assign(tePeriod, p);
+    _teSilent = true;
+    renderTechEval();
+    rows = (teRows || []).map(r => ({ t: r.t, points: r.points, count: r.count }));
+  }catch(e){ console.error('teRowsFor:', e); rows = []; }
+  Object.keys(tePeriod).forEach(k => delete tePeriod[k]);
+  Object.assign(tePeriod, save);
+  teOpenTech = saveOpen; teRows = saveRows; _teSilent = saveSilent;
+  return rows;
+}
+
+// جدول المقارنة
+function teCompareHtml(){
+  const now = new Date();
+  const year = tePeriod.year || now.getFullYear();
+  const cols = teCmp === 'years'
+    ? teYears().slice().reverse().map(y => ({ key:'y' + y, label:String(y), p:{ mode:'ym', year:y, month:-1 }, y, m:-1 }))
+    : Array.from({ length:12 }, (_, m) => ({
+        key:'m' + m, label:TE_MONTH(m), y:year, m,
+        future: (year > now.getFullYear()) || (year === now.getFullYear() && m > now.getMonth()),
+        p:{ mode:'ym', year, month:m }
+      }));
+
+  const byCol = {}, names = {};
+  cols.forEach(c => {
+    if(c.future){ byCol[c.key] = {}; return; }
+    const map = {};
+    teRowsFor(c.p).forEach(r => { map[r.t] = r; names[r.t] = (names[r.t] || 0) + (r.points || 0); });
+    byCol[c.key] = map;
+  });
+  const list = Object.keys(names).sort((a, b) => names[b] - names[a]);
+  const r1 = n => Math.round(n * 10) / 10;
+
+  // أعلى رقم في كل عمود
+  const best = {};
+  cols.forEach(c => {
+    let mx = 0;
+    Object.values(byCol[c.key]).forEach(r => { if(r.points > mx) mx = r.points; });
+    best[c.key] = mx;
+  });
+  const bestTotal = list.length ? names[list[0]] : 0;
+
+  const sticky = 'position:sticky;inset-inline-start:0;background:var(--surface);z-index:1;';
+  const head = `<tr><th style="${sticky}text-align:start;">${t('te.colTech')}</th>`
+    + cols.map(c => `<th style="white-space:nowrap;">${esc(c.label)}</th>`).join('')
+    + `<th style="white-space:nowrap;">∑ الإجمالي</th></tr>`;
+
+  const body = list.map(n => `<tr>
+      <td style="${sticky}font-weight:800;white-space:nowrap;">🔧 ${esc(n)}</td>
+      ${cols.map(c => {
+        if(c.future) return `<td style="color:var(--muted-2);text-align:center;">·</td>`;
+        const r = byCol[c.key][n];
+        if(!r) return `<td style="color:var(--muted-2);text-align:center;">—</td>`;
+        const top = r.points > 0 && r.points === best[c.key];
+        return `<td onclick="teOpenYM(${c.y},${c.m})" style="cursor:pointer;text-align:center;${top ? 'background:rgba(252,104,24,.13);' : ''}">
+          <div style="font-weight:900;font-family:'Cairo',sans-serif;color:${top ? 'var(--ifx-ember-ink, var(--accent))' : 'var(--violet)'};">${top ? '🥇 ' : ''}${r.points}</div>
+          <div style="font-size:10.5px;color:var(--muted-2);">${r.count} جهاز</div></td>`;
+      }).join('')}
+      <td style="text-align:center;font-weight:900;font-family:'Cairo',sans-serif;${names[n] === bestTotal && bestTotal > 0 ? 'background:rgba(252,104,24,.13);' : ''}">${r1(names[n])}</td>
+    </tr>`).join('');
+
+  const chip = (k, l) => `<button class="inv-chip ${teCmp === k ? 'active' : ''}" onclick="setTeCmp('${k}')">${l}</button>`;
+  return `
+    <div class="inv-filter">
+      ${chip('months', '🗓️ شهور ' + year)}${chip('years', '📆 كل السنين')}
+    </div>
+    ${(typeof devicesComplete !== 'undefined' && !devicesComplete)
+      ? `<div style="font-size:12.5px;color:var(--warn);font-weight:800;margin:-6px 2px 10px;">⏳ الأرشيف القديم لسه بيتحمّل — الأرقام هتكمل لوحدها</div>` : ''}
+    <div style="font-size:12px;color:var(--muted);margin:-4px 2px 10px;line-height:1.8;">
+      ⭐ النقاط · وتحتها عدد الأجهزة · 🥇 = الأعلى في العمود · دوس على أي خانة تفتح الفترة دي بالتفصيل
+    </div>
+    ${list.length
+      ? `<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--border);border-radius:12px;">
+           <table class="inv-table" style="min-width:${cols.length * 70 + 220}px;margin:0;">${head}${body}</table></div>`
+      : `<div class="empty-col">${t('te.noWork')}</div>`}`;
+}
 function setTeCustom(){
   tePeriod.mode = 'custom';
   tePeriod.from = document.getElementById('teFrom').value;
@@ -14523,6 +14743,22 @@ function inTeRange(iso){
   if(tePeriod.mode === 'today') f = startOfDay(now);
   else if(tePeriod.mode === 'week'){ f = startOfDay(now); f.setDate(f.getDate() - 6); }
   else if(tePeriod.mode === 'month'){ f = startOfDay(now); f.setDate(f.getDate() - 29); }
+  // 🆕 (٢٠٢٦-١٠-١٩) شهور التقويم — لترتيب الفنيين (tech-board)
+  //    🧸 «الشهر الحالي» = من يوم ١ في الشهر لحد دلوقتي.
+  //       «الشهر السابق» = الشهر اللي فات كامل: من أول يوم لآخر لحظة فيه.
+  else if(tePeriod.mode === 'thisMonth'){ f = new Date(now.getFullYear(), now.getMonth(), 1); }
+  else if(tePeriod.mode === 'lastMonth'){
+    f = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    t = new Date(now.getFullYear(), now.getMonth(), 1); t.setMilliseconds(-1);   // آخر لحظة في الشهر اللي فات
+  }
+  // 📅 شهر معيّن في سنة معيّنة — أو السنة كلها (month = -1)
+  else if(tePeriod.mode === 'ym'){
+    const y = tePeriod.year || now.getFullYear();
+    const m = (typeof tePeriod.month === 'number') ? tePeriod.month : -1;
+    if(m >= 0){ f = new Date(y, m, 1);  t = new Date(y, m + 1, 1); }
+    else      { f = new Date(y, 0, 1);  t = new Date(y + 1, 0, 1); }
+    t.setMilliseconds(-1);
+  }
   else if(tePeriod.mode === 'custom'){
     if(tePeriod.from) f = startOfDay(new Date(tePeriod.from));
     if(tePeriod.to){ t = new Date(tePeriod.to); t.setHours(23,59,59,999); }
@@ -14678,18 +14914,23 @@ const TECH_BOARD_KEY = 'tech-board';
 // بنبني الصفوف للفترة المطلوبة من غير ما نلمس الشاشة:
 // بنغيّر tePeriod مؤقتاً، ننادي renderTechEval (اللي بتملا teRows)،
 // وبعدين نرجّع الفترة زي ما كانت ونعيد الرسم.
+// 🐛 (٢٠٢٦-١٠-١٩) بقت «في السر» (_teSilent): قبل كده كل نشر كان بيرسم
+//    شاشة التقييم بفترة النشر — فلو المحاسب فاتحها كان يلاقي الأرقام
+//    اتبدّلت قدامه لفترة تانية من غير ما يدوس حاجة.
 function techBoardFor(mode){
-  const save = { mode: tePeriod.mode, from: tePeriod.from, to: tePeriod.to };
+  const save = Object.assign({}, tePeriod), saveRows = teRows, saveSilent = _teSilent;
   let rows = [];
   try{
     tePeriod.mode = mode; tePeriod.from = ''; tePeriod.to = '';
+    _teSilent = true;
     renderTechEval();
     rows = (teRows || []).map(r => ({
       t: r.t, points: r.points, count: r.count,
       avg: r.avg, ret: r.returns, rate: r.rate
     }));
   }catch(e){ rows = []; }
-  tePeriod.mode = save.mode; tePeriod.from = save.from; tePeriod.to = save.to;
+  Object.assign(tePeriod, save);
+  teRows = saveRows; _teSilent = saveSilent;
   return rows;
 }
 
@@ -14710,7 +14951,19 @@ async function publishTechBoard(){
     // ⚠️ الترتيب محسوب على آخر ٣٠ يوم — لو الأرشيف لسه بيتحمّل
     //    هيتنشر ترتيب ناقص للفنيين. loadDevices بتنده دي تاني في الآخر.
     if(!devicesComplete) return;
-    const rows = { today: techBoardFor('today'), d30: techBoardFor('month') };
+    // 🆕 (٢٠٢٦-١٠-١٩) النهارده · الشهر الحالي · الشهر السابق (بدل «آخر ٣٠ يوم»)
+    //    ⚠️ d30 لسه بيتنشر — عشان أي موبايل لسه على النسخة القديمة
+    //       مايلاقيش الشاشة فاضية لحد ما يحدّث.
+    const _now = new Date();
+    const _mName = (y, m) => new Date(y, m, 1).toLocaleDateString('ar-EG', { month:'long' });
+    const rows = {
+      today: techBoardFor('today'),
+      cm:    techBoardFor('thisMonth'),
+      pm:    techBoardFor('lastMonth'),
+      d30:   techBoardFor('month'),
+      cmLabel: _mName(_now.getFullYear(), _now.getMonth()),
+      pmLabel: _mName(_now.getFullYear(), _now.getMonth() - 1),
+    };
 
     // ⚠️ المقارنة على **الأرقام بس** — من غير الوقت.
     //    كانت: JSON.stringify({at: new Date(), ...}) والوقت جوه
@@ -14727,7 +14980,7 @@ async function publishTechBoard(){
     if(sig === _lastBoardSig && (now - _lastBoardAt) < BOARD_HEARTBEAT_MS) return;
     _lastBoardSig = sig; _lastBoardAt = now;
 
-    const body = JSON.stringify({ at: new Date(now).toISOString(), today: rows.today, d30: rows.d30 });
+    const body = JSON.stringify(Object.assign({ at: new Date(now).toISOString() }, rows));
     await sb.from('app_data').upsert({
       key: TECH_BOARD_KEY, value: body, updated_at: new Date().toISOString()
     });
@@ -14736,8 +14989,27 @@ async function publishTechBoard(){
 let _lastBoardSig = '', _lastBoardAt = 0;
 
 function renderTechEval(){
+  const isCmp = teView === 'compare' && !_teSilent;
   const chip = (mode, label) =>
-    `<button class="inv-chip ${tePeriod.mode===mode?'active':''}" onclick="setTePeriod('${mode}')">${label}</button>`;
+    `<button class="inv-chip ${(!isCmp && tePeriod.mode===mode)?'active':''}" onclick="setTePeriod('${mode}')">${label}</button>`;
+  // 📅 السنة والشهر
+  const _yNow = new Date().getFullYear();
+  const _ySel = tePeriod.year || _yNow;
+  const _mSel = (tePeriod.mode === 'ym' && typeof tePeriod.month === 'number') ? String(tePeriod.month) : '';
+  const _selStyle = 'border:1.5px solid var(--border-strong);background:var(--surface);color:var(--ink);'
+    + 'border-radius:20px;padding:7px 12px;font-family:inherit;font-weight:700;cursor:pointer;';
+  const ymBar = `
+    <div class="inv-filter" style="margin-top:-6px;">
+      <select id="teYear" onchange="setTeYM()" style="${_selStyle}">
+        ${teYears().map(y => `<option value="${y}" ${y === _ySel ? 'selected' : ''}>📅 ${y}</option>`).join('')}
+      </select>
+      ${isCmp ? '' : `<select id="teMonth" onchange="setTeYM()" style="${_selStyle}${tePeriod.mode === 'ym' ? 'border-color:var(--accent);' : ''}">
+        <option value="" ${_mSel === '' && tePeriod.mode !== 'ym' ? 'selected' : ''} disabled>اختار شهر…</option>
+        <option value="-1" ${tePeriod.mode === 'ym' && _mSel === '-1' ? 'selected' : ''}>🗓️ السنة كلها</option>
+        ${Array.from({ length:12 }, (_, m) => `<option value="${m}" ${_mSel === String(m) ? 'selected' : ''}>${TE_MONTH(m)}</option>`).join('')}
+      </select>`}
+      <button class="inv-chip ${isCmp ? 'active' : ''}" onclick="setTeView('${isCmp ? 'table' : 'compare'}')">📊 ${isCmp ? 'رجوع للترتيب' : 'مقارنة'}</button>
+    </div>`;
   const filterBar = `
     <div class="inv-filter">
       ${chip('today',t('inv.today'))}${chip('week',t('inv.week'))}${chip('month',t('inv.month'))}${chip('all',t('inv.all'))}
@@ -14745,7 +15017,16 @@ function renderTechEval(){
         ${t('inv.from')} <input type="date" id="teFrom" value="${tePeriod.from}" onchange="setTeCustom()">
         ${t('inv.to')} <input type="date" id="teTo" value="${tePeriod.to}" onchange="setTeCustom()">
       </span>
-    </div>`;
+    </div>` + ymBar;
+
+  // 📊 المقارنة: جدول الشهور/السنين بدل الترتيب العادي
+  if(isCmp){
+    const host = document.getElementById('techEvalBody');
+    if(host) host.innerHTML = `${filterBar}
+      <div class="inv-section-title">📊 مقارنة الفنيين</div>
+      ${teCompareHtml()}`;
+    return;
+  }
 
   // ===== حساب مساهمات كل فني =====
   const contrib = {};                      // اسم الفني → قائمة مساهماته
@@ -15038,11 +15319,15 @@ function renderTechEval(){
               وخلاص. الدالة recalcOldDeliveredPoints لسه موجودة تحت لو
               احتجتها من الكونسول يوم ما تستورد بيانات قديمة. */
     : '';
+  if(_teSilent) return;   // 🤫 حساب بس (مقارنة / نشر) — مانرسمش
+  // 📅 عنوان الفترة لما تكون شهر/سنة معيّنة
+  const _ymTitle = tePeriod.mode === 'ym'
+    ? ` <span style="font-size:13px;color:var(--muted);font-weight:700;">— ${tePeriod.month >= 0 ? TE_MONTH(tePeriod.month) + ' ' : 'سنة '}${tePeriod.year || _yNow}</span>` : '';
   document.getElementById('techEvalBody').innerHTML = `
     ${filterBar}
     ${recalcBtn}
     ${notes}
-    <div class="inv-section-title">⭐ ${t('ui.techRanking')}</div>
+    <div class="inv-section-title">⭐ ${t('ui.techRanking')}${_ymTitle}</div>
     ${table}
   `;
 }
