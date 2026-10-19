@@ -480,6 +480,92 @@ document.addEventListener('DOMContentLoaded', function(){
 });
 
 // ============================================================
+// 🔒 قفل الشاشة برّه الشيفت — تحميل shift-lock.js (ملف SQL رقم 116)
+// ------------------------------------------------------------
+// 🧸 بالبلدي: لو الزرار «🔒 قفل الشاشة برّه الشيفت» شغّال في لوحة
+//    الأدمن، الاستقبال · أمين الخزنة · الكول سنتر · مسؤول القطع ·
+//    التيستر · مسؤول الحركة · الموظف — وهما ماحضروش أو منصرفين أو
+//    في بريك — الشاشة بتتغطّى ومايفضلش غير: المواعيد · مرتبك ·
+//    ترتيب الاستلامات · «📨 اطلب فتح من المحاسب العام».
+//    وفي الداشبورد عند المحاسب العام: لوحة «🔓 طلبات فتح الشاشة».
+// 🔒 الحماية الحقيقية على السيرفر — الملف ده بيغطّي الشاشة بس.
+// ⚠️ لو الملف مش مرفوع أو ملف 116 مش متشغّل: مفيش قفل خالص — ولا صفحة بتقع.
+// ============================================================
+addEventListener('DOMContentLoaded', function(){
+  try{
+    var page = (location.pathname.split('/').pop() || '').toLowerCase().replace(/\.html$/,'') || 'index';
+    if(['dashboard','dispatch','parts','tester','staff'].indexOf(page) === -1) return;
+    if(window.IFixShiftLock || document.getElementById('slScript')) return;
+    var s = document.createElement('script');
+    s.id = 'slScript';
+    s.src = 'shift-lock.js';
+    s.onerror = function(){ console.error('فشل تحميل shift-lock.js — «قفل الشاشة برّه الشيفت» مش هيشتغل'); };
+    document.head.appendChild(s);
+  }catch(e){ console.error('shift-lock loader:', e); }
+});
+
+// ============================================================
+// 🎛️ زرار «🔒 قفل الشاشة برّه الشيفت» في لوحة الأدمن (ملف 116)
+// ------------------------------------------------------------
+// 🧸 بالبلدي: لوحة الأدمن عندها قايمة «🎛️ المميزات» (KNOWN_FLAGS).
+//    بدل ما نلمس admin.html، بنزوّد الزرار في القايمة دي من هنا —
+//    نفس طريقة باقي الإضافات. وبنحط سؤال «متأكد؟» قبل التشغيل
+//    والقفل، عشان دوسة بالغلط ماتقفلش على الموظفين وهما شغالين.
+// ⚠️ السيرفر بيقرا نفس المفتاح (feature-flags → shift_lock) —
+//    فالزرار هنا هو اللي بيشغّل القفل فعلاً.
+// ⚠️ admin.html بتعرّف KNOWN_FLAGS و featureFlags و toggleFlag في
+//    سكريبتها — وإحنا هنا بعد ما الصفحة اتقرت (DOMContentLoaded)،
+//    وقبل ما loadAll تخلص (بتستنى السيرفر)، فالزرار بيلحق يدخل.
+// ============================================================
+addEventListener('DOMContentLoaded', function(){
+  try{
+    var page = (location.pathname.split('/').pop() || '').toLowerCase().replace(/\.html$/,'') || 'index';
+    if(page !== 'admin') return;
+    if(typeof KNOWN_FLAGS === 'undefined' || !Array.isArray(KNOWN_FLAGS)) return;
+    var KEY = 'shift_lock';
+    var DESC = '🔒 قفل الشاشة برّه الشيفت — الاستقبال · أمين الخزنة · الكول سنتر · مسؤول القطع · '
+             + 'التيستر · مسؤول الحركة · الموظف: لو ماحضروش أو منصرفين أو في بريك مايشوفوش غير '
+             + 'المواعيد ومرتبك والترتيب (ويقدروا يطلبوا فتح من المحاسب العام)';
+    if(!KNOWN_FLAGS.some(function(f){ return f && f.key === KEY; })) KNOWN_FLAGS.push({ key:KEY, desc:DESC });
+
+    if(typeof toggleFlag === 'function' && !toggleFlag.__sl){
+      var orig = toggleFlag;
+      var wrapped = async function(key){
+        if(key === KEY){
+          try{
+            if(typeof featureFlags !== 'undefined' && featureFlags && !featureFlags[KEY]){
+              featureFlags[KEY] = { is_enabled:false, description:DESC, updated_at:new Date().toISOString() };
+            }
+            var willOn = !(featureFlags[KEY] && featureFlags[KEY].is_enabled);
+            var msg = willOn
+              ? '🔒 تشغيل «قفل الشاشة برّه الشيفت»؟\n\n'
+                + 'أي حد من (الاستقبال · أمين الخزنة · الكول سنتر · مسؤول القطع · التيستر · '
+                + 'مسؤول الحركة · الموظف) مش عامل حضور دلوقتي، أو منصرف، أو في بريك — '
+                + 'شاشته هتتقفل خلال أقل من دقيقة.\n\n'
+                + 'اتأكد إن الموجودين في المحل عاملين حضور الأول.'
+              : '🔓 إيقاف «قفل الشاشة برّه الشيفت»؟\n\nكل الشاشات هترجع مفتوحة زي الأول.';
+            if(!confirm(msg)) return;
+          }catch(e){ console.error('shift_lock flag:', e); }
+        }
+        return orig.apply(this, arguments);
+      };
+      wrapped.__sl = 1;
+      window.toggleFlag = wrapped;
+    }
+    // لو اللوحة اترسمت قبل ما نزوّد الزرار → نرسمها تاني
+    setTimeout(function(){
+      try{
+        if(typeof featureFlags !== 'undefined' && featureFlags && !featureFlags[KEY]
+           && document.querySelector('#wrap .sec') && typeof render === 'function'){
+          featureFlags[KEY] = { is_enabled:false, description:DESC, updated_at:new Date().toISOString() };
+          render();
+        }
+      }catch(e){}
+    }, 0);
+  }catch(e){ console.error('shift-lock admin flag:', e); }
+});
+
+// ============================================================
 // 👥 شؤون العاملين على الـERP — تحميل erp-hr.js
 // ------------------------------------------------------------
 // 🧸 بالبلدي: كل مرتب يتصرف بقى ليه «سند صرف» برقم (ملف SQL رقم 106).
