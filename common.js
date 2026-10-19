@@ -461,6 +461,25 @@ addEventListener('DOMContentLoaded', function(){
 });
 
 // ============================================================
+// 🔔 الإشعارات لكل الشاشات — تحميل push-ui.js (ملف SQL 115)
+// 🧸 زرار «🔔 الإشعارات» في قايمة ⋮ — كل موظف بيشوف أنواع شغله بس،
+//    والشات (الخاص · «الكل») ليه مفتاح لوحده.
+//    شؤون العاملين (hr) مالهاش إشعارات شغل ولا شات → مش بنحمّله هناك.
+// ============================================================
+document.addEventListener('DOMContentLoaded', function(){
+  try{
+    var page = (location.pathname.split('/').pop() || '').toLowerCase().replace(/\.html$/,'') || 'index';
+    if(['dashboard','dispatch','owner','my-devices','parts','tester','staff'].indexOf(page) === -1) return;
+    if(window.IFixPush || document.getElementById('pshScript')) return;
+    var s = document.createElement('script');
+    s.id = 'pshScript';
+    s.src = 'push-ui.js';
+    s.onerror = function(){ console.error('فشل تحميل push-ui.js — زرار «الإشعارات» مش هيظهر'); };
+    document.head.appendChild(s);
+  }catch(e){ console.error('push-ui loader:', e); }
+});
+
+// ============================================================
 // 👥 شؤون العاملين على الـERP — تحميل erp-hr.js
 // ------------------------------------------------------------
 // 🧸 بالبلدي: كل مرتب يتصرف بقى ليه «سند صرف» برقم (ملف SQL رقم 106).

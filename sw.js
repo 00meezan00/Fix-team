@@ -13,6 +13,7 @@
 //
 // ⚠️ لو ضفت صفحة أو ملف جديد للنظام: زوّده كمان في APP_SHELL تحت.
 // v162 — 📄 «ترتيب الفنيين» بقى صفحة كاملة (رأس أسود لازق فوق تحت النتش) بدل الشيت اللي بيطلع من تحت — عند المالك والفني (من غير SQL)
+// v163 — 🔔 الإشعارات لكل الشاشات: push-ui.js (common.js بيحمّله في dashboard · dispatch · owner · my-devices · parts · tester · staff) — كل موظف بيشوف أنواع شغله بس + مفتاح لوحده للشات (الخاص · «الكل») · دوسة الإشعار بتفتح شاشة الموظف نفسه (أو الشات) — محتاج ملف SQL رقم 115
 // v161 — 👑 ترتيب الاستلامات: المالك بقى يشوف فلوس كل الموظفين + الإجمالي + «اختار شهر» زي المحاسب العام — محتاج ملف SQL رقم 114
 // v160 — 📄 «ترتيب الاستلامات» بقى صفحة كاملة (رأس أسود لازق فوق تحت النتش) بدل الشيت اللي بيطلع من تحت · خانة «📅 اختار شهر» عند المحاسب العام بقت باينة بكلام بدل المربع الفاضي (من غير SQL)
 // v159 — 📥 ترتيب الاستلامات: كل اللي بيسجّل أجهزة بيدخل الترتيب بمجموع سعر الأجهزة اللي اتسلّمت (المرفوض مابيتحسبش) · كل واحد بيشوف ترتيب الكل وعدد أجهزتهم وفلوسه هو بس (السيرفر بيقفل فلوس الباقيين) · المحاسب العام بيشوف فلوس الكل + الإجمالي + أي شهر — intake-board-view.js (common.js بيحمّله في dashboard · dispatch · owner) — محتاج ملف SQL رقم 113
@@ -60,7 +61,7 @@
 // v113 — 🛡️ الثغرات — محتاج ملف SQL رقم 83
 // v112 … v103 — الاستقبال · مدير الإنتاج · أمين الخزنة (ملفات 74–82)
 // v102 … v83 — HR والمرتبات والحسابات (التفاصيل في ملخصات الجلسات)
-const CACHE_NAME = 'ifixteam-v162';
+const CACHE_NAME = 'ifixteam-v163';
 
 const APP_SHELL = [
   './',
@@ -95,6 +96,7 @@ const APP_SHELL = [
   'erp-hr.js',           // 👥 سندات المرتبات ومسير المرتبات (ملف 106)
   'gl.html',             // 📒 مركز الأستاذ (ملف 107)
   'tech-board-view.js',  // 🏆 ترتيب الفنيين (المالك + الفني)
+  'push-ui.js',          // 🔔 الإشعارات لكل الشاشات (ملف 115)
   'intake-board-view.js',// 📥 ترتيب الاستلامات (ملف 113)
   'manifest.json',
   'i18n.js',
@@ -263,15 +265,30 @@ self.addEventListener('notificationclick', (event) => {
   const data   = event.notification.data || {};
   const target = data.url || 'index.html';
   const dev    = data.dev || null;
+  const isChat = /^ifx-chat/.test(event.notification.tag || '');
+  // 🧭 الصفحة اللي الإشعار عايزها (my-devices.html / dispatch.html / …)
+  const page   = (target.split('?')[0].split('/').pop() || 'index.html').toLowerCase();
   event.waitUntil(
     self.clients.matchAll({ type:'window', includeUncontrolled:true }).then(list => {
-      // الأولوية لصفحة الداشبورد لو مفتوحة
       const mine = list.filter(c => c.url.indexOf(self.location.origin) === 0);
-      const dash = mine.find(c => /dashboard\.html/.test(c.url)) || mine[0];
-      if(dash && 'focus' in dash){
-        if(dev){ try{ dash.postMessage({ type:'ifx-open-dev', id: dev }); }catch(e){} }
-        return dash.focus();
+      const pathOf = c => (new URL(c.url).pathname.split('/').pop() || 'index.html').toLowerCase();
+      // 💬 الشات موجود في كل الشاشات → أي شاشة مفتوحة تنفع
+      if(isChat){
+        const any = mine[0];
+        if(any && 'focus' in any){
+          try{ any.postMessage({ type:'ifx-open-chat' }); }catch(e){}
+          return any.focus();
+        }
+        return self.clients.openWindow(target);
       }
+      // 🔧 جهاز: الأولوية للشاشة نفسها لو مفتوحة
+      const same = mine.find(c => pathOf(c) === page)
+                || (page === 'index.html' ? mine[0] : null);
+      if(same && 'focus' in same){
+        if(dev){ try{ same.postMessage({ type:'ifx-open-dev', id: dev }); }catch(e){} }
+        return same.focus();
+      }
+      // الشاشة مش مفتوحة → نفتحها (مش بنحوّل شاشة مفتوحة عشان مايضيعش شغل مكتوب فيها)
       return self.clients.openWindow(target);
     })
   );
