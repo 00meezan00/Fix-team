@@ -178,8 +178,13 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
   #veil{position:fixed; inset:0; z-index:9999; display:flex; flex-direction:column;
         align-items:center; justify-content:center; gap:15px; background:var(--paper);}
   #veil.gone{display:none;}
-  #veil .mk{width:96px; height:96px; border-radius:22px; display:grid; place-items:center;
-            font-size:46px; box-shadow:0 8px 26px rgba(16,22,32,.14); background:var(--card);}
+  /* 🖼️ (١٩-١٠) لوجو FIX TEAM عريض — مبقاش في برواز أبيض مربع.
+     ⚠️ كان width:68% جوه grid بمقاس ٩٦px: سفاري مبيعرفش يحسب
+        النسبة دي، فكان بيرسم الصورة بمقاسها الأصلي وتطلع برّه
+        البرواز ناحية الشمال (الصفحة RTL). دلوقتي المقاس ثابت بالـpx. */
+  #veil .mk{width:min(240px,64vw); display:flex; align-items:center; justify-content:center;
+            font-size:46px; background:none; box-shadow:none;}
+  #veil .mk img{display:block; width:100%; height:auto; max-height:170px; object-fit:contain;}
   #veil .sp{width:26px; height:26px; border-radius:50%; border:3px solid #D7DEE7;
             border-top-color:var(--steel); animation:vsp .8s linear infinite;}
   @keyframes vsp{to{transform:rotate(360deg);}}
@@ -194,7 +199,7 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
   .topbar::after{content:''; position:absolute; inset:auto 0 0 0; height:3px;
     background:linear-gradient(90deg,var(--blue) 0 34%, var(--red) 34% 67%, var(--gold) 67% 100%);}
   .who{display:flex; align-items:center; gap:11px; min-width:0;}
-  .who .mark{width:40px; height:40px; border-radius:11px; flex:none;
+  .who .mark{width:40px; height:40px; border-radius:11px; flex:none; overflow:hidden;
     background:linear-gradient(135deg,#3b2f10,#6b5418); display:grid; place-items:center; font-size:21px;
     box-shadow:inset 0 0 0 1px rgba(255,255,255,.10);}
   .who .txt{min-width:0;}
@@ -942,7 +947,7 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
     <!-- ⚠️ onerror شبكة أمان: لو ملف الصورة مش مرفوع على السيرفر،
          الآيفون بيحط مكانها مربع مكسور بعلامة استفهام. السطر ده
          بيحطّ مفتاح بدالها — الشكل يفضل نضيف والصفحة تشتغل عادي. -->
-    <div class="mark"><img src="owner-icon.png" alt="" onerror="this.parentNode.textContent='🔑';" style="width:100%;height:100%;object-fit:contain;border-radius:inherit;background:var(--card);"></div>
+    <div class="mark"><img src="owner-icon.png" alt="" onerror="this.parentNode.textContent='🔑';" style="width:40px;height:40px;object-fit:contain;border-radius:inherit;background:#FFFFFF;"></div>
     <div class="txt">
       <div class="hi">المالك</div>
       <div class="nm" id="ownName">—</div>
@@ -1120,7 +1125,7 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
 </div>
 
 <div id="veil">
-  <div class="mk"><img src="owner-icon.png" alt="المالك" onerror="this.parentNode.textContent='🔑';" style="width:68%;height:68%;object-fit:contain;"></div>
+  <div class="mk"><img src="owner-icon.png" alt="FIX TEAM" onerror="this.parentNode.textContent='🔑';"></div>
   <div class="sp"></div>
   <div class="ms" id="veilMsg">جاري التحميل...</div>
 </div>

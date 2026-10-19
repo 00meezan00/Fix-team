@@ -92,15 +92,19 @@
   // ---------- الستايل ----------
   // ⚠️ كل الألوان متغيّرات جوه #sbOverlay — والوضع الداكن بيقلبها.
   //    الصفحتين بيحطوا data-theme على <html>، فبنقرا منه مباشرة.
+  // 🎨 (١٩-١٠) ألوان FIX TEAM: أسود/جرافيت + برتقالي اللوجو (#F26A1B).
+  //    ألوان الحالات (أخضر/أصفر/بنفسجي/أزرق/أحمر) فضلت زي ما هي — ليها معنى.
   var CSS = ''
-  + '#sbOverlay{--sb-bg:#F3F5F7;--sb-card:#FFFFFF;--sb-ink:#1A2332;--sb-muted:#64748B;--sb-line:#E2E8F0;'
+  + '#sbOverlay{--sb-bg:#F1F0ED;--sb-card:#FFFFFF;--sb-ink:#141416;--sb-muted:#6B6B70;--sb-line:#E3E1DC;'
+  + '--sb-acc:#F26A1B;--sb-acc-bg:rgba(242,106,27,.10);--sb-head:#141416;--sb-head-ink:#FFFFFF;--sb-hbtn:#26262A;'
   + '--sb-in:#16A34A;--sb-in-bg:#F0FDF4;--sb-brk:#A16207;--sb-brk-dot:#EAB308;--sb-brk-bg:#FEFCE8;'
   + '--sb-out:#7C3AED;--sb-out-bg:#F5F3FF;--sb-abs:#DC2626;--sb-abs-bg:#FEF2F2;'
   + '--sb-fgt:#2563EB;--sb-fgt-bg:#EFF6FF;'
   + 'position:fixed;inset:0;z-index:72;background:var(--sb-bg);color:var(--sb-ink);'
   + 'overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;display:none;'
   + 'font-family:"Tajawal","Segoe UI",sans-serif;}'
-  + 'html[data-theme="dark"] #sbOverlay{--sb-bg:#131E29;--sb-card:#1B2A3A;--sb-ink:#E9EFF5;--sb-muted:#92A6B8;--sb-line:#2F4356;'
+  + 'html[data-theme="dark"] #sbOverlay{--sb-bg:#0E0E10;--sb-card:#1A1A1D;--sb-ink:#F2F2F0;--sb-muted:#9C9CA2;--sb-line:#2C2C31;'
+  + '--sb-acc:#FF7A2E;--sb-acc-bg:rgba(255,122,46,.13);--sb-head:#000000;--sb-head-ink:#F2F2F0;--sb-hbtn:#1F1F23;'
   + '--sb-in:#4ADE80;--sb-in-bg:rgba(74,222,128,.13);--sb-brk:#FACC15;--sb-brk-dot:#FACC15;--sb-brk-bg:rgba(250,204,21,.13);'
   + '--sb-out:#A78BFA;--sb-out-bg:rgba(167,139,250,.15);--sb-abs:#F87171;--sb-abs-bg:rgba(248,113,113,.14);'
   + '--sb-fgt:#60A5FA;--sb-fgt-bg:rgba(96,165,250,.14);}'
@@ -108,10 +112,13 @@
   + '#sbOverlay *{box-sizing:border-box;}'
   // ⚠️ env(safe-area-inset-top) = نتش الأيفون — من غيره زرار × بيستخبى تحت الساعة
   + '.sb-head{position:sticky;top:0;z-index:3;display:flex;align-items:center;gap:8px;'
-  + 'padding:calc(14px + env(safe-area-inset-top)) 16px 12px;background:var(--sb-card);border-bottom:1px solid var(--sb-line);}'
+  + 'padding:calc(14px + env(safe-area-inset-top)) 16px 12px;background:var(--sb-head);color:var(--sb-head-ink);'
+  + 'border-bottom:3px solid var(--sb-acc);}'
   + '.sb-head h2{flex:1;min-width:0;margin:0;font-family:"Cairo",sans-serif;font-size:18px;font-weight:900;}'
-  + '.sb-hbtn{flex:none;border:none;background:var(--sb-bg);color:var(--sb-ink);width:38px;height:38px;'
+  + '.sb-head h2 em{font-style:normal;color:var(--sb-acc);}'
+  + '.sb-hbtn{flex:none;border:none;background:var(--sb-hbtn);color:var(--sb-head-ink);width:38px;height:38px;'
   + 'border-radius:10px;font-size:19px;line-height:1;cursor:pointer;}'
+  + '.sb-hbtn:active{background:var(--sb-acc);color:#fff;}'
   + '.sb-hbtn:disabled{opacity:.5;}'
   + '.sb-body{padding:14px 16px 48px;}'
   // الكروت جوه شبكة: عمود واحد على الموبايل، وعلى الكمبيوتر بتتصف جنب بعض
@@ -132,6 +139,8 @@
   // ⚠️ ١٦px مقصودة: أقل من كده الأيفون بيكبّر الصفحة ومبيرجعش في وضع التطبيق
   + '.sb-search{width:100%;border:1px solid var(--sb-line);background:var(--sb-card);color:var(--sb-ink);'
   + 'border-radius:11px;padding:11px 13px;font-family:inherit;font-size:16px;margin-bottom:6px;}'
+  + '.sb-search:focus{outline:none;border-color:var(--sb-acc);box-shadow:0 0 0 3px var(--sb-acc-bg);}'
+  + '.sb-pill:hover{border-color:var(--sb-acc);}'
   + '.sb-upd{font-size:11.5px;color:var(--sb-muted);margin:2px 2px 12px;}'
   + '.sb-row{display:flex;gap:11px;align-items:flex-start;background:var(--sb-card);border:1px solid var(--sb-line);'
   + 'border-inline-start:5px solid var(--sb-c);border-radius:13px;padding:12px 13px;margin-bottom:9px;}'
@@ -192,7 +201,7 @@
     el.id = 'sbOverlay';
     el.innerHTML =
         '<div class="sb-head">'
-      +   '<h2>👥 الموظفين</h2>'
+      +   '<h2><em>👥</em> الموظفين</h2>'
       +   '<button class="sb-hbtn" id="sbRef" title="تحديث" onclick="StaffBoard.refresh()">↻</button>'
       +   '<button class="sb-hbtn" title="قفل" onclick="StaffBoard.close()">×</button>'
       + '</div>'
