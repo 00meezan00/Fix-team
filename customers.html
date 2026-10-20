@@ -964,7 +964,13 @@ async function prepStatement(){
   if(!LED || LED.err) await loadLed();
   if(!LED || LED.err) throw new Error('الكشف لسه ما اتحمّلش');
   const act = LED.filter(l => !l.removed_at);
-  ledger = act.map(l => Object.assign({}, l.raw, { shop: CUR.name }));
+  // لو الحركة الجديدة مالهاش raw كامل، بنكمّل التاريخ والنوع والمبلغ من الكشف نفسه
+  ledger = act.map(l => {
+    const r = l.raw || {};
+    return Object.assign({}, r, { shop: CUR.name,
+      date: r.date || l.entry_at, type: r.type || l.type,
+      amount: (r.amount != null) ? r.amount : l.amount });
+  });
   const ids = [...new Set(act.map(l => l.device_id).filter(Boolean))];
   devices = [];
   for(let i = 0; i < ids.length; i += 100){
@@ -988,41 +994,55 @@ async function printCust(fmtK){
 // ------------------------------------------------------------
 // 🧸 بالبلدي: «الدورة» = صفحة في كشكول الحساب. أول ما الحساب يبقى
 //    صفر (المحل سدّد كل اللي عليه) وبعدين ياخد جهاز آجل تاني → بتبدأ
-//    صفحة جديدة. ده نفس معنى خط «🔄 دورة جديدة» في شاشة الحسابات
-//    القديمة (cycleStartIds في accounts.js).
-//
-//    الزرار بيطبع من أول يوم في **الصفحة الحالية** لحد النهارده —
-//    يعني الأجهزة اللي على المحل دلوقتي بس، من غير اللي اتسدّد قبل كده.
+//    صفحة جديدة. الزرار بيطبع **الصفحة الحالية بس** — الأجهزة اللي على
+//    المحل دلوقتي — من غير اللي اتسدّد قبل كده.
 //    وبيبقى **متختار لوحده** كل ما تفتح الشاشة من هنا.
 //
-// ⚠️ بنحسب الدورات بنفس التاريخ اللي الشاشة ماشية عليه (📥 الدخول /
-//    📤 الخروج) — عشان سطر «الرصيد السابق» في أول الكشف يطلع صح (صفر،
-//    أو «لصالح المحل» لو كان دافع زيادة)، مش مبلغ غريب.
-// ⚠️ مابنلمسش accounts.js — بنزوّد الزرار في الشاشة بعد ما تتفتح.
+// ⚠️ بنمشي على **ترتيب تسجيل الحركات في الدفتر** — مش تاريخ خروج الجهاز.
+//    ليه؟ دفعة وجهاز في نفس اليوم: لو رتّبنا بتاريخ الخروج ممكن الجهاز
+//    ييجي قبل الدفعة، فالحساب «مايوصلش صفر» والدورة الجديدة ماتتعرفش.
+// ⚠️ ومش بنقطع بالـ«يوم»: لو الدفعة والجهاز الجديد في نفس اليوم، القطع
+//    باليوم كان هيجيب الدفعة القديمة معاه. بنقطع عند الحركة نفسها.
+//    إزاي؟ وقت الطباعة بنحط في «ledger» حركات الدورة دي بس (لحظة الطباعة
+//    بس، وبعدها بيرجع زي ما كان) — والكشف بيتطبع بنفس كود accounts.js.
+// ⚠️ لو المحل كان دافع زيادة قبل الدورة (رصيده بالسالب) → سطر «رصيد
+//    سابق (لصالح المحل)» في أول الكشف، عشان المتبقي يطلع صح.
+// ⚠️ مابنلمسش accounts.js — بنلفّ ٣ دوال منه هنا.
 // ============================================================
-function cycleInfo(basis){
-  if(!CUR || !Array.isArray(ledger)) return null;
-  const shop = CUR.name;
-  const bd = e => accBasisDate(e, basis);
-  const all = ledger.filter(e => (e.shop || 'بدون محل') === shop && !isNaN(new Date(bd(e) || '').getTime()))
-    .slice().sort((a, b) => new Date(bd(a)) - new Date(bd(b)));
-  let start = null, bal = 0;
-  all.forEach(e => {
+// «ledger» متحضّر بترتيب التسجيل (prepStatement بياخده من الكشف وهو مترتب بـ entry_at)
+function cycleSplit(){
+  if(!CUR || !Array.isArray(ledger) || !ledger.length) return null;
+  let start = -1, bal = 0, before = 0;
+  ledger.forEach((e, i) => {
     const a = Number(e.amount) || 0;
     const debt = isDebitLike(e);
-    if(debt && a > 0 && bal <= 0.5) start = e;   // الحساب كان خالص وجه دين جديد = بداية دورة
+    if(debt && a > 0 && bal <= 0.5){ start = i; before = bal; }   // الحساب كان خالص وجه دين جديد
     bal += debt ? a : -a;
   });
-  if(!start) return null;
-  const d = new Date(bd(start));
-  if(isNaN(d.getTime())) return null;
-  return { ymd: accYmd(d), day: accFmtDay(d) };
+  if(start < 0) return null;
+  const s = ledger[start];
+  const d = new Date(s.date || 0);
+  return { start, before, at: isNaN(d.getTime()) ? null : d };
+}
+function cycleInfo(){
+  const c = cycleSplit(); if(!c || !c.at) return null;
+  return { ymd: accYmd(c.at), day: accFmtDay(c.at) };
+}
+// حركات الدورة الحالية + سطر «رصيد سابق» لو المحل ليه فلوس من قبلها
+function cycleEntries(){
+  const c = cycleSplit(); if(!c) return ledger;
+  const list = ledger.slice(c.start);
+  if(c.before < -0.5 && c.at){
+    list.unshift({ id:'__carry', _carry:true, _carryFrom: c.at.toISOString(), shop: CUR.name,
+      type:'credit', amount: Math.abs(c.before), date: new Date(c.at.getTime() - 1000).toISOString(), by:'', note:'' });
+  }
+  return list;
 }
 function addCycleChip(preselect){
   const box = document.querySelector('#accRangeOv .arg-chips');
   if(!box || !ACC_RD) return;
   const old = box.querySelector('[data-k="cycle"]'); if(old) old.remove();
-  const pc = cycleInfo(ACC_RD.basisSel || 'out');
+  const pc = cycleInfo();
   if(!pc){ if(ACC_RD.mode === 'cycle'){ ACC_RD.mode = 'all'; accRangeSync(); } return; }
   const b = document.createElement('button');
   b.type = 'button'; b.className = 'arg-chip'; b.setAttribute('data-k', 'cycle');
@@ -1033,21 +1053,35 @@ function addCycleChip(preselect){
 }
 function pickCycle(){
   if(!ACC_RD) return;
-  const pc = cycleInfo(ACC_RD.basisSel || 'out');
-  if(!pc) return;
+  const pc = cycleInfo(); if(!pc) return;
   ACC_RD.mode = 'cycle';
   const f = $('argFrom'), t2 = $('argTo');
-  if(f) f.value = pc.ymd;
-  if(t2) t2.value = '';          // فاضي = لحد النهارده
+  if(f) f.value = pc.ymd;        // للعرض بس — الطباعة بتقطع عند الحركة نفسها
+  if(t2) t2.value = '';
   accRangeSync();
 }
-// 📥📤 لو غيّرت «حسب تاريخ الدخول / الخروج» → تاريخ بداية الدورة ممكن يتغيّر، فنحسبه تاني
+// 🔧 اللفّ على accounts.js:
 (function(){
-  const orig = window.accRangeBasis;
-  if(typeof orig !== 'function') return;
-  window.accRangeBasis = function(b){
-    orig(b);
-    if(document.getElementById('accRangeOv')) addCycleChip(!!(ACC_RD && ACC_RD.mode === 'cycle'));
+  // ① وضع «الدورة» = فترة من نوع خاص (من غير من/إلى) — لو كتبت تاريخ بإيدك بيرجع عادي
+  const origRead = window.accRangeRead;
+  if(typeof origRead === 'function') window.accRangeRead = function(){
+    if(ACC_RD && ACC_RD.mode === 'cycle' && cycleSplit()) return { cycle:true, from:null, to:null, basis: ACC_RD.basisSel || 'out' };
+    return origRead.apply(this, arguments);
+  };
+  // ② الكلام اللي بيتكتب على الورقة
+  const origLabel = window.accRangeLabel;
+  if(typeof origLabel === 'function') window.accRangeLabel = function(r){
+    if(r && r.cycle){ const pc = cycleInfo(); return 'الفترة: الدورة الحالية — من ' + (pc ? pc.day : '') + ' لحد النهارده'; }
+    return origLabel.apply(this, arguments);
+  };
+  // ③ سطور الكشف: في وضع الدورة بنحط حركات الدورة بس، وبعدين بنرجّع الدفتر زي ما كان
+  const origRows = window.shopStatementRows;
+  if(typeof origRows === 'function') window.shopStatementRows = function(shop){
+    const r = ACC_RANGE;
+    if(!r || !r.cycle) return origRows.apply(this, arguments);
+    const saved = ledger;
+    try{ ledger = cycleEntries(); ACC_RANGE = null; return origRows.call(this, shop); }
+    finally{ ledger = saved; ACC_RANGE = r; }
   };
 })();
 
@@ -1303,8 +1337,12 @@ function devPrep(D){
   let w, doc, path = '';
   try{ w = D.fr.contentWindow; doc = D.fr.contentDocument; path = String(w.location.pathname || ''); }catch(e){ return null; }
   if(!w || !doc) return null;
-  if(/index\.html/.test(path)) return { w, doc, login:true };
-  if(!/dashboard\.html/.test(path)) return null;    // لسه بيحمّل
+  // ⚠️ Cloudflare بيشيل «.html» من العنوان: /dashboard.html بيبقى /dashboard
+  //    (والدخول بيبقى / أو /index) — فبنقبل الشكلين
+  if(/\/dashboard(\.html)?$/i.test(path) === false){
+    if(/^\/(index(\.html)?)?$/i.test(path) || /\/index(\.html)?$/i.test(path)) return { w, doc, login:true };
+    return null;    // لسه بيحمّل (about:blank)
+  }
   // ١) نخبّي شاشة الداشبورد من أول لحظة
   if(!D.styled && doc.head){
     try{
