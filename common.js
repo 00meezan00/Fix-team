@@ -91,15 +91,18 @@ function commonIsPhone(){
 })();
 
 // ============================================================
-// 🖥️ (٢٠٢٦-١٠-٢٠) ملو الشاشة على الكمبيوتر — صفحات المحاسب العام
+// 🖥️ (٢٠٢٦-١٠-٢٠) ملو الشاشة على الكمبيوتر — الصفحات المنفصلة
 // ------------------------------------------------------------
 // 🧸 بالبلدي: الصفحات كانت متعمولة للموبايل — عمود في النص عرضه
 //    زي عرض موبايل كبير (٦٢٠ · ٧٢٠ · ٨٢٠ · ٨٨٠ بكسل). على شاشة
 //    الكمبيوتر العمود ده كان بيبقى «مدّا» في النص والجنبين فاضيين.
 //    دلوقتي على الكمبيوتر: أي «عمود متضيّق» بيتفرد على الشاشة كلها.
 //
-// 📄 الصفحات: dashboard (الداشبورد وكل شاشاته اللي بتفتح منه) ·
-//    customers (📒 حسابات العملاء) · gl (📒 دفتر الأستاذ العام).
+// 📄 الصفحات المنفصلة بس (كل واحدة ليها رابط لوحدها):
+//    customers (📒 حسابات العملاء) · gl (📒 دفتر الأستاذ العام) ·
+//    parts (🛵 قطع الغيار) · tester (🧪 الفحص).
+// ⛔ الداشبورد مش في القايمة عن قصد (قرار بلال ٢٠-١٠): كارت الجهاز
+//    وشاشات قايمة ⋮ (حسابي · ترتيب الاستلامات …) بيفضلوا بحجمهم الأصلي.
 //
 // 🔍 إزاي بنلاقي «العمود المتضيّق» من غير ما نلمس الصفحات؟
 //    بنعدّي على:
@@ -113,7 +116,6 @@ function commonIsPhone(){
 //    • الرسايل الصغيرة («متأكد؟» · «اختار الفترة» · سبب …) — أقل من ٥٦٠.
 //    • أي حاجة «طايرة» (fixed/absolute): الإشعار الصغير تحت · شريط التحديث.
 //    • الموبايل — زي ما هو بالظبط.
-//    • فورم «جهاز جديد» في الداشبورد بيفضل بحجمه (٤٤٠).
 // ⚠️ لو عايز حاجة معيّنة تفضل ضيّقة: حط عليها data-ifx-keep.
 // 🔙 عايز ترجع زي الأول؟ امسح البلوك ده كله. خلاص.
 // ============================================================
@@ -122,7 +124,8 @@ function commonIsPhone(){
     if(window.__ifxDeskFull) return;
     window.__ifxDeskFull = true;
     var page = (location.pathname.split('/').pop() || '').toLowerCase().replace(/\.html$/,'') || 'index';
-    if(['dashboard','customers','gl'].indexOf(page) === -1) return;
+    var FULL = ['customers','gl','parts','tester'];
+    if(FULL.indexOf(page) === -1) return;
     if(commonIsPhone()) return;
 
     var root = document.documentElement;
@@ -132,13 +135,9 @@ function commonIsPhone(){
     var st = document.createElement('style');
     st.id = 'ifxDeskCss';
     st.textContent =
-      // 🪟 نوافذ الداشبورد الكبيرة (كارت الجهاز …) — كانت ٧٥٪ من الشاشة
-      //    ⚠️ النوافذ الصغيرة مكتوب عليها max-width جوه العنصر نفسه
-      //       (٤٢٠ وكده) — دي بتكسب القاعدة دي فبتفضل صغيرة زي ما هي.
-      'html.ifx-desk .modal{width:96vw;max-width:96vw;max-height:94vh;}'
-      // صفحتي الحسابات والأستاذ: مسافة أوسع شوية من الجنب بدل ١٤ بكسل
-      + 'html.ifx-desk[data-ifx-page="gl"] .wrap,html.ifx-desk[data-ifx-page="customers"] .wrap{padding-inline:28px;}'
-      + 'html.ifx-desk[data-ifx-page="gl"] .sh-b,html.ifx-desk[data-ifx-page="customers"] .sh-b{padding-inline:28px;}'
+      // مسافة أوسع شوية من الجنب بدل ١٤ بكسل (الصفحات الأربعة نفس الأسامي)
+      'html.ifx-desk .wrap{padding-inline:28px;}'
+      + 'html.ifx-desk .sh-b{padding-inline:28px;}'
       // العلامة اللي بنحطها على العمود المتضيّق = اتفرد
       + 'html.ifx-desk [data-ifx-full]{max-width:none !important;}';
     (document.head || root).appendChild(st);
