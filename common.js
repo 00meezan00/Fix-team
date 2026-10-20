@@ -90,6 +90,116 @@ function commonIsPhone(){
   }catch(e){}
 })();
 
+// ============================================================
+// 🖥️ (٢٠٢٦-١٠-٢٠) ملو الشاشة على الكمبيوتر — صفحات المحاسب العام
+// ------------------------------------------------------------
+// 🧸 بالبلدي: الصفحات كانت متعمولة للموبايل — عمود في النص عرضه
+//    زي عرض موبايل كبير (٦٢٠ · ٧٢٠ · ٨٢٠ · ٨٨٠ بكسل). على شاشة
+//    الكمبيوتر العمود ده كان بيبقى «مدّا» في النص والجنبين فاضيين.
+//    دلوقتي على الكمبيوتر: أي «عمود متضيّق» بيتفرد على الشاشة كلها.
+//
+// 📄 الصفحات: dashboard (الداشبورد وكل شاشاته اللي بتفتح منه) ·
+//    customers (📒 حسابات العملاء) · gl (📒 دفتر الأستاذ العام).
+//
+// 🔍 إزاي بنلاقي «العمود المتضيّق» من غير ما نلمس الصفحات؟
+//    بنعدّي على:
+//      • الحاجات اللي على الصفحة نفسها (لحد دورين لجوه)
+//      • والشاشات اللي بتطلع فوق الصفحة (لحد ٣ أدوار لجوه)
+//    وأي حاجة ليها «أقصى عرض» من ٥٦٠ بكسل ولفوق، وأضيق من اللي
+//    حواليها → بنشيل الحد ده. كده أي شاشة جديدة تتعمل بعدين
+//    (ترتيب الاستلامات · الإشعارات · …) بتاخد نفس الميزة لوحدها.
+//
+// ⛔ اللي مابنلمسوش عن قصد:
+//    • الرسايل الصغيرة («متأكد؟» · «اختار الفترة» · سبب …) — أقل من ٥٦٠.
+//    • أي حاجة «طايرة» (fixed/absolute): الإشعار الصغير تحت · شريط التحديث.
+//    • الموبايل — زي ما هو بالظبط.
+//    • فورم «جهاز جديد» في الداشبورد بيفضل بحجمه (٤٤٠).
+// ⚠️ لو عايز حاجة معيّنة تفضل ضيّقة: حط عليها data-ifx-keep.
+// 🔙 عايز ترجع زي الأول؟ امسح البلوك ده كله. خلاص.
+// ============================================================
+(function(){
+  try{
+    if(window.__ifxDeskFull) return;
+    window.__ifxDeskFull = true;
+    var page = (location.pathname.split('/').pop() || '').toLowerCase().replace(/\.html$/,'') || 'index';
+    if(['dashboard','customers','gl'].indexOf(page) === -1) return;
+    if(commonIsPhone()) return;
+
+    var root = document.documentElement;
+    root.classList.add('ifx-desk');
+    root.setAttribute('data-ifx-page', page);
+
+    var st = document.createElement('style');
+    st.id = 'ifxDeskCss';
+    st.textContent =
+      // 🪟 نوافذ الداشبورد الكبيرة (كارت الجهاز …) — كانت ٧٥٪ من الشاشة
+      //    ⚠️ النوافذ الصغيرة مكتوب عليها max-width جوه العنصر نفسه
+      //       (٤٢٠ وكده) — دي بتكسب القاعدة دي فبتفضل صغيرة زي ما هي.
+      'html.ifx-desk .modal{width:96vw;max-width:96vw;max-height:94vh;}'
+      // صفحتي الحسابات والأستاذ: مسافة أوسع شوية من الجنب بدل ١٤ بكسل
+      + 'html.ifx-desk[data-ifx-page="gl"] .wrap,html.ifx-desk[data-ifx-page="customers"] .wrap{padding-inline:28px;}'
+      + 'html.ifx-desk[data-ifx-page="gl"] .sh-b,html.ifx-desk[data-ifx-page="customers"] .sh-b{padding-inline:28px;}'
+      // العلامة اللي بنحطها على العمود المتضيّق = اتفرد
+      + 'html.ifx-desk [data-ifx-full]{max-width:none !important;}';
+    (document.head || root).appendChild(st);
+
+    var MIN = 560;          // أقل من كده = رسالة صغيرة، مش صفحة
+    var SKIP_TAG = /^(IMG|VIDEO|CANVAS|IFRAME|INPUT|TEXTAREA|SELECT|BUTTON|SVG|TABLE|THEAD|TBODY|TR|TD|TH|SCRIPT|STYLE|LINK|DATALIST|OPTION)$/i;
+
+    function consider(el){
+      if(!el || el.nodeType !== 1) return;
+      if(el.hasAttribute('data-ifx-full') || el.hasAttribute('data-ifx-keep')) return;
+      if(SKIP_TAG.test(el.tagName)) return;
+      if(!el.getClientRects().length) return;               // مستخبي
+      var cs = getComputedStyle(el);
+      if(cs.position === 'fixed' || cs.position === 'absolute') return;
+      var mw = cs.maxWidth;
+      if(!mw || mw === 'none' || mw.indexOf('%') !== -1) return;
+      var v = parseFloat(mw);
+      if(!(v >= MIN)) return;
+      var p = el.parentElement; if(!p) return;
+      if(p.clientWidth - v < 40) return;                    // مش متضيّق فعلاً
+      el.setAttribute('data-ifx-full', '');
+    }
+    function walk(el, d){
+      if(!d || !el) return;
+      var c = el.children;
+      for(var i = 0; i < c.length; i++){ consider(c[i]); walk(c[i], d - 1); }
+    }
+    function scan(){
+      var b = document.body; if(!b) return;
+      var kids = b.children;
+      for(var i = 0; i < kids.length; i++){
+        var k = kids[i];
+        if(k.tagName === 'SCRIPT' || k.tagName === 'STYLE') continue;
+        var pos = getComputedStyle(k).position;
+        if(pos === 'fixed' || pos === 'absolute'){
+          // شاشة طايرة فوق الصفحة (شيت · نافذة) — بندوّر جوّاها لو مفتوحة
+          if(k.getClientRects().length) walk(k, 3);
+        }else{
+          consider(k);
+          walk(k, 2);
+        }
+      }
+    }
+
+    // ⏱️ بنعيد البص كل ما حاجة تتفتح أو تتقفل — بس مش أكتر من مرة كل ربع ثانية
+    var t = 0;
+    function soon(){ if(t) return; t = setTimeout(function(){ t = 0; try{ scan(); }catch(e){} }, 250); }
+    function boot(){
+      scan();
+      try{
+        new MutationObserver(soon).observe(document.body, {
+          childList:true, subtree:true, attributes:true, attributeFilter:['class']
+        });
+      }catch(e){}
+      addEventListener('resize', soon);
+    }
+    if(document.readyState === 'loading') addEventListener('DOMContentLoaded', boot);
+    else boot();
+  }catch(e){ console.warn('ifx desk-full:', e); }
+})();
+
 // ===== خطط الاشتراك =====
 // ⚠️ الأسعار وسعر الصرف هنا **مرة واحدة بس**. بيظهروا في المنشور،
 //    وفي صفحة "حسابي"، وفي لوحة الأدمن.
@@ -716,12 +826,13 @@ addEventListener('DOMContentLoaded', function(){
 });
 
 // ============================================================
-// 📒 مركز الأستاذ — زرار في قايمة الداشبورد (ملف SQL رقم 107)
+// 📒 دفتر الأستاذ العام — زرار في قايمة الداشبورد (ملف SQL رقم 107)
 // ------------------------------------------------------------
-// 🧸 بالبلدي: بنحط زرار «📒 مركز الأستاذ» تحت «📒 حسابات العملاء»
+// 🧸 بالبلدي: بنحط زرار «📒 دفتر الأستاذ العام» تحت «📒 حسابات العملاء»
 //    على طول — من غير ما نلمس الداشبورد. الزرار واخد نفس class
 //    بتاع «حسابات العملاء» (cust-menu-item)، فالداشبورد نفسه بيظهّره
 //    للمحاسب العام بس ويخبّيه عن الباقي.
+//    (٢٠-١٠-٢٠٢٦) كان اسمه «مركز الأستاذ» — اتغيّر للاسم المحاسبي الصح.
 // ⚠️ الصفحة نفسها (gl.html) بتسأل السيرفر «إنت المحاسب العام؟»
 //    وأي حد تاني بيترجع للداشبورد — والقيود مقفولة على السيرفر كمان.
 // ============================================================
@@ -734,7 +845,7 @@ addEventListener('DOMContentLoaded', function(){
     var b = document.createElement('button');
     b.id = 'glMenuBtn';
     b.className = 'cust-menu-item';
-    b.textContent = '📒 مركز الأستاذ';
+    b.textContent = '📒 دفتر الأستاذ العام';
     b.onclick = function(){ location.href = 'gl.html'; };
     cust.parentNode.insertBefore(b, cust.nextSibling);
   }catch(e){ console.error('gl menu:', e); }

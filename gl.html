@@ -20,11 +20,11 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
 })();
 </script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>مركز الأستاذ — FIX TEAM</title>
+<title>دفتر الأستاذ العام — FIX TEAM</title>
 <meta name="theme-color" content="#16233A">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="مركز الأستاذ">
+<meta name="apple-mobile-web-app-title" content="دفتر الأستاذ العام">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -34,7 +34,9 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;800;900&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
 <style>
   /* ============================================================
-     📒 مركز الأستاذ — نفس ألوان باقي النظام بالحرف (زي customers.html)
+     📒 دفتر الأستاذ العام — نفس ألوان باقي النظام بالحرف (زي customers.html)
+     🖥️ على الكمبيوتر الصفحة بتفرد على الشاشة كلها — ده من common.js
+        (بلوك «ملو الشاشة على الكمبيوتر»)، مش من هنا.
      ============================================================ */
   :root{
     --chrome:#16233A; --on-chrome:#FFFFFF;
@@ -225,7 +227,7 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
 <div class="topbar">
   <div class="tb-row">
     <div>
-      <h1>📒 مركز الأستاذ</h1>
+      <h1>📒 دفتر الأستاذ العام</h1>
       <div class="who" id="whoLbl">…</div>
     </div>
     <button class="back-btn" onclick="location.href='dashboard.html'">→ رجوع</button>
@@ -242,7 +244,9 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
 
 <script>
 // ============================================================
-// 📒 مركز الأستاذ (ملفات SQL رقم 107 و 108) — المحاسب العام بس
+// 📒 دفتر الأستاذ العام (ملفات SQL رقم 107 و 108) — المحاسب العام بس
+//    (كان اسمه «مركز الأستاذ» — اتغيّر ٢٠-١٠-٢٠٢٦ للاسم المحاسبي الصح:
+//     «دفتر الأستاذ العام» = General Ledger)
 // ------------------------------------------------------------
 // 🧸 الحكاية:
 //   كل ورقة فلوس في النظام (فاتورة تسليم · عربون · فاتورة تاجر ·
@@ -1461,7 +1465,7 @@ async function excel(file, title, head, rows, moneyCols, boldRows){
   ws.getCell(1, 1).value = title; ws.getCell(1, 1).font = { size:15, bold:true, color:{argb:'FF1F3864'} };
   ws.getCell(1, 1).alignment = { horizontal:'center' };
   ws.mergeCells(2, 1, 2, head.length);
-  ws.getCell(2, 1).value = 'FIX TEAM — مركز الأستاذ — اتطبع ' + new Date().toLocaleString('ar-EG');
+  ws.getCell(2, 1).value = 'FIX TEAM — دفتر الأستاذ العام — اتطبع ' + new Date().toLocaleString('ar-EG');
   ws.getCell(2, 1).font = { size:10, color:{argb:'FF6B7280'} }; ws.getCell(2, 1).alignment = { horizontal:'center' };
   const h = ws.getRow(4); h.values = head;
   h.eachCell(c => { c.font = { bold:true, color:{argb:'FFFFFFFF'} }; c.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FF1F3864'} }; c.border = border; c.alignment = { horizontal:'center' }; });
