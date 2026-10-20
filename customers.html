@@ -208,6 +208,7 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
 
   /* ===== 📱 شبّاك كارت الجهاز (٢٠-١٠) ===== */
   #devOv{position:fixed; inset:0; z-index:80;}
+  #devOv.pre{visibility:hidden; pointer-events:none;}   /* بيحمّل في الخلفية — مش باين */
   #devOv .dev-wait{position:absolute; inset:0; z-index:1; display:flex; align-items:center; justify-content:center;
     background:rgba(8,14,20,.55); padding:20px;}
   #devOv .dev-card{background:var(--card); color:var(--ink); border-radius:16px; padding:18px; width:100%; max-width:340px;
@@ -256,7 +257,7 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
 //     🔗 دمج / فك دمج · 🟡 الأسامي الجديدة
 //   (٢٠-١٠) 📱 الدوسة على جهاز في الكشف بتفتح كارت تفاصيله (تعديل علطول)
 //           ولما تقفله بترجع لنفس الحساب — شوف «شبّاك كارت الجهاز» تحت.
-//   (٢٠-١٠) 🔄 «من أول الدورة اللي فاتت» في شاشة اختيار فترة PDF/Excel.
+//   (٢٠-١٠) 🔄 «من أول الدورة الحالية» (متختار لوحده) في شاشة اختيار فترة PDF/Excel.
 //
 // ⚠️ كل كتابة من دوال السيرفر (erp_ledger_post · erp_ledger_void · …)
 //    — الشاشة مابتكتبش الدفتر بنفسها خالص. السيرفر بيكتب في الدفتر
@@ -689,6 +690,8 @@ function openCust(id, tab){
   CTAB = tab || 'led'; LED = null;
   sheet(CUR.name + ' — ' + CUR.code, custHtml());
   if(CTAB === 'led') loadLed();
+  // 🚀 نبدأ نجهّز شبّاك كارت الجهاز من دلوقتي — عشان الدوسة على أي جهاز تفتح علطول
+  setTimeout(devEnsure, 400);
 }
 function custHtml(){
   const c = CUR, b = BAL[c.id] || {};
@@ -974,70 +977,65 @@ async function printCust(fmtK){
   try{
     toast('⏳ بنجهّز الكشف…');
     await prepStatement();
-    // 🔄 آخر اختيار كان «الدورة اللي فاتت» (أو لسه مفيش اختيار خالص)؟ → نختارها لوحدها
-    let raw = null;
-    try{ raw = localStorage.getItem(ACC_RANGE_PREF_KEY); }catch(e){}
-    const lastMode = raw ? accRangePrefGet().mode : null;
+    // 🔄 الافتراضي في الصفحة دي: من أول الدورة الحالية (وتقدر تختار غيرها بدوسة)
     accRangeShop(fmtK, CUR.name);
-    addPrevCycleChip(!raw || lastMode === 'prev');
+    addCycleChip(true);
   }catch(e){ toast(errMsg(e), true); }
 }
 
 // ============================================================
-// 🔄 «من أول الدورة اللي فاتت» — زرار في شاشة «اختار الفترة» (٢٠-١٠)
+// 🔄 «من أول الدورة الحالية» — زرار في شاشة «اختار الفترة» (٢٠-١٠)
 // ------------------------------------------------------------
-// 🧸 بالبلدي: «الدورة» = كشكول حساب. أول ما الحساب يبقى صفر (المحل
-//    سدّد كل اللي عليه) وبعدين ياخد جهاز آجل تاني → بتبدأ صفحة جديدة.
-//    ده نفس المعنى بتاع خط «🔄 دورة جديدة» في شاشة الحسابات القديمة
-//    (cycleStartIds في accounts.js).
+// 🧸 بالبلدي: «الدورة» = صفحة في كشكول الحساب. أول ما الحساب يبقى
+//    صفر (المحل سدّد كل اللي عليه) وبعدين ياخد جهاز آجل تاني → بتبدأ
+//    صفحة جديدة. ده نفس معنى خط «🔄 دورة جديدة» في شاشة الحسابات
+//    القديمة (cycleStartIds في accounts.js).
 //
-//    الدورة اللي فاتت = الصفحة اللي **قبل** الصفحة اللي شغّالة دلوقتي.
-//    فالكشف بيطلع من أول يوم فيها لحد النهارده (يعني الدورة اللي فاتت
-//    + الدورة الحالية). ولو المحل لسه في أول دورة ليه → من أول يوم خالص.
+//    الزرار بيطبع من أول يوم في **الصفحة الحالية** لحد النهارده —
+//    يعني الأجهزة اللي على المحل دلوقتي بس، من غير اللي اتسدّد قبل كده.
+//    وبيبقى **متختار لوحده** كل ما تفتح الشاشة من هنا.
 //
 // ⚠️ بنحسب الدورات بنفس التاريخ اللي الشاشة ماشية عليه (📥 الدخول /
-//    📤 الخروج) — عشان سطر «الرصيد السابق» في أول الكشف يطلع صح (صفر
-//    أو لصالح المحل)، مش مبلغ غريب.
+//    📤 الخروج) — عشان سطر «الرصيد السابق» في أول الكشف يطلع صح (صفر،
+//    أو «لصالح المحل» لو كان دافع زيادة)، مش مبلغ غريب.
 // ⚠️ مابنلمسش accounts.js — بنزوّد الزرار في الشاشة بعد ما تتفتح.
 // ============================================================
-function prevCycleInfo(basis){
+function cycleInfo(basis){
   if(!CUR || !Array.isArray(ledger)) return null;
   const shop = CUR.name;
   const bd = e => accBasisDate(e, basis);
   const all = ledger.filter(e => (e.shop || 'بدون محل') === shop && !isNaN(new Date(bd(e) || '').getTime()))
     .slice().sort((a, b) => new Date(bd(a)) - new Date(bd(b)));
-  const starts = []; let bal = 0;
+  let start = null, bal = 0;
   all.forEach(e => {
     const a = Number(e.amount) || 0;
     const debt = isDebitLike(e);
-    if(debt && a > 0 && bal <= 0.5) starts.push(e);   // الحساب كان خالص وجه دين جديد = بداية دورة
+    if(debt && a > 0 && bal <= 0.5) start = e;   // الحساب كان خالص وجه دين جديد = بداية دورة
     bal += debt ? a : -a;
   });
-  if(!starts.length) return null;
-  const only = starts.length < 2;
-  const s = starts[only ? 0 : starts.length - 2];
-  const d = new Date(bd(s));
+  if(!start) return null;
+  const d = new Date(bd(start));
   if(isNaN(d.getTime())) return null;
-  return { ymd: accYmd(d), day: accFmtDay(d), only };
+  return { ymd: accYmd(d), day: accFmtDay(d) };
 }
-function addPrevCycleChip(preselect){
+function addCycleChip(preselect){
   const box = document.querySelector('#accRangeOv .arg-chips');
   if(!box || !ACC_RD) return;
-  const old = box.querySelector('[data-k="prev"]'); if(old) old.remove();
-  const pc = prevCycleInfo(ACC_RD.basisSel || 'out');
-  if(!pc){ if(ACC_RD.mode === 'prev'){ ACC_RD.mode = 'all'; accRangeSync(); } return; }
+  const old = box.querySelector('[data-k="cycle"]'); if(old) old.remove();
+  const pc = cycleInfo(ACC_RD.basisSel || 'out');
+  if(!pc){ if(ACC_RD.mode === 'cycle'){ ACC_RD.mode = 'all'; accRangeSync(); } return; }
   const b = document.createElement('button');
-  b.type = 'button'; b.className = 'arg-chip'; b.setAttribute('data-k', 'prev');
-  b.textContent = (pc.only ? '🔄 من أول الدورة · ' : '🔄 من أول الدورة اللي فاتت · ') + pc.day;
-  b.onclick = pickPrevCycle;
+  b.type = 'button'; b.className = 'arg-chip'; b.setAttribute('data-k', 'cycle');
+  b.textContent = '🔄 من أول الدورة الحالية · ' + pc.day;
+  b.onclick = pickCycle;
   box.insertBefore(b, box.firstChild);
-  if(preselect) pickPrevCycle(); else accRangeSync();
+  if(preselect) pickCycle(); else accRangeSync();
 }
-function pickPrevCycle(){
+function pickCycle(){
   if(!ACC_RD) return;
-  const pc = prevCycleInfo(ACC_RD.basisSel || 'out');
+  const pc = cycleInfo(ACC_RD.basisSel || 'out');
   if(!pc) return;
-  ACC_RD.mode = 'prev';
+  ACC_RD.mode = 'cycle';
   const f = $('argFrom'), t2 = $('argTo');
   if(f) f.value = pc.ymd;
   if(t2) t2.value = '';          // فاضي = لحد النهارده
@@ -1049,7 +1047,7 @@ function pickPrevCycle(){
   if(typeof orig !== 'function') return;
   window.accRangeBasis = function(b){
     orig(b);
-    if(document.getElementById('accRangeOv')) addPrevCycleChip(!!(ACC_RD && ACC_RD.mode === 'prev'));
+    if(document.getElementById('accRangeOv')) addCycleChip(!!(ACC_RD && ACC_RD.mode === 'cycle'));
   };
 })();
 
@@ -1255,7 +1253,7 @@ async function doMerge(fromId, intoId, why){
 // ⚠️ مابنلمسش dashboard.html خالص — كله من هنا.
 // ============================================================
 let DEV = null;   // { id, ov, fr, opened, t0, tick, styled, patched, hiddenAt, obs, closing }
-const DEV_WAIT_MS = 90000;
+const DEV_WAIT_MS = 60000;
 // الحاجات اللي بتتعمل في الداشبورد بعد ما الكارت يتفتح وبنسيبها مستخبية
 // (تنبيهات «ميعاد العميل» · رسايل «وصلك جهاز» · شريط STAGING بتاعه — عندنا واحد)
 const DEV_SKIP = /due-alert-ov|ph1Toasts|ph1-toast/;
@@ -1269,59 +1267,44 @@ const DEV_CSS =
   // 🚫 المنشورات والإعلانات والشريط الجانبي — مالهمش لازمة هنا
   'html.ifx-embed #broadcastOverlay,html.ifx-embed #annOverlay,html.ifx-embed #dkRail,html.ifx-embed #dkPanel{display:none!important;}';
 
-function devVisible(){ const o = $('devOv'); return !!(o && o.style.display !== 'none'); }
+function devVisible(){ const o = $('devOv'); return !!(o && !o.classList.contains('pre')); }
 function devWaitSet(html, bad){
   const w = $('devWait'); if(!w) return;
   w.style.display = '';
   w.innerHTML = `<div class="dev-card${bad ? ' bad' : ''}">${html}</div>`;
 }
 function devWaitDefault(){
-  devWaitSet(`⏳ بنفتح كارت الجهاز…<div class="note-in" id="devWaitTxt">أول مرة ممكن تاخد كام ثانية</div>
+  devWaitSet(`⏳ بنفتح كارت الجهاز…<div class="note-in" id="devWaitTxt">ثانية واحدة</div>
     <button class="btn" onclick="closeDev()">إلغاء</button>`);
 }
 
-function openDev(id){
-  if(!id) return;
-  if(!navigator.onLine){ toast('مفيش نت — كارت الجهاز محتاج اتصال', true); return; }
-  if(DEV && DEV.closing) return;
-  let ov = $('devOv');
-  if(!ov){
-    ov = document.createElement('div');
-    ov.id = 'devOv';
-    ov.innerHTML = `<div class="dev-wait" id="devWait"></div>
-      <iframe id="devFrame" title="تفاصيل الجهاز" allowtransparency="true"></iframe>
-      <button class="dev-back" id="devBack" onclick="closeDev()">↩️ رجوع للحساب</button>`;
-    document.body.appendChild(ov);
-    const fr = ov.querySelector('#devFrame');
-    DEV = { fr, styled:false, patched:false, obs:null };
-    fr.src = 'dashboard.html?embed=1';
-  }
-  ov.style.display = '';
-  Object.assign(DEV, { id, opened:false, t0: Date.now(), hiddenAt: 0, closing:false });
-  DEV.fr.style.visibility = 'hidden';
-  $('devBack').style.display = 'none';
-  devWaitDefault();
-  clearInterval(DEV.tick);
-  DEV.tick = setInterval(devTick, 150);
+// 🚀 الشبّاك بيتعمل (ويبدأ يحمّل الداشبورد في الخلفية) أول ما تفتح حساب أي محل —
+//    مش لما تدوس على الجهاز. فلما تدوس، يكون الداشبورد جاهز.
+//    وهو مستخبي (class="pre") مابيبانش ومابيمسكش لمس.
+function devEnsure(){
+  if(DEV && $('devOv')) return DEV;
+  if(!navigator.onLine) return null;
+  const ov = document.createElement('div');
+  ov.id = 'devOv'; ov.className = 'pre';
+  ov.innerHTML = `<div class="dev-wait" id="devWait"></div>
+    <iframe id="devFrame" title="تفاصيل الجهاز" allowtransparency="true"></iframe>
+    <button class="dev-back" id="devBack" onclick="closeDev()">↩️ رجوع للحساب</button>`;
+  document.body.appendChild(ov);
+  const fr = ov.querySelector('#devFrame');
+  DEV = { fr, styled:false, patched:false, obs:null, opened:false, id:null };
+  fr.src = 'dashboard.html?embed=1';
+  // تحضير في الخلفية (التخبية + إيقاف النسخة الاحتياطية) لحد ما الداشبورد يجهز
+  DEV.prep = setInterval(() => { const r = devPrep(DEV); if(r && r.ready){ clearInterval(DEV.prep); DEV.prep = null; } }, 200);
+  return DEV;
 }
 
-// كل ١٥٠ مللي بنبص جوه الشبّاك: اتحمّل؟ الجهاز وصل؟ الكارت اتقفل؟
-function devTick(){
-  const D = DEV; if(!D || D.closing) return;
-  let w, doc;
-  try{ w = D.fr.contentWindow; doc = D.fr.contentDocument; }catch(e){ return; }
-  if(!w || !doc) return;
-  let path = '';
-  try{ path = String(w.location.pathname || ''); }catch(e){ return; }
-  // الجلسة خلصت → الداشبورد حوّل على صفحة الدخول
-  if(/index\.html/.test(path)){
-    clearInterval(D.tick);
-    devWaitSet(`⚠️ لازم تسجّل دخول تاني<div class="note-in">اقفل الصفحة دي وادخل من الأول</div>
-      <button class="btn" onclick="closeDev()">رجوع</button>`, true);
-    return;
-  }
-  if(!/dashboard\.html/.test(path)) return;   // لسه بيحمّل
-
+// بنبص جوه الشبّاك: اتحمّل؟ اتخبّى؟ عرف إنت مين (الصلاحيات)؟
+function devPrep(D){
+  let w, doc, path = '';
+  try{ w = D.fr.contentWindow; doc = D.fr.contentDocument; path = String(w.location.pathname || ''); }catch(e){ return null; }
+  if(!w || !doc) return null;
+  if(/index\.html/.test(path)) return { w, doc, login:true };
+  if(!/dashboard\.html/.test(path)) return null;    // لسه بيحمّل
   // ١) نخبّي شاشة الداشبورد من أول لحظة
   if(!D.styled && doc.head){
     try{
@@ -1341,22 +1324,68 @@ function devTick(){
     }catch(e){}
     D.patched = true;
   }
+  // ٣) «جاهز» = الداشبورد عرف إنت مين وصلاحياتك إيه (من غيرها الكارت يطلع بأزرار غلط)
+  let ready = false;
+  try{ ready = !!w.eval("typeof rolesLoadOk!=='undefined' && rolesLoadOk===true && typeof currentUser!=='undefined' && !!currentUser.email && typeof openDetail==='function' && typeof mergeDevices==='function'"); }catch(e){}
+  return { w, doc, ready };
+}
 
-  // ٣) لسه الكارت مااتفتحش → نستنى الجهاز يوصل ونفتحه
+function openDev(id){
+  if(!id) return;
+  if(!navigator.onLine){ toast('مفيش نت — كارت الجهاز محتاج اتصال', true); return; }
+  if(DEV && DEV.closing) return;
+  const D = devEnsure(); if(!D) return;
+  $('devOv').classList.remove('pre');
+  Object.assign(D, { id, opened:false, t0: Date.now(), hiddenAt: 0, closing:false, row: undefined });
+  D.fr.style.visibility = 'hidden';
+  $('devBack').style.display = 'none';
+  devWaitDefault();
+  // ⚡ الجهاز نفسه بنجيبه لوحده من السيرفر (سطر واحد = لحظة) — بدل ما نستنى
+  //    الداشبورد يحمّل كل الأجهزة عشان يلاقيه
+  sb.from('devices_data').select('id,data').eq('id', id).maybeSingle().then(({ data, error }) => {
+    if(!DEV || DEV.id !== id) return;
+    if(error){ console.warn('[كارت الجهاز] جلب الجهاز:', error); D.row = null; return; }
+    D.row = data ? Object.assign({}, data.data || {}, { id: data.id }) : null;
+  });
+  clearInterval(D.tick);
+  D.tick = setInterval(devTick, 120);
+}
+
+// كل ١٢٠ مللي: الداشبورد جاهز؟ نفتح الكارت. الكارت اتقفل؟ نرجع للحساب.
+function devTick(){
+  const D = DEV; if(!D || D.closing) return;
+  const r = devPrep(D); if(!r) return;
+  const { w, doc } = r;
+  if(r.login){
+    clearInterval(D.tick);
+    devWaitSet(`⚠️ لازم تسجّل دخول تاني<div class="note-in">اقفل الصفحة دي وادخل من الأول</div>
+      <button class="btn" onclick="closeDev()">رجوع</button>`, true);
+    return;
+  }
+
+  // ٣) لسه الكارت مااتفتحش
   if(!D.opened){
-    let has = false, trashed = false;
-    try{
-      const q = JSON.stringify(D.id);
-      has = !!w.eval(`typeof devices!=='undefined' && Array.isArray(devices) && devices.some(function(d){return d && d.id===${q};})`);
-      if(!has) trashed = !!w.eval(`typeof trashDevices!=='undefined' && Array.isArray(trashDevices) && trashDevices.some(function(d){return d && d.id===${q};})`);
-    }catch(e){}
-    if(trashed){
+    const q = JSON.stringify(D.id);
+    let has = false;
+    try{ has = !!w.eval(`typeof devices!=='undefined' && Array.isArray(devices) && devices.some(function(d){return d && d.id===${q};})`); }catch(e){}
+    if(D.row === null){
+      clearInterval(D.tick);
+      devWaitSet(`⚠️ مالقيناش الجهاز ده<div class="note-in">ممكن يكون اتمسح نهائي</div>
+        <button class="btn" onclick="closeDev()">رجوع</button>`, true);
+      return;
+    }
+    if(D.row && D.row.status === 'trashed'){
       clearInterval(D.tick);
       devWaitSet(`🗑 الجهاز ده في المهملات<div class="note-in">رجّعه من المهملات في الداشبورد الأول</div>
         <button class="btn" onclick="closeDev()">رجوع</button>`, true);
       return;
     }
-    if(has && typeof w.openDetail === 'function'){
+    // الداشبورد جاهز والجهاز لسه مش عنده؟ نحطّه إحنا (نسخة طازة من السيرفر)
+    if(!has && r.ready && D.row){
+      try{ w.mergeDevices(w.JSON.parse(JSON.stringify([D.row])), 'fresh'); has = true; }
+      catch(e){ console.warn('[كارت الجهاز] mergeDevices:', e); }
+    }
+    if(has && r.ready){
       try{ w.openDetail(D.id); }catch(e){ console.warn('[كارت الجهاز] openDetail:', e); }
       const dov = doc.getElementById('detailOverlay');
       if(dov && !dov.classList.contains('hidden')){
@@ -1370,11 +1399,11 @@ function devTick(){
     const sec = Math.round((Date.now() - D.t0) / 1000);
     if(Date.now() - D.t0 > DEV_WAIT_MS){
       clearInterval(D.tick);
-      devWaitSet(`⚠️ مالقيناش الجهاز ده<div class="note-in">ممكن يكون اتمسح، أو النت بطيء — جرّب تاني بعد شوية</div>
+      devWaitSet(`⚠️ الشبكة بطيئة<div class="note-in">جرّب تاني بعد شوية</div>
         <button class="btn" onclick="closeDev()">رجوع</button>`, true);
       return;
     }
-    const t = $('devWaitTxt'); if(t && sec >= 4) t.textContent = 'بنحمّل الأجهزة… ' + sec + ' ثانية';
+    const t = $('devWaitTxt'); if(t && sec >= 3) t.textContent = 'بنجهّز الشاشة… ' + sec + ' ثانية';
     return;
   }
 
@@ -1437,7 +1466,7 @@ async function closeDev(){
   }
   D.opened = false; D.id = null; D.closing = false;
   D.fr.style.visibility = 'hidden';
-  const ov = $('devOv'); if(ov) ov.style.display = 'none';
+  const ov = $('devOv'); if(ov) ov.classList.add('pre');
   // 🔄 الكشف يتحدّث (السعر/المحل ممكن يكونوا اتغيّروا) — ومرة كمان بعد شوية،
   //    عشان السيرفر بيحدّث الدفتر من الجهاز بعد الحفظ بلحظة
   if(wasOpen){ load(); setTimeout(() => load(), 2500); }
