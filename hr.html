@@ -874,7 +874,20 @@ const KIND = {
 function roleLabel(r){
   return { super_admin:'أدمن', accountant:'أمين الخزنة', dispatcher:'مسؤول حركة',
            technician:'فني', hr:'شؤون العاملين', staff:'موظف',
-           owner:'المالك', reception:'موظف الاستقبال', production:'مدير الإنتاج', callcenter:'الكول سنتر', parts:'مسؤول قطع الغيار' }[r] || r;
+           owner:'المالك', reception:'موظف الاستقبال', production:'مدير الإنتاج', callcenter:'الكول سنتر', parts:'مسؤول قطع الغيار',
+           tester:'مسؤول الفحص' }[r] || r;
+}
+// 🏢 (ملف 118) «الحساب الإداري» = موظف بمرتب بس مالوش حضور ولا انصراف.
+//    المالك تلقائي · أو أي حساب الأدمن علّمه 'admin_staff' جوه caps.
+//    ⚠️ المحاسب العام إداري برضه، بس مش في ROLES_MAP ومابيظهرش هنا خالص (قرار 67).
+//    ⚠️ نفس الفحص اللي في السيرفر (is_admin_staff_email) — لازم يفضلوا متطابقين.
+function isAdminEmp(email){
+  const k = String(email || '').toLowerCase();
+  const v = ROLES_MAP[email] || ROLES_MAP[k];
+  if(!v) return false;
+  if(typeof v === 'string') return v === 'owner';
+  if(v.role === 'owner') return true;
+  return Array.isArray(v.caps) && v.caps.indexOf('admin_staff') !== -1;
 }
 function nameOf(email){
   const v = ROLES_MAP[email];
@@ -1027,6 +1040,11 @@ function groupEmps(){
     (emps[e] = emps[e] || {})[r.work_date] = (emps[e][r.work_date] || []);
     emps[e][r.work_date].push(r);
   }
+  // 🏢 الإداريين ليهم كارت حتى من غير ولا تسجيل (مرتب · خصم · حافز)
+  for(const em of Object.keys(ROLES_MAP || {})){
+    const e = em.toLowerCase();
+    if(isAdminEmp(e) && !emps[e]) emps[e] = {};
+  }
   return emps;
 }
 
@@ -1044,12 +1062,13 @@ function render(){
   const emps = groupEmps();
 
   // مؤشرات فوق
-  let totalMin = 0, totalDays = 0, flagged = 0;
+  // 🆕 (٢٠٢٦-١٠-٢٠) «يوم حضور» و«إجمالي الساعات» اتشالوا بطلب بلال —
+  //    فاضل: عدد الموظفين · الأيام الناقصة انصراف (دي اللي محتاجة HR تتحرك).
+  let flagged = 0;
   for(const e of Object.keys(emps)){
+    if(isAdminEmp(e)) continue;   // 🏢 الإداري مالوش حضور
     for(const d of Object.keys(emps[e])){
-      const s = dayMinutes(emps[e][d]);
-      totalMin += effMin(e, emps[e][d], d); totalDays++;
-      if(s.missingOut) flagged++;
+      if(dayMinutes(emps[e][d]).missingOut) flagged++;
     }
   }
 
@@ -1060,9 +1079,8 @@ function render(){
              oninput="SEARCH=this.value; renderCards()">
     </div>
     <div class="kpis">
-      <div class="kpi"><div class="v">${Object.keys(emps).length}</div><div class="l">موظف</div></div>
-      <div class="kpi"><div class="v">${totalDays}</div><div class="l">يوم حضور</div></div>
-      <div class="kpi"><div class="v">${fmtHm(totalMin)}</div><div class="l">إجمالي الساعات</div></div>
+      <div class="kpi"><div class="v">${Object.keys(emps).length}</div><div class="l">موظف${
+        (n => n ? ' <span style="opacity:.75">(منهم ' + n + ' 🏢 إداري)</span>' : '')(Object.keys(emps).filter(isAdminEmp).length)}</div></div>
       <div class="kpi"><div class="v" style="color:var(--waiting)">${flagged}</div><div class="l">يوم ناقص انصراف</div></div>
     </div>`;
 
@@ -1115,7 +1133,40 @@ function avatarColor(e){
   return `hsl(${h} 55% 42%)`;
 }
 
+// 🏢 كارت الإداري: من غير ساعات ولا تأخير ولا غياب — فلوس بس
+function adminCardHtml(e){
+  const m  = manualDed(e, MONTH);
+  const bn = bonusSum(e, MONTH);
+  const dr = debtRemaining(e);
+  const v  = ROLES_MAP[e] || {};
+  const rl = typeof v === 'string' ? v : (v.role || '');
+  const bits = [];
+  if(bn.total) bits.push(`<span style="color:var(--done)">🎁 حوافز: <b>+${bn.total}</b> ج.م</span>`);
+  if(dr) bits.push(`💳 ديون باقية: <b>${lbMoney(dr)}</b> ج.م`);
+  if(m.total) bits.push(`💸 خصم يدوي: <b>${m.total}</b> ج.م`);
+  if(m.wd)    bits.push(`🔩 مسحوبات: <b>${m.wd}</b> ج.م`);
+  if(m.unseen) bits.push(`<i>${m.unseen} لسه ما اتقراش</i>`);
+  return `
+  <div class="card">
+    <div class="card-top">
+      <div class="avatar" style="background:${avatarColor(e)}">${esc(nameOf(e).charAt(0))}</div>
+      <div class="card-id">
+        <b>${esc(nameOf(e))}</b>
+        <span>🏢 إداري${rl ? ' · ' + esc(roleLabel(rl)) : ''}</span>
+      </div>
+    </div>
+    <div class="card-ded" style="color:var(--muted);">🏢 حساب إداري — مالوش حضور ولا انصراف، فمفيش ساعات ولا تأخير ولا غياب.
+      المرتب والكشف من تبويب المرتبات.</div>
+    ${bits.length ? `<div class="card-ded">${bits.join(' · ')}</div>` : ''}
+    <div class="card-foot">
+      <button onclick="openDeduction('${esc(e)}')" title="خصم">💸 خصم</button>
+      <button onclick="openBonus('${esc(e)}')" title="حافز">🎁 حافز</button>
+    </div>
+  </div>`;
+}
+
 function cardHtml(e, days){
+  if(isAdminEmp(e)) return adminCardHtml(e);
   let mins = 0, flags = 0, penalty = 0, late = 0, over = 0, short = 0;
   const dkeys = Object.keys(days);
   dkeys.forEach(d => {
@@ -2019,6 +2070,7 @@ function allEmployees(){
     const v = ROLES_MAP[em];
     const r = typeof v === 'string' ? v : (v && v.role) || '';
     if(r === 'hr') continue;          // HR مش بتسجّل حضور موظفين
+    if(isAdminEmp(em)) continue;      // 🏢 (118) الإداري مالوش مواعيد
     out.push(em.toLowerCase());
   }
   // وأي حد في السجل ومش في الخريطة (حساب اتشال مثلاً)
@@ -4296,7 +4348,7 @@ function prCardHtml(e){
       <div class="avatar" style="background:${avatarColor(e)}">${esc(nameOf(e).charAt(0))}</div>
       <div class="card-id">
         <b>${esc(nameOf(e))}</b>
-        <span>${esc(e)}</span>
+        <span>${isAdminEmp(e) ? '🏢 إداري · ' : ''}${esc(e)}</span>
       </div>
     </div>
 

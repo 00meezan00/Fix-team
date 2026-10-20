@@ -8,13 +8,15 @@
         🟣 بنفسجي = انصرف
         🔵 أزرق   = نسي ينصرف (يوم الشغل اللي فات خلص ١٠ الصبح وهو ما انصرفش)
         🔴 أحمر   = مجاش خالص النهاردة
+        ⚫ رمادي  = 🏢 إداري (ملف 118) — مالوش حضور ولا انصراف أصلاً
+                    (المالك · المحاسب العام · أي حساب الأدمن علّمه «🏢 حساب إداري»)
       وتحت اسمه سطر بمواعيد الوردية دي:
         🟢 حضور ١٠:٠٢ · ☕ بريك ٢:١٥ · ▶️ رجع ٢:٤٥ · 🟣 انصراف ٨:٠٠
       📅 يوم الشغل بيبدأ ١٠ الصبح وبيخلص ١٠ الصبح اللي بعده (قاعدة المحل).
          الساعة ١٠ الصبح الصفحة بتتفضّى، واللي لسه ما انصرفش بيبقى
          🔵 نسي ينصرف. الحساب كله في السيرفر (hr_staff_board).
 
-   🔑 كل الحساب في السيرفر: دالة hr_staff_board (ملف 65).
+   🔑 كل الحساب في السيرفر: دالة hr_staff_board (ملف 65 + جراحة 117 و 118).
       الصفحة دي بتعرض بس — مفيش ولا سطر بيكتب في أي جدول.
 
    📍 مين بيحمّله؟ common.js — لوحده، في صفحتين بس:
@@ -37,7 +39,8 @@
     break:  { t:'في بريك', cls:'brk' },
     out:    { t:'انصرف',   cls:'out' },
     forgot: { t:'نسي ينصرف', cls:'fgt' },
-    absent: { t:'مجاش',    cls:'abs' }
+    absent: { t:'مجاش',    cls:'abs' },
+    admin:  { t:'🏢 إداري', cls:'adm' }   // (118) مالوش حضور ولا انصراف
   };
   var KIND = {
     in:     { i:'🟢', t:'حضور'   },
@@ -45,7 +48,7 @@
     resume: { i:'▶️', t:'رجع'    },
     out:    { i:'🟣', t:'انصراف' }
   };
-  var ORDER = ['in', 'break', 'forgot', 'out', 'absent'];
+  var ORDER = ['in', 'break', 'forgot', 'out', 'absent', 'admin'];
 
   var rows = [], err = '', loading = false, loadedAt = null;
   var filter = 'all', q = '', timer = null, opts = {};
@@ -84,7 +87,7 @@
       accountant:'أمين الخزنة', dispatcher:'مسؤول حركة', technician:'فني',
       hr:'شؤون العاملين', staff:'موظف', owner:'المالك',
       reception:'موظف الاستقبال', production:'مدير الإنتاج',
-      callcenter:'الكول سنتر', parts:'مسؤول قطع الغيار'
+      callcenter:'الكول سنتر', parts:'مسؤول قطع الغيار', tester:'مسؤول الفحص'
     };
     return map[r] || r || '';
   }
@@ -94,12 +97,13 @@
   //    الصفحتين بيحطوا data-theme على <html>، فبنقرا منه مباشرة.
   // 🎨 (١٩-١٠) ألوان FIX TEAM: أسود/جرافيت + برتقالي اللوجو (#F26A1B).
   //    ألوان الحالات (أخضر/أصفر/بنفسجي/أزرق/أحمر) فضلت زي ما هي — ليها معنى.
+  //    🏢 الإداري رمادي أردوازي — هادي، عشان مايتلخبطش مع «مجاش» الأحمر.
   var CSS = ''
   + '#sbOverlay{--sb-bg:#F1F0ED;--sb-card:#FFFFFF;--sb-ink:#141416;--sb-muted:#6B6B70;--sb-line:#E3E1DC;'
   + '--sb-acc:#F26A1B;--sb-acc-bg:rgba(242,106,27,.10);--sb-head:#141416;--sb-head-ink:#FFFFFF;--sb-hbtn:#26262A;'
   + '--sb-in:#16A34A;--sb-in-bg:#F0FDF4;--sb-brk:#A16207;--sb-brk-dot:#EAB308;--sb-brk-bg:#FEFCE8;'
   + '--sb-out:#7C3AED;--sb-out-bg:#F5F3FF;--sb-abs:#DC2626;--sb-abs-bg:#FEF2F2;'
-  + '--sb-fgt:#2563EB;--sb-fgt-bg:#EFF6FF;'
+  + '--sb-fgt:#2563EB;--sb-fgt-bg:#EFF6FF;--sb-adm:#475569;--sb-adm-bg:#F1F5F9;'
   + 'position:fixed;inset:0;z-index:72;background:var(--sb-bg);color:var(--sb-ink);'
   + 'overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;display:none;'
   + 'font-family:"Tajawal","Segoe UI",sans-serif;}'
@@ -107,7 +111,7 @@
   + '--sb-acc:#FF7A2E;--sb-acc-bg:rgba(255,122,46,.13);--sb-head:#000000;--sb-head-ink:#F2F2F0;--sb-hbtn:#1F1F23;'
   + '--sb-in:#4ADE80;--sb-in-bg:rgba(74,222,128,.13);--sb-brk:#FACC15;--sb-brk-dot:#FACC15;--sb-brk-bg:rgba(250,204,21,.13);'
   + '--sb-out:#A78BFA;--sb-out-bg:rgba(167,139,250,.15);--sb-abs:#F87171;--sb-abs-bg:rgba(248,113,113,.14);'
-  + '--sb-fgt:#60A5FA;--sb-fgt-bg:rgba(96,165,250,.14);}'
+  + '--sb-fgt:#60A5FA;--sb-fgt-bg:rgba(96,165,250,.14);--sb-adm:#94A3B8;--sb-adm-bg:rgba(148,163,184,.14);}'
   + '#sbOverlay.on{display:block;}'
   + '#sbOverlay *{box-sizing:border-box;}'
   // ⚠️ env(safe-area-inset-top) = نتش الأيفون — من غيره زرار × بيستخبى تحت الساعة
@@ -124,18 +128,21 @@
   // الكروت جوه شبكة: عمود واحد على الموبايل، وعلى الكمبيوتر بتتصف جنب بعض
   + '.sb-grid{display:grid;grid-template-columns:1fr;gap:9px;}'
   + '.sb-grid .sb-row{margin-bottom:0;}'
-  + '.sb-pills{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:12px;}'
+  // ٦ أرقام: على الموبايل صفّين × ٣ (عشان ماتتزنقش) · على الكمبيوتر صف واحد × ٦
+  + '.sb-pills{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px;}'
   + '.sb-pill{border:1.5px solid var(--sb-line);background:var(--sb-card);border-radius:12px;padding:10px 4px;'
   + 'text-align:center;cursor:pointer;font-family:inherit;color:var(--sb-ink);min-width:0;}'
   + '.sb-pill b{display:block;font-family:"Cairo",sans-serif;font-size:22px;font-weight:900;line-height:1.1;}'
   + '.sb-pill span{display:block;font-size:11px;font-weight:700;color:var(--sb-muted);line-height:1.35;}'
   + '.sb-pill.in b{color:var(--sb-in);}.sb-pill.brk b{color:var(--sb-brk);}'
   + '.sb-pill.out b{color:var(--sb-out);}.sb-pill.abs b{color:var(--sb-abs);}.sb-pill.fgt b{color:var(--sb-fgt);}'
+  + '.sb-pill.adm b{color:var(--sb-adm);}'
   + '.sb-pill.sel.in{border-color:var(--sb-in);background:var(--sb-in-bg);}'
   + '.sb-pill.sel.brk{border-color:var(--sb-brk-dot);background:var(--sb-brk-bg);}'
   + '.sb-pill.sel.out{border-color:var(--sb-out);background:var(--sb-out-bg);}'
   + '.sb-pill.sel.abs{border-color:var(--sb-abs);background:var(--sb-abs-bg);}'
   + '.sb-pill.sel.fgt{border-color:var(--sb-fgt);background:var(--sb-fgt-bg);}'
+  + '.sb-pill.sel.adm{border-color:var(--sb-adm);background:var(--sb-adm-bg);}'
   // ⚠️ ١٦px مقصودة: أقل من كده الأيفون بيكبّر الصفحة ومبيرجعش في وضع التطبيق
   + '.sb-search{width:100%;border:1px solid var(--sb-line);background:var(--sb-card);color:var(--sb-ink);'
   + 'border-radius:11px;padding:11px 13px;font-family:inherit;font-size:16px;margin-bottom:6px;}'
@@ -149,6 +156,7 @@
   + '.sb-row.out{--sb-c:var(--sb-out);--sb-cb:var(--sb-out-bg);--sb-d:var(--sb-out);}'
   + '.sb-row.abs{--sb-c:var(--sb-abs);--sb-cb:var(--sb-abs-bg);--sb-d:var(--sb-abs);}'
   + '.sb-row.fgt{--sb-c:var(--sb-fgt);--sb-cb:var(--sb-fgt-bg);--sb-d:var(--sb-fgt);}'
+  + '.sb-row.adm{--sb-c:var(--sb-adm);--sb-cb:var(--sb-adm-bg);--sb-d:var(--sb-adm);}'
   // اللمبة: دايرة + هالة بنفس اللون عشان تبان من بعيد
   + '.sb-dot{flex:none;width:14px;height:14px;border-radius:50%;margin-top:4px;background:var(--sb-d);'
   + 'box-shadow:0 0 0 4px var(--sb-cb);}'
@@ -176,7 +184,7 @@
   +   '.sb-head{padding-inline:28px;}'
   +   '.sb-head h2{font-size:21px;}'
   +   '.sb-body{padding:20px 28px 60px;}'
-  +   '.sb-pills{gap:12px;margin-bottom:16px;}'
+  +   '.sb-pills{grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:16px;}'
   +   '.sb-pill{padding:14px 8px;border-radius:14px;}'
   +   '.sb-pill b{font-size:30px;}'
   +   '.sb-pill span{font-size:13px;}'
@@ -246,7 +254,7 @@
   function render(){ renderPills(); renderList(); }
 
   function counts(){
-    var c = { in:0, break:0, out:0, forgot:0, absent:0 };
+    var c = { in:0, break:0, out:0, forgot:0, absent:0, admin:0 };
     rows.forEach(function(r){ if(c[r.status] != null) c[r.status]++; });
     return c;
   }
@@ -280,6 +288,7 @@
 
   function metaTxt(r){
     var bits = [roleTxt(r.role)];
+    if(r.status === 'admin')  bits.push('حساب إداري — مالوش حضور ولا انصراف');
     if(r.status === 'in')     bits.push('شغّال من ' + hm(r.since));
     if(r.status === 'break')  bits.push('في بريك من ' + hm(r.since) + ' (' + durTxt(minsSince(r.since)) + ')');
     if(r.status === 'out')    bits.push('انصرف ' + hm(r.since));

@@ -627,6 +627,73 @@ addEventListener('DOMContentLoaded', function(){
 });
 
 // ============================================================
+// 🏢 «الحساب الإداري» — موظف بمرتب بس مالوش حضور (ملف SQL رقم 118)
+// ------------------------------------------------------------
+// 🧸 بالبلدي: فيه موظفين شغلهم إداري — مابيسجّلوش حضور ولا انصراف،
+//    بس ليهم مرتب وخصم وحافز عند شؤون العاملين زي أي حد.
+//    مين؟ المالك (تلقائي) · المحاسب العام (تلقائي — بس مابيظهرش في HR،
+//    قرار 67) · وأي حساب الأدمن يفتحله «🏢 حساب إداري».
+//
+// ① لوحة الأدمن: زرار «🏢 حساب إداري» تحت كل حساب (زي الصلاحيات).
+//    العلامة = كلمة 'admin_staff' جوه caps — والسيرفر بيقرا نفس الكلمة.
+// ② أي صفحة: لو إنت إداري، زرار «⏰ المواعيد» بيستخبى (💰 مرتبك يفضل).
+//    ⚠️ الإخفاء ده شكل بس — الرفض الحقيقي على السيرفر (hr_punch).
+// ③ hr.html بيعرف الإداري لوحده من نفس العلامة (شوف ifxIsAdminStaff).
+// ⚠️ لوحة الموظفين الملوّنة: السيرفر بيرجّع حالته «admin» = 🏢 إداري.
+// ============================================================
+function ifxIsAdminStaff(v){
+  if(!v) return false;
+  if(typeof v === 'string') return v === 'owner';
+  if(typeof v !== 'object') return false;
+  if(v.role === 'owner') return true;
+  return Array.isArray(v.caps) && v.caps.indexOf('admin_staff') !== -1;
+}
+window.ifxIsAdminStaff = ifxIsAdminStaff;
+addEventListener('DOMContentLoaded', function(){
+  try{
+    var page = (location.pathname.split('/').pop() || '').toLowerCase().replace(/\.html$/,'') || 'index';
+
+    // ① لوحة الأدمن
+    if(page === 'admin' && typeof CAPS !== 'undefined' && Array.isArray(CAPS)
+       && !CAPS.some(function(c){ return c && c.key === 'admin_staff'; })){
+      CAPS.push({
+        key:'admin_staff', icon:'🏢', label:'حساب إداري',
+        hint:'مالوش حضور ولا انصراف · بيتحسب موظف في شؤون العاملين (مرتب · خصم · حافز) · مابيتقفلش برّه الشيفت',
+        forRoles:['reception','accountant','callcenter','parts','tester','dispatcher','production','staff','technician']
+      });
+      setTimeout(function(){
+        try{ if(document.querySelector('#wrap .sec') && typeof render === 'function') render(); }catch(e){}
+      }, 0);
+    }
+
+    // ② إخفاء زرار المواعيد عن الإداري
+    if(page === 'index' || page === 'login' || page === 'admin') return;
+    if(!document.getElementById('ifxAdmCss')){
+      var st = document.createElement('style');
+      st.id = 'ifxAdmCss';
+      // ⚠️ !important عشان attendance.js بيظهّر الزرار بنفسه كل شوية
+      st.textContent = 'html.ifx-admin .att-menu-btn,html.ifx-admin #deskHint{display:none !important;}';
+      document.head.appendChild(st);
+    }
+    var tries = 0;
+    var ask = async function(){
+      try{
+        if(typeof sb === 'undefined' || !sb.rpc) return;
+        var ses = sb.auth && sb.auth.getSession ? await sb.auth.getSession() : null;
+        if(ses && ses.data && !ses.data.session){
+          if(++tries < 5) setTimeout(ask, 1500);   // لسه بيسجّل دخول
+          return;
+        }
+        var res = await sb.rpc('my_is_admin_staff');
+        if(res.error) return;                       // ملف 118 لسه ما اتشغّلش — عادي
+        document.documentElement.classList.toggle('ifx-admin', res.data === true);
+      }catch(e){}
+    };
+    setTimeout(ask, 300);
+  }catch(e){ console.error('admin-staff:', e); }
+});
+
+// ============================================================
 // 👥 شؤون العاملين على الـERP — تحميل erp-hr.js
 // ------------------------------------------------------------
 // 🧸 بالبلدي: كل مرتب يتصرف بقى ليه «سند صرف» برقم (ملف SQL رقم 106).
