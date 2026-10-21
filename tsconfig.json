@@ -1,0 +1,30 @@
+{
+  // ============================================================
+  // FIX TEAM — إعدادات فحص TypeScript (npm run check)
+  // 🧸 ده «المدرّس» اللي بيصحّح الكراسة. مابيغيّرش ولا حرف في
+  //    الموقع — بيقولك بس فين الغلط.
+  // ============================================================
+  "compilerOptions": {
+    "target": "ES2020",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "noEmit": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "types": [],
+
+    // ملفات .js اللي لسه ماتحوّلتش: المدرّس بيشوف أساميها (عشان
+    // ملفات ts تعرف إنها موجودة) بس مابيصحّحهاش لسه.
+    "allowJs": true,
+    "checkJs": false
+  },
+  "include": ["ts/**/*.ts", "*.js"],
+  "exclude": [
+    "dist", "node_modules",
+    "sw.js",          // الحارس — بيشتغل في مكان لوحده (worker) وبيفضل js
+    "jsQR.js",        // مكتبة جاهزة مش بتاعتنا
+    "test-*.js",
+    "build.mjs"
+  ]
+}

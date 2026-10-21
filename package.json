@@ -1,0 +1,12 @@
+{
+  "name": "fix-team",
+  "private": true,
+  "description": "FIX TEAM — المترجم اللي بيحوّل ملفات ts/ لـ js قبل الرفع على Cloudflare Pages",
+  "scripts": {
+    "build": "node build.mjs",
+    "check": "tsc --noEmit -p ."
+  },
+  "devDependencies": {
+    "typescript": "6.0.3"
+  }
+}
