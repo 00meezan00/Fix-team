@@ -3,6 +3,8 @@
   // FIX TEAM — إعدادات فحص TypeScript (npm run check)
   // 🧸 ده «المدرّس» اللي بيصحّح الكراسة. مابيغيّرش ولا حرف في
   //    الموقع — بيقولك بس فين الغلط.
+  // ⚠️ بيفحص فولدر ts/ بس. الحاجات اللي لسه في ملفات JS القديمة
+  //    متعرّفة في ts/legacy-globals.d.ts.
   // ============================================================
   "compilerOptions": {
     "target": "ES2020",
@@ -12,19 +14,7 @@
     "noEmit": true,
     "strict": true,
     "skipLibCheck": true,
-    "types": [],
-
-    // ملفات .js اللي لسه ماتحوّلتش: المدرّس بيشوف أساميها (عشان
-    // ملفات ts تعرف إنها موجودة) بس مابيصحّحهاش لسه.
-    "allowJs": true,
-    "checkJs": false
+    "types": []
   },
-  "include": ["ts/**/*.ts", "*.js"],
-  "exclude": [
-    "dist", "node_modules",
-    "sw.js",          // الحارس — بيشتغل في مكان لوحده (worker) وبيفضل js
-    "jsQR.js",        // مكتبة جاهزة مش بتاعتنا
-    "test-*.js",
-    "build.mjs"
-  ]
+  "include": ["ts/**/*.ts"]
 }
