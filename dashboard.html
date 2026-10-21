@@ -16431,6 +16431,7 @@ async function loadSupPays(){
     const { data, error } = await sb.from('supplier_payments')
       .select('id,amount,paid_at,voided')
       .eq('voided', false)
+      .neq('source', 'excel')   // 📥 (ملف 119) دفعات شيت الإكسل خرجت من الخزنة العامة مش من درج أمين الخزنة
       .gte('paid_at', new Date(Date.now() - 60 * 86400000).toISOString())
       .order('paid_at', { ascending: false }).limit(500);
     if(error) throw error;

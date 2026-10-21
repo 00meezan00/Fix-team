@@ -123,6 +123,7 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
     border-radius:13px; padding:11px 13px; margin-bottom:8px;}
   button.card{display:block; width:100%; text-align:start; color:var(--ink);}
   .card.k-auto{--edge:var(--blue);} .card.k-cogs{--edge:var(--violet);} .card.k-manual,.card.k-adjust{--edge:var(--wait);}
+  .card.k-excel{--edge:var(--done);} .card.k-till{--edge:var(--blue);}
   .card.k-opening{--edge:var(--done);} .card.k-asset{--edge:var(--blue);} .card.k-depr{--edge:var(--violet);} .card.k-reversal{--edge:var(--red);} .card.k-closing{--edge:var(--ink-2);}
   .card.off{opacity:.62;}
   .c-top{display:flex; align-items:flex-start; justify-content:space-between; gap:8px;}
@@ -174,6 +175,9 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
   .tscroll{overflow-x:auto; border-radius:13px;}
   .tscroll .tbl td:first-child{min-width:150px;}
   .tbl .zero{color:var(--faint);}
+  /* 📥 اختيارات الإكسل جوه الجدول */
+  .tbl select{width:100%; min-width:150px; border:1px solid var(--wait); background:var(--wait-bg); color:var(--ink);
+    border-radius:8px; padding:6px 8px; font-family:inherit; font-size:13px; font-weight:700;}
 
   /* ===== الشيت ===== */
   .ov{position:fixed; inset:0; z-index:60; background:rgba(8,14,20,.55); display:flex; align-items:flex-end; justify-content:center;}
@@ -269,7 +273,8 @@ const TYPE = { asset:'الأصول', liability:'الخصوم', equity:'حقوق 
 const KIND = {
   auto:['🤖 تلقائي','blue'], cogs:['🔧 تكلفة قطع','violet'], manual:['✍️ يدوي','wait'], adjust:['🛠️ تسوية','wait'],
   opening:['📌 افتتاحي','green'], reversal:['↩️ عكسي','red'], closing:['📅 إقفال سنة',''],
-  asset:['🏗️ أصول','blue'], depr:['📉 إهلاك','violet']
+  asset:['🏗️ أصول','blue'], depr:['📉 إهلاك','violet'],
+  excel:['📥 شيت الإكسل','green'], till:['🧺 تقفيل الخزنة','blue']
 };
 const MONTHS = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
 
@@ -407,6 +412,7 @@ function tabsList(){
   return [
     { k:'home', l:'🩺 الملخص', n: warn },
     { k:'journal', l:'✍️ القيود' },
+    { k:'xl', l:'📥 الإكسل' },
     { k:'chart', l:'📚 الدليل' },
     { k:'tb', l:'⚖️ ميزان المراجعة' },
     { k:'pl', l:'📊 أرباح وخسائر' },
@@ -426,7 +432,7 @@ function render(){
     return;
   }
   const head = loadErr ? `<div class="err">⚠️ آخر تحديث فشل: ${escH(loadErr)}</div>` : '';
-  const V = { home:viewHome, journal:viewJournal, chart:viewChart, tb:viewTB, pl:viewPL, bs:viewBS, fa:viewFA, rec:viewRec, periods:viewPeriods };
+  const V = { home:viewHome, journal:viewJournal, xl:viewXL, chart:viewChart, tb:viewTB, pl:viewPL, bs:viewBS, fa:viewFA, rec:viewRec, periods:viewPeriods };
   app.innerHTML = head + (V[S.tab] || viewHome)();
   $('fabHost').innerHTML = S.tab === 'fa' ? `<button class="fab" onclick="openFAAdd()">➕ أصل جديد</button>`
     : ['home','journal','chart'].includes(S.tab) ? `<button class="fab" onclick="openEntry('manual')">✍️ قيد جديد</button>` : '';
@@ -435,6 +441,7 @@ function render(){
   if(['tb','pl','bs','chart'].includes(S.tab)) fillReport();
   if(S.tab === 'home') homePL();
   if(S.tab === 'rec' && !REC) loadRec();
+  if(S.tab === 'xl' && XL.month && !XL.board && !XL.loading) xlLoadBoard();
 }
 function go(k){ S.tab = k; S.limit = 80; render(); window.scrollTo(0, 0); }
 function rangeHtml(onch, withAsOf){
@@ -544,7 +551,7 @@ async function startGo(){
 
 // ---------- ✍️ القيود ----------
 function viewJournal(){
-  const kinds = [['','الكل'], ['auto','🤖 تلقائي'], ['cogs','🔧 تكلفة'], ['manual','✍️ يدوي'], ['adjust','🛠️ تسوية'], ['opening','📌 افتتاحي'], ['asset','🏗️ أصول'], ['depr','📉 إهلاك'], ['reversal','↩️ عكسي'], ['closing','📅 إقفال']];
+  const kinds = [['','الكل'], ['auto','🤖 تلقائي'], ['cogs','🔧 تكلفة'], ['manual','✍️ يدوي'], ['adjust','🛠️ تسوية'], ['opening','📌 افتتاحي'], ['asset','🏗️ أصول'], ['depr','📉 إهلاك'], ['excel','📥 الإكسل'], ['till','🧺 التقفيل'], ['reversal','↩️ عكسي'], ['closing','📅 إقفال']];
   return `${rangeHtml('J=null;render()')}
     <input class="search" type="search" placeholder="🔍 رقم قيد · رقم ورقة (DL-…) · كود عميل · رقم حساب · كلمة" value="${escH(S.q)}"
       onkeydown="if(event.key==='Enter'){S.q=this.value;J=null;render();}" onchange="S.q=this.value;J=null;render()">
@@ -1483,6 +1490,516 @@ async function excel(file, title, head, rows, moneyCols, boldRows){
   a.href = url; a.download = file + '-' + cairoDay() + '.xlsx';
   document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
 }
+
+// ============================================================
+// 📥 استيراد شيت الإكسل اليومي (ملف SQL رقم 119)
+// ------------------------------------------------------------
+// 🧸 الحكاية:
+//   المحاسب العام بيختار ملف الشهر (.xlsm) → الصفحة بتفكّه على الجهاز
+//   نفسه (من غير ما يترفع لأي حتة) وبتقرا الخانات اللي اتكتبت بإيدك في
+//   الـ٣١ يوم → لكل يوم «معاينة»: المقبوضات على انستا/محافظ · المدفوعات
+//   حسب البند · سلف الموظفين · سجل السلف · التحويلات — وجنبه مقارنة
+//   بالسيستم → «📥 قيّد» = قيد واحد لليوم بتاريخه (xl_import_day).
+//
+// ⚠️ الحسابات والقيد نفسه بيتعملوا على السيرفر — الشاشة بتبعت اللي في
+//    الشيت بس (والاختيارات: البند · التاجر · المحل · نوع الأصل).
+// ⚠️ مابنقراش المعادلات — بنقرا الخانات اللي بتتكتب بإيدك بس، فلو
+//    الملف ما اتحسبش في إكسل (أو اتنسخ) الأرقام بتطلع صح برضه.
+//    الأرقام المحسوبة اللي في الملف (لو موجودة) بنقارن بيها بس.
+// 🧭 أماكن الخانات = شيت v18 (شوف «التغييرات-الشيت-الجديد-والماكرو-v13.md»).
+//    لو حركت ركن في الشيت، عدّل الجدول XLB تحت.
+// ============================================================
+const XL = { file:'', month:'', wb:null, days:null, board:null, loading:false, err:'', picks:{}, base:{}, sys:{}, busy:false, log:[] };
+const XL_CASH = ['', 'نقدي', 'كاش'];
+// 🗺️ أركان المقبوضات: t = عنوان الركن (بيتقري من الشيت) · who/memo/m/a = الأعمدة
+const XLB = [
+  { t:'B1',  who:'B', memo:'C', m:'D', a:'E', rows:[4, 17] },
+  { t:'B19', who:'B', memo:'C', m:'D', a:'E', rows:[22, 43], coll:true },     // تحصيلات حسابات العملاء
+  { t:'G1',  who:'G', memo:'H', m:'J', a:'K', rows:[4, 43] },                 // fix team
+  { t:'M1',  memo:'M', m:'N', a:'O', rows:[4, 17] },  { t:'M19', memo:'M', m:'N', a:'O', rows:[22, 43] },
+  { t:'P1',  memo:'P', m:'R', a:'S', rows:[4, 17] },  { t:'P19', memo:'P', m:'R', a:'S', rows:[22, 43] },
+  { t:'T1',  memo:'T', m:'U', a:'V', rows:[4, 17] },  { t:'T19', memo:'T', m:'U', a:'V', rows:[22, 43] },
+  { t:'T45', memo:'T', m:'U', a:'V', rows:[47, 68] },
+  { t:'W1',  memo:'W', m:'X', a:'Y', rows:[4, 17] },  { t:'W19', memo:'W', m:'X', a:'Y', rows:[22, 43] },
+  { t:'W45', memo:'W', m:'X', a:'Y', rows:[47, 68] }
+];
+
+// ---------- 🗜️ فك ملف الإكسل (من غير مكتبة) ----------
+// 🧸 ملف .xlsx / .xlsm = ملف ZIP جواه ملفات XML. المتصفح بيعرف يفك
+//    الضغط لوحده (DecompressionStream) — فبنقرا الفهرس اللي في آخر
+//    الملف ونطلّع اللي محتاجينه بس.
+async function xlUnzip(buf){
+  const u8 = new Uint8Array(buf), dv = new DataView(buf);
+  let eocd = -1;
+  for(let i = u8.length - 22; i >= Math.max(0, u8.length - 70000); i--){ if(dv.getUint32(i, true) === 0x06054b50){ eocd = i; break; } }
+  if(eocd < 0) throw new Error('الملف ده مش ملف إكسل (xlsx / xlsm)');
+  const n = dv.getUint16(eocd + 10, true);
+  let p = dv.getUint32(eocd + 16, true);
+  const files = {}, dec = new TextDecoder('utf-8');
+  for(let i = 0; i < n; i++){
+    if(dv.getUint32(p, true) !== 0x02014b50) throw new Error('الملف بايظ (فهرس الضغط)');
+    const meth = dv.getUint16(p + 10, true), csize = dv.getUint32(p + 20, true);
+    const nl = dv.getUint16(p + 28, true), el = dv.getUint16(p + 30, true), cl = dv.getUint16(p + 32, true);
+    const off = dv.getUint32(p + 42, true);
+    files[dec.decode(u8.subarray(p + 46, p + 46 + nl))] = { meth, csize, off };
+    p += 46 + nl + el + cl;
+  }
+  async function text(name){
+    const f = files[name]; if(!f) return null;
+    const ds = f.off + 30 + dv.getUint16(f.off + 26, true) + dv.getUint16(f.off + 28, true);
+    const raw = u8.subarray(ds, ds + f.csize);
+    if(f.meth === 0) return dec.decode(raw);
+    if(f.meth !== 8) throw new Error('نوع ضغط مش معروف في الملف');
+    if(typeof DecompressionStream === 'undefined') throw new Error('المتصفح ده قديم ومايعرفش يفك الملف — جرّب كروم');
+    const out = new Response(new Blob([raw]).stream().pipeThrough(new DecompressionStream('deflate-raw')));
+    return dec.decode(await out.arrayBuffer());
+  }
+  return { text, has: name => !!files[name] };
+}
+// بيرجّع { sheets: {الاسم: خريطة الخانات}, names:[...] } — الخانة = {v: القيمة, f: فيها معادلة؟}
+async function xlRead(buf){
+  const z = await xlUnzip(buf);
+  const P = s => new DOMParser().parseFromString(s, 'application/xml');
+  const wbx = P(await z.text('xl/workbook.xml'));
+  const rels = P(await z.text('xl/_rels/workbook.xml.rels'));
+  const relMap = {};
+  [...rels.getElementsByTagName('Relationship')].forEach(r => { relMap[r.getAttribute('Id')] = r.getAttribute('Target'); });
+  const sst = [];
+  const ss = await z.text('xl/sharedStrings.xml');
+  if(ss){ [...P(ss).getElementsByTagName('si')].forEach(si => sst.push([...si.getElementsByTagName('t')].map(t => t.textContent).join(''))); }
+  const out = { sheets:{}, names:[] };
+  for(const sh of [...wbx.getElementsByTagName('sheet')]){
+    const name = sh.getAttribute('name');
+    const rid = sh.getAttribute('r:id') || sh.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'id');
+    let tg = relMap[rid] || ''; tg = tg.replace(/^\/?xl\//, '').replace(/^\//, '');
+    const xml = await z.text('xl/' + tg);
+    out.names.push(name);
+    if(!xml || !/^(Sheet\d+|ملخص الشهر)$/.test(name)) continue;   // الأيام + الملخص بس
+    const cells = {};
+    for(const c of [...P(xml).getElementsByTagName('c')]){
+      const t = c.getAttribute('t'), vEl = c.getElementsByTagName('v')[0], fEl = c.getElementsByTagName('f')[0];
+      let v = vEl ? vEl.textContent : null;
+      if(t === 's') v = v == null ? null : sst[+v];
+      else if(t === 'inlineStr') v = [...c.getElementsByTagName('t')].map(x => x.textContent).join('');
+      else if(t === 'b') v = v === '1';
+      else if(t !== 'str' && t !== 'e' && v != null && v !== '') v = Number(v);
+      cells[c.getAttribute('r')] = { v, f: !!fEl };
+    }
+    out.sheets[name] = cells;
+  }
+  return out;
+}
+
+// ---------- 📄 قراية يوم ----------
+const xlTxt = v => (v == null ? '' : String(v)).replace(/\s+/g, ' ').trim();
+function xlCell(cs, ref){ return cs[ref] || { v:null, f:false }; }
+function xlIn(cs, ref){ const c = xlCell(cs, ref); return c.f ? null : c.v; }        // خانة كتابة بس (من غير معادلات)
+function xlNum(cs, ref){ const v = xlIn(cs, ref); if(v == null || v === '') return 0; return typeof v === 'number' ? v : (num(v) || 0); }
+function xlCached(cs, ref){ const c = xlCell(cs, ref); return c.f && typeof c.v === 'number' ? c.v : null; }
+function xlParseDay(cs, n){
+  const d = { n, rec:[], ret:[], exp:[], wd:[], loans:{ out:[], in:[] }, tr:[], bad:[] };
+  const meth = (ref) => { const m = xlTxt(xlIn(cs, ref)); return m; };
+  XLB.forEach(b => {
+    const title = xlTxt(xlCell(cs, b.t).v) || b.t;
+    for(let r = b.rows[0]; r <= b.rows[1]; r++){
+      const a = xlNum(cs, b.a + r); if(!a) continue;
+      d.rec.push({ blk:title, coll:!!b.coll, who: b.who ? xlTxt(xlIn(cs, b.who + r)) : '', memo: xlTxt(xlIn(cs, b.memo + r)), m: meth(b.m + r), amt:a, row:b.a + r });
+    }
+  });
+  for(let r = 47; r <= 68; r++){
+    let a = xlNum(cs, 'S' + r);
+    if(a) d.ret.push({ memo: xlTxt(xlIn(cs, 'Q' + r)), m: meth('R' + r), amt:a, row:'S' + r });
+    a = xlNum(cs, 'P' + r);
+    if(a) d.exp.push({ memo: xlTxt(xlIn(cs, 'M' + r)), cat: xlTxt(xlIn(cs, 'N' + r)), m: meth('O' + r), amt:a, row:'P' + r });
+    a = xlNum(cs, 'L' + r);
+    if(a) d.wd.push({ name: xlTxt(xlIn(cs, 'H' + r)), m: meth('K' + r), amt:a, row:'L' + r });
+  }
+  for(let r = 48; r <= 68; r++){
+    let a = xlNum(cs, 'D' + r), nm = xlTxt(xlIn(cs, 'B' + r));
+    if(a && nm) d.loans.out.push({ name:nm, m: meth('C' + r), amt:a });
+    else if(a) d.bad.push('سلفة للغير بـ ' + fmt(a) + ' من غير اسم (صف ' + r + ')');
+    a = xlNum(cs, 'G' + r); nm = xlTxt(xlIn(cs, 'E' + r));
+    if(a && nm) d.loans.in.push({ name:nm, m: meth('F' + r), amt:a });
+    else if(a) d.bad.push('سلفة من الغير بـ ' + fmt(a) + ' من غير اسم (صف ' + r + ')');
+  }
+  for(let r = 78; r <= 97; r++){
+    const a = xlNum(cs, 'E' + r); if(!a) continue;
+    const t = { memo: xlTxt(xlIn(cs, 'B' + r)), from: xlTxt(xlIn(cs, 'C' + r)), to: xlTxt(xlIn(cs, 'D' + r)), amt:a, row:'E' + r };
+    t.opening = t.memo === 'رصيد افتتاحي';
+    if(!t.opening && (!t.from || !t.to)) d.bad.push('تحويل بـ ' + fmt(a) + ' (صف ' + r + ') ناقصه «من» أو «إلى»');
+    d.tr.push(t);
+  }
+  // طرق دفع مش معروفة
+  const okM = m => XL_CASH.includes(m) || /^(انستا ?باي|إنستا ?باي)$/.test(m) || /^(محفظة|كاش) ?[0-9]$/.test(m);
+  [...d.rec, ...d.ret, ...d.exp, ...d.wd, ...d.loans.out, ...d.loans.in].forEach(x => { if(!okM(x.m)) d.bad.push('طريقة دفع مش معروفة «' + x.m + '»'); });
+  d.tr.filter(t => !t.opening).forEach(t => { if(!okM(t.from) || !okM(t.to)) d.bad.push('تحويل: طريقة دفع مش معروفة'); });
+  // الأرقام اللي إكسل حسبها (لو الملف اتحسب) — للمقارنة بس
+  d.cached = { rec: xlCached(cs, 'AG71'), exp: xlCached(cs, 'P69'), wd: xlCached(cs, 'L69'), ret: xlCached(cs, 'S69') };
+  d.tot = { rec: d.rec.reduce((t, x) => t + x.amt, 0), ret: d.ret.reduce((t, x) => t + x.amt, 0),
+            exp: d.exp.reduce((t, x) => t + x.amt, 0), wd: d.wd.reduce((t, x) => t + x.amt, 0) };
+  d.empty = !d.rec.length && !d.ret.length && !d.exp.length && !d.wd.length && !d.loans.out.length && !d.loans.in.length
+            && !d.tr.filter(t => !t.opening).length;
+  return d;
+}
+const xlIsCash = m => XL_CASH.includes(m);
+const xlDate = n => XL.month + '-' + String(n).padStart(2, '0');
+function xlDaysInMonth(ym){ const [y, m] = ym.split('-').map(Number); return new Date(Date.UTC(y, m, 0)).getUTCDate(); }
+function xlFnv(s){ let h = 0x811c9dc5; for(let i = 0; i < s.length; i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; } return h.toString(16); }
+const xlCat = name => ((XL.board && XL.board.cats) || []).find(c => c.name === name) || null;
+const xlPick = (n, key) => ((XL.picks[n] || {})[key]) || '';
+
+// ---------- 🧮 اللي هيتبعت للسيرفر ----------
+function xlPayload(d){
+  const pk = XL.picks[d.n] || {};
+  const byM = {};
+  d.rec.forEach(x => { if(!xlIsCash(x.m)) byM[x.m] = (byM[x.m] || 0) + x.amt; });
+  d.ret.forEach(x => { if(!xlIsCash(x.m)) byM[x.m] = (byM[x.m] || 0) - x.amt; });
+  return {
+    receipts: Object.entries(byM).filter(([, a]) => r2(a) !== 0).map(([m, amt]) => ({ m, amt: r2(amt) })),
+    expenses: d.exp.map(x => {
+      const cat = pk['c' + x.row] || x.cat;
+      const o = { cat, m:x.m, amt:x.amt, memo:x.memo };
+      const c = xlCat(cat);
+      if(c && c.how === 'supplier') o.supplier_id = pk['s' + x.row] || xlGuessSup(x.memo) || '';
+      if(c && c.how === 'acq') o.customer_id = pk['u' + x.row] || xlGuessAcq(x.memo) || '';
+      if(c && c.how === 'asset') o.acc = pk['a' + x.row] || '';
+      return o;
+    }),
+    wd: d.wd.map(x => ({ name:x.name, m:x.m, amt:x.amt })),
+    transfers: d.tr.filter(t => !t.opening).map(t => ({ from:t.from, to:t.to, amt:t.amt, memo:t.memo })),
+    loans: d.loans,
+    loans_base: !!XL.base[d.n]
+  };
+}
+function xlGuessSup(memo){
+  const m = norm(memo); if(!m) return '';
+  const s = ((XL.board && XL.board.suppliers) || []).find(x => m.includes(norm(x.name)));
+  return s ? s.id : '';
+}
+function xlGuessAcq(memo){
+  const m = norm(memo); if(!m) return '';
+  const c = CUST.find(x => x.kind === 'acquisition' && m.includes(norm(x.name)));
+  return c ? c.id : '';
+}
+// نفس تبسيط السيرفر (erp_norm) — زي customers.html
+function norm(t){
+  return String(t || '').toLowerCase().replace(/[أإآ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه').replace(/ـ/g, '')
+    .replace(/[\s!-\/:-@\[-`{-~،؛؟«»]+/g, ' ').trim();
+}
+// الحاجات اللي لازم تتختار قبل التسجيل
+function xlNeeds(d){
+  const p = xlPayload(d), out = [];
+  p.expenses.forEach((x, i) => {
+    const c = xlCat(x.cat), row = d.exp[i].row, lbl = '«' + (x.memo || 'من غير بيان') + '» ' + fmt(x.amt);
+    if(!c) out.push({ k:'c' + row, t: x.cat ? 'البند «' + x.cat + '» مش معروف — ' + lbl : 'من غير بند — ' + lbl });
+    else if(c.how === 'supplier' && !x.supplier_id) out.push({ k:'s' + row, t:'اختار التاجر — ' + lbl });
+    else if(c.how === 'acq' && !x.customer_id) out.push({ k:'u' + row, t:'اختار محل الاستحواذ — ' + lbl });
+    else if(c.how === 'asset' && !x.acc) out.push({ k:'a' + row, t:'اختار نوع الأصل — ' + lbl });
+  });
+  return out;
+}
+function xlState(d){
+  const day = xlDate(d.n), b = XL.board;
+  const rec = b && (b.days || []).find(x => x.day === day);
+  if(d.empty && !rec) return { k:'empty', l:'فاضي', c:'' };
+  if(day < H.start) return { k:'pre', l:'قبل بداية الدفاتر', c:'' };
+  if(b && day > b.today) return { k:'future', l:'لسه ماجاش', c:'' };
+  if(d.bad.length) return { k:'bad', l:'⚠️ فيه غلط في الشيت', c:'red', rec };
+  const need = xlNeeds(d).length;
+  const hash = xlFnv(JSON.stringify(xlPayload(d)));
+  if(rec && rec.hash === hash) return { k:'done', l:'✅ متقيّد ' + (rec.entry_no || ''), c:'green', rec, hash };
+  if(need) return { k:'need', l:'🟡 محتاج ' + need + ' اختيار', c:'wait', rec, hash };
+  if(rec) return { k:'changed', l:'✏️ اتغيّر — هيتقيّد تاني', c:'wait', rec, hash };
+  return { k:'ready', l:'جاهز', c:'blue', hash };
+}
+
+// ---------- 🖼️ التاب ----------
+function viewXL(){
+  const top = `<div class="hint">ارفع ملف الشهر (.xlsm) — الصفحة بتقرا الخانات اللي اتكتبت بإيدك في كل يوم، وتوريك كل رقم رايح فين قبل ما يتقيّد.
+      المقبوضات نفسها متسجّلة من السيستم؛ الشيت بيقول بس <b>جت إزاي</b> (نقدي · انستا · محافظ)، وبيضيف المدفوعات والسلف والتحويلات.</div>
+    <div class="acts" style="margin:0 0 10px;">
+      <button class="btn pri" onclick="$('xlFile').click()">📂 ${XL.file ? 'غيّر الملف' : 'اختار ملف الشهر'}</button>
+      ${XL.days ? `<button class="btn" onclick="xlLoadBoard(true)">↻ حدّث</button>` : ''}</div>
+    <input type="file" id="xlFile" accept=".xlsm,.xlsx" style="display:none" onchange="xlPickFile(this)">
+    ${XL.file ? `<div class="range"><label>📄 الملف<input value="${escH(XL.file)}" disabled></label>
+      <label>📅 الشهر بتاع الملف<input type="month" value="${XL.month}" onchange="xlSetMonth(this.value)"></label></div>` : ''}`;
+  if(XL.err) return top + `<div class="err">⚠️ ${escH(XL.err)}</div>`;
+  if(!XL.days) return top + `<div class="empty">📂 اختار ملف الشهر عشان تبدأ</div>`;
+  if(!XL.board) return top + '<div class="empty">⏳ …</div>';
+  const list = XL.days.map(d => ({ d, s: xlState(d) }));
+  const ready = list.filter(x => ['ready','changed'].includes(x.s.k));
+  const later = XL.board.later;
+  const sumRow = (k) => list.filter(x => !['pre','future'].includes(x.s.k)).reduce((t, x) => t + x.d.tot[k], 0);
+  return top + `<div class="stats">
+      <div class="stat"><div class="k">💰 المقبوضات</div><div class="v">${fmt(sumRow('rec'))}</div><div class="s">مرتجعات ${fmt(sumRow('ret'))}</div></div>
+      <div class="stat"><div class="k">🧾 المدفوعات</div><div class="v">${fmt(sumRow('exp'))}</div></div>
+      <div class="stat"><div class="k">👥 سلف الموظفين</div><div class="v">${fmt(sumRow('wd'))}</div></div>
+      <div class="stat ${ready.length ? 'warn' : 'good'}"><div class="k">📥 جاهز للتقييد</div><div class="v">${ready.length}</div>
+        <div class="s">${list.filter(x => x.s.k === 'done').length} متقيّد</div></div></div>
+    ${later ? `<div class="warnbox">⚠️ فيه أيام بعد الشهر ده متقيّدة خلاص (من ${dt(later)}). لو غيّرت «سجل السلف» في آخر يوم هنا، ارفع اليوم اللي بعده تاني.</div>` : ''}
+    ${ready.length ? `<button class="big" style="margin-bottom:12px;" onclick="xlPostMany()" ${XL.busy ? 'disabled' : ''}>${XL.busy ? '⏳ بنقيّد…' : '📥 قيّد الأيام الجاهزة (' + ready.length + ')'}</button>` : ''}
+    ${XL.log.length ? `<div class="okbox" style="font-weight:700;">${XL.log.map(escH).join('<br>')}</div>` : ''}
+    ${list.filter(x => x.s.k !== 'empty' || x.s.rec).map(({ d, s }) => `<button class="card k-${s.k === 'done' ? 'excel' : 'manual'}${['pre','future'].includes(s.k) ? ' off' : ''}" onclick="xlOpenDay(${d.n})">
+      <div class="c-top"><div class="c-t">يوم ${d.n} <span class="code">${dt(xlDate(d.n))}</span></div><span class="pill ${s.c}">${escH(s.l)}</span></div>
+      <div class="c-s">💰 ${fmt(d.tot.rec)}${d.tot.ret ? ' · ↩️ ' + fmt(d.tot.ret) : ''} · 🧾 ${fmt(d.tot.exp)} · 👥 ${fmt(d.tot.wd)}
+        ${d.loans.out.length || d.loans.in.length ? ' · 🤝 سجل السلف ' + (d.loans.out.length + d.loans.in.length) : ''}
+        ${d.tr.filter(t => !t.opening).length ? ' · ⇄ ' + d.tr.filter(t => !t.opening).length + ' تحويل' : ''}</div>
+    </button>`).join('') || '<div class="empty">الملف فاضي — مفيش ولا يوم مكتوب فيه حاجة</div>'}
+    <div class="hint" style="margin-top:10px;">💡 الأيام الفاضية مش ظاهرة. نفس اليوم لو اترفع تاني بنفس الأرقام مابيتقيّدش مرتين؛ لو الأرقام اتغيّرت القيد القديم بيتعكس والجديد بيتسجّل.</div>`;
+}
+async function xlPickFile(inp){
+  const f = inp.files && inp.files[0]; inp.value = '';
+  if(!f) return;
+  XL.err = ''; XL.days = null; XL.board = null; XL.picks = {}; XL.base = {}; XL.sys = {}; XL.log = [];
+  XL.file = f.name;
+  const m = f.name.match(/(20\d\d)[-_. ](\d{1,2})(?!\d)/);
+  XL.month = m ? m[1] + '-' + String(+m[2]).padStart(2, '0') : (XL.month || cairoDay().slice(0, 7));
+  render();
+  try{
+    XL.wb = await xlRead(await f.arrayBuffer());
+    if(!XL.wb.sheets['Sheet1']) throw new Error('مالقيناش صفحة Sheet1 — ده مش ملف الشيت اليومي');
+    xlBuildDays();
+    if(!m) toast('📅 اتأكد من الشهر — اسم الملف مافيهوش السنة والشهر (زي 2026-11)');
+    await xlLoadBoard();
+  }catch(e){ console.error('[الإكسل]', e); XL.err = e.message || String(e); render(); }
+}
+function xlBuildDays(){
+  const max = xlDaysInMonth(XL.month);
+  XL.days = [];
+  for(let n = 1; n <= max; n++){ const cs = XL.wb.sheets['Sheet' + n]; if(cs) XL.days.push(xlParseDay(cs, n)); }
+}
+function xlSetMonth(v){ if(!v) return; XL.month = v; XL.board = null; XL.sys = {}; if(XL.wb) xlBuildDays(); xlLoadBoard(); }
+async function xlLoadBoard(manual){
+  if(!XL.month) return;
+  XL.loading = true;
+  try{
+    XL.board = await rpc('xl_board', { p_from: XL.month + '-01', p_to: XL.month + '-' + xlDaysInMonth(XL.month) });
+    if(!XL.board.cats) throw new Error('جدول البنود فاضي');
+    XL.err = '';
+    if(manual) toast('اتحدّث ✅');
+  }catch(e){ XL.err = /xl_board|schema cache|does not exist|PGRST20/i.test(e.message || '') ? 'ملف SQL رقم 119 لسه ما اتشغّلش' : errMsg(e); }
+  XL.loading = false;
+  if(S.tab === 'xl') render();
+  if($('xlDay')) xlRenderDay();
+}
+
+// ---------- 🔎 يوم واحد ----------
+let XLD = 0;
+async function xlOpenDay(n){
+  XLD = n;
+  sheet('📥 يوم ' + n + ' — ' + dt(xlDate(n)), '<div id="xlDay"></div>');
+  xlRenderDay();
+  const day = xlDate(n);
+  if(!XL.sys[day] && day >= H.start && day <= XL.board.today){
+    try{ XL.sys[day] = await rpc('xl_system_day', { p_day: day }); }catch(e){ XL.sys[day] = { err: errMsg(e) }; }
+    if(XLD === n) xlRenderDay();
+  }
+}
+function xlAccOf(m){
+  if(xlIsCash(m)) return (ACC.find(a => a.sys_key === 'CASH_MAIN') || {}).code;
+  if(/انستا|إنستا/.test(m)) return (ACC.find(a => a.sys_key === 'INSTAPAY') || {}).code;
+  const w = String(m).match(/[0-9]$/); return w ? (ACC.find(a => a.sys_key === 'WALLET_' + w[0]) || {}).code : '';
+}
+const xlAccLbl = code => code ? `<span class="code">${code}</span> ${escH(accName(code))}` : '<span style="color:var(--red)">؟</span>';
+const xlM = m => xlIsCash(m) ? 'نقدي' : m;
+function xlPrevLoans(n){
+  // 🧸 سجل امبارح: من الملف لو اليوم اللي قبله في نفس الشهر · وإلا آخر يوم اتقيّد
+  const prevDay = XL.days.find(x => x.n === n - 1);
+  if(prevDay) return { src:'من يوم ' + (n - 1) + ' في الملف', loans: prevDay.loans };
+  const b = XL.board;
+  const st = (b.days || []).filter(x => x.day < xlDate(n)).pop() || b.prev;
+  if(st) return { src:'من آخر يوم اتقيّد (' + dt(st.day) + ')', loans: st.loans };
+  return null;
+}
+function xlLoanDiff(cur, prev){
+  const agg = (L) => { const m = {}; (L || []).forEach(x => { const k = norm(x.name); if(!k) return; m[k] = m[k] || { nm:x.name, a:0, m:x.m }; m[k].a += x.amt; }); return m; };
+  const out = [];
+  ['out', 'in'].forEach(side => {
+    const c = agg(cur[side]), p = agg(prev ? prev[side] : []);
+    new Set([...Object.keys(c), ...Object.keys(p)]).forEach(k => {
+      const d = r2((c[k] ? c[k].a : 0) - (p[k] ? p[k].a : 0));
+      if(d) out.push({ side, nm:(c[k] || p[k]).nm, d, m: d > 0 ? (c[k] || {}).m : (p[k] || c[k]).m });
+    });
+  });
+  return out;
+}
+function xlRenderDay(){
+  const host = $('xlDay'); if(!host) return;
+  const d = XL.days.find(x => x.n === XLD); if(!d) return;
+  const s = xlState(d), day = xlDate(d.n), pk = XL.picks[d.n] = XL.picks[d.n] || {};
+  const sys = XL.sys[day];
+  const cats = (XL.board.cats || []);
+  const sups = XL.board.suppliers || [];
+  const acqs = CUST.filter(x => x.kind === 'acquisition');
+  const assetAccs = leafs().filter(a => /^1[56]/.test(a.code) && a.normal === 'D' && a.active);
+  const can = ['ready','changed'].includes(s.k);
+
+  // ١) المقبوضات
+  const byM = {};
+  d.rec.forEach(x => { byM[xlM(x.m)] = (byM[xlM(x.m)] || 0) + x.amt; });
+  d.ret.forEach(x => { byM[xlM(x.m)] = (byM[xlM(x.m)] || 0) - x.amt; });
+  const recHtml = `<div class="tscroll"><table class="tbl"><tr><th>جت إزاي</th><th class="n">المبلغ</th><th>بيتقيّد</th></tr>
+    ${Object.entries(byM).map(([m, a]) => `<tr><td>${escH(m)}</td><td class="n">${fmt(a)}</td>
+      <td>${m === 'نقدي' ? '<span class="zero">في الدرج — مفيش قيد</span>' : `من الخزنة العامة ← ${xlAccLbl(xlAccOf(m))}`}</td></tr>`).join('') || '<tr><td colspan="3" class="zero">مفيش</td></tr>'}</table></div>`;
+
+  // ٢) المقارنة بالسيستم
+  let cmp = '';
+  if(sys && sys.err) cmp = `<div class="err">${escH(sys.err)}</div>`;
+  else if(sys){
+    const sheetSales = d.rec.filter(x => !x.coll).reduce((t, x) => t + x.amt, 0) - d.tot.ret;
+    const diff = r2(sheetSales - Number(sys.till || 0));
+    const used = new Set();
+    const colls = d.rec.filter(x => x.coll).map(x => {
+      const cu = xlFindCust(x.who);
+      const hit = (sys.collections || []).findIndex((c, i) => !used.has(i) && cu && c.customer_id === cu.id && r2(c.amount) === r2(x.amt));
+      if(hit >= 0) used.add(hit);
+      return { x, cu, ok: hit >= 0 };
+    });
+    cmp = `<div class="${Math.abs(diff) < 1 ? 'okbox' : 'warnbox'}">🧺 المبيعات في الشيت (من غير التحصيلات − المرتجعات) <b>${fmt(sheetSales)}</b> · اللي دخل سلّة أمين الخزنة في السيستم <b>${fmt(sys.till)}</b>
+        ${Math.abs(diff) < 1 ? ' — ✅ زي بعض' : ` — فرق <b>${fmt(diff)}</b>: ${diff > 0 ? 'فيه حاجة في الشيت ماتسجّلتش في السيستم (جهاز اتسلّم ومادفعش؟ إكسسوار؟)' : 'السيستم قابض أكتر من الشيت'}`}
+        ${(sys.closings || []).length ? '<br>🔒 تقفيلات النهارده: ' + sys.closings.map(c => escH(c.by) + ' — المفروض ' + fmt(c.expected) + ' · اتعدّ ' + fmt(c.counted)).join(' · ') : ''}</div>
+      ${colls.length ? `<div class="sec-h">💵 تحصيلات حسابات العملاء<span class="rule"></span></div>
+        ${colls.map(({ x, cu, ok }, i) => `<div class="card" style="--edge:${ok ? 'var(--done)' : 'var(--wait)'}"><div class="c-top"><div class="c-t">${escH(x.who || '—')} ${cu ? '<span class="code">' + escH(cu.code) + '</span>' : ''}</div><div class="money">${fmt(x.amt)}</div></div>
+          <div class="c-s">${escH(xlM(x.m))}${x.memo ? ' · ' + escH(x.memo) : ''} · ${ok ? '✅ متسجّلة في حسابات العملاء' : '⚠️ مش متسجّلة في السيستم'}</div>
+          ${ok ? '' : `<div class="acts">${cu ? `<button class="btn pri sm" onclick="xlRecordColl(${i})">💵 سجّلها لـ ${escH(cu.name)}</button>`
+               : `<input class="search" style="margin:0;flex:1 1 200px;" list="dlCust" id="xlCu${i}" placeholder="مين المحل ده؟ اكتب واختار">
+                  <button class="btn pri sm" onclick="xlRecordColl(${i})">💵 سجّلها</button>`}</div>`}</div>`).join('')}` : ''}`;
+    XL._colls = colls;
+  } else if(day >= H.start) cmp = '<div class="empty">⏳ بنجيب اللي في السيستم…</div>';
+
+  // ٣) المدفوعات
+  const expHtml = d.exp.length ? `<div class="tscroll"><table class="tbl"><tr><th>البيان</th><th>البند</th><th>منين</th><th class="n">المبلغ</th><th>بيتقيّد</th></tr>
+    ${d.exp.map(x => {
+      const cn = pk['c' + x.row] || x.cat, c = xlCat(cn);
+      let to = '', extra = '';
+      if(!c){
+        extra = `<select onchange="xlSetPick('c${x.row}',this.value)"><option value="">— اختار البند —</option>${cats.map(k => `<option${k.name === cn ? ' selected' : ''}>${escH(k.name)}</option>`).join('')}</select>`;
+      } else if(c.how === 'supplier'){
+        const sid = pk['s' + x.row] || xlGuessSup(x.memo);
+        to = '🏪 سند صرف SP لـ ' + (sid ? escH((sups.find(z => z.id === sid) || {}).name || '') : '؟');
+        extra = `<select onchange="xlSetPick('s${x.row}',this.value)"><option value="">— التاجر —</option>${sups.map(z => `<option value="${z.id}"${z.id === sid ? ' selected' : ''}>${escH(z.name)}</option>`).join('')}</select>`;
+      } else if(c.how === 'acq'){
+        const cid = pk['u' + x.row] || xlGuessAcq(x.memo);
+        to = xlAccLbl(c.acc);
+        extra = `<select onchange="xlSetPick('u${x.row}',this.value)"><option value="">— محل الاستحواذ —</option>${acqs.map(z => `<option value="${z.id}"${z.id === cid ? ' selected' : ''}>${escH(z.code + ' · ' + z.name)}</option>`).join('')}</select>`;
+      } else if(c.how === 'asset'){
+        const a = pk['a' + x.row];
+        to = a ? xlAccLbl(a) : '';
+        extra = `<select onchange="xlSetPick('a${x.row}',this.value)"><option value="">— نوع الأصل —</option>${assetAccs.map(z => `<option value="${z.code}"${z.code === a ? ' selected' : ''}>${z.code} · ${escH(z.name)}</option>`).join('')}</select>`;
+      } else to = xlAccLbl(c.acc);
+      return `<tr><td>${escH(x.memo || '—')}</td><td>${escH(cn || '—')}${pk['c' + x.row] && x.cat !== cn ? ' <small>(اخترته)</small>' : ''}</td><td>${escH(xlM(x.m))}</td>
+        <td class="n">${fmt(x.amt)}</td><td>${to}${extra ? '<div style="margin-top:4px;">' + extra + '</div>' : ''}</td></tr>`;
+    }).join('')}</table></div>` : '<div class="empty">مفيش مدفوعات</div>';
+
+  // ٤) سلف الموظفين · السجل · التحويلات
+  const wdHtml = d.wd.length ? `<div class="card">${d.wd.map(x => `<div class="jl"><div class="a">👥 ${escH(x.name || '— من غير اسم')} <small>${escH(xlM(x.m))} ← مسحوبات الموظفين (1255)</small></div><div class="d">${fmt(x.amt)}</div><div></div></div>`).join('')}
+      <div class="c-s">💡 الاسم بيتربط بالموظف من «🔩 مسحوبات الإكسل» في HR — الاسم اللي مش مربوط بيتقيّد من غير موظف وبيطلعلك تنبيه.</div></div>` : '';
+  const pv = xlPrevLoans(d.n);
+  const ld = xlLoanDiff(d.loans, pv ? pv.loans : null);
+  const noHistory = !pv && (d.loans.out.length || d.loans.in.length);
+  const loanHtml = (d.loans.out.length || d.loans.in.length || ld.length) ? `<div class="sec-h">🤝 سجل السلف (الفرق عن امبارح)<span class="rule"></span></div>
+    <div class="hint">${pv ? escH(pv.src) : 'مفيش سجل قبل كده'} — اللي اتغيّر بس هو اللي بيتقيّد.</div>
+    ${noHistory ? `<label class="warnbox" style="display:flex;gap:8px;align-items:flex-start;"><input type="checkbox" style="width:auto;margin-top:5px;" ${XL.base[d.n] ? 'checked' : ''} onchange="XL.base[${d.n}]=this.checked;xlRenderDay();render()">
+      <span>ده أول يوم يتقيّد. السلف دي كانت موجودة قبل بداية الدفاتر؟ علّم هنا وهتتعامل كرصيد قديم (اكتبها في القيد الافتتاحي). من غير علامة = سلف جديدة النهارده.</span></label>` : ''}
+    <div class="card">${(XL.base[d.n] && noHistory ? [] : ld).map(x => `<div class="jl"><div class="a">${x.side === 'out' ? (x.d > 0 ? '➡️ سلّفنا ' : '⬅️ رجّعلنا ') : (x.d > 0 ? '⬅️ استلفنا من ' : '➡️ رجّعنا لـ')}${escH(x.nm)}
+      <small>${escH(xlM(x.m))} · ${x.side === 'out' ? 'سلف مؤقتة للغير (1270)' : 'سلف مؤقتة من الغير (2170)'}</small></div><div class="d">${fmt(Math.abs(x.d))}</div><div></div></div>`).join('') || '<div class="c-s">مفيش تغيير</div>'}</div>` : '';
+  const trs = d.tr.filter(t => !t.opening);
+  const trHtml = trs.length || d.tr.length ? `<div class="sec-h">⇄ التحويلات بين الخزن<span class="rule"></span></div><div class="card">
+    ${trs.map(t => `<div class="jl"><div class="a">${escH(xlM(t.from))} ← ${escH(xlM(t.to))} <small>${escH(t.memo)}</small></div><div class="d">${fmt(t.amt)}</div><div></div></div>`).join('')}
+    ${d.tr.filter(t => t.opening).length ? `<div class="c-s">📌 ${d.tr.filter(t => t.opening).length} سطر «رصيد افتتاحي» — مابيتقيّدوش (أرصدة أول الشهر)</div>` : ''}</div>` : '';
+
+  // ٥) مراجعة على أرقام إكسل نفسه
+  const chk = [['rec','المقبوضات'],['exp','المدفوعات'],['wd','سلف الموظفين'],['ret','المرتجعات']]
+    .filter(([k]) => d.cached[k] != null).map(([k, l]) => ({ l, ok: Math.abs(d.cached[k] - d.tot[k]) < 0.5, a: d.tot[k], b: d.cached[k] }));
+  const chkHtml = chk.length ? `<div class="${chk.every(c => c.ok) ? 'okbox' : 'err'}">${chk.every(c => c.ok) ? '✅ الأرقام اللي اتقرت = مجاميع الشيت نفسه'
+      : '⚠️ اللي اتقرا مش زي مجاميع الشيت: ' + chk.filter(c => !c.ok).map(c => c.l + ' ' + fmt(c.a) + ' ≠ ' + fmt(c.b)).join(' · ')}</div>` : '';
+
+  const rec = s.rec;
+  host.innerHTML = `${['pre','future'].includes(s.k) ? `<div class="warnbox">📅 ${escH(s.l)} — مايتقيّدش.</div>` : ''}
+    ${d.bad.length ? `<div class="err">⚠️ صلّح الحاجات دي في الشيت الأول:<br>${d.bad.map(escH).join('<br>')}</div>` : ''}
+    ${rec ? `<div class="okbox">📥 اتقيّد ${rec.entry_no ? '<span class="code">' + escH(rec.entry_no) + '</span>' : '(من غير قيد — كله نقدي)'} · ${escH(rec.by)} · ${new Date(rec.at).toLocaleString('ar-EG')}
+      ${(rec.sup_nos || []).length ? ' · دفعات ' + rec.sup_nos.map(x => '<span class="code">' + escH(x) + '</span>').join(' ') : ''}
+      ${s.k === 'changed' ? '<br>✏️ الأرقام في الملف اتغيّرت عن اللي اتقيّد — «قيّد تاني» هيعكس القديم ويسجّل الجديد.' : ''}</div>` : ''}
+    ${(rec && rec.warns || []).map(w => `<div class="warnbox">${w.t === 'wd_name' ? '👥 «' + escH(w.name) + '» (' + fmt(w.amt) + ') مش مربوط بموظف — اربطه من «🔩 مسحوبات الإكسل» في HR وارفع اليوم تاني'
+        : w.t === 'asset' ? '🏗️ شراء أصل «' + escH(w.memo) + '» بـ ' + fmt(w.amt) + ' — اعمله كارت في «🏗️ الأصول» واختار «📝 متقيّد قبل كده»'
+        : w.t === 'acq' ? '🤝 دفعة محل استحواذ بـ ' + fmt(w.amt) + ' — اعملها كارت في «🏗️ الأصول» (مقابل محل استحواذ · «📝 متقيّد قبل كده») عشان تتوزّع على الشهور'
+        : w.t === 'loans_base' ? '📌 سجل السلف اتعامل كرصيد قديم — اتأكد إنه في القيد الافتتاحي' : escH(JSON.stringify(w))}</div>`).join('')}
+    ${chkHtml}
+    <div class="sec-h">💰 المقبوضات جت إزاي<span class="rule"></span></div>${recHtml}
+    ${cmp}
+    <div class="sec-h">🧾 المدفوعات<span class="rule"></span></div>${expHtml}
+    ${wdHtml ? `<div class="sec-h">👥 سلف الموظفين<span class="rule"></span></div>${wdHtml}` : ''}
+    ${loanHtml}${trHtml}
+    ${xlNeeds(d).length && !['pre','future'].includes(s.k) ? `<div class="warnbox">🟡 قبل التقييد: ${xlNeeds(d).map(x => escH(x.t)).join(' · ')}</div>` : ''}
+    <div class="acts">
+      ${can ? `<button class="btn pri" onclick="xlPostDay(${d.n})" ${XL.busy ? 'disabled' : ''}>${XL.busy ? '⏳ …' : s.k === 'changed' ? '📥 قيّد تاني' : '📥 قيّد اليوم ده'}</button>` : ''}
+      ${rec ? `<button class="btn bad sm" onclick="xlUndo(${d.n})">↩️ شيل القيد</button>` : ''}
+    </div>`;
+}
+function xlFindCust(name){
+  const k = norm(name); if(!k) return null;
+  const al = (XL.aliases || {})[k];
+  return CUST.find(c => c.id === al) || CUST.find(c => norm(c.name) === k) || null;
+}
+function xlSetPick(k, v){ (XL.picks[XLD] = XL.picks[XLD] || {})[k] = v; xlRenderDay(); render(); }
+async function xlRecordColl(i){
+  const it = (XL._colls || [])[i]; if(!it) return;
+  let cu = it.cu;
+  if(!cu){
+    const v = String(($('xlCu' + i) || {}).value || '').trim();
+    cu = CUST.find(x => (x.code + ' · ' + x.name) === v) || CUST.find(x => x.code === v.split(' ')[0]);
+    if(!cu){ toast('اختار المحل من القايمة', true); return; }
+  }
+  const day = xlDate(XLD);
+  if(!confirm(`💵 دفعة ${fmt(it.x.amt)} ج.م من «${cu.name}» بتاريخ ${dt(day)}\nهتتسجّل في «حسابات العملاء» (ومنها في الدفاتر). نسجّل؟`)) return;
+  try{
+    await rpc('erp_ledger_post', { p_customer: cu.id, p_type:'credit', p_amount: it.x.amt,
+      p_note: 'من شيت الإكسل يوم ' + dt(day) + (it.x.memo ? ' — ' + it.x.memo : ''), p_date: new Date(day + 'T12:00:00+03:00').toISOString() });
+    toast('✅ اتسجّلت'); delete XL.sys[day]; xlOpenDay(XLD);
+  }catch(e){ toast(errMsg(e), true); }
+}
+async function xlPostOne(d){
+  const st = xlState(d);
+  if(!['ready','changed'].includes(st.k)) throw new Error('يوم ' + d.n + ': ' + st.l);
+  const r = await rpc('xl_import_day', { p_day: xlDate(d.n), p_hash: st.hash, p_data: xlPayload(d), p_force: false });
+  return 'يوم ' + d.n + ': ' + (r.skipped ? 'زي ما هو' : (r.entry_no || 'كله نقدي — مفيش قيد') + ((r.sup_nos || []).length ? ' · ' + r.sup_nos.join(' ') : '')
+    + ((r.warns || []).length ? ' · ⚠️ ' + r.warns.length + ' تنبيه' : '') + (r.redo ? ' (اتقيّد تاني)' : ''));
+}
+async function xlPostDay(n){
+  const d = XL.days.find(x => x.n === n); if(!d || XL.busy) return;
+  if(!confirm('📥 قيّد يوم ' + n + ' (' + dt(xlDate(n)) + ')؟')) return;
+  XL.busy = true; xlRenderDay();
+  try{ const m = await xlPostOne(d); XL.log = [m]; toast('✅ ' + m); }
+  catch(e){ toast(errMsg(e), true); }
+  XL.busy = false; await xlLoadBoard(); load();
+}
+async function xlPostMany(){
+  if(XL.busy) return;
+  const list = XL.days.filter(d => ['ready','changed'].includes(xlState(d).k));
+  if(!list.length) return;
+  if(!confirm('📥 هيتقيّد ' + list.length + ' يوم بالترتيب (' + list.map(d => d.n).join('، ') + ').\nلو يوم وقف هنقف عنده. نكمّل؟')) return;
+  XL.busy = true; XL.log = []; render();
+  for(const d of list){
+    try{ XL.log.push('✅ ' + await xlPostOne(d)); }
+    catch(e){ XL.log.push('⛔ يوم ' + d.n + ': ' + errMsg(e)); break; }
+    render();
+  }
+  XL.busy = false; await xlLoadBoard(); load();
+}
+async function xlUndo(n){
+  const why = prompt('↩️ شيل قيد يوم ' + n + '\nالقيد هيتعكس (ودفعات التجار بتاعته تتلغي) — مفيش حاجة بتتمسح.\n\nالسبب:');
+  if(why === null) return;
+  try{
+    const r = await rpc('xl_undo_day', { p_day: xlDate(n), p_reason: why });
+    toast('↩️ اتشال' + (r.later ? ' — ⚠️ فيه أيام بعده متقيّدة: ارفعها تاني عشان سجل السلف' : ''), !!r.later);
+    await xlLoadBoard(); load();
+  }catch(e){ toast(errMsg(e), true); }
+}
+// الأسامي البديلة للمحلات (عشان «حفيله» = «حفيلة»)
+(async function xlAliases(){
+  try{ const a = await sel('customer_aliases', 'alias_norm,customer_id'); XL.aliases = {}; a.forEach(x => { XL.aliases[x.alias_norm] = x.customer_id; }); }
+  catch(e){ XL.aliases = {}; }
+})();
 
 // ============================================================
 // 🪟 الشيت
