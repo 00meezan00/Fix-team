@@ -14,3 +14,12 @@ declare const supabase: any;
 
 /** ExcelJS — للتصدير لإكسل */
 declare const ExcelJS: any;
+
+/** qrcodejs — رسم الباركود (من cdnjs). label.ts بيحمّلها لوحده لو مش موجودة */
+declare var QRCode: any;
+
+/** jsQR — قارئ الباركود (jsQR.js جنب ملفات النظام · أو من النت احتياطي) */
+declare var jsQR: any;
+
+/** قارئ الباركود المدمج في المتصفح (كروم/أندرويد بس — سفاري مافيهوش) */
+declare var BarcodeDetector: any;
