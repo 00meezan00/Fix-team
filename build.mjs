@@ -32,7 +32,7 @@ const SRC  = path.join(ROOT, 'ts');
 const SKIP = new Set([
   'dist', 'ts', 'node_modules', '.git', '.github', 'functions',
   'package.json', 'package-lock.json', 'tsconfig.json',
-  'build.mjs', 'build.sh', '.gitignore', '.DS_Store',
+  'build.mjs', 'build.sh', 'check-pages.mjs', '.gitignore', '.DS_Store',
 ]);
 
 function copyTree(from, to){

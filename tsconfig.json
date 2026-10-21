@@ -16,5 +16,8 @@
     "skipLibCheck": true,
     "types": []
   },
-  "include": ["ts/**/*.ts"]
+  "include": ["ts/**/*.ts"],
+  // 📄 كود الصفحات (ts/pages/) بيتفحص كل صفحة لوحدها — check-pages.mjs
+  //    (كل صفحة «أوضة» لوحدها في المتصفح، فممكن يبقى فيها أسامي زي صفحة تانية)
+  "exclude": ["ts/pages/**"]
 }
