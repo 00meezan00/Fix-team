@@ -757,6 +757,24 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
 #purOverlay .modal-head{
   padding-top: calc(16px + env(safe-area-inset-top)) !important;
 }
+
+  /* ⏰🔒 برّه الشيفت (بريك / انصراف / لسه ماسجّلش) — الأجهزة كلها تستخبى
+     وفاضل كارت القفل + المواعيد ومرتبك. القفل الحقيقي على السيرفر
+     (prod-dispatch-shift.sql) — ده عشان الشكل بس. */
+  body.dp-locked .newbar, body.dp-locked .tabs, body.dp-locked .searchbar, body.dp-locked #app,
+  body.dp-locked .cap-accounts, body.dp-locked .cap-inventory,
+  body.dp-locked .cap-purchases, body.dp-locked .cap-partsreview{display:none !important;}
+  #dpLock{display:none;}
+  body.dp-locked #dpLock{display:block;}
+  .dp-lock{max-width:440px; margin:28px auto; padding:26px 20px; text-align:center;
+    background:var(--card); border:1px solid var(--line); border-radius:18px;}
+  .dp-lock .ic{font-size:46px; line-height:1; margin-bottom:10px;}
+  .dp-lock h2{margin:0 0 8px; font-size:19px; color:var(--ink);}
+  .dp-lock p{margin:0 0 18px; color:var(--muted); line-height:1.9; font-size:14.5px;}
+  .dp-lock button{display:block; width:100%; margin:8px 0 0; padding:13px; border-radius:12px;
+    font:inherit; font-weight:800; font-size:15px; cursor:pointer;
+    border:1px solid var(--line); background:var(--paper); color:var(--ink);}
+  .dp-lock button.pri{background:var(--ink); color:var(--card); border-color:var(--ink);}
 </style>
 </head>
 <body>
@@ -875,6 +893,8 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
 <div class="tabs" id="tabs"></div>
 <div class="searchbar"><input id="q" oninput="render()" placeholder="دوّر على جهاز، عميل، أو محل..." data-i18n-ph="rp.searchPh"></div>
 <div class="wrap" id="app"></div>
+<!-- ⏰🔒 كارت «الشاشة مقفولة برّه الشيفت» — بيتملي من applyShift() -->
+<div class="wrap" id="dpLock"></div>
 
 <!-- شيت إدخال جهاز -->
 <div class="sheet-bg" id="sheetBg" onclick="closeIntake()"></div>
@@ -1342,7 +1362,10 @@ async function boot(){
       try{
         const p = JSON.parse(u); ME = p.name || ''; MY_EMAIL = p.email || '';
         devices = (JSON.parse(c) || []).map(adapt); reindexSearch();
-        offline = true; showOffline(); finish(); return;
+        offline = true; showOffline();
+        // ⏰🔒 آخر مرة كان مقفول؟ يفضل مقفول لحد ما النت يرجع ونسأل السيرفر
+        try{ if(localStorage.getItem(DP_LOCK_KEY) === '1'){ SHIFT = { on:false }; dpLockUI(true); } }catch(e){}
+        finish(); return;
       }catch(e){}
     }
     location.replace('index.html'); return;
@@ -1479,7 +1502,8 @@ async function boot(){
     sessionStorage.removeItem('ifix-bounced');
   }catch(e){}
   loadTechNames();          // مش await — القايمة تتعبّى في الخلفية
-  await loadDevices();
+  // ⏰🔒 الأجهزة بتتحمّل بس لو في الشيفت (حضور / استئناف)
+  if(await applyShift(true)) await loadDevices();
   finish();
 }
 
@@ -2464,6 +2488,7 @@ function reindexSearch(){
 }
 
 function render(){
+  if(DP_LOCKED){ $('app').innerHTML = ''; $('tabs').innerHTML = ''; return; }   // 🔒
   const q = ($('q').value||'').trim();
   // بحث مرن — نفس منطق الداشبورد
   const base = (d, q) => {
@@ -2605,6 +2630,7 @@ const dpDue = IFixDue.picker('dp', {
 });
 
 function openIntake(){
+  if(DP_LOCKED){ toast('🔒 سجّل حضور (أو استئناف) من «المواعيد» الأول'); return; }
   buildDpSuggest();
   dpMountLock('dpLockHostIntake');   // 🔒 شاشة الباسورد (فاضية كل مرة)
   dpDue.reset();                      // ⏳ الميعاد يبدأ فاضي كل مرة
@@ -2876,8 +2902,86 @@ async function doLogout(){
    على الخطة المجانية وكان سبب مشترك في "تجاوز الحصة".
    البديل: تحديث لما يرجع للصفحة + زرار تحديث يدوي.
    ============================================================ */
+// ============================================================
+// ⏰🔒 مربوط بالحضور — الديسباتشر شغّال بس وهو «حاضر»
+// ------------------------------------------------------------
+// 🧸 آخر تسجيل في «المواعيد»:
+//    🟢 حضور / ▶️ استئناف → الشاشة شغّالة
+//    ☕ بريك / 🔴 انصراف / لسه ماسجّلش → الشاشة مقفولة، وفاضل
+//       «⏰ المواعيد» و«💰 مرتبك» (والترتيب والإعدادات والخروج).
+//    نسي ينصرف؟ بعد ١٨ ساعة من آخر تسجيل بتتقفل لوحدها.
+// 🔒 القفل الحقيقي على السيرفر (prod-dispatch-shift.sql): الشاشة
+//    devices_dispatch بترجع فاضية، والتسجيل والتعديل بيترفضوا.
+//    الكود هنا عشان الشكل بس — نفس طريقة صفحة الكول سنتر.
+// ============================================================
+const DP_LOCK_KEY = 'ifix_disp_locked';
+let SHIFT = null;          // { on, kind, at }
+var DP_LOCKED = false;   // var عن قصد: render() ممكن تتنده قبل السطر ده
+async function loadShift(){
+  try{
+    const { data, error } = await sb.rpc('cc_shift_state');
+    if(error) throw error;
+    SHIFT = data || { on:false };
+  }catch(e){
+    // الدالة مش موجودة (الملف مااتشغّلش) أو مشكلة نت → مانقفلش من هنا،
+    // السيرفر هو اللي بيحكم في الآخر
+    console.error('cc_shift_state failed:', e);
+    SHIFT = { on:true, unknown:true };
+  }
+  return SHIFT;
+}
+function dpLockHtml(){
+  const k = SHIFT && SHIFT.kind;
+  const tm = SHIFT && SHIFT.at ? new Date(SHIFT.at).toLocaleTimeString('ar-EG', { hour:'2-digit', minute:'2-digit', timeZone:'Africa/Cairo' }) : '';
+  const why = k === 'break' ? `☕ انت في بريك من ${tm}` : k === 'out' ? `🔴 انصرفت الساعة ${tm}` : '⚪ لسه ماسجّلتش حضور';
+  return `<div class="dp-lock">
+    <div class="ic">🔒</div>
+    <h2>الشاشة مقفولة برّه الشيفت</h2>
+    <p>${why}<br>سجّل ${k === 'break' ? '«استئناف»' : '«حضور»'} من «المواعيد» والشاشة هتفتح لوحدها.</p>
+    <button class="pri att-menu-btn" onclick="openAttendance()">⏰ المواعيد</button>
+    <button class="pay-menu-btn" onclick="openPayroll()">💰 مرتبك</button>
+  </div>`;
+}
+function dpLockUI(locked){
+  DP_LOCKED = locked;
+  document.body.classList.toggle('dp-locked', locked);
+  try{ localStorage.setItem(DP_LOCK_KEY, locked ? '1' : '0'); }catch(e){}
+  if(!locked){ $('dpLock').innerHTML = ''; return; }
+  // اقفل أي حاجة مفتوحة فيها أجهزة أو شغل
+  try{ closeIntake(); }catch(e){}
+  try{ closeAct(); }catch(e){}
+  ['accountsOverlay', 'inventoryOverlay', 'prOverlay'].forEach(id => { const el = $(id); if(el) el.classList.add('hidden'); });
+  try{ if(typeof closePartsReview === 'function') closePartsReview(); }catch(e){}
+  // الأجهزة تتشال من الصفحة ومن النسخة المحفوظة على الموبايل
+  devices = []; try{ reindexSearch(); }catch(e){}
+  try{ localStorage.removeItem(CACHE_KEY); }catch(e){}
+  $('dpLock').innerHTML = dpLockHtml();
+  try{ attSyncMenu(); }catch(e){}        // زرار المواعيد على الموبايل بس
+  try{ if(typeof paySyncBadge === 'function') paySyncBadge(); }catch(e){}
+  $('app').innerHTML = ''; $('tabs').innerHTML = '';
+}
+// بترجّع true لو شغّال. firstBoot = أول مرة (التحميل بيحصل في boot نفسها)
+async function applyShift(firstBoot){
+  await loadShift();
+  const locked = !SHIFT.on;
+  const wasLocked = DP_LOCKED;
+  dpLockUI(locked);
+  // كان مقفول وفتح → هات الأجهزة من جديد
+  if(!locked && wasLocked && !firstBoot && booted){ await loadDevices(); render(); }
+  return !locked;
+}
+// بعد ما يقفل شاشة المواعيد (سجّل حضور أو بريك) → نشوف تاني على طول
+(function(){
+  const orig = window.closeAttendance;
+  if(typeof orig !== 'function') return;
+  window.closeAttendance = function(){ const r = orig.apply(this, arguments); if(booted && navigator.onLine) applyShift(); return r; };
+})();
+// ⏰ الشيفت بيتشاف كل دقيقة — البريك والانصراف بيقفلوا من غير ما يستنى
+setInterval(() => { if(booted && !document.hidden && navigator.onLine) applyShift(); }, 60000);
+
 async function refresh(){
   if(!booted || !navigator.onLine) return;
+  if(!(await applyShift())) return;      // 🔒 برّه الشيفت — مفيش تحميل
   await loadDevices();
   render();
 }
