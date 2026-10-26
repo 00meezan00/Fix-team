@@ -486,6 +486,14 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
   .cc-done{font-size:13.5px; line-height:1.8;}
   .cc-more{display:block; width:100%; margin:12px 0 4px; border:1px dashed var(--line); background:var(--card);
     color:var(--muted); border-radius:12px; padding:11px; font:700 13px/1 inherit; cursor:pointer;}
+  /* 🔒 قفل برّه الشيفت */
+  .cc-lock{max-width:440px; margin:26px auto; text-align:center; background:var(--card); border:1px solid var(--line);
+    border-radius:18px; padding:26px 18px 20px;}
+  .cc-lock .ic{font-size:46px; line-height:1;}
+  .cc-lock h2{font-family:'Cairo',sans-serif; font-size:19px; margin:12px 0 6px; color:var(--ink);}
+  .cc-lock p{font-size:14px; color:var(--muted); line-height:1.9; margin:0 0 18px;}
+  .cc-lock .act-btn + .act-btn{margin-top:10px;}
+  body.cc-locked .cc-sticky, body.cc-locked .cc-work{display:none !important;}
 </style>
 </head>
 <body>
@@ -507,7 +515,7 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
       <button class="pay-menu-btn" style="display:none;" onclick="closeKebab(); openPayroll()">💰 مرتبك</button>
       <button id="accountMenuBtn" class="hidden" style="display:none;" onclick="closeKebab(); openAccountShared()">👤 حسابي</button>
       <div class="sep"></div>
-      <button onclick="closeKebab(); ccReload(true)">🔄 حدّث القوايم</button>
+      <button class="cc-work" onclick="closeKebab(); ccReload(true)">🔄 حدّث القوايم</button>
       <button onclick="closeKebab(); ccToggleTheme()">🌓 فاتح / غامق</button>
       <span id="ifxUpdSlot" hidden></span>
       <div class="sep"></div>
@@ -1184,9 +1192,72 @@ async function asNoCall(id){
 }
 
 // ============================================================
+// ⏰🔒 مربوط بالحضور — شغّال بس وهو «حاضر»
+// ------------------------------------------------------------
+// 🧸 آخر تسجيل في «المواعيد»:
+//    🟢 حضور / ▶️ استئناف → الشاشة شغّالة
+//    ☕ بريك / 🔴 انصراف / لسه ماسجّلش → الشاشة مقفولة، وفاضل
+//       «⏰ المواعيد» و«💰 مرتبك» بس (وتسجيل الخروج).
+//    نسي ينصرف؟ بعد ١٨ ساعة من آخر تسجيل بتتقفل لوحدها.
+// 🔒 القفل الحقيقي على السيرفر (ملف prod-callcenter-shift.sql): الأجهزة
+//    والبحث والكتابة كلهم بيترفضوا برّه الشيفت. ده هنا عشان الشكل بس.
+// ============================================================
+let SHIFT = null;   // { on, kind, at } — null = لسه مااتعرفش
+async function loadShift(){
+  try{
+    const { data, error } = await sb.rpc('cc_shift_state');
+    if(error) throw error;
+    SHIFT = data || { on:false };
+  }catch(e){
+    // الدالة مش موجودة (الملف مااتشغّلش) أو مشكلة نت → مانقفلش من هنا،
+    // السيرفر هو اللي بيحكم في الآخر
+    console.error('cc_shift_state failed:', e);
+    SHIFT = { on:true, unknown:true };
+  }
+  return SHIFT;
+}
+function shiftLockHtml(){
+  const k = SHIFT && SHIFT.kind;
+  const tm = SHIFT && SHIFT.at ? new Date(SHIFT.at).toLocaleTimeString('ar-EG', { hour:'2-digit', minute:'2-digit', timeZone:'Africa/Cairo' }) : '';
+  const why = k === 'break' ? `☕ انت في بريك من ${tm}` : k === 'out' ? `🔴 انصرفت الساعة ${tm}` : '⚪ لسه ماسجّلتش حضور';
+  return `<div class="cc-lock">
+    <div class="ic">🔒</div>
+    <h2>الشاشة مقفولة برّه الشيفت</h2>
+    <p>${why}<br>سجّل ${k === 'break' ? '«استئناف»' : '«حضور»'} من «المواعيد» والشاشة هتفتح لوحدها.</p>
+    <button class="act-btn act-primary att-menu-btn" onclick="openAttendance()">⏰ المواعيد</button>
+    <button class="act-btn act-out pay-menu-btn" onclick="openPayroll()">💰 مرتبك</button>
+  </div>`;
+}
+let _lockedNow = null;
+async function applyShift(){
+  await loadShift();
+  const locked = !SHIFT.on;
+  document.body.classList.toggle('cc-locked', locked);
+  if(locked){
+    closeAct();
+    devices = new Map(); searchRows = null;
+    $('ccList').innerHTML = shiftLockHtml();
+    try{ attSyncMenu(); }catch(e){}       // زرار المواعيد على الموبايل بس
+  } else if(_lockedNow !== false){
+    await loadDevices();
+    if(_lockedNow === null){ const first = TABS.find(t => t.list().length); if(first) TAB = first.k; }
+    if(searchQ) runSearch(false); else render();
+  }
+  _lockedNow = locked;
+  return !locked;
+}
+// بعد ما يقفل شاشة المواعيد (سجّل حضور أو بريك) → نشوف تاني على طول
+(function(){
+  const orig = window.closeAttendance;
+  if(typeof orig !== 'function') return;
+  window.closeAttendance = function(){ const r = orig.apply(this, arguments); if(ME) applyShift(); return r; };
+})();
+
+// ============================================================
 // 🚀 الإقلاع
 // ============================================================
 async function ccReload(showMsg){
+  if(!(await applyShift())) return;      // 🔒 برّه الشيفت
   const ok = await loadDevices();
   if(searchQ) runSearch(); else render();
   if(showMsg && ok) toast('🔄 اتحدّثت');
@@ -1228,14 +1299,12 @@ async function boot(){
   }catch(e){}
   try{ syncAccountShared(MY_EMAIL, ME, CC_ROLE_LABEL); }catch(e){}
 
-  await loadDevices();
-  // أول تبويب فيه شغل
-  const first = TABS.find(t => t.list().length);
-  if(first) TAB = first.k;
-  render();
+  await applyShift();   // 🔒 بيحمّل الأجهزة بس لو في الشيفت
 }
 document.addEventListener('visibilitychange', () => { if(!document.hidden && ME) ccReload(false); });
 setInterval(() => { if(!document.hidden && ME) ccReload(false); }, 5 * 60000);
+// ⏰ الشيفت بيتشاف كل دقيقة — البريك والانصراف بيقفلوا من غير ما يستنى ٥ دقايق
+setInterval(() => { if(!document.hidden && ME) applyShift(); }, 60000);
 boot();
 </script>
 
