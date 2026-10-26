@@ -1,0 +1,1231 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<script>
+/* ============================================================
+   🔒 اللغة متثبّتة على العربي
+   ------------------------------------------------------------
+   بنكتبها كل مرة الصفحة تفتح، مش مرة واحدة — عن قصد.
+   ليه؟ لأن أي حد كان مبدّل على الإنجليزي قبل ما المبدّل يتشال،
+   اختياره القديم متخزّن على جهازه هو. لو مكتبناهاش بالقوة،
+   هيفضل شايف إنجليزي للأبد ومفيش أي طريقة يرجع بيها.
+   ============================================================ */
+try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
+</script>
+<script>
+/* المظهر قبل أي رسم — نفس مفتاح الداشبورد (ifix-theme) عشان
+   الاختيار يسري على كل شاشات النظام. من غير ده فيه ومضة بيضا. */
+(function(){
+  try{
+    var m = localStorage.getItem('ifix-theme') || 'auto';
+    var h = new Date().getHours();
+    var d = m === 'dark' || (m === 'auto' && (h >= 19 || h < 7));
+    document.documentElement.setAttribute('data-theme', d ? 'dark' : 'light');
+    var mt = document.querySelector('meta[name="theme-color"]');
+    if(mt) mt.setAttribute('content', d ? '#0E1721' : '#1B2A3A');
+  }catch(e){}
+})();
+</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>الكول سنتر — I Fix Team</title>
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#1B2A3A">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="الكول سنتر">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="common.js"></script>
+<script src="i18n.js"></script>
+<script src="attendance.js"></script>
+<script src="payroll.js"></script>
+<script src="due-deposit.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;800;900&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  /* ============================================================
+     I Fix Team — واجهة الكول سنتر (نسخة الإنتاج)
+     الستايل منقول من dispatch.html بالحرف عشان الشكل يبقى واحد.
+     ============================================================ */
+  :root{
+    --on-chrome:#FFFFFF; --on-color:#FFFFFF; --chrome:#16233A; --ink-2:#475569;
+    --steel:#1B2A3A; --steel-2:#283B4F; --steel-ink:#EAF0F6;
+    --paper:#EBEEF2; --card:#FFFFFF; --line:#E4E9EF;
+    --ink:#17222E; --muted:#6B7A8C; --faint:#94A3B4;
+    --red:#E8321E; --red-dark:#C22513; --blue:#2B1DE8; --gold:#BE8A1C;
+    --waiting:#B5651D; --waiting-bg:#FBF2E9;
+    --diagnosing:#6E56CF; --diagnosing-bg:#F1EEFB;
+    --repairing:#2B6CB0; --repairing-bg:#EAF1F8;
+    --done:#15803D; --done-bg:#EAF6EE;
+    --delivered:#64748B; --delivered-bg:#EEF1F3;
+    --rejected:#DC2626; --rejected-bg:#FEF2F2;
+    --returned:#9333EA; --returned-bg:#F5EEFC;
+    --rejected_shop:#C2185B; --rejected_shop-bg:#FCE7F1;
+    --mono:ui-monospace,'SFMono-Regular','Cascadia Code',Menlo,monospace;
+  }
+
+  /* ===== الوضع الداكن ===== */
+  /* الهيدر أصلاً بلون --steel، فالوضع الداكن بيمد نفس اللون على
+     الشاشة كلها بدل ما يخترع لون جديد. */
+  html[data-theme="dark"]{
+    color-scheme:dark;
+    --on-chrome:#E9EFF5; --on-color:#0E1721; --chrome:#0E1721; --ink-2:#C3D2DF;
+    --steel:#0E1721; --steel-2:#1B2A3A; --steel-ink:#E9EFF5;
+    --paper:#131E29; --card:#1B2A3A; --line:#2F4356;
+    --ink:#E9EFF5; --muted:#92A6B8; --faint:#71879B;
+    --red:#F0554A; --red-dark:#D13B2E; --blue:#7C8FFF; --gold:#E3B85C;
+    --waiting:#E0A15C;    --waiting-bg:rgba(224,161,92,.15);
+    --diagnosing:#A78BFA; --diagnosing-bg:rgba(167,139,250,.15);
+    --repairing:#7BA9DC;  --repairing-bg:rgba(123,169,220,.15);
+    --done:#4ADE80;       --done-bg:rgba(74,222,128,.14);
+    --returned:#C084FC;   --returned-bg:rgba(192,132,252,.15);
+    --rejected_shop:#F472B6;   --rejected_shop-bg:rgba(244,114,182,.15);
+  }
+
+
+  /* ===== شريط وضع النظام + الإشعارات ===== */
+  .sysbar{text-align:center; padding:8px 14px; font-size:12.5px; font-weight:800; line-height:1.5; color:var(--on-color);}
+  .nt-ov{
+    position:fixed; inset:0; z-index:9500; background:rgba(16,22,32,.5);
+    display:flex; align-items:center; justify-content:center; padding:18px;
+  }
+  .nt-ov.hide{display:none;}
+  /* ⚠️ max-height + overflow ضروريين: منشور طويل من غيرهم
+     بيخلي زرار "فهمت" يخرج برّه الشاشة والمستخدم يتحبس. */
+  .nt-card{
+    background:var(--card); border-radius:18px; max-width:400px; width:100%;
+    max-height:88vh; display:flex; flex-direction:column;
+    padding:22px 20px 18px; text-align:center; position:relative;
+    box-shadow:0 20px 50px rgba(16,22,32,.28);
+  }
+  .nt-x{
+    position:absolute; top:10px; inset-inline-start:10px;
+    border:none; background:var(--paper); color:var(--muted); width:32px; height:32px;
+    border-radius:50%; font-size:19px; line-height:1; cursor:pointer; flex:0 0 auto;
+  }
+  .nt-scroll{overflow-y:auto; -webkit-overflow-scrolling:touch; min-height:0; padding:6px 2px 4px;}
+  .nt-ic{font-size:44px; line-height:1;}
+  /* ⚠️ var(--ink) مش لون ثابت: العنوان كان #16233A أزرق غامق —
+     في الوضع الداكن بيبقى غامق فوق غامق ومش باين. */
+  .nt-t{font-family:'Cairo',sans-serif; font-weight:900; font-size:18px; margin:13px 0 9px; color:var(--ink);}
+  .nt-b{color:var(--muted); line-height:1.9; font-size:14.5px; margin:0; white-space:pre-wrap;}
+  .nt-ok{
+    margin-top:20px; width:100%; border:none; border-radius:12px; padding:13px;
+    background:var(--chrome); color:var(--on-chrome); font-family:'Tajawal',sans-serif; font-weight:900; font-size:15px; cursor:pointer;
+  }
+
+  /* ===== ستارة الإقلاع ===== */
+  #veil{position:fixed; inset:0; z-index:9999; display:flex; flex-direction:column;
+        align-items:center; justify-content:center; gap:15px; background:var(--paper);}
+  #veil.gone{display:none;}
+  /* اللوجو المخصص لصفحة الحركة — بيتحمّل مع الصفحة نفسها
+     فمفيش لحظة يظهر فيها لوجو تاني */
+  #veil .mk{width:96px; height:96px; border-radius:22px; overflow:hidden;
+            box-shadow:0 8px 26px rgba(16,22,32,.14); background:var(--card);}
+  #veil .mk img{width:100%; height:100%; object-fit:contain; display:block;}
+  #veil .sp{width:26px; height:26px; border-radius:50%; border:3px solid #D7DEE7;
+            border-top-color:var(--steel); animation:vsp .8s linear infinite;}
+  @keyframes vsp{to{transform:rotate(360deg);}}
+  #veil .ms{font-size:13.5px; color:var(--muted); font-weight:700; text-align:center; line-height:1.9; padding:0 26px;}
+  #veil a{color:var(--blue); font-weight:800;}
+  .offbar{background:#FEF3C7; color:#92400E; text-align:center; font-weight:800; font-size:12.5px; padding:7px;}
+  /* شارة الطلب المعلّق على الكارت */
+  .pend{margin-top:9px; background:#FEF3C7; border:1px solid #FDE68A; color:#92400E;
+        border-radius:9px; padding:7px 10px; font-size:12px; font-weight:800; line-height:1.6;}
+
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;}
+  body{
+    font-family:'Tajawal','Segoe UI',sans-serif; color:var(--ink);
+    background:
+      radial-gradient(circle at 1px 1px, rgba(27,42,58,.05) 1px, transparent 1.4px) 0 0/22px 22px,
+      var(--paper);
+    min-height:100vh; padding-bottom:40px;
+  }
+
+  /* ===== شريط علوي ستيل + خط ألوان التروس ===== */
+  .topbar{
+    position:sticky; top:0; z-index:31; background:var(--steel); color:var(--on-chrome);
+    padding:calc(12px + env(safe-area-inset-top)) 16px 13px;
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+  }
+  .who{display:flex; align-items:center; gap:11px; min-width:0;}
+  .who .mark{width:40px; height:40px; border-radius:11px; flex:none;
+    background:linear-gradient(135deg,#22344a,#33506b); display:grid; place-items:center; font-size:19px;
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.08);}
+  .who .hi{font-family:'Cairo',sans-serif; font-size:13px; font-weight:700; line-height:1.45; color:#C6D6E7;}   /* سطر الوظيفة: نفس خط الاسم + لون أنصع */
+  .who .nm{font-family:'Cairo',sans-serif; font-weight:800; font-size:16.5px; line-height:1.25; white-space:nowrap;}
+  .logout{flex:none; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.14); color:#DCE6F0;
+    font-family:inherit; font-weight:700; font-size:13px; padding:9px 13px; border-radius:10px; cursor:pointer;}
+  .logout:active{background:rgba(255,255,255,.16);}
+
+
+  /* الموديول بيقرا متغيّرات الداشبورد — بنعملها هنا أسماء مرادفة
+     عشان يشتغل بألوان الديسباتشر بدل ما يطلع بلون ناقص */
+  :root{
+    --surface:var(--card); --surface-2:var(--paper); --surface-3:var(--paper);
+    --bg:var(--paper); --border:var(--line); --border-strong:var(--line);
+    --muted-2:var(--faint); --ink-2:var(--muted); --accent:var(--repairing);
+    --on-accent:var(--on-color); --danger:var(--red); --success:var(--done);
+    --warn:var(--waiting); --info:var(--repairing);
+  }
+  /* ===== قايمة ⋮ في الهيدر ===== */
+  .kebab-wrap{position:relative; flex:none;}
+  .kebab-btn{
+    background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.14); color:#DCE6F0;
+    font-family:inherit; font-size:19px; line-height:1; font-weight:700;
+    width:40px; height:38px; border-radius:10px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .kebab-btn:active{background:rgba(255,255,255,.16);}
+  .kebab-menu{
+    position:absolute; top:calc(100% + 8px); inset-inline-end:0; z-index:60;
+    min-width:190px; background:var(--card); border:1px solid var(--line); border-radius:13px;
+    box-shadow:0 14px 38px rgba(16,24,40,.20); padding:6px; overflow:hidden;
+  }
+  .kebab-menu.hidden{display:none;}
+  .kebab-menu button{
+    display:block; width:100%; text-align:start; background:none; border:none;
+    font-family:inherit; font-size:14.5px; font-weight:600; color:var(--ink);
+    padding:12px 13px; border-radius:9px; cursor:pointer;
+  }
+  .kebab-menu button:active{background:var(--paper);}
+  /* ⚠️ الصفحة دي مفيهاش قاعدة .hidden عامة — و.kebab-menu button فيها
+     display:block، فالزرار المخفي كان بيفضل ظاهر. القاعدة دي بتحسمها. */
+  .kebab-menu button.hidden{display:none !important;}
+
+  .kebab-menu .sep{height:1px; background:var(--line); margin:5px 8px;}
+  .kebab-menu .danger{color:var(--red);}
+  /* 🗂️ عنوان المجموعة — صغير وباهت عشان مايتلخبطش مع الزراير.
+     الخط الرفيع فوقه بيفصل المجموعة عن اللي قبلها. */
+  .kebab-menu .mh{font-size:11.5px; font-weight:800; color:var(--faint); letter-spacing:.2px;
+    padding:11px 5px 4px; margin:4px 8px 0; border-top:1px solid var(--line); user-select:none;}
+  /* أول عنوان ظاهر في القايمة مالوش خط فوقه */
+  .kebab-menu .mh.first{border-top:none; margin-top:0; padding-top:6px;}
+  /* القايمة طويلة على الموبايل — لو مش هتكفي الشاشة تتسكرول جواها */
+  .kebab-menu{max-height:calc(100vh - 90px - env(safe-area-inset-top)); overflow-y:auto;
+    -webkit-overflow-scrolling:touch;}
+  /* درع بيقفل القايمة لو دوست بره */
+  .kebab-shield{position:fixed; inset:0; z-index:59; background:transparent;}
+  .kebab-shield.hidden{display:none;}
+
+  /* ===== تبويبات ===== */
+  .tabs{
+    position:sticky; top:135px; z-index:29; background:var(--paper); padding:6px 16px 8px;
+    display:flex; gap:7px;
+  }
+  .tab{
+    flex:1; border:1px solid var(--line); background:var(--card); border-radius:12px; padding:9px 6px; cursor:pointer;
+    font-family:'Tajawal',sans-serif; font-weight:700; font-size:12.5px; color:var(--muted);
+    display:flex; flex-direction:column; align-items:center; gap:3px; transition:all .15s; line-height:1.2;
+  }
+  .tab .cnt{font-family:var(--mono); font-weight:800; font-size:15px; color:var(--ink);}
+  .tab.on{background:var(--steel); border-color:var(--steel); color:#C7D6E4;}
+  .tab.on .cnt{color:var(--on-color);}
+
+  .searchbar{padding:4px 16px 8px;}
+  .searchbar input{
+    width:100%; border:1px solid var(--line); background:var(--card); border-radius:12px;
+    padding:11px 14px 11px 42px; font-family:inherit; font-size:15px; color:var(--ink);
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%236B7A8C' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3-3'/%3E%3C/svg%3E");
+    background-repeat:no-repeat; background-position:left 14px center;
+  }
+  .searchbar input:focus{outline:none; border-color:var(--repairing); box-shadow:0 0 0 3px rgba(43,108,176,.14);}
+
+  .wrap{padding:2px 16px 0;}
+  .grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(300px,1fr)); gap:13px;}
+
+  /* ===== تذكرة (نفس توقيع الفني) ===== */
+  .ticket{
+    position:relative; background:var(--card); border:1px solid var(--line);
+    border-inline-start:4px solid var(--sp,#CBD5E1); border-radius:13px; padding:13px 15px 14px; cursor:pointer;
+    transition:transform .13s, box-shadow .13s; box-shadow:0 1px 2px rgba(23,34,46,.04); animation:tkin .3s ease both;
+  }
+  .ticket:hover{transform:translateY(-2px); box-shadow:0 10px 24px rgba(23,34,46,.10);}
+  @keyframes tkin{from{opacity:0; transform:translateY(8px);} to{opacity:1; transform:none;}}
+  .tk-top{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:7px;}
+  .tk-no{font-family:var(--mono); font-size:11.5px; letter-spacing:.5px; color:var(--faint); font-weight:600;}
+  .tk-status{font-size:11.5px; font-weight:800; padding:3px 10px; border-radius:20px; white-space:nowrap;
+    background:var(--st-bg,#EEF1F3); color:var(--st,#64748B);}
+  .tk-title{font-family:'Cairo',sans-serif; font-weight:800; font-size:16px; line-height:1.35;}
+  .tk-sub{font-size:12.5px; color:var(--muted); margin-top:2px;}
+  /* ⚠️ الألوان كانت ثابتة فاتحة (#F7F9FB) — فالخانة كانت بتطلع
+     بيضا في الوضع الغامق والكلام مش مقروء. بقت من متغيرات الثيم. */
+  .tk-issue{
+    display:flex; gap:7px; align-items:flex-start;
+    font-size:12.5px; color:var(--ink-2); line-height:1.55;
+    background:var(--paper); border:1px solid var(--line); border-radius:9px;
+    padding:8px 10px; margin-top:9px;
+  }
+  .tk-issue .w{flex:none; opacity:.7;}
+  .tk-sub .dot{opacity:.5; margin:0 5px;}
+  .tk-meta{display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:10px; font-size:11.5px; color:var(--faint);}
+  .tk-meta .chip{background:var(--paper); color:#52657A; border-radius:7px; padding:3px 8px; font-weight:600;}
+  .tk-meta .chip b{color:var(--ink);}
+  .tk-actions{display:flex; gap:7px; margin-top:11px;}
+  .act{flex:1; border:none; border-radius:10px; padding:9px 8px; cursor:pointer; font-family:'Tajawal',sans-serif;
+    font-weight:800; font-size:12.5px; display:inline-flex; align-items:center; justify-content:center; gap:5px; transition:filter .12s, transform .1s;}
+  .act:active{transform:scale(.97);}
+  .act-hand{background:var(--repairing-bg); color:var(--repairing);}
+  .act-ret{background:var(--returned-bg); color:var(--returned);}
+  .act-rej{background:var(--rejected_shop-bg); color:var(--rejected_shop);}
+  .act-view{background:var(--paper); color:#52657A; flex:0 0 auto;}
+  .act:hover{filter:brightness(.97);}
+
+  .empty{text-align:center; color:var(--muted); font-size:14px; padding:34px 16px;
+    background:var(--card); border:1px dashed var(--line); border-radius:13px; line-height:1.9;}
+  .empty .big{font-size:30px; display:block; margin-bottom:8px; opacity:.85;}
+
+  /* ===== توست ===== */
+  .toast{position:fixed; left:50%; bottom:calc(20px + env(safe-area-inset-bottom)); transform:translateX(-50%) translateY(20px);
+    background:var(--steel); color:var(--on-chrome); font-weight:700; font-size:13.5px; padding:12px 18px; border-radius:12px;
+    box-shadow:0 12px 30px rgba(23,34,46,.3); opacity:0; pointer-events:none; transition:opacity .25s, transform .25s; z-index:80; max-width:88vw;}
+  .toast.on{opacity:1; transform:translateX(-50%) translateY(0);}
+
+  /* ===== شيت إدخال جهاز ===== */
+  .sheet-bg{position:fixed; inset:0; background:rgba(15,23,34,.5); opacity:0; pointer-events:none; transition:opacity .25s; z-index:60;}
+  .sheet-bg.on{opacity:1; pointer-events:auto;}
+  .sheet{position:fixed; left:0; right:0; bottom:0; z-index:61; background:var(--paper); border-radius:20px 20px 0 0;
+    max-height:92vh; overflow-y:auto; transform:translateY(102%); transition:transform .3s cubic-bezier(.32,.72,0,1);
+    box-shadow:0 -10px 40px rgba(15,23,34,.28); padding-bottom:calc(20px + env(safe-area-inset-bottom));}
+  .sheet.on{transform:translateY(0);}
+  .sheet-head{position:sticky; top:0; background:var(--steel); color:var(--on-chrome); padding:16px 18px 15px; border-radius:20px 20px 0 0;}
+  .sheet-head::after{content:''; position:absolute; inset:auto 0 0 0; height:3px;
+    background:linear-gradient(90deg,var(--blue) 0 34%, var(--red) 34% 67%, var(--gold) 67% 100%);}
+  .grab{width:42px; height:5px; border-radius:3px; background:rgba(255,255,255,.3); margin:0 auto 12px;}
+  .sh-row{display:flex; align-items:center; justify-content:space-between;}
+  .sh-title{font-family:'Cairo',sans-serif; font-weight:900; font-size:18px;}
+  .sh-x{background:rgba(255,255,255,.1); border:none; color:var(--on-color); width:34px; height:34px; border-radius:9px; font-size:20px; cursor:pointer;}
+  .sh-body{padding:16px;}
+  /* قايمة الفني — نفس شكل باقي الحقول عشان النموذج ما يبانش متفكك */
+  .tech-select{
+    width:100%; font-family:inherit; font-size:15px; color:var(--ink);
+    background:var(--card); border:1px solid var(--line); border-radius:11px;
+    padding:11px 12px; appearance:none; -webkit-appearance:none;
+    background-image:linear-gradient(45deg,transparent 50%,var(--faint) 50%),linear-gradient(135deg,var(--faint) 50%,transparent 50%);
+    background-position:calc(0% + 14px) calc(50% + 2px), calc(0% + 19px) calc(50% + 2px);
+    background-size:5px 5px,5px 5px; background-repeat:no-repeat;
+  }
+  .tech-select:focus{outline:none; border-color:var(--repairing);}
+  .fld-hint{font-size:12px; color:var(--muted); line-height:1.7; margin-top:6px;}
+  .fld{margin-bottom:13px;}
+  .fld label{display:block; font-size:12.5px; font-weight:700; color:var(--muted); margin-bottom:6px;}
+  .fld input, .fld textarea{width:100%; border:1px solid var(--line); border-radius:11px; padding:12px 13px;
+    font-family:inherit; font-size:15px; color:var(--ink); background:var(--card);}
+  .fld input:focus, .fld textarea:focus{outline:none; border-color:var(--repairing); box-shadow:0 0 0 3px rgba(43,108,176,.13);}
+  .fld textarea{resize:none; min-height:60px;}
+  .frow{display:flex; gap:11px;}
+  .frow .fld{flex:1;}
+  .save{width:100%; margin-top:6px; background:var(--red); color:var(--on-color); border:none; border-radius:12px; padding:15px;
+    font-family:'Cairo',sans-serif; font-weight:900; font-size:16px; cursor:pointer; box-shadow:0 8px 20px rgba(232,50,30,.3);}
+  .save:active{transform:translateY(1px);}
+
+  /* ===== شيت الأكشن العام: تفاصيل / تسليم / رفض ===== */
+  .info-row{display:flex; align-items:center; justify-content:space-between; gap:14px; padding:12px 2px; border-bottom:1px solid var(--line);}
+  .info-row:last-child{border-bottom:none;}
+  .info-k{color:var(--muted); font-size:13px; font-weight:700; flex:0 0 auto;}
+  .info-v{color:var(--ink); font-size:14.5px; font-weight:600; text-align:left; line-height:1.6; word-break:break-word;}
+  .info-chip{display:inline-block; padding:4px 13px; border-radius:999px; font-family:'Cairo',sans-serif; font-weight:800; font-size:12.5px; background:var(--st-bg); color:var(--st);}
+
+  /* ===== تفاصيل الجهاز — الشكل الجديد ===== */
+  .di-head{display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:12px;}
+  .di-title b{display:block; font-family:'Cairo',sans-serif; font-size:19px; line-height:1.35;}
+  .di-no{font-size:12px; color:var(--muted); font-family:var(--mono,monospace);}
+  .di-issue{display:flex; gap:8px; align-items:flex-start; background:var(--paper);
+    border:1px solid var(--line); border-radius:12px; padding:12px 13px;
+    font-size:14px; color:var(--ink-2); line-height:1.6; margin-bottom:12px;}
+  .di-card{border:1px solid var(--line); border-radius:14px; padding:4px 13px 12px; margin-bottom:11px;}
+  .di-card-h{font-size:12px; font-weight:800; color:var(--muted); padding:11px 0 3px;}
+  .di-row{display:flex; align-items:center; justify-content:space-between; gap:12px;
+    padding:9px 0; border-bottom:1px solid var(--line);}
+  .di-row:last-child{border-bottom:none;}
+  .di-k{color:var(--muted); font-size:12.5px; font-weight:700; flex:0 0 auto;}
+  .di-v{color:var(--ink); font-size:14px; font-weight:600; text-align:left;
+    line-height:1.6; word-break:break-word;}
+  .di-contact{display:flex; gap:9px; margin-top:11px;}
+  /* ✏️ زراير التعديل الصغيرة (العطل والفني) */
+  .di-issue .di-issue-t{flex:1; min-width:0; word-break:break-word;}
+  .di-edit{flex:none; border:1px solid var(--line); background:var(--card); color:var(--repairing);
+    border-radius:9px; padding:6px 10px; font:800 12px/1 inherit; cursor:pointer; white-space:nowrap;}
+  .di-edit:active{transform:scale(.96);}
+  .di-edit.lock{color:var(--muted);}
+  .di-v .di-edit{margin-inline-start:8px; vertical-align:middle;}
+  /* فورم التعديل جوه الشيت */
+  .de-cur{font-size:13px; color:var(--muted); margin:4px 2px 12px;}
+  .de-cur b{color:var(--ink);}
+  .de-ta{width:100%; box-sizing:border-box; min-height:90px; font:inherit; font-size:15px; color:var(--ink);
+    background:var(--card); border:1px solid var(--line); border-radius:11px; padding:11px 12px;
+    resize:vertical; line-height:1.7; margin-bottom:14px;}
+  .de-ta:focus{outline:none; border-color:var(--repairing);}
+  .de-hint{font-size:12px; color:var(--muted); line-height:1.8; margin:-6px 2px 14px;}
+  /* 📝 ملاحظات الجهاز في التفاصيل — نفس شكل الداشبورد */
+  .dn-list{margin:4px 0 10px;}
+  .dn{background:var(--paper); border:1px solid var(--line); border-radius:10px; padding:9px 11px; margin-bottom:7px;}
+  .dn-t{font-size:13.5px; line-height:1.7; color:var(--ink); white-space:pre-wrap; word-break:break-word;}
+  .dn-m{font-size:11px; color:var(--muted); margin-top:4px;}
+  .dn-empty{font-size:12.5px; color:var(--muted); padding:4px 2px 10px;}
+  .dn-ta{width:100%; box-sizing:border-box; min-height:64px; font:inherit; font-size:14px; color:var(--ink);
+    background:var(--card); border:1px solid var(--line); border-radius:10px; padding:10px 11px;
+    resize:vertical; line-height:1.7; margin-bottom:8px;}
+  .dn-ta:focus{outline:none; border-color:var(--repairing);}
+  .dn-add{width:100%; border:1px solid var(--line); background:var(--card); color:var(--repairing);
+    border-radius:11px; padding:11px; font:800 13.5px/1 inherit; cursor:pointer;}
+  .dn-add:disabled{opacity:.55; cursor:default;}
+
+  /* ===== 🔒 باسورد الجهاز — نفس فكرة الداشبورد (تبويبين) ===== */
+  .lk-tabs{display:flex; gap:7px; margin-bottom:10px;}
+  .lk-tab{flex:1; border:1px solid var(--line); background:var(--card); color:var(--muted);
+    border-radius:10px; padding:9px 6px; font:800 12.5px/1 inherit; cursor:pointer;}
+  .lk-tab.on{background:var(--repairing); border-color:var(--repairing); color:#fff;}
+  .lk-wrap{position:relative;}
+  /* ١٦px مقصود: أقل من كده الأيفون بيكبّر الصفحة لوحده عند الكتابة */
+  .lk-in{width:100%; box-sizing:border-box; border:1px solid var(--line); border-radius:11px;
+    padding:12px 44px 12px 13px; font-family:var(--mono,monospace); font-size:16px;
+    font-weight:700; letter-spacing:1.5px;
+    background:var(--card); color:var(--ink); -webkit-text-fill-color:var(--ink);
+    caret-color:var(--repairing);}
+  .lk-in:focus{outline:none; border-color:var(--repairing);}
+  .lk-eye{position:absolute; inset-inline-end:6px; top:50%; transform:translateY(-50%);
+    background:none; border:none; font-size:18px; cursor:pointer; padding:6px; line-height:1;}
+  #dpPatPad{position:relative; margin:0 auto 8px; touch-action:none;}
+  .lk-hint{text-align:center; font-size:12.5px; color:var(--muted); margin-bottom:7px;}
+  .lk-redraw{display:block; margin:0 auto; border:1px solid var(--line); background:var(--card);
+    color:var(--ink); border-radius:10px; padding:8px 16px; font:700 12.5px/1 inherit; cursor:pointer;}
+  /* عرض الباسورد في التفاصيل */
+  .lk-code{font-family:var(--mono,monospace); font-weight:800; font-size:17px; letter-spacing:1px; color:var(--ink);}
+  .lk-img{width:130px; height:130px; border:1px solid var(--line); border-radius:12px;
+    object-fit:cover; cursor:pointer; background:#fff;}
+  .lk-none{font-size:13px; color:var(--muted); padding:2px 0 8px;}
+  .lk-btn{width:100%; border:1px solid var(--line); background:var(--card); color:var(--repairing);
+    border-radius:11px; padding:11px; font:800 13.5px/1 inherit; cursor:pointer; margin-top:9px;}
+  .lk-btn:disabled{opacity:.55; cursor:default;}
+  .di-btn{flex:1; text-align:center; text-decoration:none; border-radius:11px;
+    padding:11px; font-size:13.5px; font-weight:800;}
+  .di-call{background:var(--blue-bg,#EAF1F8); color:var(--blue,#2B6CB0);}
+  .di-wa{background:var(--done-bg); color:var(--done);}
+  .di-label-row{margin-top:12px;}
+  .di-lbl{width:100%; border:1px solid var(--line); background:var(--paper); color:var(--ink);
+    border-radius:12px; padding:12px; font-family:inherit; font-size:13.5px;
+    font-weight:800; cursor:pointer;}
+  .di-lbl:hover{background:var(--card);}
+  .di-actions{display:flex; gap:9px; margin-top:14px;}
+  .di-act{flex:1; border:none; border-radius:12px; padding:14px 10px;
+    font-family:inherit; font-size:14px; font-weight:800; cursor:pointer; color:#fff;}
+  .di-hand{background:var(--done);} .di-ret{background:var(--waiting);}
+  .di-rej{background:var(--red);}
+  .di-pend{flex:1; text-align:center; background:var(--waiting-bg); color:var(--waiting);
+    border-radius:12px; padding:13px; font-size:13px; font-weight:800; line-height:1.7;}
+  .act-dev{display:flex; align-items:center; gap:13px; background:var(--paper); border:1px solid var(--line); border-radius:15px; padding:14px 15px; margin-bottom:18px;}
+  .act-dev-ic{font-size:30px; line-height:1; flex:0 0 auto;}
+  .act-dev-name{font-family:'Cairo',sans-serif; font-weight:900; font-size:16.5px; color:var(--ink); line-height:1.25;}
+  .act-dev-sub{font-size:12.5px; color:var(--muted); margin-top:3px;}
+  .act-note{font-size:14px; color:var(--muted); line-height:1.85; margin:0 0 18px; text-align:center;}
+  .act-q{font-family:'Cairo',sans-serif; font-weight:900; font-size:15.5px; color:var(--ink); text-align:center; margin:2px 0 16px;}
+  .act-btn{width:100%; border:none; border-radius:13px; padding:15px; font-family:'Cairo',sans-serif; font-weight:900; font-size:15.5px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:9px; color:#fff;}
+  .act-btn:active{transform:translateY(1px);}
+  .act-btn + .act-btn{margin-top:11px;}
+  .act-primary{background:var(--repairing); box-shadow:0 8px 20px rgba(15,23,34,.2);}
+  .act-drawer{background:var(--rejected_shop); box-shadow:0 8px 20px rgba(15,23,34,.2);}
+  .act-out{background:var(--card); color:var(--ink); border:1.5px solid var(--line); box-shadow:none;}
+  .act-ghost{background:transparent; color:var(--muted); box-shadow:none; padding:13px;}
+  @media (prefers-reduced-motion: reduce){ .sheet{transition:none;} }
+
+  @media (max-width:520px){ .grid{grid-template-columns:1fr;} .tab{font-size:11.5px;} }
+  :root{
+    --violet:#7C3AED; --info:#2563EB; --info-bg:#EFF6FF; --info-border:#BFDBFE;
+    --danger-strong:#B91C1C; --warn-tint:#FFFBEB; --ink-3:#334155;
+    --success-border:#BBF7D0;
+    /* ⚠️ التلاتة دول مش معرّفين في الصفحة دي أصلاً (الداشبورد بس).
+       من غيرهم خلفيات الحركات في الكشف بتطلع شفافة ومش مقروءة. */
+    --danger-bg:#FEF2F2; --danger-border:#FCA5A5; --success-bg:#F0FDF4;
+  }
+  html[data-theme="dark"]{
+    --violet:#A78BFA; --info:#60A5FA; --info-bg:rgba(96,165,250,.13);
+    --info-border:rgba(96,165,250,.40); --danger-strong:#FCA5A5;
+    --warn-tint:rgba(251,191,36,.10); --ink-3:#D6E1EB;
+    --success-border:rgba(74,222,128,.40);
+    --danger-bg:rgba(248,113,113,.15); --danger-border:rgba(248,113,113,.42);
+    --success-bg:rgba(74,222,128,.13);
+  }
+
+  /* ============================================================
+     📞 الكول سنتر — زيادات على ستايل الحركة
+     ============================================================ */
+  .cc-sticky{position:sticky; top:calc(64px + env(safe-area-inset-top)); z-index:29; background:var(--paper); padding-top:10px;}
+  .cc-sticky .tabs{position:static; padding-top:2px;}
+  .cc-hint{font-size:12.5px; color:var(--muted); line-height:1.8; margin:2px 2px 10px;}
+  .cc-group{font-family:'Cairo',sans-serif; font-weight:800; font-size:13.5px; color:var(--muted); margin:14px 2px 8px;}
+  .cc-group:first-child{margin-top:4px;}
+  .cc-tag{display:inline-block; font-size:11.5px; font-weight:800; padding:3px 9px; border-radius:8px;}
+  .cc-late{background:var(--rejected-bg); color:var(--rejected);}
+  .cc-sleep{background:var(--waiting-bg); color:var(--waiting);}
+  .cc-as{background:var(--done-bg); color:var(--done);}
+  .cc-tries{background:var(--waiting-bg); color:var(--waiting);}
+  .cc-box{border:1.5px solid var(--line); border-radius:14px; padding:12px 13px; margin-bottom:11px; background:var(--card);}
+  .cc-box.as{border-color:var(--done); background:var(--done-bg);}
+  .cc-box.late{border-color:var(--rejected);}
+  .cc-box.sleep{border-color:var(--waiting);}
+  .cc-q{font-weight:800; font-size:13.5px; color:var(--ink); margin:2px 0 8px; line-height:1.7;}
+  .cc-chips{display:flex; flex-wrap:wrap; gap:6px;}
+  .cc-chip{border:1.5px solid var(--line); background:var(--card); color:var(--ink); border-radius:18px;
+    padding:8px 12px; font:inherit; font-size:13px; font-weight:700; cursor:pointer; text-decoration:none; display:inline-block;}
+  .cc-chip.on{background:var(--repairing); border-color:var(--repairing); color:#fff;}
+  .cc-chip.bad.on{background:var(--rejected); border-color:var(--rejected);}
+  .cc-stars{display:flex; gap:4px; direction:ltr; justify-content:flex-end;}
+  .cc-star{border:none; background:none; font-size:30px; line-height:1; cursor:pointer; color:var(--line); padding:2px;}
+  .cc-star.on{color:#F5B301;}
+  .cc-ta{width:100%; box-sizing:border-box; min-height:64px; font:inherit; font-size:15px; color:var(--ink);
+    background:var(--card); border:1px solid var(--line); border-radius:10px; padding:10px 11px; resize:vertical; line-height:1.7;}
+  .cc-row2{display:flex; gap:8px; margin-top:10px;}
+  .cc-row2 .act-btn{margin-top:0 !important; padding:12px; font-size:14px;}
+  .cc-log{margin:0 0 11px;}
+  .cc-log summary{cursor:pointer; font-size:12.5px; font-weight:800; color:var(--muted); padding:6px 2px;}
+  .cc-log-i{background:var(--paper); border:1px solid var(--line); border-radius:10px; padding:8px 10px; margin-top:6px; font-size:13px; line-height:1.7;}
+  .cc-log-m{font-size:11px; color:var(--muted); margin-top:3px;}
+  .cc-done{font-size:13.5px; line-height:1.8;}
+  .cc-more{display:block; width:100%; margin:12px 0 4px; border:1px dashed var(--line); background:var(--card);
+    color:var(--muted); border-radius:12px; padding:11px; font:700 13px/1 inherit; cursor:pointer;}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="who">
+    <div class="mark">📞</div>
+    <div>
+      <div class="hi">الكول سنتر</div>
+      <div class="nm" id="ccName">—</div>
+    </div>
+  </div>
+  <div class="kebab-wrap">
+    <button class="kebab-btn" onclick="toggleKebab()" aria-label="قائمة">⋮</button>
+    <div id="kebabShield" class="kebab-shield hidden" onclick="closeKebab()"></div>
+    <div id="kebabMenu" class="kebab-menu hidden">
+      <div class="mh first">👤 أنا</div>
+      <button class="att-menu-btn" style="display:none;" onclick="closeKebab(); openAttendance()">⏰ المواعيد</button>
+      <button class="pay-menu-btn" style="display:none;" onclick="closeKebab(); openPayroll()">💰 مرتبك</button>
+      <button id="accountMenuBtn" class="hidden" style="display:none;" onclick="closeKebab(); openAccountShared()">👤 حسابي</button>
+      <div class="sep"></div>
+      <button onclick="closeKebab(); ccReload(true)">🔄 حدّث القوايم</button>
+      <button onclick="closeKebab(); ccToggleTheme()">🌓 فاتح / غامق</button>
+      <span id="ifxUpdSlot" hidden></span>
+      <div class="sep"></div>
+      <button class="danger" onclick="closeKebab(); doLogout()">⏻ تسجيل الخروج</button>
+    </div>
+  </div>
+</div>
+
+<div class="cc-sticky">
+  <div class="searchbar">
+    <input id="ccSearch" type="search" autocomplete="off" placeholder="دوّر بالاسم أو الرقم أو رقم الجهاز أو الموديل…"
+           oninput="ccOnSearch(this.value)">
+  </div>
+  <div class="tabs" id="ccTabs"></div>
+</div>
+
+<div class="wrap" id="ccList"><div class="empty"><span class="big">⏳</span>جاري التحميل…</div></div>
+
+<!-- شيت التفاصيل -->
+<div class="sheet-bg" id="actBg" onclick="closeAct()"></div>
+<div class="sheet" id="actSheet">
+  <div class="sheet-head">
+    <div class="grab"></div>
+    <div class="sh-row"><div class="sh-title" id="actTitle"></div><button class="sh-x" onclick="closeAct()">×</button></div>
+  </div>
+  <div class="sh-body" id="actBody"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ############################################################
+// 📞 الكول سنتر — نسخة الإنتاج (callcenter.html)
+// ------------------------------------------------------------
+// 🧸 موظف شغلته التليفون. عنده:
+//   🔍 بحث فوق: يدوّر على أي جهاز ويعرف حالته
+//   ⏰ «عدّى ميعادهم»  — الجهاز لسه في الورشة والميعاد اللي اتفقنا
+//                        عليه مع العميل فات → يكلّمه ويتفق على ميعاد جديد
+//   😴 «نايمين في المحل» — «تم الصيانة» أو «درج الرفض» بقالهم ٧ أيام
+//                        → «جهازك مستنيك، تعالى خده»
+//   🤝 «ما بعد البيع» — **كل يوم**: اللي استلموا أجهزتهم امبارح
+//                        → «الخدمة كانت عاملة إزاي؟ الجهاز شغال؟»
+//
+// 🔒 الأمان على السيرفر (ملف prod-callcenter.sql):
+//   • بيقرا من الشاشة devices_callcenter بس (مش devices_data)
+//   • بيكتب بالدالة callcenter_patch بس — خانات المكالمات والملاحظات.
+//     مايلمسش الحالة ولا السعر ولا الدفع ولا الفني. السجلات بتتزاد بس.
+//   • «ماتتصلش بيا» بالدالة callcenter_nocall — على كل أجهزة الرقم.
+//
+// 🗄️ الخانات (نفس أسماء الاستيدج عشان البيانات تكمّل):
+//   afterSale{state done|noanswer|closed, stars, tags, working, note, at, by, tries, nextAt}
+//   callLog[{kind aftersale|due|sleep, result, text, at, by}]
+//   noCall{at, by, note} · drawerCall{at, by, how}
+//   dueAt · dueStart · dueLabel · dueLog (الميعاد — due-deposit.js)
+// ############################################################
+
+// ---------- الإعدادات ----------
+const CC_ROLE_LABEL = 'الكول سنتر';
+const LATE_SNOOZE_H = 3;                 // «مردّش» على ميعاد متأخر → يرجع بعد ٣ ساعات
+const SLEEP_DAYS = 7, SLEEP_SNOOZE_DAYS = 3;
+const SLEEP_FROM = '2026-10-01';         // أجهزة الأرشيف القديمة مابتطلعش كلها مرة واحدة
+const AS_FROM = '2026-10-25';            // ما بعد البيع: من أول يوم اشتغلت فيه الميزة
+const AS_KEEP_DAYS = 7;                  // اللي ماتكلّمش في يومه بيفضل ظاهر لحد ٧ أيام
+const AS_RETRY_H = 24;                   // مردّش → يرجع بكره
+const AS_MAX_TRIES = 3;                  // ٣ مرات مردّش → تتقفل
+const AS_TAGS = ['💰 السعر', '⏱️ الوقت', '😐 المعاملة', '🔧 جودة الصيانة', '✍️ حاجة تانية'];
+const ACTIVE = ['waiting', 'diagnosing', 'repairing', 'returned'];
+const DELIVERED_WINDOW_DAYS = AS_KEEP_DAYS + 3;
+
+const ST = {
+  waiting:    { label:'قيد الانتظار',   c:'--waiting' },
+  diagnosing: { label:'جاري الكشف',     c:'--diagnosing' },
+  repairing:  { label:'جاري الصيانة',   c:'--repairing' },
+  done:       { label:'تم الصيانة — جاهز', c:'--done' },
+  delivered:  { label:'تم التسليم',     c:'--delivered' },
+  rejected:   { label:'تم الرفض',       c:'--rejected' },
+  returned:   { label:'المرتجعات',      c:'--returned' },
+};
+function stOf(d){
+  if(d.status === 'rejected' && d.rejectedInShop) return { label:'درج الرفض — لسه في المحل', c:'--rejected_shop' };
+  if(d.status === 'rejected') return { label:'تم الرفض — العميل استلمه', c:'--rejected' };
+  return ST[d.status] || { label: d.status || '—', c:'--muted' };
+}
+
+let ME = '', MY_EMAIL = '';
+let devices = new Map();      // id → data
+let TAB = 'late';
+let searchQ = '', searchRows = null, searchT = null, searchSeq = 0;
+let asEdit = null;            // { id, stars, tags, working, note }
+let dueEditOpen = null;       // id الجهاز اللي فورم الميعاد مفتوح عليه
+
+// ---------- أدوات ----------
+const $ = id => document.getElementById(id);
+const nowIso = () => new Date().toISOString();
+const ticketNo = id => '#' + String(id).replace(/\D/g,'').slice(-5);
+const fmtDate = iso => { const d = new Date(iso); if(isNaN(d)) return '—';
+  return d.toLocaleDateString('ar-EG', { day:'numeric', month:'short' }) + ' · ' + d.toLocaleTimeString('ar-EG', { hour:'2-digit', minute:'2-digit' }); };
+const devName = d => `${d.deviceType || ''} ${d.model || ''}`.trim() || '—';
+function waNum(tel){
+  let n = String(tel || '').replace(/\D/g, '');
+  if(n.startsWith('0')) n = '2' + n; else if(!n.startsWith('2')) n = '2' + n;
+  return n;
+}
+function phoneKey(p){ const s = String(p || '').replace(/[^0-9]/g, ''); return s.length >= 8 ? s.slice(-10) : ''; }
+function openWa(tel, msg){ window.open('https://wa.me/' + waNum(tel) + '?text=' + encodeURIComponent(msg), '_blank'); }
+function agoTxt(iso){
+  const ms = Date.now() - Date.parse(iso);
+  if(!(ms >= 0)) return '';
+  const h = Math.floor(ms / 3600000), dd = Math.floor(h / 24);
+  if(h < 1) return 'من شوية';
+  if(h < 24) return 'من ' + h + ' ساعة';
+  if(dd === 1) return 'امبارح';
+  return 'من ' + dd + ' يوم';
+}
+// اليوم بتوقيت القاهرة (YYYY-MM-DD)
+const cairoDay = t => new Date(t).toLocaleDateString('en-CA', { timeZone:'Africa/Cairo' });
+let toastT;
+function toast(msg){ const el = $('toast'); el.innerHTML = msg; el.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('on'), 2800); }
+function errBar(msg){
+  document.querySelectorAll('.errbar').forEach(e => e.remove());
+  const b = document.createElement('div');
+  b.className = 'errbar';
+  b.style.cssText = 'background:#FEE2E2;color:#B91C1C;text-align:center;font-weight:800;font-size:12.5px;padding:9px 12px;line-height:1.8;';
+  b.innerHTML = '⚠️ مشكلة في قراءة البيانات:<br><span style="font-family:monospace;font-size:11.5px;">' + esc(msg) + '</span>';
+  document.body.insertBefore(b, document.body.firstChild.nextSibling);
+}
+
+// ---------- القايمة والمظهر ----------
+function toggleKebab(){
+  const m = $('kebabMenu'), s = $('kebabShield'); if(!m) return;
+  const open = m.classList.contains('hidden');
+  if(open && typeof ifxTidyMenu === 'function') ifxTidyMenu(m);
+  m.classList.toggle('hidden', !open); if(s) s.classList.toggle('hidden', !open);
+}
+function closeKebab(){ const m = $('kebabMenu'), s = $('kebabShield'); if(m) m.classList.add('hidden'); if(s) s.classList.add('hidden'); }
+function ccToggleTheme(){
+  const dark = document.documentElement.getAttribute('data-theme') !== 'dark';
+  document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+  try{ localStorage.setItem('ifix-theme', dark ? 'dark' : 'light'); }catch(e){}
+}
+async function doLogout(){
+  if(!confirm('تسجيل الخروج؟')) return;
+  try{ await sb.auth.signOut(); }catch(e){}
+  try{ sessionStorage.removeItem('ifix-bounced'); }catch(e){}
+  location.replace('index.html');
+}
+
+// ---------- الشيت ----------
+function openAct(title, html){ $('actTitle').textContent = title; $('actBody').innerHTML = html; $('actBg').classList.add('on'); $('actSheet').classList.add('on'); }
+function closeAct(){ $('actBg').classList.remove('on'); $('actSheet').classList.remove('on'); asEdit = null; dueEditOpen = null; }
+
+// ============================================================
+// 📥 التحميل — من الشاشة devices_callcenter بس
+// ============================================================
+async function fetchPaged(makeQuery){
+  const PAGE = 1000, rows = [];
+  for(let p = 0; p < 30; p++){
+    const { data, error } = await makeQuery().range(p * PAGE, p * PAGE + PAGE - 1);
+    if(error) throw error;
+    if(!data || !data.length) break;
+    rows.push(...data);
+    if(data.length < PAGE) break;
+  }
+  return rows;
+}
+async function loadDevices(){
+  try{
+    const V = 'devices_callcenter';
+    const cutoff = new Date(Date.now() - DELIVERED_WINDOW_DAYS * 86400000).toISOString();
+    const [act, done, rej, out] = await Promise.all([
+      fetchPaged(() => sb.from(V).select('id,data').in('status', ACTIVE).order('intake_date', { ascending:false })),
+      fetchPaged(() => sb.from(V).select('id,data').eq('status', 'done').order('intake_date', { ascending:false })),
+      fetchPaged(() => sb.from(V).select('id,data').eq('status', 'rejected').eq('data->>rejectedInShop', 'true').order('intake_date', { ascending:false })),
+      fetchPaged(() => sb.from(V).select('id,data').eq('status', 'delivered').gte('delivered_at', cutoff).order('delivered_at', { ascending:false })),
+    ]);
+    const m = new Map();
+    [...act, ...done, ...rej, ...out].forEach(r => { if(r && r.data) m.set(r.id, Object.assign({ id: r.id }, r.data)); });
+    devices = m;
+    document.querySelectorAll('.errbar').forEach(e => e.remove());
+    return true;
+  }catch(e){
+    console.error('loadDevices failed:', e);
+    errBar((e && e.message) || String(e));
+    return false;
+  }
+}
+// نسخة السيرفر الطازة من جهاز — قبل أي كتابة في السجلات
+async function freshRow(id){
+  const { data, error } = await sb.from('devices_callcenter').select('id,data').eq('id', id).maybeSingle();
+  if(error) throw error;
+  if(!data) throw new Error('الجهاز مش ظاهر — ممكن اتمسح أو اتغيّرت حالته');
+  const d = Object.assign({ id: data.id }, data.data);
+  devices.set(id, d);
+  return d;
+}
+async function ccPatch(id, p){
+  const { error } = await sb.rpc('callcenter_patch', { p_id: id, p_patch: p });
+  if(error){ alert('⚠️ ماتحفظش: ' + (error.message || error)); return false; }
+  try{ await freshRow(id); }catch(e){ console.error(e); }
+  return true;
+}
+function logEntry(kind, result, text, extra){
+  return Object.assign({ kind, result, text, at: nowIso(), by: ME }, extra || {});
+}
+function noteEntry(text){ return { text, at: nowIso(), by: ME, role: CC_ROLE_LABEL }; }
+
+// ============================================================
+// ⏰ عدّى ميعادهم
+// ============================================================
+function lastCall(d, kind){
+  const l = (d.callLog || []).filter(c => c && c.kind === kind);
+  return l.length ? l[l.length - 1] : null;
+}
+function lateList(){
+  const out = [];
+  devices.forEach(d => {
+    if(!ACTIVE.includes(d.status)) return;
+    const i = IFixDue.info(d);
+    if(!i || i.left >= 0) return;
+    const lc = lastCall(d, 'due');
+    if(lc && Date.parse(lc.at) > Date.parse(d.dueAt) && (Date.now() - Date.parse(lc.at)) < LATE_SNOOZE_H * 3600000) return;
+    out.push({ d, late: -i.left });
+  });
+  return out.sort((a, b) => b.late - a.late);
+}
+// ============================================================
+// 😴 نايمين في المحل
+// ============================================================
+function enteredAt(d, st){
+  const h = d.statusHistory || [];
+  for(let i = h.length - 1; i >= 0; i--) if(h[i] && h[i].status === st && h[i].date) return h[i].date;
+  return d.lastModifiedAt || d.intakeDate || '';
+}
+function inDrawer(d){ return d.status === 'done' || (d.status === 'rejected' && d.rejectedInShop); }
+function sleepList(){
+  const out = [];
+  devices.forEach(d => {
+    if(!inDrawer(d)) return;
+    const at = enteredAt(d, d.status);
+    if(!at || String(at).slice(0, 10) < SLEEP_FROM) return;
+    const days = Math.floor((Date.now() - Date.parse(at)) / 86400000);
+    if(days < SLEEP_DAYS) return;
+    if(d.drawerCall && (Date.now() - Date.parse(d.drawerCall.at)) < SLEEP_SNOOZE_DAYS * 86400000) return;
+    out.push({ d, days, at });
+  });
+  return out.sort((a, b) => b.days - a.days);
+}
+// ============================================================
+// 🤝 ما بعد البيع — يومي: اللي استلموا امبارح
+// ============================================================
+function deliveredAt(d){
+  const h = d.statusHistory || [];
+  for(let i = h.length - 1; i >= 0; i--) if(h[i] && h[i].status === 'delivered' && h[i].date) return h[i].date;
+  return '';
+}
+function asList(){
+  const today = cairoDay(Date.now());
+  const yest = cairoDay(Date.now() - 86400000);
+  const oldest = cairoDay(Date.now() - (AS_KEEP_DAYS + 1) * 86400000);
+  const out = [];
+  devices.forEach(d => {
+    if(d.status !== 'delivered' || !phoneKey(d.customerPhone) || d.noCall) return;
+    const at = deliveredAt(d);
+    if(!at) return;
+    const day = cairoDay(at);
+    if(day >= today || day < AS_FROM || day < oldest) return;   // النهارده بيظهر بكره
+    const a = d.afterSale;
+    if(a && (a.state === 'done' || a.state === 'closed')) return;
+    if(a && a.state === 'noanswer' && Date.parse(a.nextAt) > Date.now()) return;
+    out.push({ d, at, day, yest: day === yest, tries: (a && a.tries) || 0 });
+  });
+  return out.sort((a, b) => (b.yest - a.yest) || (Date.parse(a.at) - Date.parse(b.at)));
+}
+function asEligible(d){ return asList().some(x => x.d.id === d.id); }
+
+// ============================================================
+// 🖼️ الرسم
+// ============================================================
+const TABS = [
+  { k:'late',  label:'⏰ عدّى ميعادهم', list: lateList },
+  { k:'sleep', label:'😴 نايمين في المحل', list: sleepList },
+  { k:'as',    label:'🤝 ما بعد البيع', list: asList },
+];
+function render(){
+  const tabsEl = $('ccTabs'), host = $('ccList');
+  if(searchQ){
+    tabsEl.style.display = 'none';
+    renderSearch();
+    return;
+  }
+  tabsEl.style.display = '';
+  tabsEl.innerHTML = TABS.map(t => `<div class="tab ${TAB === t.k ? 'on' : ''}" onclick="TAB='${t.k}';render()"><span class="cnt">${t.list().length}</span><span>${t.label}</span></div>`).join('');
+  const t = TABS.find(x => x.k === TAB);
+  const list = t.list();
+  let html = '';
+  if(TAB === 'late'){
+    html = `<div class="cc-hint">أجهزة لسه في الورشة والميعاد اللي اتفقنا عليه مع العميل فات — كلّمه وبلّغه، واتفق على ميعاد جديد.</div>`
+      + (list.length ? `<div class="grid">${list.map(({d, late}) => ticket(d, `<span class="cc-tag cc-late">⏰ متأخر ${esc(IFixDue.durTxt(late))}</span>`)).join('')}</div>`
+                     : empty('✅', 'مفيش أجهزة عدّى ميعادها'));
+  } else if(TAB === 'sleep'){
+    html = `<div class="cc-hint">أجهزة في «تم الصيانة» أو «درج الرفض» بقالها ${SLEEP_DAYS} أيام أو أكتر — فكّر العميل ييجي ياخدها. بعد ما تكلّمه بتختفي ${SLEEP_SNOOZE_DAYS} أيام.</div>`
+      + (list.length ? `<div class="grid">${list.map(({d, days}) => ticket(d, `<span class="cc-tag cc-sleep">😴 ${days} يوم</span>`)).join('')}</div>`
+                     : empty('✅', 'مفيش أجهزة نايمة'));
+  } else {
+    const y = list.filter(x => x.yest), o = list.filter(x => !x.yest);
+    const row = ({d, at, tries}) => ticket(d, `<span class="cc-tag cc-as">📦 اتسلّم ${esc(agoTxt(at))}</span>${tries ? ` <span class="cc-tag cc-tries">📵 مردّش ${tries} مرة</span>` : ''}`);
+    html = `<div class="cc-hint">كل يوم: اللي استلموا أجهزتهم امبارح — اطمّن على الجهاز واسأله عن الخدمة.</div>`
+      + (y.length ? `<div class="cc-group">📅 استلموا امبارح (${y.length})</div><div class="grid">${y.map(row).join('')}</div>` : '')
+      + (o.length ? `<div class="cc-group">⏳ لسه ماتكلّموش — من أيام قبل كده (${o.length})</div><div class="grid">${o.map(row).join('')}</div>` : '')
+      + (!list.length ? empty('✅', 'خلّصت مكالمات النهارده') : '');
+  }
+  host.innerHTML = html;
+}
+function empty(ic, txt){ return `<div class="empty"><span class="big">${ic}</span>${esc(txt)}<br><small>دوّر على أي جهاز من البحث اللي فوق</small></div>`; }
+function ticket(d, tagHtml){
+  const s = stOf(d);
+  return `<div class="ticket" style="--sp:var(${s.c});" onclick="showInfo('${esc(d.id)}')">
+    <div class="tk-top"><span class="tk-no">${esc(ticketNo(d.id))}</span><span class="tk-status" style="--st:var(${s.c}); --st-bg:var(${s.c}-bg);">${esc(s.label)}</span></div>
+    <div class="tk-title">${esc(devName(d))}</div>
+    <div class="tk-sub">${esc(d.customerName || '—')}${d.customerPhone ? `<span class="dot">•</span><span dir="ltr">${esc(d.customerPhone)}</span>` : ''}${d.shopName ? `<span class="dot">•</span>${esc(d.shopName)}` : ''}</div>
+    ${d.reportedIssue ? `<div class="tk-issue"><span class="w">🛠️</span><span>${esc(d.reportedIssue)}</span></div>` : ''}
+    <div class="tk-meta">${tagHtml || ''}${d.technician ? `<span class="chip">الفني: <b>${esc(d.technician)}</b></span>` : ''}<span>· دخل ${esc(fmtDate(d.intakeDate))}</span></div>
+  </div>`;
+}
+
+// ---------- 🔍 البحث (على السيرفر — كل الأجهزة مش اللي متحمّلة بس) ----------
+function ccOnSearch(v){
+  searchQ = String(v || '').trim();
+  clearTimeout(searchT);
+  if(!searchQ){ searchRows = null; render(); return; }
+  if(searchQ.replace(/\s/g, '').length < 2){ searchRows = null; renderSearch(); return; }
+  searchT = setTimeout(runSearch, 400);
+}
+async function runSearch(){
+  const seq = ++searchSeq;
+  const q = searchQ.replace(/[,()*%\\]/g, ' ').trim();
+  const digits = q.replace(/\D/g, '');
+  searchRows = 'loading'; renderSearch();
+  try{
+    const like = '*' + q + '*';
+    const ors = [`data->>customerName.ilike.${like}`, `data->>model.ilike.${like}`, `data->>deviceType.ilike.${like}`,
+                 `data->>shopName.ilike.${like}`, `data->>serialNumber.ilike.${like}`];
+    if(digits.length >= 3){
+      ors.push(`data->>customerPhone.ilike.*${digits.slice(-8)}*`);
+      ors.push(`id.ilike.*${digits}*`);
+    }
+    const { data, error } = await sb.from('devices_callcenter').select('id,data')
+      .or(ors.join(',')).order('intake_date', { ascending:false }).limit(40);
+    if(seq !== searchSeq) return;
+    if(error) throw error;
+    searchRows = (data || []).map(r => { const d = Object.assign({ id: r.id }, r.data); devices.set(r.id, d); return d; });
+  }catch(e){
+    if(seq !== searchSeq) return;
+    console.error('search failed:', e);
+    searchRows = { err: (e && e.message) || String(e) };
+  }
+  renderSearch();
+}
+function renderSearch(){
+  const host = $('ccList');
+  if(searchQ.replace(/\s/g, '').length < 2){ host.innerHTML = empty('🔍', 'اكتب حرفين على الأقل'); return; }
+  if(searchRows === 'loading' || searchRows === null){ host.innerHTML = empty('⏳', 'بدوّر…'); return; }
+  if(searchRows.err){ host.innerHTML = `<div class="empty"><span class="big">⚠️</span>البحث ماشتغلش<br><small dir="ltr">${esc(searchRows.err)}</small></div>`; return; }
+  if(!searchRows.length){ host.innerHTML = empty('🤷', 'مفيش جهاز بالكلام ده'); return; }
+  host.innerHTML = `<div class="cc-hint">${searchRows.length >= 40 ? 'أحدث ٤٠ نتيجة — اكتب أكتر عشان تضيّق البحث' : searchRows.length + ' نتيجة'}</div>
+    <div class="grid">${searchRows.map(d => ticket(d, '')).join('')}</div>`;
+}
+
+// ============================================================
+// 📋 التفاصيل — قراية + أدوات المكالمة
+// ============================================================
+function showInfo(id){
+  const d = devices.get(id); if(!d) return;
+  const s = stOf(d);
+  const tel = String(d.customerPhone || '').replace(/[^\d+]/g, '');
+  const row = (k, v) => v ? `<div class="di-row"><span class="di-k">${esc(k)}</span><span class="di-v">${v}</span></div>` : '';
+  const price = (d.agreedPrice !== '' && d.agreedPrice != null && !isNaN(parseInt(d.agreedPrice))) ? (parseInt(d.agreedPrice)).toLocaleString('en-US') + ' ج.م' : '';
+  const dAt = d.status === 'delivered' ? deliveredAt(d) : '';
+  openAct('تفاصيل الجهاز', `
+    <div class="di">
+      <div class="di-head">
+        <div class="di-title"><b>${esc(devName(d))}</b><span class="di-no">${esc(ticketNo(d.id))}</span></div>
+        <span class="info-chip" style="--st:var(${s.c}); --st-bg:var(${s.c}-bg);">📍 ${esc(s.label)}</span>
+      </div>
+      ${d.reportedIssue ? `<div class="di-issue"><span>🛠️</span><span class="di-issue-t">${esc(d.reportedIssue)}</span></div>` : ''}
+
+      ${toolsHtml(d)}
+
+      <div class="di-card">
+        <div class="di-card-h">👤 العميل</div>
+        ${row('العميل', esc(d.customerName || '—'))}
+        ${row('المحل', d.shopName ? esc(d.shopName) : '')}
+        ${row('التليفون', d.customerPhone ? `<span dir="ltr">${esc(d.customerPhone)}</span>` : '<span style="color:var(--muted)">— مفيش رقم</span>')}
+        ${tel ? `<div class="di-contact">
+          <a class="di-btn di-call" href="tel:${esc(tel)}">📞 اتصال</a>
+          <a class="di-btn di-wa" target="_blank" rel="noopener" href="https://wa.me/${esc(waNum(tel))}">💬 واتساب</a>
+        </div>` : ''}
+        ${d.noCall ? `<div class="fld-hint">🚫 العميل طلب مانتصلش بيه${d.noCall.note ? ' — ' + esc(d.noCall.note) : ''} (${esc(d.noCall.by || '')})</div>` : ''}
+      </div>
+
+      <div class="di-card">
+        <div class="di-card-h">🔧 الجهاز</div>
+        ${row('🎨 اللون', esc(d.deviceColor || ''))}
+        ${row('🔎 العطل المكتشف', d.discoveredFault ? esc(d.discoveredFault) : '')}
+        ${row('👨‍🔧 الفني', d.technician ? esc(d.technician) : '')}
+        ${row('💰 السعر', price ? esc(price) : '')}
+        ${row('💵 العربون (إخباري)', IFixDue.depAmount(d) ? esc(IFixDue.depAmount(d).toLocaleString('en-US')) + ' ج.م' : '')}
+        ${row('📥 دخل', esc(fmtDate(d.intakeDate)))}
+        ${row('📦 اتسلّم', dAt ? esc(fmtDate(dAt)) : '')}
+        ${row('🚫 سبب الرفض', d.rejectReason ? esc(d.rejectReason) : '')}
+      </div>
+
+      ${IFixDue.boxHtml(d)}
+      ${asResultHtml(d)}
+      ${callLogHtml(d)}
+
+      <div class="di-card">
+        <div class="di-card-h">📝 الملاحظات</div>
+        ${notesHtml(d)}
+        <textarea id="ccNote" class="dn-ta" maxlength="500" placeholder="اكتب ملاحظة جديدة…"></textarea>
+        <button class="dn-add" id="ccNoteGo" onclick="addNote('${esc(d.id)}')">➕ إضافة ملاحظة</button>
+      </div>
+    </div>`);
+  if(dueEditOpen === id) setTimeout(() => ccDue.render(), 0);
+}
+function notesHtml(d){
+  const n = (d.activityNotes || []).slice(-8);
+  if(!n.length) return '<div class="dn-empty">مفيش ملاحظات</div>';
+  return `<div class="dn-list">${n.map(x => `<div class="dn"><div class="dn-t">${esc(x.text || '')}</div>
+    <div class="dn-m">${esc(fmtDate(x.at))}${x.by ? ' — ' + esc(x.by) : ''}${x.role ? ' (' + esc(x.role) + ')' : ''}</div></div>`).join('')}</div>`;
+}
+function callLogHtml(d){
+  const log = d.callLog || [];
+  if(!log.length) return '';
+  return `<details class="cc-log" open><summary>📞 سجل المكالمات (${log.length})</summary>
+    ${[...log].reverse().slice(0, 10).map(c => `<div class="cc-log-i"><span style="white-space:pre-wrap;">${esc(c.text || '')}</span>
+      <div class="cc-log-m">${esc(c.by || '')} · ${esc(fmtDate(c.at))}</div></div>`).join('')}</details>`;
+}
+async function addNote(id){
+  const ta = $('ccNote'); const text = ((ta && ta.value) || '').trim();
+  if(!text){ toast('اكتب الملاحظة الأول'); return; }
+  const btn = $('ccNoteGo'); if(btn) btn.disabled = true;
+  try{
+    const d = await freshRow(id);
+    const ok = await ccPatch(id, { activityNotes: [...(d.activityNotes || []), noteEntry(text)] });
+    if(ok){ toast('📝 الملاحظة اتضافت'); showInfo(id); }
+  }catch(e){ alert('⚠️ ' + ((e && e.message) || e)); }
+  if(btn) btn.disabled = false;
+}
+
+// ---------- 🧰 أدوات المكالمة حسب القايمة ----------
+function toolsHtml(d){
+  let h = '';
+  if(lateList().some(x => x.d.id === d.id) || dueEditOpen === d.id) h += lateToolsHtml(d);
+  if(sleepList().some(x => x.d.id === d.id)) h += sleepToolsHtml(d);
+  if(asEligible(d)) h += asFormHtml(d);
+  return h;
+}
+// ⏰ ميعاد متأخر
+const ccDue = IFixDue.picker('cc', {
+  host: 'ccDueHost', getFromMs: () => Date.now(), fromWord: 'دلوقتي',
+  title: '⏳ اتفقت مع العميل على قد إيه من دلوقتي؟',
+});
+function lateToolsHtml(d){
+  const i = IFixDue.info(d);
+  const open = dueEditOpen === d.id;
+  return `<div class="cc-box late">
+    <div class="cc-q">⏰ الميعاد مع العميل فات${i ? ' — متأخر ' + esc(IFixDue.durTxt(Math.max(0, -i.left))) : ''}. كلّمه وبلّغه.</div>
+    <div class="cc-chips">
+      ${d.customerPhone ? `<a class="cc-chip" href="tel:${esc(d.customerPhone)}">📞 اتصل</a>
+      <button class="cc-chip" onclick="lateWa('${esc(d.id)}')">💬 واتساب</button>` : ''}
+    </div>
+    ${open ? `<div id="ccDueHost" style="margin-top:12px;"></div>
+      <div class="cc-row2">
+        <button class="act-btn act-primary" onclick="lateSave('${esc(d.id)}')">💾 سجّل الميعاد الجديد</button>
+        <button class="act-btn act-out" onclick="dueEditOpen=null;showInfo('${esc(d.id)}')">إلغاء</button>
+      </div>`
+    : `<div class="cc-row2">
+        <button class="act-btn act-primary" onclick="dueEditOpen='${esc(d.id)}';ccDue.chip='';ccDue.custom='';showInfo('${esc(d.id)}')">⏳ اتفقنا على ميعاد جديد</button>
+        <button class="act-btn act-out" onclick="lateNoAnswer('${esc(d.id)}')">📵 مردّش</button>
+      </div>`}
+  </div>`;
+}
+function lateWa(id){
+  const d = devices.get(id); if(!d || !d.customerPhone) return;
+  openWa(d.customerPhone, `أهلاً ${d.customerName || ''} 👋\nمعاك I Fix Team — جهازك *${devName(d)}* (${ticketNo(d.id)}) لسه في الصيانة، وهياخد وقت أكتر شوية من الميعاد اللي اتفقنا عليه 🙏\nهنبلّغك أول ما يخلص.`);
+}
+async function lateSave(id){
+  try{
+    const d = await freshRow(id);
+    const now = nowIso();
+    const r = ccDue.fields(now, ME, 'callcenter');
+    if(r.err){ alert('⏳ ' + r.err); return; }
+    const text = '⏳ الكول سنتر كلّم العميل — ميعاد جديد: ' + r.label + ' (لحد ' + IFixDue.whenTxt(r.fields.dueAt) + ')';
+    const ok = await ccPatch(id, {
+      dueAt: r.fields.dueAt, dueStart: now, dueLabel: r.label,
+      dueLog: [...(d.dueLog || []), Object.assign({}, r.fields.dueLog[0], { text })],
+      callLog: [...(d.callLog || []), logEntry('due', 'newdue', text)],
+      activityNotes: [...(d.activityNotes || []), noteEntry(text)],
+      lastModifiedAt: now, lastModifiedBy: ME,
+    });
+    if(!ok) return;
+    dueEditOpen = null; closeAct(); render();
+    toast('✅ الميعاد الجديد اتسجّل');
+  }catch(e){ alert('⚠️ ' + ((e && e.message) || e)); }
+}
+async function lateNoAnswer(id){
+  try{
+    const d = await freshRow(id);
+    const text = '📵 الكول سنتر: الميعاد فات والعميل مردّش';
+    const ok = await ccPatch(id, { callLog: [...(d.callLog || []), logEntry('due', 'noanswer', text)] });
+    if(!ok) return;
+    closeAct(); render();
+    toast(`📵 اتسجّل — هيرجع يظهر بعد ${LATE_SNOOZE_H} ساعات`);
+  }catch(e){ alert('⚠️ ' + ((e && e.message) || e)); }
+}
+// 😴 نايم في المحل
+function sleepToolsHtml(d){
+  const days = Math.floor((Date.now() - Date.parse(enteredAt(d, d.status))) / 86400000);
+  return `<div class="cc-box sleep">
+    <div class="cc-q">😴 الجهاز ${d.status === 'done' ? '🟢 جاهز في المحل' : '🔴 في درج الرفض'} من ${days} يوم${d.drawerCall ? ' · آخر مرة اتكلّم ' + esc(agoTxt(d.drawerCall.at)) : ''}</div>
+    <div class="cc-chips">
+      ${d.customerPhone ? `<a class="cc-chip" href="tel:${esc(d.customerPhone)}">📞 اتصل</a>
+      <button class="cc-chip" onclick="sleepWa('${esc(d.id)}')">💬 ذكّره واتساب</button>` : '<span class="fld-hint">⚠️ مفيش رقم</span>'}
+      <button class="cc-chip on" onclick="sleepMark('${esc(d.id)}','call')">✓ كلّمته</button>
+    </div>
+  </div>`;
+}
+function sleepMsg(d){
+  const days = Math.floor((Date.now() - Date.parse(enteredAt(d, d.status))) / 86400000);
+  return d.status === 'done'
+    ? `أهلاً ${d.customerName || ''} 👋\nتذكير: جهازك *${devName(d)}* (${ticketNo(d.id)}) جاهز ومستنيك في المحل من ${days} يوم 🎉\nمستنيينك في I Fix Team 🙏`
+    : `أهلاً ${d.customerName || ''} 👋\nتذكير: جهازك *${devName(d)}* (${ticketNo(d.id)}) لسه عندنا في المحل من ${days} يوم.${d.rejectReason ? `\nللأسف تعذّرت صيانته — السبب: ${d.rejectReason}` : ''}\nتقدر تعدّي تستلمه في أي وقت 🙏`;
+}
+async function sleepMark(id, how){
+  try{
+    const d = await freshRow(id);
+    const now = nowIso();
+    const text = how === 'wa' ? '💬 اتبعت للعميل تذكير «جهازك لسه في المحل»' : '📞 اتكلّم مع العميل — الجهاز لسه في المحل';
+    const ok = await ccPatch(id, {
+      drawerCall: { at: now, by: ME, how },
+      callLog: [...(d.callLog || []), logEntry('sleep', how, text)],
+      activityNotes: [...(d.activityNotes || []), noteEntry(text)],
+      lastModifiedAt: now, lastModifiedBy: ME,
+    });
+    if(!ok) return false;
+    closeAct(); render();
+    toast(`✅ اتسجّل — هيختفي ${SLEEP_SNOOZE_DAYS} أيام`);
+    return true;
+  }catch(e){ alert('⚠️ ' + ((e && e.message) || e)); return false; }
+}
+async function sleepWa(id){
+  const d = devices.get(id); if(!d || !d.customerPhone) return;
+  const msg = sleepMsg(d);
+  // ⚠️ الحفظ قبل الواتساب — الصفحة بتنام لما الواتس يفتح
+  if(await sleepMark(id, 'wa')) openWa(d.customerPhone, msg);
+}
+
+// 🤝 ما بعد البيع
+function asResultHtml(d){
+  const a = d.afterSale;
+  if(!a || !(a.state === 'done' || a.state === 'closed')) return '';
+  const st = a.state === 'closed' ? `📵 اتقفلت — مردّش ${a.tries || AS_MAX_TRIES} مرات`
+    : `${'⭐'.repeat(a.stars || 0)} (${a.stars || 0}/5)${a.working === 'no' ? ' · <b style="color:var(--rejected)">🔧 الجهاز فيه مشكلة</b>' : ' · ✅ الجهاز شغال'}`;
+  return `<div class="cc-box${a.working === 'no' || (a.stars && a.stars <= 2) ? ' late' : ' as'}">
+    <div class="cc-done">🤝 ما بعد البيع: ${st}</div>
+    ${a.tags && a.tags.length ? `<div class="fld-hint">اشتكى من: ${esc(a.tags.join(' · '))}</div>` : ''}
+    ${a.note ? `<div class="cc-done" style="white-space:pre-wrap;">${esc(a.note)}</div>` : ''}
+    <div class="fld-hint">${esc(a.by || '')} · ${esc(fmtDate(a.at))}</div>
+  </div>`;
+}
+function asFormHtml(d){
+  const a = d.afterSale;
+  const e = asEdit && asEdit.id === d.id ? asEdit : (asEdit = { id: d.id, stars: 0, tags: [], working: '', note: '' });
+  const star = n => `<button type="button" class="cc-star${e.stars >= n ? ' on' : ''}" onclick="asSet('stars',${n})">★</button>`;
+  const tag = (t, i) => `<button type="button" class="cc-chip${e.tags.includes(t) ? ' on' : ''}" onclick="asTag(${i})">${t}</button>`;
+  return `<div class="cc-box as">
+    <div class="cc-q">🤝 مكالمة ما بعد البيع — اتسلّم ${esc(agoTxt(deliveredAt(d)))}${a && a.tries ? ` · مردّش قبل كده ${a.tries} مرة` : ''}</div>
+    <div class="cc-chips" style="margin-bottom:10px;">
+      ${d.customerPhone ? `<a class="cc-chip" href="tel:${esc(d.customerPhone)}">📞 اتصل</a>
+      <button type="button" class="cc-chip" onclick="asWa('${esc(d.id)}')">💬 واتساب</button>` : ''}
+    </div>
+    <div class="cc-q">⭐ الخدمة كانت عاملة إزاي؟</div>
+    <div class="cc-stars">${[1, 2, 3, 4, 5].map(star).join('')}</div>
+    <div class="cc-q" style="margin-top:10px;">🔧 الجهاز شغال كويس؟</div>
+    <div class="cc-chips">
+      <button type="button" class="cc-chip${e.working === 'yes' ? ' on' : ''}" onclick="asSet('working','yes')">✅ أيوه</button>
+      <button type="button" class="cc-chip bad${e.working === 'no' ? ' on' : ''}" onclick="asSet('working','no')">🔧 لأ — فيه مشكلة</button>
+    </div>
+    <div class="cc-q" style="margin-top:10px;">😕 اشتكى من حاجة؟ <small style="font-weight:600;color:var(--muted);">(اختياري)</small></div>
+    <div class="cc-chips">${AS_TAGS.map(tag).join('')}</div>
+    <div class="cc-q" style="margin-top:10px;">${e.working === 'no' ? '✍️ المشكلة إيه؟ <b style="color:var(--rejected)">*</b>' : '✍️ قال إيه؟ <small style="font-weight:600;color:var(--muted);">(اختياري)</small>'}</div>
+    <textarea id="asNote" class="cc-ta" oninput="asEdit.note=this.value">${esc(e.note)}</textarea>
+    <button class="act-btn act-primary" style="margin-top:10px;background:var(--done);" onclick="asSave('${esc(d.id)}')">💾 سجّل المكالمة</button>
+    <div class="cc-row2">
+      <button class="act-btn act-out" onclick="asNoAnswer('${esc(d.id)}')">📵 مردّش</button>
+      <button class="act-btn act-out" onclick="asNoCall('${esc(d.id)}')">🚫 ماتتصلش بيا</button>
+    </div>
+  </div>`;
+}
+function asSet(k, v){ if(!asEdit) return; asEdit[k] = v; const id = asEdit.id, keep = asEdit; showInfo(id); asEdit = keep; }
+function asTag(i){
+  if(!asEdit) return;
+  const t = AS_TAGS[i];
+  asEdit.tags = asEdit.tags.includes(t) ? asEdit.tags.filter(x => x !== t) : [...asEdit.tags, t];
+  const id = asEdit.id, keep = asEdit; showInfo(id); asEdit = keep;
+}
+function asWa(id){
+  const d = devices.get(id); if(!d || !d.customerPhone) return;
+  openWa(d.customerPhone, `أهلاً ${d.customerName || ''} 👋\nمعاك I Fix Team — بنطمّن على جهازك *${devName(d)}* اللي استلمته امبارح 🙏\nالجهاز شغال كويس؟ ورأيك في الخدمة كان إيه؟`);
+}
+async function asSave(id){
+  const e = asEdit && asEdit.id === id ? asEdit : null;
+  if(!e) return;
+  const note = String(($('asNote') || {}).value || e.note || '').trim();
+  if(!e.stars){ alert('اختار عدد النجوم'); return; }
+  if(!e.working){ alert('الجهاز شغال كويس؟ اختار أيوه أو لأ'); return; }
+  if(e.working === 'no' && note.length < 3){ alert('اكتب المشكلة — بتوصل للمحاسب العام'); return; }
+  try{
+    const d = await freshRow(id);
+    const now = nowIso(), prev = d.afterSale || {};
+    const a = { state: 'done', stars: e.stars, tags: e.tags, working: e.working, note, at: now, by: ME, tries: prev.tries || 0 };
+    const txt = '🤝 ما بعد البيع: ' + '⭐'.repeat(e.stars) + ` (${e.stars}/5)` + (e.working === 'no' ? ' · 🔧 الجهاز فيه مشكلة' : ' · ✅ الجهاز شغال')
+              + (e.tags.length ? ' · اشتكى من: ' + e.tags.join('، ') : '') + (note ? '\n' + note : '');
+    const ok = await ccPatch(id, {
+      afterSale: a,
+      callLog: [...(d.callLog || []), logEntry('aftersale', 'done', txt, { stars: e.stars })],
+      activityNotes: [...(d.activityNotes || []), noteEntry(txt)],
+      lastModifiedAt: now, lastModifiedBy: ME,
+    });
+    if(!ok) return;
+    asEdit = null; closeAct(); render();
+    toast(e.working === 'no' || e.stars <= 2 ? '📝 اتسجّلت — والشكوى وصلت للمحاسب العام' : '✅ اتسجّلت — شكراً');
+  }catch(err){ alert('⚠️ ' + ((err && err.message) || err)); }
+}
+async function asNoAnswer(id){
+  try{
+    const d = await freshRow(id);
+    const now = new Date(), prev = d.afterSale || {};
+    const tries = (prev.tries || 0) + 1, closed = tries >= AS_MAX_TRIES;
+    const a = Object.assign({}, prev, { state: closed ? 'closed' : 'noanswer', tries, at: now.toISOString(), by: ME,
+      nextAt: new Date(now.getTime() + AS_RETRY_H * 3600000).toISOString() });
+    const txt = closed ? `📵 ما بعد البيع: مردّش للمرة ${tries} — اتقفلت` : `📵 ما بعد البيع: مردّش (${tries}/${AS_MAX_TRIES}) — هيظهر تاني بكره`;
+    const ok = await ccPatch(id, { afterSale: a, callLog: [...(d.callLog || []), logEntry('aftersale', 'noanswer', txt)],
+                                   lastModifiedAt: now.toISOString(), lastModifiedBy: ME });
+    if(!ok) return;
+    asEdit = null; closeAct(); render(); toast(txt);
+  }catch(e){ alert('⚠️ ' + ((e && e.message) || e)); }
+}
+async function asNoCall(id){
+  const why = prompt('🚫 العميل طلب مانتصلش بيه تاني؟\nكل أجهزة الرقم ده مش هتظهر في ما بعد البيع.\n\nقال إيه؟ (اختياري)');
+  if(why === null) return;
+  const { data, error } = await sb.rpc('callcenter_nocall', { p_id: id, p_by: ME, p_note: why.trim() });
+  if(error){ alert('⚠️ ماتحفظش: ' + (error.message || error)); return; }
+  await loadDevices();
+  asEdit = null; closeAct(); render();
+  toast('🚫 اتسجّل — الرقم ده مش هيظهر تاني' + (data > 1 ? ` (${data} أجهزة)` : ''));
+}
+
+// ============================================================
+// 🚀 الإقلاع
+// ============================================================
+async function ccReload(showMsg){
+  const ok = await loadDevices();
+  if(searchQ) runSearch(); else render();
+  if(showMsg && ok) toast('🔄 اتحدّثت');
+}
+async function boot(){
+  const { data:{ session } } = await sb.auth.getSession();
+  if(!session){ location.replace('index.html'); return; }
+  // بوابة الاشتراك — جدول shop بيتقرا دايماً
+  try{
+    const { data:sh } = await sb.from('shop').select('paid_until, trial_until').eq('id', 1).maybeSingle();
+    if(sh){
+      const n = new Date();
+      const ok = (sh.paid_until && new Date(sh.paid_until) > n) || (sh.trial_until && new Date(sh.trial_until) > n);
+      if(!ok){ try{ showServiceStopped(false); }catch(e){} return; }
+    }
+  }catch(e){ console.error('[الاشتراك] فشل فحص المدة:', e); }
+  MY_EMAIL = (session.user.email || '').toLowerCase();
+  let role = '', roles = {};
+  try{
+    const { data:row } = await sb.from('app_data').select('value').eq('key', 'user-roles').maybeSingle();
+    roles = (row && row.value) ? JSON.parse(row.value) : {};
+    const ent = roles[MY_EMAIL];
+    role = typeof ent === 'string' ? ent : (ent && ent.role) || '';
+  }catch(e){}
+  if(role !== 'callcenter'){ location.replace('dashboard.html'); return; }
+
+  // الاسم: لوحة الأدمن ← ملف الحساب ← أول الإيميل
+  ME = MY_EMAIL.split('@')[0];
+  try{
+    const { data:prof } = await sb.from('profiles').select('full_name').eq('id', session.user.id).single();
+    if(prof && prof.full_name && prof.full_name.trim()) ME = prof.full_name.trim();
+  }catch(e){}
+  try{ const en = roles[MY_EMAIL]; const nm = (en && typeof en === 'object' && en.techName || '').trim(); if(nm) ME = nm; }catch(e){}
+  $('ccName').textContent = ME;
+  try{
+    localStorage.setItem('ifix-last-role', 'callcenter');
+    localStorage.setItem('ifix-last-email', MY_EMAIL);
+    sessionStorage.removeItem('ifix-bounced');
+  }catch(e){}
+  try{ syncAccountShared(MY_EMAIL, ME, CC_ROLE_LABEL); }catch(e){}
+
+  await loadDevices();
+  // أول تبويب فيه شغل
+  const first = TABS.find(t => t.list().length);
+  if(first) TAB = first.k;
+  render();
+}
+document.addEventListener('visibilitychange', () => { if(!document.hidden && ME) ccReload(false); });
+setInterval(() => { if(!document.hidden && ME) ccReload(false); }, 5 * 60000);
+boot();
+</script>
+
+<!-- شاشة المواعيد — بتتبني بالكامل من attendance.js -->
+<div id="attOverlay" class="hidden"></div>
+<!-- شاشة «مرتبك» — بتتبني بالكامل من payroll.js -->
+<div id="payOverlay" class="hidden"></div>
+</body>
+</html>

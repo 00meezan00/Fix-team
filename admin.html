@@ -752,7 +752,7 @@ async function toggleFlag(key){
 //    + فني في صفحة واحدة (owner.html)، وبيسعّر الأجهزة
 //    اللي السوبر أدمن بيشاركها معاه. مايقدرش يأكد دفع.
 //    ⚠️ الاسم الظاهر عنده **إجباري** — هو اللي بيربط أجهزته.
-const ROLES = ['super_admin', 'accountant', 'dispatcher', 'technician', 'hr', 'staff', 'owner'];
+const ROLES = ['super_admin', 'accountant', 'dispatcher', 'technician', 'hr', 'staff', 'owner', 'callcenter'];   // 📞 callcenter: ملف prod-callcenter.sql لازم يتشغّل الأول
 const ROLE_LABEL_KEYS = {
   super_admin: 'adm.roleSuper',
   accountant:  'adm.roleAcc',
@@ -763,7 +763,7 @@ const ROLE_LABEL_KEYS = {
 };
 // الأدوار اللي لسه مالهاش مفتاح ترجمة — من غير ده بيظهر الاسم
 // الإنجليزي الخام (staff) قدّام الأدمن.
-const ROLE_LABEL_FALLBACK = { staff: 'موظف', owner: 'المالك' };
+const ROLE_LABEL_FALLBACK = { staff: 'موظف', owner: 'المالك', callcenter: 'الكول سنتر' };
 function roleLabel(r){
   const k = ROLE_LABEL_KEYS[r];
   try{ return k ? t(k) : (ROLE_LABEL_FALLBACK[r] || r); }

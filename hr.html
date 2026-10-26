@@ -943,7 +943,7 @@ document.addEventListener('visibilitychange', () => { if(!document.hidden) loadS
 function roleLabel(r){
   return { super_admin:'أدمن', accountant:'محاسب', dispatcher:'مسؤول حركة',
            technician:'فني', hr:'شؤون العاملين', staff:'موظف',
-           owner:'المالك' }[r] || r;
+           owner:'المالك', callcenter:'الكول سنتر' }[r] || r;
 }
 function nameOf(email){
   const v = ROLES_MAP[email];

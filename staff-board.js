@@ -82,7 +82,7 @@
     var map = {
       super_admin: opts.adminLabel || 'المحاسب العام',
       accountant:'محاسب', dispatcher:'مسؤول حركة', technician:'فني',
-      hr:'شؤون العاملين', staff:'موظف', owner:'المالك'
+      hr:'شؤون العاملين', staff:'موظف', owner:'المالك', callcenter:'الكول سنتر'
     };
     return map[r] || r || '';
   }

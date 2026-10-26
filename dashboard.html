@@ -68,12 +68,13 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
       }
     }
 
-    if(!bounced && sameUser && (last === 'dispatcher' || last === 'technician' || last === 'hr' || last === 'staff' || last === 'owner')){
+    if(!bounced && sameUser && (last === 'dispatcher' || last === 'technician' || last === 'hr' || last === 'staff' || last === 'owner' || last === 'callcenter')){
       sessionStorage.setItem('ifix-bounced', '1');
       location.replace(last === 'dispatcher' ? 'dispatch.html'
                      : last === 'hr'         ? 'hr.html'
                      : last === 'staff'      ? 'staff.html'
                      : last === 'owner'      ? 'owner.html'
+                     : last === 'callcenter' ? 'callcenter.html'
                      : 'my-devices.html');
       return;
     }
@@ -1950,7 +1951,7 @@ function isAdmin(){ return isSuperAdmin(); }
 // لو إيميل الأدمن لسه ماتحطش، بنسيب الصلاحيات مفتوحة عشان محدش يتقفل بره النظام
 const ADMIN_EMAIL_SET = ADMIN_EMAILS.length > 0;
 const ROLES_KEY = 'user-roles';
-const ROLES = ['super_admin', 'accountant', 'dispatcher', 'technician', 'hr', 'staff', 'owner'];
+const ROLES = ['super_admin', 'accountant', 'dispatcher', 'technician', 'hr', 'staff', 'owner', 'callcenter'];   // 📞 callcenter → callcenter.html
 let userRoles = {};   // { "email": "super_admin" }  أو  { "email": {role, techName} }
 
 async function loadUserRoles(){
@@ -2030,7 +2031,7 @@ const ROLE_LABEL_KEYS = {
 };
 // دور HR اتضاف بعد ما الخريطة دي اتكتبت ومالوش مفتاح ترجمة،
 // فبيرجّع 'hr' خام. الخريطة دي بتغطّي أي دور مالوش مفتاح.
-const ROLE_LABEL_FALLBACK = { hr: 'موارد بشرية', staff: 'موظف', owner: 'المالك' };
+const ROLE_LABEL_FALLBACK = { hr: 'موارد بشرية', staff: 'موظف', owner: 'المالك', callcenter: 'الكول سنتر' };
 function roleLabel(r){
   // 🧾 حساب السوبر أدمن **هو** «المحاسب العام» — ولوحة الأدمن باب جواه.
   //    فاسمه في كل حاجة الناس بتشوفها (ملاحظات الأجهزة · حسابي ·
@@ -2078,6 +2079,8 @@ function applyRoleVisibility(){
   if(myRole() === 'staff'){ location.replace('staff.html'); return; }
   // 👑 المالك: صفحته owner.html — بتقرا من devices_owner
   if(myRole() === 'owner'){ location.replace('owner.html'); return; }
+  // 📞 الكول سنتر: صفحته callcenter.html — بتقرا من devices_callcenter
+  if(myRole() === 'callcenter'){ location.replace('callcenter.html'); return; }
 
   // الدور اتحدد → نحفظه ونحدّث الكلاسات
   try{
@@ -4825,7 +4828,79 @@ function ownerHoldPanelHtml(){
 function renderOwnerHoldPanel(){
   const host = document.getElementById('ownerHoldHost');
   // ⏸️ «لسه» و🚫 «اترفض» — لوحتين في نفس المكان فوق الأعمدة
-  if(host) host.innerHTML = ownerHoldPanelHtml() + ownerRejPanelHtml();
+  if(host) host.innerHTML = ownerHoldPanelHtml() + ownerRejPanelHtml() + ccComplaintPanelHtml();
+}
+
+// ============================================================
+// 😕 شكاوى العملاء من الكول سنتر — للمحاسب العام (السوبر أدمن) بس
+// ------------------------------------------------------------
+// 🧸 الكول سنتر بيكلّم اللي استلموا امبارح. لو العميل قال «الجهاز
+//    فيه مشكلة» أو ادّى نجمتين أو أقل → الجهاز بيطلع هنا لحد ما
+//    المحاسب العام يدوس «✓ راجعته».
+// 🗄️ afterSale{state, stars, tags, working, note, by, at, reviewed{at,by}}
+//    (الكول سنتر بيكتبها من callcenter.html — «راجعته» بتاعة هنا بس)
+// ============================================================
+function ccIsComplaint(d){
+  const a = d && d.afterSale;
+  return !!(a && a.state === 'done' && (a.working === 'no' || (a.stars && a.stars <= 2)));
+}
+function ccComplaintList(){
+  if(!isSuperAdmin()) return [];
+  return devices.filter(d => ccIsComplaint(d) && !d.afterSale.reviewed)
+    .sort((a, b) => Date.parse(b.afterSale.at) - Date.parse(a.afterSale.at));
+}
+function ccComplaintPanelHtml(){
+  const list = ccComplaintList();
+  if(!list.length) return '';
+  return `<div class="appr-panel" style="border-color:var(--danger-border);">
+    <div class="appr-panel-head" style="color:var(--danger);">😕 شكاوى العملاء — من مكالمات ما بعد البيع <span class="appr-count" style="background:var(--danger);">${list.length}</span></div>
+    ${list.map(d => { const a = d.afterSale; let when = '';
+      try{ when = new Date(a.at).toLocaleString(getLocale()); }catch(e){}
+      return `<div class="appr-row">
+        <div class="appr-row-info" style="cursor:pointer;" onclick="openDetail('${d.id}')">
+          <div class="appr-row-dev">📱 ${esc(d.deviceType || '')} ${esc(d.model || '')}${d.customerName ? ' — ' + esc(d.customerName) : ''}</div>
+          <div style="font-size:13px;line-height:1.7;margin-top:4px;">${'⭐'.repeat(a.stars || 0)} (${a.stars || 0}/5)${a.working === 'no' ? ' · 🔧 الجهاز فيه مشكلة' : ''}${a.tags && a.tags.length ? '<br>اشتكى من: ' + esc(a.tags.join(' · ')) : ''}${a.note ? '<br>' + esc(a.note) : ''}</div>
+          <div class="appr-row-meta">${d.technician ? '🔧 ' + esc(d.technician) + ' · ' : ''}${d.customerPhone ? '📞 <span dir="ltr">' + esc(d.customerPhone) + '</span> · ' : ''}📞 ${esc(a.by || '')}${when ? ' · ' + esc(when) : ''}</div>
+        </div>
+        <div class="appr-row-actions"><button class="appr-btn-yes" onclick="event.stopPropagation();ccReview('${d.id}')">✓ راجعته</button></div>
+      </div>`; }).join('')}
+  </div>`;
+}
+async function ccReview(id){
+  if(!isSuperAdmin()) return;
+  const now = new Date().toISOString();
+  devices = devices.map(x => x.id !== id || !x.afterSale ? x : { ...x,
+    afterSale: { ...x.afterSale, reviewed: { at: now, by: currentUser.name } },
+    lastModifiedAt: now, lastModifiedBy: currentUser.name });
+  render(); if(selectedId === id) renderDetail();
+  await persist();
+}
+// 📞 في تفاصيل الجهاز: نتيجة ما بعد البيع + سجل المكالمات (قراية)
+function ccDetailHtml(d){
+  if(!d) return '';
+  const a = d.afterSale, log = d.callLog || [];
+  let h = '';
+  if(a && (a.state === 'done' || a.state === 'closed')){
+    const bad = ccIsComplaint(d);
+    const st = a.state === 'closed' ? `📵 اتقفلت — العميل مردّش ${a.tries || 3} مرات`
+      : `${'⭐'.repeat(a.stars || 0)} (${a.stars || 0}/5)${a.working === 'no' ? ' · <b style="color:var(--danger)">🔧 الجهاز فيه مشكلة</b>' : ' · ✅ الجهاز شغال'}`;
+    h += `<div style="border:1.5px solid var(--${bad ? 'danger' : 'success'});border-radius:10px;padding:10px 12px;margin:0 0 12px;">
+      <div style="font-size:13.5px;line-height:1.7;">🤝 ما بعد البيع: ${st}</div>
+      ${a.tags && a.tags.length ? `<div style="font-size:12.5px;color:var(--muted);">اشتكى من: ${esc(a.tags.join(' · '))}</div>` : ''}
+      ${a.note ? `<div style="font-size:13px;margin-top:4px;white-space:pre-wrap;">${esc(a.note)}</div>` : ''}
+      <div style="font-size:11.5px;color:var(--muted);margin-top:4px;">📞 ${esc(a.by || '')}${a.reviewed ? ' · ✓ راجعه ' + esc(a.reviewed.by || '') : ''}</div>
+      ${bad && !a.reviewed && isSuperAdmin() ? `<button class="appr-btn-yes" style="margin-top:8px;" onclick="ccReview('${d.id}')">✓ راجعته</button>` : ''}
+    </div>`;
+  }
+  if(log.length){
+    h += `<details style="margin:0 0 12px;"><summary style="cursor:pointer;font-size:12.5px;font-weight:800;color:var(--muted);">📞 سجل المكالمات (${log.length})</summary>
+      ${[...log].reverse().slice(0, 10).map(c => `<div style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:7px 10px;margin-top:6px;font-size:13px;line-height:1.6;">
+        <span style="white-space:pre-wrap;">${esc(c.text || '')}</span>
+        <div style="font-size:11px;color:var(--muted-2);">${esc(c.by || '')} · ${esc(new Date(c.at).toLocaleString('ar-EG'))}</div></div>`).join('')}
+    </details>`;
+  }
+  if(d.noCall) h += `<div style="font-size:12.5px;color:var(--muted);margin:0 0 12px;">🚫 العميل طلب مانتصلش بيه${d.noCall.note ? ' — ' + esc(d.noCall.note) : ''}</div>`;
+  return h;
 }
 
 // نفس التنبيه جوه تفاصيل الجهاز — عشان لو فتحته من أي حتة تلاقي الزرار
@@ -5359,6 +5434,7 @@ function renderDetailNow(){
     <h2 style="font-family:'Cairo',sans-serif;font-size:18px;margin:4px 0 10px;">${esc(d.deviceType)} ${esc(d.model)}</h2>
     ${pendingApprovalText(d) ? `<div class="pending-appr-banner">⏳ ${pendingApprovalText(d)} — ${t('appr.bannerHint')}</div>` : ''}
     ${dueDetailHtml(d)}
+    ${ccDetailHtml(d)}
 
     <div class="row2">
       <label class="field"><span>${t('det.customerName')}</span><input value="${esc(d.customerName)}"${roI} onblur="editField('customerName', this.value)" /></label>
