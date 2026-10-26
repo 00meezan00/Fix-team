@@ -852,26 +852,25 @@ function ccOnSearch(v){
   clearTimeout(searchT);
   if(!searchQ){ searchRows = null; render(); return; }
   if(searchQ.replace(/\s/g, '').length < 2){ searchRows = null; renderSearch(); return; }
-  searchT = setTimeout(runSearch, 400);
+  searchT = setTimeout(() => runSearch(false), 400);
 }
-async function runSearch(){
+// ⚠️ (٢٠٢٦-١٠-٢٦) البحث بقى بالدالة callcenter_search على السيرفر (ملف
+//    prod-callcenter-search.sql): بيدوّر في **كل** أجهزة السيستم، ومن غير فرق
+//    بين أ/ا و ة/ه و ى/ي، وكل كلمة لوحدها، والرقم بالأرقام بس. ٥٠ نتيجة في
+//    المرة وزرار «اعرض أكتر».
+const SEARCH_PAGE = 50;
+let searchTotal = 0;
+async function runSearch(more){
   const seq = ++searchSeq;
-  const q = searchQ.replace(/[,()*%\\]/g, ' ').trim();
-  const digits = q.replace(/\D/g, '');
-  searchRows = 'loading'; renderSearch();
+  const off = more && Array.isArray(searchRows) ? searchRows.length : 0;
+  if(!more){ searchRows = 'loading'; renderSearch(); }
   try{
-    const like = '*' + q + '*';
-    const ors = [`data->>customerName.ilike.${like}`, `data->>model.ilike.${like}`, `data->>deviceType.ilike.${like}`,
-                 `data->>shopName.ilike.${like}`, `data->>serialNumber.ilike.${like}`];
-    if(digits.length >= 3){
-      ors.push(`data->>customerPhone.ilike.*${digits.slice(-8)}*`);
-      ors.push(`id.ilike.*${digits}*`);
-    }
-    const { data, error } = await sb.from('devices_callcenter').select('id,data')
-      .or(ors.join(',')).order('intake_date', { ascending:false }).limit(40);
+    const { data, error } = await sb.rpc('callcenter_search', { p_q: searchQ, p_limit: SEARCH_PAGE, p_offset: off });
     if(seq !== searchSeq) return;
     if(error) throw error;
-    searchRows = (data || []).map(r => { const d = Object.assign({ id: r.id }, r.data); devices.set(r.id, d); return d; });
+    const rows = (data || []).map(r => { const d = Object.assign({ id: r.id }, r.data); devices.set(r.id, d); return d; });
+    searchTotal = (data && data.length) ? Number(data[0].total) || rows.length : (more ? searchTotal : 0);
+    searchRows = more && Array.isArray(searchRows) ? [...searchRows, ...rows] : rows;
   }catch(e){
     if(seq !== searchSeq) return;
     console.error('search failed:', e);
@@ -882,11 +881,13 @@ async function runSearch(){
 function renderSearch(){
   const host = $('ccList');
   if(searchQ.replace(/\s/g, '').length < 2){ host.innerHTML = empty('🔍', 'اكتب حرفين على الأقل'); return; }
-  if(searchRows === 'loading' || searchRows === null){ host.innerHTML = empty('⏳', 'بدوّر…'); return; }
+  if(searchRows === 'loading' || searchRows === null){ host.innerHTML = empty('⏳', 'بدوّر في كل السيستم…'); return; }
   if(searchRows.err){ host.innerHTML = `<div class="empty"><span class="big">⚠️</span>البحث ماشتغلش<br><small dir="ltr">${esc(searchRows.err)}</small></div>`; return; }
-  if(!searchRows.length){ host.innerHTML = empty('🤷', 'مفيش جهاز بالكلام ده'); return; }
-  host.innerHTML = `<div class="cc-hint">${searchRows.length >= 40 ? 'أحدث ٤٠ نتيجة — اكتب أكتر عشان تضيّق البحث' : searchRows.length + ' نتيجة'}</div>
-    <div class="grid">${searchRows.map(d => ticket(d, '')).join('')}</div>`;
+  if(!searchRows.length){ host.innerHTML = empty('🤷', 'مفيش أي جهاز في السيستم بالكلام ده'); return; }
+  const left = searchTotal - searchRows.length;
+  host.innerHTML = `<div class="cc-group">🔍 نتايج البحث في كل السيستم — ${searchTotal} جهاز</div>
+    <div class="grid">${searchRows.map(d => ticket(d, '')).join('')}</div>
+    ${left > 0 ? `<button class="cc-more" onclick="this.disabled=true;this.textContent='⏳ بحمّل…';runSearch(true)">⬇️ اعرض أكتر (فاضل ${left})</button>` : ''}`;
 }
 
 // ============================================================
