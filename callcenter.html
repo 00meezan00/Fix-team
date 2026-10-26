@@ -725,6 +725,7 @@ function lateList(){
   const out = [];
   devices.forEach(d => {
     if(!ACTIVE.includes(d.status)) return;
+    if(!isOwnShop(d.shopName)) return;   // 🏪 عملاء المحل بس
     const i = IFixDue.info(d);
     if(!i || i.left >= 0) return;
     const lc = lastCall(d, 'due');
@@ -746,6 +747,7 @@ function sleepList(){
   const out = [];
   devices.forEach(d => {
     if(!inDrawer(d)) return;
+    if(!isOwnShop(d.shopName)) return;   // 🏪 عملاء المحل بس
     const at = enteredAt(d, d.status);
     if(!at || String(at).slice(0, 10) < SLEEP_FROM) return;
     const days = Math.floor((Date.now() - Date.parse(at)) / 86400000);
@@ -763,7 +765,7 @@ function deliveredAt(d){
   for(let i = h.length - 1; i >= 0; i--) if(h[i] && h[i].status === 'delivered' && h[i].date) return h[i].date;
   return '';
 }
-// 🏪 ما بعد البيع لعملاء المحل نفسه (القطاعي) بس: اسم المحل «I Fix Team» أو
+// 🏪 القوايم التلاتة (عدّى ميعادهم · نايمين · ما بعد البيع) لعملاء المحل نفسه (القطاعي) بس: اسم المحل «I Fix Team» أو
 //    «Fix Team» بأي شكل كتابة (كابيتال/سمول، مسافات، ifix، عربي «فيكس تيم»).
 //    أي اسم محل تاني (محلات بتتعامل معانا) مابيظهرش.
 //    ⚠️ الجهاز القديم اللي اسم المحل عليه فاضي بيتحسب قطاعي برضه — اسم المحل
@@ -815,11 +817,11 @@ function render(){
   const list = t.list();
   let html = '';
   if(TAB === 'late'){
-    html = `<div class="cc-hint">أجهزة لسه في الورشة والميعاد اللي اتفقنا عليه مع العميل فات — كلّمه وبلّغه، واتفق على ميعاد جديد.</div>`
+    html = `<div class="cc-hint">أجهزة عملاء المحل (I Fix Team) لسه في الورشة والميعاد اللي اتفقنا عليه مع العميل فات — كلّمه وبلّغه، واتفق على ميعاد جديد.</div>`
       + (list.length ? `<div class="grid">${list.map(({d, late}) => ticket(d, `<span class="cc-tag cc-late">⏰ متأخر ${esc(IFixDue.durTxt(late))}</span>`)).join('')}</div>`
                      : empty('✅', 'مفيش أجهزة عدّى ميعادها'));
   } else if(TAB === 'sleep'){
-    html = `<div class="cc-hint">أجهزة في «تم الصيانة» أو «درج الرفض» بقالها ${SLEEP_DAYS} أيام أو أكتر — فكّر العميل ييجي ياخدها. بعد ما تكلّمه بتختفي ${SLEEP_SNOOZE_DAYS} أيام.</div>`
+    html = `<div class="cc-hint">أجهزة عملاء المحل (I Fix Team) في «تم الصيانة» أو «درج الرفض» بقالها ${SLEEP_DAYS} أيام أو أكتر — فكّر العميل ييجي ياخدها. بعد ما تكلّمه بتختفي ${SLEEP_SNOOZE_DAYS} أيام.</div>`
       + (list.length ? `<div class="grid">${list.map(({d, days}) => ticket(d, `<span class="cc-tag cc-sleep">😴 ${days} يوم</span>`)).join('')}</div>`
                      : empty('✅', 'مفيش أجهزة نايمة'));
   } else {
