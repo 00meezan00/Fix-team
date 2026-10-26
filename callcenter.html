@@ -518,7 +518,7 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
 
 <div class="cc-sticky">
   <div class="searchbar">
-    <input id="ccSearch" type="search" autocomplete="off" placeholder="دوّر بالاسم أو الرقم أو رقم الجهاز أو الموديل…"
+    <input id="ccSearch" type="search" autocomplete="off" placeholder="دوّر على أي جهاز في السيستم — اسم، رقم، #جهاز، موديل…"
            oninput="ccOnSearch(this.value)">
   </div>
   <div class="tabs" id="ccTabs"></div>
@@ -763,6 +763,16 @@ function deliveredAt(d){
   for(let i = h.length - 1; i >= 0; i--) if(h[i] && h[i].status === 'delivered' && h[i].date) return h[i].date;
   return '';
 }
+// 🏪 ما بعد البيع لعملاء المحل نفسه (القطاعي) بس: اسم المحل «I Fix Team» أو
+//    «Fix Team» بأي شكل كتابة (كابيتال/سمول، مسافات، ifix، عربي «فيكس تيم»).
+//    أي اسم محل تاني (محلات بتتعامل معانا) مابيظهرش.
+//    ⚠️ الجهاز القديم اللي اسم المحل عليه فاضي بيتحسب قطاعي برضه — اسم المحل
+//       بقى إجباري، فده للأجهزة اللي اتسجّلت قبل كده بس.
+function isOwnShop(name){
+  const n = String(name || '').toLowerCase().replace(/[أإآ]/g, 'ا').replace(/[^a-z\u0600-\u06ff]/g, '');
+  if(!n) return true;
+  return n === 'ifix' || n.includes('fixteam') || n.includes('فيكستيم') || n.includes('فكستيم');
+}
 function asList(){
   const today = cairoDay(Date.now());
   const yest = cairoDay(Date.now() - 86400000);
@@ -770,6 +780,7 @@ function asList(){
   const out = [];
   devices.forEach(d => {
     if(d.status !== 'delivered' || !phoneKey(d.customerPhone) || d.noCall) return;
+    if(!isOwnShop(d.shopName)) return;   // 🏪 عملاء المحل بس
     const at = deliveredAt(d);
     if(!at) return;
     const day = cairoDay(at);
@@ -814,7 +825,7 @@ function render(){
   } else {
     const y = list.filter(x => x.yest), o = list.filter(x => !x.yest);
     const row = ({d, at, tries}) => ticket(d, `<span class="cc-tag cc-as">📦 اتسلّم ${esc(agoTxt(at))}</span>${tries ? ` <span class="cc-tag cc-tries">📵 مردّش ${tries} مرة</span>` : ''}`);
-    html = `<div class="cc-hint">كل يوم: اللي استلموا أجهزتهم امبارح — اطمّن على الجهاز واسأله عن الخدمة.</div>`
+    html = `<div class="cc-hint">كل يوم: عملاء المحل (I Fix Team) اللي استلموا أجهزتهم امبارح — اطمّن على الجهاز واسأله عن الخدمة.</div>`
       + (y.length ? `<div class="cc-group">📅 استلموا امبارح (${y.length})</div><div class="grid">${y.map(row).join('')}</div>` : '')
       + (o.length ? `<div class="cc-group">⏳ لسه ماتكلّموش — من أيام قبل كده (${o.length})</div><div class="grid">${o.map(row).join('')}</div>` : '')
       + (!list.length ? empty('✅', 'خلّصت مكالمات النهارده') : '');
@@ -833,7 +844,9 @@ function ticket(d, tagHtml){
   </div>`;
 }
 
-// ---------- 🔍 البحث (على السيرفر — كل الأجهزة مش اللي متحمّلة بس) ----------
+// ---------- 🔍 البحث (على السيرفر — **كل** أجهزة السيستم بكل حالاتها، مش اللي متحمّلة بس) ----------
+// 🧸 القوايم التلاتة بتحمّل جزء بس، لكن البحث بيسأل الشاشة devices_callcenter كلها
+//    (كل الأجهزة ما عدا المهملات) — قيد الانتظار، في الصيانة، اتسلّم من سنة… أي حاجة.
 function ccOnSearch(v){
   searchQ = String(v || '').trim();
   clearTimeout(searchT);
@@ -913,7 +926,7 @@ function showInfo(id){
         ${row('🎨 اللون', esc(d.deviceColor || ''))}
         ${row('🔎 العطل المكتشف', d.discoveredFault ? esc(d.discoveredFault) : '')}
         ${row('👨‍🔧 الفني', d.technician ? esc(d.technician) : '')}
-        ${row('💰 السعر', price ? esc(price) : '')}
+        ${row('💰 السعر', price ? '<b>' + esc(price) + '</b>' : '<span style="color:var(--muted)">لسه ماتسعّرش</span>')}
         ${row('💵 العربون (إخباري)', IFixDue.depAmount(d) ? esc(IFixDue.depAmount(d).toLocaleString('en-US')) + ' ج.م' : '')}
         ${row('📥 دخل', esc(fmtDate(d.intakeDate)))}
         ${row('📦 اتسلّم', dAt ? esc(fmtDate(dAt)) : '')}

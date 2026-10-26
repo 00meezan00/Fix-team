@@ -971,7 +971,7 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
     <div class="frow">
       <div class="fld"><label>تليفون العميل</label><input id="f_phone" list="ownPhoneList" autocomplete="off" inputmode="tel" oninput="this.dataset.autoFill='';" placeholder="010..." style="direction:ltr;text-align:right;"></div>
       <datalist id="ownPhoneList"></datalist>
-      <div class="fld"><label>المحل (اختياري)</label><input id="f_shop" list="ownShopList" autocomplete="off" placeholder="لو الجهاز من محل"></div>
+      <div class="fld"><label>🏪 المحل <b style="color:var(--rejected)">*</b></label><input id="f_shop" list="ownShopList" autocomplete="off" placeholder="اسم المحل — لو عميل قطاعي اكتب I Fix Team"></div>
       <datalist id="ownShopList"></datalist>
     </div>
     <!-- 🛵 المندوب = اللي جاب الجهاز للمحل (مش صاحبه). اختياري.
@@ -3369,9 +3369,11 @@ async function saveIntake(){
   if(!type) missing.push('نوع الجهاز');
   if(!cust) missing.push('اسم العميل');
   if(!color) missing.push('لون الجهاز');
+  // 🏪 اسم المحل إجباري — عميل قطاعي = «I Fix Team»
+  if(!(($('f_shop') || {}).value || '').trim()) missing.push('اسم المحل (لو عميل قطاعي اكتب I Fix Team)');
   if(missing.length){
     toast('لازم تكتب: ' + missing.join('، '));
-    const first = !type ? 'f_type' : (!cust ? 'f_cust' : 'f_color');
+    const first = !type ? 'f_type' : (!cust ? 'f_cust' : (!color ? 'f_color' : 'f_shop'));
     const el = $(first); if(el) el.focus();
     return;
   }

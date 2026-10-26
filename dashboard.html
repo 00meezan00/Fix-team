@@ -1586,7 +1586,7 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
            الاقتراح اللي تحت بقى من عندنا، وبيملّي أحدث رقم. -->
       <label class="field"><span data-i18n="add.customerName">اسم العميل</span><input id="f_customerName" list="custNameList" autocomplete="off" oninput="onCustomerNameInput()" /></label>
       <datalist id="custNameList"></datalist>
-      <label class="field"><span data-i18n="add.shopName">اسم المحل</span><input id="f_shopName" list="shopNameList" autocomplete="off" oninput="autoWholesaleCheck()" /></label>
+      <label class="field"><span>اسم المحل <b style="color:var(--danger)">*</b></span><input id="f_shopName" list="shopNameList" autocomplete="off" placeholder="اسم المحل — لو عميل قطاعي اكتب I Fix Team" oninput="autoWholesaleCheck()" /></label>
       <div id="wsAutoHint" style="display:none;background:var(--violet-bg,#F5F3FF);color:var(--violet);border:1px solid var(--violet);border-radius:9px;padding:8px 11px;font-size:12.5px;font-weight:800;margin-bottom:10px;">🏷️ عميل جملة معروف — اتظبط تلقائي (تقدر تغيّره تحت)</div>
       <datalist id="shopNameList"></datalist>
       <!-- 🛵 المندوب = اللي جاب الجهاز للمحل (مش صاحبه). اختياري.
@@ -4527,9 +4527,11 @@ async function submitAdd(){
   if(!customerName) missing.push('اسم العميل');
   if(!deviceType)   missing.push('نوع الجهاز');
   if(!deviceColor)  missing.push('لون الجهاز');
+  // 🏪 اسم المحل إجباري — عميل قطاعي = «I Fix Team»
+  if(!get('shopName')) missing.push('اسم المحل (لو عميل قطاعي اكتب I Fix Team)');
   if(missing.length){
     alert('لازم تكتب: ' + missing.join('، '));
-    const first = !customerName ? 'f_customerName' : (!deviceType ? 'f_deviceType' : 'f_deviceColor');
+    const first = !customerName ? 'f_customerName' : (!deviceType ? 'f_deviceType' : (!deviceColor ? 'f_deviceColor' : 'f_shopName'));
     const el = document.getElementById(first); if(el) el.focus();
     return;
   }
@@ -5438,7 +5440,7 @@ function renderDetailNow(){
 
     <div class="row2">
       <label class="field"><span>${t('det.customerName')}</span><input value="${esc(d.customerName)}"${roI} onblur="editField('customerName', this.value)" /></label>
-      <label class="field"><span>${t('det.shopName')}</span><input value="${esc(d.shopName||'')}" list="shopNameListDetail" autocomplete="off" placeholder="${t('det.shopName')}"${roI} onblur="editField('shopName', this.value)" /></label>
+      <label class="field"><span>${t('det.shopName')}</span><input value="${esc(d.shopName||'')}" list="shopNameListDetail" autocomplete="off" placeholder="${t('det.shopName')}"${roI} onblur="if(!this.value.trim()){ alert('🏪 اسم المحل إجباري — لو عميل قطاعي اكتب I Fix Team'); this.value = (devices.find(x => x.id === selectedId) || {}).shopName || ''; return; } editField('shopName', this.value)" /></label>
       <datalist id="shopNameListDetail">${shopNamesForDatalist()}</datalist>
     </div>
     <!-- ⚠️ رقم العميل كان **مش ظاهر خالص** في تفاصيل الداشبورد —

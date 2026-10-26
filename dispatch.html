@@ -899,7 +899,7 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
     <div class="frow">
       <div class="fld"><label data-i18n="dp.customerPhone">تليفون العميل</label><input id="f_phone" list="dpPhoneList" autocomplete="off" inputmode="tel" oninput="this.dataset.autoFill='';" placeholder="010..." style="direction:ltr;text-align:right;"></div>
       <datalist id="dpPhoneList"></datalist>
-      <div class="fld"><label data-i18n="dp.shopOpt">المحل (اختياري)</label><input id="f_shop" list="dpShopList" autocomplete="off" placeholder="لو الجهاز من محل" data-i18n-ph="dp.shopPh"></div>
+      <div class="fld"><label>🏪 المحل <b style="color:var(--rejected)">*</b></label><input id="f_shop" list="dpShopList" autocomplete="off" placeholder="اسم المحل — لو عميل قطاعي اكتب I Fix Team"></div>
       <datalist id="dpShopList"></datalist>
     </div>
     <!-- 🛵 المندوب = اللي جاب الجهاز للمحل (مش صاحبه). اختياري.
@@ -2752,6 +2752,8 @@ async function saveIntake(){
   const type=$('f_type').value.trim(), model=$('f_model').value.trim(), cust=$('f_cust').value.trim();
   const color=$('f_color').value.trim();
   if(!type || !cust){ toast(t('dp.needFields')); return; }
+  // 🏪 اسم المحل إجباري — عميل قطاعي = «I Fix Team»
+  if(!(($('f_shop') || {}).value || '').trim()){ toast('🏪 اكتب اسم المحل — لو عميل قطاعي اكتب I Fix Team'); const s=$('f_shop'); if(s) s.focus(); return; }
   if(!color){ toast('🎨 اكتب لون الجهاز الأول'); const c=$('f_color'); if(c) c.focus(); return; }
   // 🔢 السريال اختياري — بس لو مكرر بنسأل (نفس تحذير المحاسب)
   const serial = $('f_serial').value.trim();
