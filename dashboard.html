@@ -112,6 +112,7 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
 <script src="points.js"></script>
 <script src="statuses.js"></script>
 <script src="due-deposit.js"></script>   <!-- ⏳ الميعاد مع العميل + 💵 العربون (إخباري) — مؤقت للإنتاج -->
+<script src="intake-board-view.js" defer></script>   <!-- 📥 ترتيب الاستلامات (ملف prod-intake-board.sql) — زرار في قايمة ⋮ -->
 <script src="accounts.js"></script>
 <script src="label.js"></script>
 <script src="attendance.js"></script>
@@ -1451,7 +1452,7 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
     <button class="pay-menu-btn" style="display:none;" onclick="openPayroll()">💰 مرتبك</button>
     <button id="accountMenuBtn" class="hidden" onclick="openAccount()">👤 حسابي</button>
 
-    <div class="mh">🏪 المحل</div>
+    <div class="mh mh-shop">🏪 المحل</div>   <!-- mh-shop: «📥 ترتيب الاستلامات» بيتحط تحتها (intake-board-view.js) -->
     <button class="money-menu-item" onclick="openAnalytics()">📊 الملخص المالي</button>
     <button class="money-menu-item" onclick="openAccounts()">📒 الحسابات</button>
     <!-- 💬 للسوبر أدمن بس — syncWaHeldMenu بيظهّره ويحط عليه العدد -->
