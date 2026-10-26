@@ -4253,7 +4253,7 @@ function openAddModal(){
   document.getElementById('f_intakeTimeOnly').value = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
   addDue.reset();   // ⏳ الميعاد مع العميل يبدأ فاضي كل مرة
   const _dep = document.getElementById('addDepHost');
-  if(_dep) _dep.innerHTML = IFixDue.depFieldHtml('f_depositNote');   // 💵 فاضية كل مرة
+  if(_dep) _dep.innerHTML = depFieldHtml('f_depositNote', '', '');   // 💵 فاضية كل مرة
   document.getElementById('addFormWrap').classList.remove('hidden');
   document.getElementById('addSuccessWrap').classList.add('hidden');
   document.getElementById('addLabelArea').innerHTML = '';
@@ -5236,32 +5236,31 @@ async function dueEditSave(id){
   await persist();
 }
 
-let depEditId = null;
+// 💵 العربون في التفاصيل — نفس شكل خانة «جهاز جديد» بالظبط (من غير شرح)،
+//    وبيتحفظ أول ما تسيب الخانة (زي السعر).
+// نفس الخانة في «جهاز جديد» وفي التفاصيل — شكل واحد
+function depFieldHtml(id, val, onblur){
+  return `<label class="field" style="margin-bottom:0;"><span>💵 العربون (اختياري) <span class="ifd-info">إخباري</span></span>
+    <input${id ? ` id="${id}"` : ''} type="text" inputmode="numeric" maxlength="9" autocomplete="off" value="${esc(val || '')}"
+           placeholder="مثلاً 1000 — سيبه فاضي لو مفيش"
+           oninput="this.value=IFixDue.depDigits(this.value)"${onblur ? ` onblur="${onblur}"` : ''} /></label>`;
+}
 function depDetailHtml(d){
   if(!d || d.status === 'trashed') return '';
-  const ed = depEditId === d.id;
   const n = IFixDue.depAmount(d);
-  const act = ed
-    ? `<input id="depEditIn" class="ifd-input" type="text" inputmode="numeric" maxlength="9" autocomplete="off"
-              value="${esc(n ? String(n) : '')}" placeholder="المبلغ — فاضي = مفيش عربون"
-              oninput="this.value=IFixDue.depDigits(this.value)" />
-       <button class="ifd-btn" style="background:var(--ifd-dep);border-color:var(--ifd-dep);color:#fff;" onclick="depEditSave('${d.id}')">💾 حفظ</button>
-       <button class="ifd-btn" onclick="depEditId=null;renderDetail();">إلغاء</button>`
-    : `<button class="ifd-btn" onclick="depEditId='${d.id}';renderDetail();setTimeout(()=>{const e=document.getElementById('depEditIn');if(e)e.focus();},60);">✏️ ${n ? 'تعديل' : 'اكتب'} العربون</button>`;
-  return IFixDue.depBoxHtml(d, isPriced(d) ? d.agreedPrice : null, act);
+  return `<div style="margin-bottom:12px;">${depFieldHtml('', n ? String(n) : '', `depSave('${d.id}', this.value)`)}</div>`;
 }
-async function depEditSave(id){
+async function depSave(id, v){
   const d = devices.find(x => x.id === id); if(!d) return;
-  const val = IFixDue.depDigits((document.getElementById('depEditIn') || {}).value);
+  const val = IFixDue.depDigits(v);
   const old = IFixDue.depDigits(d.depositNote);
-  if(val === old){ depEditId = null; renderDetail(); return; }
+  if(val === old) return;
   const now = new Date().toISOString();
   const note = { text: '💵 العربون (إخباري) اتعدّل: «' + (old || '—') + '» ← «' + (val || '—') + '»',
                  at: now, by: currentUser.name, role: isAdmin() ? 'المحاسب العام' : 'موظف' };
   devices = devices.map(x => x.id === id ? { ...x, depositNote: val,
     activityNotes: [...(x.activityNotes || []), note],
     lastModifiedAt: now, lastModifiedBy: currentUser.name } : x);
-  depEditId = null;
   renderDetail(); render();
   await persist();
 }

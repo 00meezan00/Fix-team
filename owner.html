@@ -2496,7 +2496,6 @@ function editDeposit(id){
     <div class="de-cur">العربون دلوقتي: <b>${esc(cur || '—')}</b></div>
     <input id="deDep" class="de-ta" style="min-height:0;" type="text" inputmode="numeric" maxlength="9" autocomplete="off"
            placeholder="المبلغ — فاضي = مفيش عربون" value="${esc(cur)}" oninput="this.value=IFixDue.depDigits(this.value)">
-    <div class="de-hint">${esc(IFixDue.DEP_HINT)}</div>
     <button class="act-btn act-primary" id="deGo" onclick="doEditDeposit('${d.id}')">💾 حفظ</button>
     <button class="act-btn act-ghost" onclick="showInfo('${d.id}')">إلغاء</button>`);
   setTimeout(() => { const el = $('deDep'); if(el) el.focus(); }, 250);

@@ -832,6 +832,7 @@ function attRender(busyMsg){
         <div class="att-note">
           📍 التسجيل من داخل المحل بس · 🔐 بيتطلب بصمتك أو وجهك
         </div>
+        ${attMsgHtml(busyMsg)}
         <div class="att-log-head">
           <b>سجلي</b>
           <input type="month" id="attMonth" value="${_attMonthValue()}" onchange="attRenderLog()">
@@ -840,6 +841,85 @@ function attRender(busyMsg){
       </div>
     </div>`;
   attRenderLog();
+  attLoadMsgs();
+}
+
+// ============================================================
+// 📨 رسالة لشؤون العاملين
+// ------------------------------------------------------------
+// 🧸 الموظف مشي ونسي يعمل انصراف (أو أي حاجة في مواعيده)؟
+//    يكتبها هنا ويختار اليوم، والرسالة بتروح لـ HR في صفحتها.
+//    ⚠️ دي **مش تسجيل حضور** — مابتغيّرش أي ساعة. HR بتقرا
+//       وبتصلّح بنفسها من «✍️ تسجيل يدوي».
+// 🗄️ جدول hr_staff_notes (ملف prod-hr-staff-notes.sql) — السيرفر
+//    بيكتب الإيميل والدور والوقت بنفسه.
+// ============================================================
+let _attMsgDraft = { body: '', date: '' };
+let _attMsgSending = false;
+function _attToday(){
+  // اليوم بتوقيت القاهرة (YYYY-MM-DD)
+  return new Date().toLocaleDateString('en-CA', { timeZone:'Africa/Cairo' });
+}
+function attMsgHtml(busyMsg){
+  const today = _attToday();
+  const min = new Date(Date.parse(today) - 30 * 86400000).toISOString().slice(0, 10);
+  const date = _attMsgDraft.date || today;
+  return `<div class="att-msg">
+    <div class="att-msg-h">📨 رسالة لشؤون العاملين</div>
+    <div class="att-msg-p">مشيت ونسيت تعمل انصراف؟ أو حصلت حاجة في مواعيدك؟ اكتبها هنا وهتوصل لـ HR.</div>
+    <label class="att-msg-l">اليوم اللي بتتكلم عنه</label>
+    <input type="date" id="attMsgDate" class="att-msg-in" value="${esc(date)}" min="${min}" max="${today}"
+           onchange="_attMsgDraft.date=this.value">
+    <textarea id="attMsgBody" class="att-msg-in att-msg-ta" maxlength="1000"
+      placeholder="مثلاً: مشيت الساعة ١١ بالليل ونسيت أعمل انصراف"
+      oninput="_attMsgDraft.body=this.value">${esc(_attMsgDraft.body)}</textarea>
+    <button class="att-msg-send" ${(busyMsg || _attMsgSending) ? 'disabled' : ''} onclick="attSendMsg()">📨 ابعت لـ HR</button>
+    <div id="attMsgList"></div>
+  </div>`;
+}
+async function attSendMsg(){
+  if(_attMsgSending) return;
+  const body = ((document.getElementById('attMsgBody') || {}).value || '').trim();
+  const date = (document.getElementById('attMsgDate') || {}).value || _attToday();
+  if(!body){ alert('اكتب الرسالة الأول'); return; }
+  _attMsgSending = true;
+  const btn = document.querySelector('.att-msg-send'); if(btn) btn.disabled = true;
+  try{
+    const { error } = await sb.from('hr_staff_notes').insert({ body, work_date: date });
+    if(error) throw error;
+    _attMsgDraft = { body: '', date: '' };
+    const ta = document.getElementById('attMsgBody'); if(ta) ta.value = '';
+    alert('✅ الرسالة وصلت لشؤون العاملين');
+    attLoadMsgs();
+  }catch(e){
+    console.error('attSendMsg failed:', e);
+    alert('⚠️ الرسالة ماتبعتتش: ' + ((e && e.message) || e) + '\nالكلام لسه في الخانة — جرّب تاني.');
+  }finally{
+    _attMsgSending = false;
+    if(btn) btn.disabled = false;
+  }
+}
+// آخر رسايلي (٥) — عشان يعرف وصلت وHR شافتها ولا لأ
+async function attLoadMsgs(){
+  const box = document.getElementById('attMsgList');
+  if(!box) return;
+  try{
+    const me = await attMe();
+    const { data, error } = await sb.from('hr_staff_notes')
+      .select('id,work_date,body,created_at,seen_at')
+      .eq('user_email', me).order('created_at', { ascending:false }).limit(5);
+    if(error) throw error;
+    if(!data || !data.length){ box.innerHTML = ''; return; }
+    box.innerHTML = `<div class="att-msg-lh">رسايلي الأخيرة</div>` + data.map(m => `
+      <div class="att-msg-row">
+        <div class="att-msg-rt">${esc(m.body)}</div>
+        <div class="att-msg-rm">📅 ${esc(new Date(m.work_date + 'T12:00:00').toLocaleDateString('ar-EG', { weekday:'long', day:'numeric', month:'long' }))}
+          · ${m.seen_at ? '<b class="att-msg-ok">✓ HR شافتها</b>' : '⏳ لسه'}</div>
+      </div>`).join('');
+  }catch(e){
+    console.error('attLoadMsgs failed:', e);
+    box.innerHTML = '';
+  }
 }
 
 // ============================================================
@@ -1174,6 +1254,24 @@ function closeAttendance(){
   .att-manual{display:inline-block; margin-inline-start:6px; font-size:10.5px;
     font-weight:800; color:#2B6CB0; background:rgba(43,108,176,.13);
     border-radius:6px; padding:1px 6px;}
-  html[data-theme="dark"] #attOverlay .att-manual{color:#7BA9DC;}`;
+  html[data-theme="dark"] #attOverlay .att-manual{color:#7BA9DC;}
+  /* 📨 رسالة لشؤون العاملين */
+  .att-msg{background:var(--a-card); border:1px solid var(--a-line); border-radius:14px;
+    padding:14px; margin-top:16px;}
+  .att-msg-h{font-weight:800; font-size:15px; color:var(--a-ink);}
+  .att-msg-p{font-size:12.5px; line-height:1.8; color:var(--a-mut); margin:4px 0 10px;}
+  .att-msg-l{display:block; font-size:12.5px; font-weight:700; color:var(--a-mut); margin-bottom:5px;}
+  .att-msg-in{width:100%; box-sizing:border-box; border:1px solid var(--a-line); border-radius:10px;
+    padding:10px 12px; font-family:inherit; font-size:16px; background:var(--a-bg); color:var(--a-ink);
+    margin-bottom:10px;}
+  .att-msg-ta{min-height:80px; resize:vertical; line-height:1.7;}
+  .att-msg-send{width:100%; border:none; border-radius:12px; padding:14px; font-family:inherit;
+    font-size:15px; font-weight:800; color:#fff; background:#4C1D95; cursor:pointer;}
+  .att-msg-send:disabled{opacity:.4; cursor:not-allowed;}
+  .att-msg-lh{font-weight:800; font-size:13px; margin:14px 0 6px; color:var(--a-ink);}
+  .att-msg-row{border-top:1px solid var(--a-line); padding:8px 0;}
+  .att-msg-rt{font-size:13.5px; line-height:1.7; color:var(--a-ink2); white-space:pre-wrap; word-break:break-word;}
+  .att-msg-rm{font-size:11.5px; color:var(--a-mut); margin-top:3px;}
+  .att-msg-ok{color:#16A34A;}`;
   (document.head || document.documentElement).appendChild(s);
 })();

@@ -526,6 +526,28 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
     box-shadow:0 12px 30px rgba(0,0,0,.3); opacity:0; pointer-events:none;
     transition:opacity .25s, transform .25s; z-index:100000; text-align:center;}
   .hr-toast.on{opacity:1; transform:translateX(-50%) translateY(0);}
+
+  /* ===== 📨 رسايل الموظفين ===== */
+  .msg-count{display:inline-block; min-width:20px; padding:1px 6px; border-radius:10px;
+    background:var(--red); color:#fff; font-size:11.5px; text-align:center; margin-inline-start:6px;}
+  #hrMsgBanner{padding:12px 16px 0;}
+  .msg-banner{width:100%; border:none; border-radius:13px; padding:13px; font-family:inherit;
+    font-size:14px; font-weight:700; cursor:pointer; background:#4C1D95; color:#fff;}
+  .msg-tabs{display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap;}
+  .msg-tab{flex:1; border:1px solid var(--border); background:var(--surface-2); color:var(--ink);
+    border-radius:10px; padding:9px; font-family:inherit; font-weight:800; font-size:13px; cursor:pointer;}
+  .msg-tab.on{background:#4C1D95; border-color:#4C1D95; color:#fff;}
+  .msg-card{background:var(--surface); border:1.5px solid #7C3AED; border-radius:14px; padding:12px 14px; margin-bottom:10px;}
+  .msg-card.seen{border-color:var(--border); opacity:.85;}
+  .msg-top{display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:14px; color:var(--ink);}
+  .msg-role{font-size:11px; font-weight:800; background:var(--surface-2); border-radius:7px; padding:2px 7px; color:var(--muted);}
+  .msg-time{margin-inline-start:auto; font-size:11.5px; color:var(--muted);}
+  .msg-day{font-size:12.5px; color:var(--muted); margin:6px 0 4px;}
+  .msg-text{font-size:14px; line-height:1.8; color:var(--ink); white-space:pre-wrap; word-break:break-word;}
+  .msg-seen{font-size:11.5px; color:var(--done); margin-top:6px;}
+  .msg-acts{display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;}
+  .msg-acts .mini-btn{flex:1; padding:8px 6px;}
+  .msg-ok{background:var(--done) !important; color:#fff !important; border-color:var(--done) !important;}
 </style>
 <style id="ios-safe-head-fix">
 /* 📱 «فواتير المشتريات» و«مخزن قطع الغيار» بيترسموا من ai-invoice.js
@@ -565,6 +587,7 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
       <button onclick="closeMenu(); openPayrollAdmin()">💰 المخصومات والمرتبات</button>
       <button onclick="closeMenu(); openExcelW()">📊 مسحوبات الإكسل</button>
       <button onclick="closeMenu(); openHrSettings()">⏰ إعدادات المواعيد</button>
+      <button onclick="closeMenu(); openStaffMsgs()">📨 رسايل الموظفين <b id="hrMsgCount" class="msg-count" style="display:none;"></b></button>
 
       <!-- 🧰 أدوات الديسباتشر — مخفية لحد ما الأدمن يفعّلها للحساب ده
            (applyHrCaps تحت بتسأل السيرفر has_cap وبتظهّر اللي مسموح بس) -->
@@ -699,6 +722,19 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
   </div>
 </div>
 
+<!-- 📨 تنبيه رسايل الموظفين الجديدة (بيبان بس لو فيه جديد) -->
+<div id="hrMsgBanner" style="display:none;"></div>
+
+<!-- ===== 📨 رسايل الموظفين ===== -->
+<div class="sheet" id="msgSheet" style="z-index:58;">
+  <div class="sheet-head">
+    <h2>📨 رسايل الموظفين</h2>
+    <button class="icon-btn" style="background:var(--surface-2); color:var(--ink);"
+            onclick="closeSheet('msgSheet')">×</button>
+  </div>
+  <div class="sheet-body" id="msgBody"></div>
+</div>
+
 <div class="wrap" id="root">
   <div class="empty">جاري التحميل…</div>
 </div>
@@ -808,8 +844,101 @@ const KIND = {
     ME + (MY_ROLE ? ' — ' + roleLabel(MY_ROLE) : '');
 
   attSyncMenu();          // زرار المواعيد على الموبايل بس
+  loadStaffMsgs();        // 📨 رسايل الموظفين (التنبيه + العدد)
   await loadMonth();
 })();
+
+// ============================================================
+// 📨 رسايل الموظفين لشؤون العاملين
+// ------------------------------------------------------------
+// 🧸 أي موظف يقدر من ⏰ المواعيد يكتب رسالة — زي «مشيت ونسيت أعمل
+//    انصراف» — ويختار اليوم. الرسايل بتوصل هنا:
+//    • تنبيه فوق الصفحة + رقم في القايمة لو فيه جديد
+//    • «✓ شفتها» بتشيلها من الجديد (والموظف بيشوف إنها اتشافت)
+//    • «✍️ تسجيل يدوي» بيفتح تسجيل اليوم ده للموظف ده على طول
+// 🔒 السيرفر بيخفي عن HR رسايل موظفين HR نفسهم (للأدمن بس).
+// 🗄️ جدول hr_staff_notes — ملف prod-hr-staff-notes.sql.
+// ============================================================
+let STAFF_MSGS = [];
+let MSG_TAB = 'new';
+let _msgErr = '';
+async function loadStaffMsgs(){
+  try{
+    const since = new Date(Date.now() - 60 * 86400000).toISOString();
+    const { data, error } = await sb.from('hr_staff_notes')
+      .select('id,user_email,user_role,work_date,body,created_at,seen_at,seen_by')
+      .neq('user_email', ME)
+      .gte('created_at', since)
+      .order('created_at', { ascending:false }).limit(300);
+    if(error) throw error;
+    STAFF_MSGS = data || [];
+    _msgErr = '';
+  }catch(e){
+    console.error('loadStaffMsgs failed:', e);
+    _msgErr = (e && e.message) || String(e);
+  }
+  renderMsgBadges();
+  if(document.getElementById('msgSheet').classList.contains('open')) renderStaffMsgs();
+}
+function renderMsgBadges(){
+  const n = STAFF_MSGS.filter(m => !m.seen_at).length;
+  const c = document.getElementById('hrMsgCount');
+  if(c){ c.textContent = n; c.style.display = n ? '' : 'none'; }
+  const b = document.getElementById('hrMsgBanner');
+  if(b){
+    b.style.display = n ? '' : 'none';
+    b.innerHTML = n ? `<button class="msg-banner" onclick="openStaffMsgs()">📨 عندك <b>${n}</b> ${n === 1 ? 'رسالة جديدة' : 'رسايل جديدة'} من الموظفين — اضغط تشوفها</button>` : '';
+  }
+}
+function openStaffMsgs(){
+  MSG_TAB = STAFF_MSGS.some(m => !m.seen_at) ? 'new' : 'all';
+  renderStaffMsgs();
+  openSheet('msgSheet');
+  loadStaffMsgs();
+}
+function renderStaffMsgs(){
+  const box = document.getElementById('msgBody');
+  if(!box) return;
+  const nNew = STAFF_MSGS.filter(m => !m.seen_at).length;
+  const list = MSG_TAB === 'new' ? STAFF_MSGS.filter(m => !m.seen_at) : STAFF_MSGS;
+  const tab = (k, t) => `<button class="msg-tab${MSG_TAB === k ? ' on' : ''}" onclick="MSG_TAB='${k}';renderStaffMsgs()">${t}</button>`;
+  const day = d => new Date(d + 'T12:00:00').toLocaleDateString('ar-EG', { weekday:'long', day:'numeric', month:'long' });
+  const at  = d => new Date(d).toLocaleString('ar-EG', { day:'numeric', month:'short', hour:'numeric', minute:'2-digit', timeZone:'Africa/Cairo' });
+  box.innerHTML = `
+    <div class="msg-tabs">${tab('new', '🆕 الجديدة (' + nNew + ')')}${tab('all', '📋 كل الرسايل (آخر ٦٠ يوم)')}</div>
+    ${_msgErr ? `<div class="empty" style="padding:16px;">⚠️ مقدرناش نحمّل الرسايل<br><small dir="ltr">${esc(_msgErr)}</small></div>` : ''}
+    ${!list.length && !_msgErr ? `<div class="empty">${MSG_TAB === 'new' ? '✅ مفيش رسايل جديدة' : 'مفيش رسايل'}</div>` : ''}
+    ${list.map(m => `
+      <div class="msg-card${m.seen_at ? ' seen' : ''}">
+        <div class="msg-top">
+          <b>${esc(nameOf(m.user_email))}</b>
+          <span class="msg-role">${esc(roleLabel(m.user_role))}</span>
+          <span class="msg-time">${esc(at(m.created_at))}</span>
+        </div>
+        <div class="msg-day">📅 عن يوم: <b>${esc(day(m.work_date))}</b></div>
+        <div class="msg-text">${esc(m.body)}</div>
+        ${m.seen_at ? `<div class="msg-seen">✓ اتشافت ${m.seen_by ? '— ' + esc(nameOf(m.seen_by)) : ''} · ${esc(at(m.seen_at))}</div>` : ''}
+        <div class="msg-acts">
+          <button class="mini-btn" onclick="openPunch('${esc(m.user_email)}','${esc(m.work_date)}')">✍️ تسجيل يدوي لليوم ده</button>
+          ${m.seen_at
+            ? `<button class="mini-btn" onclick="markStaffMsg(${m.id}, false)">↩︎ رجّعها جديدة</button>`
+            : `<button class="mini-btn msg-ok" onclick="markStaffMsg(${m.id}, true)">✓ شفتها</button>`}
+        </div>
+      </div>`).join('')}`;
+}
+async function markStaffMsg(id, seen){
+  const { data, error } = await sb.from('hr_staff_notes')
+    .update({ seen_at: seen ? new Date().toISOString() : null })
+    .eq('id', id).select('id,seen_at,seen_by');
+  if(error){ alert('⚠️ ماتحفظش: ' + (error.message || error)); return; }
+  if(!data || !data.length){ alert('⚠️ ماتحفظش — مش مسموحلك تعلّم على الرسالة دي'); return; }
+  STAFF_MSGS = STAFF_MSGS.map(m => m.id === id ? { ...m, ...data[0] } : m);
+  renderMsgBadges();
+  renderStaffMsgs();
+}
+// تحديث كل دقيقتين + لما الصفحة ترجع قدام العين
+setInterval(() => { if(!document.hidden) loadStaffMsgs(); }, 120000);
+document.addEventListener('visibilitychange', () => { if(!document.hidden) loadStaffMsgs(); });
 
 function roleLabel(r){
   return { super_admin:'أدمن', accountant:'محاسب', dispatcher:'مسؤول حركة',

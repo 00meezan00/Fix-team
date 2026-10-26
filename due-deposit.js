@@ -304,15 +304,11 @@
     return n ? `<span class="ifd-tag ifd-dep">💵 عربون ${fmt(n)}</span>` : '';
   }
   // في التفاصيل · price = سعر الجهاز لو معروف (أو null)
+  // في التفاصيل (الديسباتشر والمالك) — سطر بسيط من غير شرح
   function depBoxHtml(d, price, actionsHtml){
     const n = depAmount(d);
-    if(!n && !actionsHtml) return '';
-    const p = (price === '' || price == null || isNaN(Number(price))) ? null : Number(price);
     return `<div class="ifd-box ifd-dep-b">
       <div class="ifd-box-h">💵 العربون <span class="ifd-info">إخباري</span>: <b>${n ? fmt(n) + ' ج.م' : '—'}</b></div>
-      ${n && p != null && p > 0 && d.paymentStatus !== 'paid' ? `<div class="ifd-box-s">الحساب ${fmt(p)} − العربون ${fmt(n)} = <b>${fmt(Math.max(0, p - n))} ج.م</b> يتاخدوا من العميل وقت التسليم<br>
-        <small>وتسجّل إن حساب الجهاز ${fmt(p)} اتدفعوا فوري.</small></div>` : ''}
-      <div class="ifd-hint">${esc(DEP_HINT)}</div>
       ${actionsHtml || ''}
     </div>`;
   }
@@ -321,7 +317,7 @@
     return `<span class="ifd-lbl">💵 العربون (اختياري) <span class="ifd-info">إخباري</span></span>
       <input id="${esc(id)}" class="ifd-input" style="margin-top:0;" type="text" inputmode="numeric" autocomplete="off" maxlength="9"
              placeholder="مثلاً 1000 — سيبه فاضي لو مفيش" oninput="this.value=IFixDue.depDigits(this.value)" />
-      <div class="ifd-hint">${esc(DEP_HINT)}</div>`;
+`;
   }
 
   // ---------- 🎨 الشكل (ألوانه جوه — مش معتمد على الصفحة) ----------
