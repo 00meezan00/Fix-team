@@ -52,6 +52,7 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
 <script src="label.js"></script>
 <script src="attendance.js"></script>
 <script src="payroll.js"></script>
+<script src="due-deposit.js"></script>   <!-- ⏳ الميعاد مع العميل + 💵 العربون (إخباري) — مؤقت للإنتاج -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;800;900&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
@@ -955,7 +956,7 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
   </div>
   <div class="sh-body">
     <div class="frow">
-      <div class="fld"><label>نوع الجهاز</label><input id="f_type" placeholder="ايفون / سامسونج..."></div>
+      <div class="fld"><label>نوع الجهاز</label><input id="f_type" placeholder="ايفون / سامسونج..." oninput="ownDue.render()"></div>
       <div class="fld"><label>الموديل</label><input id="f_model" placeholder="13 Pro / A54..."></div>
     </div>
     <!-- ⚠️ autocomplete="off" ضروري: من غيره المتصفح بيعرض اقتراحاته
@@ -981,7 +982,10 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
       <select id="f_tech" class="tech-select"></select>
       <div id="f_techHint" class="fld-hint" style="display:none;"></div>
     </div>
-    <div class="fld"><label>العطل / المشكلة</label><textarea id="f_issue" placeholder="اكتب شكوى العميل بالتفصيل..."></textarea></div>
+    <div class="fld"><label>العطل / المشكلة</label><textarea id="f_issue" placeholder="اكتب شكوى العميل بالتفصيل..." oninput="ownDue.render()"></textarea></div>
+    <!-- ⏳ الميعاد مع العميل — إجباري · 💵 العربون — إخباري (due-deposit.js) -->
+    <div class="fld" id="ownDueHost"></div>
+    <div class="fld" id="ownDepHost"></div>
     <!-- 🔒 باسورد الجهاز — المحتوى بيتبني من ownMountLock() -->
     <div class="fld"><label>🔒 باسورد الجهاز (اختياري)</label><div id="ownLockHostIntake"></div></div>
     <!-- 📝 ملاحظات وقت الاستلام — بتتحفظ كأول ملاحظة في سجل الجهاز -->
@@ -1915,6 +1919,7 @@ function dispTicket(d){
       ${crown}
       <span>· ${fmtDate(d.intake)}</span>
     </div>
+    ${(IFixDue.cardChip(d._raw) || IFixDue.depChip(d._raw)) ? `<div>${IFixDue.cardChip(d._raw)}${IFixDue.depChip(d._raw)}</div>` : ''}
     ${pend}
     ${actions}
   </div>`;
@@ -2285,6 +2290,10 @@ function showInfo(id){
         <button class="di-edit" onclick="editIssue('${d.id}','disp')">✏️ ${d.issue ? 'تعديل' : 'اكتب'}</button>
       </div>
 
+      <!-- ⏳ الميعاد مع العميل · 💵 العربون (إخباري) — due-deposit.js -->
+      ${IFixDue.boxHtml(d._raw)}
+      ${IFixDue.depBoxHtml(d._raw, null, `<button class="ifd-btn" onclick="editDeposit('${d.id}')">✏️ ${IFixDue.depAmount(d._raw) ? 'تعديل' : 'اكتب'} العربون</button>`)}
+
       <div class="di-card">
         <div class="di-card-h">👤 العميل</div>
         ${row('العميل', esc(d.customer || '—'))}
@@ -2473,6 +2482,39 @@ async function doEditBB(id){
 
   applyLocal(d, p);
   toast(val ? '🛵 المندوب اتحفظ' : '🛵 المندوب اتشال');
+  showInfo(id);
+}
+
+// ============================================================
+// 💵 تعديل العربون (إخباري) من التفاصيل — نفس طريقة المندوب
+// ============================================================
+function editDeposit(id){
+  const d = devices.find(x => x.id === id); if(!d) return;
+  const cur = IFixDue.depDigits(d._raw && d._raw.depositNote);
+  openAct('💵 العربون (إخباري)', `
+    ${actDevBlock(d)}
+    <div class="de-cur">العربون دلوقتي: <b>${esc(cur || '—')}</b></div>
+    <input id="deDep" class="de-ta" style="min-height:0;" type="text" inputmode="numeric" maxlength="9" autocomplete="off"
+           placeholder="المبلغ — فاضي = مفيش عربون" value="${esc(cur)}" oninput="this.value=IFixDue.depDigits(this.value)">
+    <div class="de-hint">${esc(IFixDue.DEP_HINT)}</div>
+    <button class="act-btn act-primary" id="deGo" onclick="doEditDeposit('${d.id}')">💾 حفظ</button>
+    <button class="act-btn act-ghost" onclick="showInfo('${d.id}')">إلغاء</button>`);
+  setTimeout(() => { const el = $('deDep'); if(el) el.focus(); }, 250);
+}
+async function doEditDeposit(id){
+  const d = devices.find(x => x.id === id); if(!d) return;
+  const val = IFixDue.depDigits(($('deDep') || {}).value);
+  const old = IFixDue.depDigits(d._raw && d._raw.depositNote);
+  if(val === old){ showInfo(id); return; }
+  const note = mkNote('💵 العربون (إخباري) اتعدّل: «' + (old || '—') + '» ← «' + (val || '—') + '»');
+  const btn = $('deGo'); if(btn) btn.disabled = true;
+  const notes = await notesWith(id, note);   // نسخة السيرفر — عشان مانمسحش ملاحظات حد تاني
+  const p = notes && { depositNote: val, activityNotes: notes, lastModifiedAt: nowIso(), lastModifiedBy: ME };
+  const ok = !!p && await patch(id, p) && await verifyField(id, 'depositNote', val, 'العربون');
+  if(btn) btn.disabled = false;
+  if(!ok) return;
+  applyLocal(d, p);
+  toast(val ? '💵 العربون اتحفظ' : '💵 العربون اتشال');
   showInfo(id);
 }
 
@@ -3260,9 +3302,28 @@ function onOwnCustInput(){
   }
 }
 
+// ============================================================
+// ⏳ الميعاد مع العميل — «الساعة الرملية» (زي الاستيدج بالظبط)
+// ------------------------------------------------------------
+// 🧸 إجباري: «اتفقت مع العميل على قد إيه؟» — الرملة بتبدأ من
+//    **دلوقتي** (وقت التسجيل). الحسابات كلها في due-deposit.js.
+// ⚠️ السيرفر لازم يكون مسموحله بالخانات dueAt · dueStart · dueLabel ·
+//    dueLog · depositNote للمالك — ملف prod-due-deposit.sql.
+// ============================================================
+const ownDue = IFixDue.picker('own', {
+  host: 'ownDueHost',
+  getType:    () => ($('f_type') || {}).value,
+  getIssue:   () => ($('f_issue') || {}).value,
+  getSamples: () => devices.map(x => x._raw),
+  getFromMs:  () => Date.now(),
+  fromWord:   'دلوقتي',
+});
+
 function openIntake(){
   buildSuggest();
   ownMountLock('ownLockHostIntake');   // 🔒 شاشة الباسورد (فاضية كل مرة)
+  ownDue.reset();                       // ⏳ الميعاد يبدأ فاضي كل مرة
+  const dep = $('ownDepHost'); if(dep) dep.innerHTML = IFixDue.depFieldHtml('f_depositNote');   // 💵
   renderTechSelect();
   const ph = $('f_phone'); if(ph && ph.dataset) ph.dataset.autoFill = '';
   $('sheet').classList.add('on'); $('sheetBg').classList.add('on');
@@ -3275,10 +3336,11 @@ function closeIntake(){ $('sheet').classList.remove('on'); $('sheetBg').classLis
 //    من الحمولة وبتتجاهل أي حاجة تانية **في صمت**. فبدل ما نعتمد
 //    على إنها بتاخدهم، بنضيفهم بعدها بـdevice_patch.
 //    الكتابة مرتين بنفس القيمة مالهاش أي ضرر.
-async function afterIntake(newId, text, lock, color, serial, bb){
+async function afterIntake(newId, text, lock, color, serial, bb, extra){
   if(!newId) return false;
   const p = {};
   if(lock) Object.assign(p, lock);
+  if(extra) Object.assign(p, extra);   // ⏳ الميعاد + 💵 العربون
   if(color) p.deviceColor = color;
   if(serial) p.serialNumber = serial;
   if(bb) p.broughtBy = bb;          // 🛵 ضمان تاني — نفس فكرة اللون
@@ -3291,6 +3353,8 @@ async function afterIntake(newId, text, lock, color, serial, bb){
   if(!await patch(newId, p)) return false;
   if(text && !await verifyNotes(newId, p.activityNotes.length)) return false;
   if(lock && !await verifyLock(newId, lock.lockType)) return false;
+  // ⏳ الميعاد إجباري — لو السيرفر رماه (ملف prod-due-deposit.sql مااتشغّلش) بنقول بوضوح
+  if(p.dueAt && !await verifyField(newId, 'dueAt', p.dueAt, 'الميعاد مع العميل')) return false;
   return true;
 }
 
@@ -3322,6 +3386,18 @@ async function saveIntake(){
     //    بس) — تنبيه مساعد مش ضمان.
     if(dup && !confirm('الرقم ده متسجّل قبل كده لجهاز «' + (dup.model || dup.type) + '» — ' + dup.customer + '.\nتكمّل التسجيل برضه؟')) return;
   }
+  // ⏳ الميعاد مع العميل — إجباري، والرملة بتبدأ من دلوقتي
+  const intakeIso = nowIso();
+  const dueF = ownDue.fields(intakeIso, ME, 'owner');
+  if(dueF.err){
+    alert('⏳ ' + dueF.err);
+    const h = $('ownDueHost'); if(h) h.scrollIntoView({ block:'center', behavior:'smooth' });
+    return;
+  }
+  // 💵 العربون — إخباري (رقم للعلم بس)
+  const depositNote = IFixDue.depDigits(($('f_depositNote') || {}).value);
+  const extra = Object.assign({}, dueF.fields, depositNote ? { depositNote } : {});
+
   if(!navigator.onLine){ toast('مفيش نت — مش هينفع تسجّل جهاز دلوقتي 📴'); return; }
 
   const btn = $('btnSave');
@@ -3352,7 +3428,7 @@ async function saveIntake(){
   const noteText0 = (($('f_note') || {}).value || '').trim();
   const lock0 = ownCollectLock();
   let lost = false;
-  if(noteText0 || lock0 || color || serial){
+  {   // ⏳ الميعاد إجباري — فالترقيع بعد التسجيل بيحصل كل مرة
     // device_intake بترجّع رقم الجهاز — بس شكل الرد مش موثّق،
     // فبنقبل الأشكال المعقولة كلها بدل ما نفترض واحد.
     let newId = (typeof data === 'string') ? data
@@ -3370,7 +3446,7 @@ async function saveIntake(){
         if(mine.length === 1) newId = mine[0].id;
       }catch(e){ console.error('البحث عن الجهاز الجديد:', e); }
     }
-    lost = !(await afterIntake(newId, noteText0, lock0, color, serial, bb));
+    lost = !(await afterIntake(newId, noteText0, lock0, color, serial, bb, extra));
   }
 
   ownMountLock('ownLockHostIntake');   // 🔒 تصفير شاشة الباسورد
@@ -3386,8 +3462,8 @@ async function saveIntake(){
   render();
 
   if(lost){
-    toast('✅ الجهاز اتسجّل — ⚠️ بس الملاحظة/الباسورد ماتحفظوش، ضيفهم من «تفاصيل»');
-    console.error('ملاحظة/باسورد الاستلام ضاعوا:', noteText0, lock0);
+    toast('✅ الجهاز اتسجّل — ⚠️ بس الملاحظة/الباسورد/الميعاد/العربون ماتحفظوش، شوفهم من «تفاصيل»');
+    console.error('ملاحظة/باسورد/ميعاد الاستلام ضاعوا:', noteText0, lock0, extra);
   } else {
     toast('✅ الجهاز اتسجّل في «قيد الانتظار»');
   }

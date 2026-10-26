@@ -27,7 +27,7 @@
 // v85 — حساب المرتجع بيتعدّل بعد التسليم (المبلغ + فوري/آجل) والدفتر بيتظبط معاه
 // v84 — كشف حساب المحل (PDF و Excel): عمود «تاريخ الدخول» + «تاريخ التسليم» بقى «تاريخ الخروج»
 // v83 — payroll.js: شاشة «🧾 كشف مرتبي» للمحاسب العام (ملف 68)
-const CACHE_NAME = 'ifixteam-v97';
+const CACHE_NAME = 'ifixteam-v98';   // v98: ⏳ الميعاد مع العميل + 💵 العربون (due-deposit.js)
 
 const APP_SHELL = [
   './',
@@ -63,6 +63,7 @@ const APP_SHELL = [
   'common.js',
   'points.js',
   'statuses.js',
+  'due-deposit.js',     // ⏳💵 مؤقت للإنتاج
   'accounts.js',
   'label.js',
   'attendance.js',

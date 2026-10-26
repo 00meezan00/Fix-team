@@ -110,6 +110,7 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
 <script src="common.js"></script>
 <script src="points.js"></script>
 <script src="statuses.js"></script>
+<script src="due-deposit.js"></script>   <!-- ⏳ الميعاد مع العميل + 💵 العربون (إخباري) — مؤقت للإنتاج -->
 <script src="accounts.js"></script>
 <script src="label.js"></script>
 <script src="attendance.js"></script>
@@ -1596,7 +1597,7 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
       <label class="field"><span data-i18n="add.phone">رقم التليفون</span><input id="f_customerPhone" list="phoneHistory" autocomplete="off" inputmode="tel" oninput="fixDigitsInput(this); this.dataset.autoFill='';" /></label>
       <datalist id="phoneHistory"></datalist>
       <div class="row2">
-        <label class="field"><span data-i18n="add.deviceType">نوع الجهاز</span><input id="f_deviceType" placeholder="iPhone / Samsung..." /></label>
+        <label class="field"><span data-i18n="add.deviceType">نوع الجهاز</span><input id="f_deviceType" placeholder="iPhone / Samsung..." oninput="addDue.render()" /></label>
         <label class="field"><span data-i18n="add.model">الموديل</span><input id="f_model" /></label>
       </div>
       <!-- 🎨 لون الجهاز — كتابة حرة (مش قايمة) وإجباري -->
@@ -1642,9 +1643,13 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
           <button type="button" id="whBulk" class="pay-btn" data-i18n="add.wholesale" onclick="setAddWholesale(true)">جملة (بدون نقاط للفني)</button>
         </div>
       </div>
-      <label class="field"><span data-i18n="add.issue">العطل حسب كلام العميل</span><textarea id="f_reportedIssue" rows="2"></textarea></label>
+      <label class="field"><span data-i18n="add.issue">العطل حسب كلام العميل</span><textarea id="f_reportedIssue" rows="2" oninput="addDue.render()"></textarea></label>
+      <!-- ⏳ الميعاد مع العميل — إجباري (due-deposit.js) -->
+      <div id="addDueHost" style="margin-bottom:14px;"></div>
       <label class="field"><span data-i18n="add.condition">حالة الجهاز الشكلية عند الاستلام</span><textarea id="f_conditionNotes" rows="2" data-i18n-ph="add.condition.ph" placeholder="خدوش، كسور، حالة الشاشة..."></textarea></label>
       <label class="field"><span data-i18n="add.price">السعر المبدئي (اختياري) — أرقام صحيحة بالجنيه، و٠ يعني ببلاش</span><input id="f_agreedPrice" type="text" inputmode="numeric" oninput="fixDigitsInput(this); togglePayTypeVisibility()" /></label>
+      <!-- 💵 العربون (إخباري) — رقم للعلم بس، مابيتحسبش فلوس (due-deposit.js) -->
+      <div id="addDepHost" style="margin-bottom:14px;"></div>
       <div id="payTypeWrap" style="margin-bottom:12px; display:none;">
         <span style="font-size:13.5px; color:var(--muted); display:block; margin-bottom:6px;" data-i18n="add.payType">طريقة الدفع</span>
         <div class="pay-choice">
@@ -1653,8 +1658,8 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
         </div>
       </div>
       <div class="row2">
-        <label class="field"><span data-i18n="add.intakeDate">تاريخ الدخول</span><input type="date" id="f_intakeDateOnly" /></label>
-        <label class="field"><span data-i18n="add.intakeTime">وقت الدخول</span><input type="time" id="f_intakeTimeOnly" /></label>
+        <label class="field"><span data-i18n="add.intakeDate">تاريخ الدخول</span><input type="date" id="f_intakeDateOnly" onchange="addDue.render()" /></label>
+        <label class="field"><span data-i18n="add.intakeTime">وقت الدخول</span><input type="time" id="f_intakeTimeOnly" onchange="addDue.render()" /></label>
       </div>
       <button id="submitBtn" class="btn-primary" style="width:100%; justify-content:center;" data-i18n="add.submit" onclick="submitAdd()">تسجيل الجهاز — يدخل تلقائياً في "قيد الانتظار"</button>
     </div>
@@ -4172,6 +4177,7 @@ function cardHtml(d, s){
     ${d.reportedIssue ? `<div class="card-issue">${esc(d.reportedIssue)}</div>` : ''}
     ${d.technician ? `<div class="card-tech">${esc(d.technician)}</div>` : ''}
     ${isPriced(d) ? `<div class="card-price">${esc(d.agreedPrice)} ج.م</div>` : ''}
+    ${(IFixDue.cardChip(d) || IFixDue.depChip(d)) ? `<div>${IFixDue.cardChip(d)}${IFixDue.depChip(d)}</div>` : ''}
     ${d.status === 'delivered' ? paymentBadge(d) : ''}
     ${pendingApprovalText(d) ? `<div class="pending-appr-chip">⏳ ${pendingApprovalText(d)}</div>` : ''}
     ${ownerNoteCardHtml(d)}
@@ -4204,6 +4210,27 @@ async function markPaid(){
   if(t) syncTrack(t);
 }
 
+// ============================================================
+// ⏳ الميعاد مع العميل (فورم التسجيل) — زي الاستيدج بالظبط
+// ------------------------------------------------------------
+// 🧸 إجباري: «اتفقت مع العميل على قد إيه؟». الرملة بتبدأ من
+//    «وقت الدخول» اللي في الفورم. الحسابات كلها في due-deposit.js.
+// ============================================================
+function addIntakeMs(){
+  const dOnly = (document.getElementById('f_intakeDateOnly') || {}).value;
+  const tOnly = (document.getElementById('f_intakeTimeOnly') || {}).value || '00:00';
+  const t = dOnly ? new Date(`${dOnly}T${tOnly}`).getTime() : Date.now();
+  return isNaN(t) ? Date.now() : t;
+}
+const addDue = IFixDue.picker('add', {
+  host: 'addDueHost',
+  getType:    () => (document.getElementById('f_deviceType') || {}).value,
+  getIssue:   () => (document.getElementById('f_reportedIssue') || {}).value,
+  getSamples: () => devices,
+  getFromMs:  addIntakeMs,
+  fromWord:   'وقت الدخول',
+});
+
 // Add device modal
 function openAddModal(){
   ['customerName','shopName','broughtBy','registeredBy','customerPhone','deviceType','model','deviceColor','serialNumber','reportedIssue','conditionNotes','agreedPrice']
@@ -4224,6 +4251,9 @@ function openAddModal(){
   const pad = n => String(n).padStart(2,'0');
   document.getElementById('f_intakeDateOnly').value = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
   document.getElementById('f_intakeTimeOnly').value = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  addDue.reset();   // ⏳ الميعاد مع العميل يبدأ فاضي كل مرة
+  const _dep = document.getElementById('addDepHost');
+  if(_dep) _dep.innerHTML = IFixDue.depFieldHtml('f_depositNote');   // 💵 فاضية كل مرة
   document.getElementById('addFormWrap').classList.remove('hidden');
   document.getElementById('addSuccessWrap').classList.add('hidden');
   document.getElementById('addLabelArea').innerHTML = '';
@@ -4509,6 +4539,15 @@ async function submitAdd(){
   const timeOnly = document.getElementById('f_intakeTimeOnly').value || '00:00';
   const intakeDateObj = dateOnly ? new Date(`${dateOnly}T${timeOnly}`) : new Date();
   const intakeDate = isNaN(intakeDateObj.getTime()) ? new Date().toISOString() : intakeDateObj.toISOString();
+  // ⏳ الميعاد مع العميل — إجباري
+  const dueF = addDue.fields(intakeDate, currentUser.name, myRole());
+  if(dueF.err){
+    alert('⏳ ' + dueF.err);
+    const h = document.getElementById('addDueHost'); if(h) h.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    return;
+  }
+  // 💵 العربون — إخباري (رقم للعلم بس، مابيدخلش في أي حساب)
+  const depositNote = IFixDue.depDigits((document.getElementById('f_depositNote') || {}).value);
   const newDevice = {
     id: 'dev_' + Date.now(),
     trackToken: genTrackToken(),
@@ -4534,6 +4573,8 @@ async function submitAdd(){
     intakeDate,
     createdBy: currentUser.name,
     statusHistory: [{ status:'waiting', date: intakeDate, by: currentUser.name }],
+    ...dueF.fields,                                   // ⏳ dueAt · dueStart · dueLabel · dueLog
+    ...(depositNote ? { depositNote } : {}),          // 💵 إخباري
   };
   devices = [newDevice, ...devices];
   render();
@@ -5144,6 +5185,87 @@ function accountantOptions(){
 // ============================================================
 let _detailRenderPending = false;
 
+// ============================================================
+// ⏳ الميعاد مع العميل + 💵 العربون — في تفاصيل الجهاز (المحاسب)
+// ------------------------------------------------------------
+// 🧸 الميعاد: بيبان كبوكس فوق (باقي قد إيه / متأخر قد إيه) ومعاه
+//    زرار «✏️ ميعاد جديد مع العميل» — الرملة الجديدة بتبدأ من دلوقتي.
+//    جهاز قديم من غير ميعاد وهو لسه في الورشة → زرار «حدّد الميعاد».
+// 🧸 العربون: إخباري بس — بيبان جنب السعر ومعاه زرار تعديل.
+//    مابيغيّرش السعر ولا الدفع ولا الحسابات.
+// ============================================================
+let dueEditId = null;
+const dueEdit = IFixDue.picker('edit', {
+  host: 'dueEditHost',
+  getFromMs: () => Date.now(),
+  fromWord: 'دلوقتي',
+  title: '⏳ الميعاد الجديد مع العميل — قد إيه من دلوقتي؟',
+});
+function dueDetailHtml(d){
+  if(!d || d.status === 'trashed') return '';
+  const ed = dueEditId === d.id;
+  let h = '';
+  if(d.dueAt){
+    h = IFixDue.boxHtml(d, ed ? '' : `<button class="ifd-btn" onclick="dueEditOpen('${d.id}')">✏️ ميعاد جديد مع العميل</button>`);
+  } else if(IFixDue.ACTIVE.includes(d.status) && !ed){
+    h = `<button class="ifd-btn" style="width:100%;margin:0 0 12px;padding:9px;" onclick="dueEditOpen('${d.id}')">⏳ حدّد الميعاد مع العميل</button>`;
+  }
+  if(ed){
+    h += `<div class="ifd-box"><div id="dueEditHost"></div>
+      <button class="ifd-btn" style="background:var(--ifd-acc);border-color:var(--ifd-acc);color:#fff;" onclick="dueEditSave('${d.id}')">💾 حفظ الميعاد</button>
+      <button class="ifd-btn" onclick="dueEditId=null;renderDetail();">إلغاء</button></div>`;
+    setTimeout(() => dueEdit.render(), 0);   // الخانة بتترسم بعد ما التفاصيل تتحط في الصفحة
+  }
+  return h;
+}
+function dueEditOpen(id){ dueEditId = id; dueEdit.chip = ''; dueEdit.custom = ''; renderDetail(); }
+async function dueEditSave(id){
+  const d = devices.find(x => x.id === id); if(!d) return;
+  const now = new Date().toISOString();
+  const r = dueEdit.fields(now, currentUser.name, myRole());
+  if(r.err){ alert('⏳ ' + r.err); return; }
+  const text = (d.dueAt ? '⏳ ميعاد جديد مع العميل: ' : '⏳ اتفقنا مع العميل: ')
+             + r.label + ' (لحد ' + IFixDue.whenTxt(r.fields.dueAt) + ')';
+  const lg = IFixDue.logAppend(d, 'set', text, currentUser.name, myRole(),
+                               isAdmin() ? 'المحاسب العام' : 'موظف', { dueAt: r.fields.dueAt });
+  devices = devices.map(x => x.id === id ? { ...x,
+    dueAt: r.fields.dueAt, dueStart: now, dueLabel: r.label, ...lg,
+    lastModifiedAt: now, lastModifiedBy: currentUser.name } : x);
+  dueEditId = null;
+  renderDetail(); render();
+  await persist();
+}
+
+let depEditId = null;
+function depDetailHtml(d){
+  if(!d || d.status === 'trashed') return '';
+  const ed = depEditId === d.id;
+  const n = IFixDue.depAmount(d);
+  const act = ed
+    ? `<input id="depEditIn" class="ifd-input" type="text" inputmode="numeric" maxlength="9" autocomplete="off"
+              value="${esc(n ? String(n) : '')}" placeholder="المبلغ — فاضي = مفيش عربون"
+              oninput="this.value=IFixDue.depDigits(this.value)" />
+       <button class="ifd-btn" style="background:var(--ifd-dep);border-color:var(--ifd-dep);color:#fff;" onclick="depEditSave('${d.id}')">💾 حفظ</button>
+       <button class="ifd-btn" onclick="depEditId=null;renderDetail();">إلغاء</button>`
+    : `<button class="ifd-btn" onclick="depEditId='${d.id}';renderDetail();setTimeout(()=>{const e=document.getElementById('depEditIn');if(e)e.focus();},60);">✏️ ${n ? 'تعديل' : 'اكتب'} العربون</button>`;
+  return IFixDue.depBoxHtml(d, isPriced(d) ? d.agreedPrice : null, act);
+}
+async function depEditSave(id){
+  const d = devices.find(x => x.id === id); if(!d) return;
+  const val = IFixDue.depDigits((document.getElementById('depEditIn') || {}).value);
+  const old = IFixDue.depDigits(d.depositNote);
+  if(val === old){ depEditId = null; renderDetail(); return; }
+  const now = new Date().toISOString();
+  const note = { text: '💵 العربون (إخباري) اتعدّل: «' + (old || '—') + '» ← «' + (val || '—') + '»',
+                 at: now, by: currentUser.name, role: isAdmin() ? 'المحاسب العام' : 'موظف' };
+  devices = devices.map(x => x.id === id ? { ...x, depositNote: val,
+    activityNotes: [...(x.activityNotes || []), note],
+    lastModifiedAt: now, lastModifiedBy: currentUser.name } : x);
+  depEditId = null;
+  renderDetail(); render();
+  await persist();
+}
+
 function renderDetail(){
   const modal = document.getElementById('detailModal');
   const ae = document.activeElement;
@@ -5237,6 +5359,7 @@ function renderDetailNow(){
     </div>
     <h2 style="font-family:'Cairo',sans-serif;font-size:18px;margin:4px 0 10px;">${esc(d.deviceType)} ${esc(d.model)}</h2>
     ${pendingApprovalText(d) ? `<div class="pending-appr-banner">⏳ ${pendingApprovalText(d)} — ${t('appr.bannerHint')}</div>` : ''}
+    ${dueDetailHtml(d)}
 
     <div class="row2">
       <label class="field"><span>${t('det.customerName')}</span><input value="${esc(d.customerName)}"${roI} onblur="editField('customerName', this.value)" /></label>
@@ -5257,6 +5380,7 @@ function renderDetailNow(){
     <datalist id="broughtByListDetail">${broughtByOptions()}</datalist>
     <div class="money-only">
     <label class="field"><span>${t('det.price')}</span><input type="text" inputmode="numeric" value="${esc(d.agreedPrice||'')}" oninput="fixDigitsInput(this)"${roI} onblur="editPrice(this.value)" /></label>
+    ${depDetailHtml(d)}
     ${isPriced(d) && d.priceConfirmation && d.priceConfirmation.requested ? `
       <div class="approval-box">
         ${!trackResponses.price_response ? `
