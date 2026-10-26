@@ -552,7 +552,8 @@ async function attPunch(kind){
 
     // ٣) السيرفر هو اللي بيقرر
     attRender('⏳ بنسجّل…');
-    const { data, error } = await sb.rpc('hr_punch', {
+    const t0 = Date.now();
+    let { data, error } = await sb.rpc('hr_punch', {
       p_kind: kind,
       p_lat: pos.coords.latitude,
       p_lng: pos.coords.longitude,
@@ -562,9 +563,31 @@ async function attPunch(kind){
     });
     // ⚠️ Supabase مبيرميش خطأ — بيرجّعه في .error. لو ما بصّيناش
     //    عليه، الفشل بيعدّي في صمت والموظف يفتكر إنه سجّل.
-    if(error) throw new Error(error.message || 'فشل التسجيل');
+    // 📶 (٢٠٢٦-١٠-٢٦) النت الضعيف: الطلب ممكن يوصل السيرفر ويتسجّل،
+    //    والرد هو اللي يضيع في السكة. قبل ما نقول «فشل» بنسأل السيرفر:
+    //    «آخر تسجيل ليا إيه؟» — لو لقيناه، يبقى نجح فعلاً.
+    if(error){
+      attRender('⏳ النت ضعيف — بنتأكد من السيرفر…');
+      if(await attConfirmOnServer(kind, t0, 2)){
+        data = { at: _attState.last_at, work_date: _attState.work_date };
+        error = null;
+      } else {
+        throw new Error(error.message || 'فشل التسجيل');
+      }
+    }
 
-    await attLoadState();
+    // ✅ (٢٠٢٦-١٠-٢٦) رسالة التأكيد بتطلع **بعد** ما نقرا التسجيل من
+    //    السيرفر تاني ونلاقيه فعلاً — والكارت فوق بيتحدّث بيه الأول.
+    //    قبل كده كانت بتطلع والكارت لسه بيقول «لسه ما سجّلتش»، لأن
+    //    قراية الحالة بعد التسجيل كانت بتفشل في صمت مع النت الضعيف.
+    attRender('⏳ بنتأكد إن التسجيل وصل…');
+    if(!(await attConfirmOnServer(kind, t0, 4))){
+      // السيرفر قال «اتسجّل» (hr_punch رجّع نجاح) بس القراية مش راضية تيجي
+      // → نكتب اللي السيرفر رجّعه في الكارت، مانخترعش حالة تانية
+      _attErr = '';
+      _attState = Object.assign({}, _attState, { last_kind: kind, last_at: (data && data.at) || new Date().toISOString(),
+                                                  work_date: (data && data.work_date) || _attState.work_date });
+    }
 
     // الانصراف تم ✅ — دلوقتي بس ننفّذ إقرار البريك (خصم/إعلان).
     // 🔴 بعد النجاح مش قبله: اللي برّه نطاق المحل مكانش ينفع ياخد
@@ -572,7 +595,10 @@ async function attPunch(kind){
     if(kind === 'out' && _attAnswer){
       const ans = _attAnswer; _attAnswer = null;
       await attApplyAnswer(ans);
+      // 📶 لو القراية دي فشلت (نت ضعيف) مانرجّعش الكارت لـ«لسه ما سجّلتش»
+      const keep = Object.assign({}, _attState);
       await attLoadState();
+      if(_attErr){ _attErr = ''; _attState = keep; }
     }
     attRender('');
 
@@ -588,6 +614,10 @@ async function attPunch(kind){
     try{ extra = await attDayWarning(kind, (data && data.work_date) || _attState.work_date); }
     catch(e){ console.error('attDayWarning:', e); }
 
+    // 🖼️ الكارت يترسم على الشاشة **قبل** الرسالة — الـ alert بيوقّف الرسم،
+    //    فمن غير الاستنية دي الموظف كان بيشوف الكارت القديم ورا الرسالة.
+    attRender('');
+    await attPaint();
     alert('✅ اتسجّل — ' + ATT_LABELS[kind].t + '\n' +
           new Date(data.at).toLocaleString('ar-EG', { timeZone:'Africa/Cairo' }) +
           extra);
@@ -603,12 +633,39 @@ async function attPunch(kind){
   }catch(e){
     console.error('attPunch failed:', e);
     attRender('');
-    alert('❌ ' + (e.message || e));
+    await attPaint();
+    const msg = String((e && e.message) || e);
+    // 📶 مشكلة نت (والسيرفر اتسأل ومالقاش التسجيل) → نقولها بالعربي الواضح
+    alert(/fetch|network|load failed|timeout/i.test(msg)
+      ? '❌ ماتسجّلش — النت ضعيف ومقدرناش نوصل للسيرفر.\nاتأكد من النت وجرّب تاني.'
+      : '❌ ' + msg);
   }finally{
     _attBusy = false;
   }
 }
 
+
+// ============================================================
+// 📶 التأكد إن التسجيل وصل السيرفر فعلاً
+// ------------------------------------------------------------
+// بنقرا الحالة من السيرفر (hr_my_today) لحد ما آخر تسجيل يبقى هو
+// اللي لسه عاملينه (نفس النوع، ووقته بعد ما دوسنا الزرار بدقيقة على
+// الأكتر قبله — فرق الساعة بين الموبايل والسيرفر). بنحاول أكتر من
+// مرة مع استنية بتزيد — النت الضعيف بيرجع بعد ثانية أو اتنين.
+// ============================================================
+async function attConfirmOnServer(kind, sinceMs, tries){
+  for(let i = 0; i < (tries || 3); i++){
+    if(i) await new Promise(r => setTimeout(r, 900 * i));
+    await attLoadState();
+    if(!_attErr && _attState && _attState.last_kind === kind
+       && Date.parse(_attState.last_at) >= (sinceMs - 120000)) return true;
+  }
+  return false;
+}
+// استنية لحد ما المتصفح يرسم الشاشة فعلاً (قبل alert)
+function attPaint(){
+  return new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(r, 30))));
+}
 
 // ============================================================
 // ⚠️ التنبيه لحظة التسجيل
