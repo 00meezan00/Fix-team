@@ -497,7 +497,8 @@ async function attPunch(kind){
   // ============================================================
   // ⚠️ فحص البريك قبل أي حاجة — وبيرجع من غير await عشان تصريح
   //    الموقع في سفاري ما يضيعش (نفس سبب ترتيب السطور تحت).
-  if(kind === 'out' && !_attAnswer && attNeedBreakAsk()){
+  const _retry = !!(_attPending && _attPending.kind === kind);   // 🔄 «جرّب تاني» لتسجيل مااتأكدش
+  if(kind === 'out' && !_attAnswer && !_retry && attNeedBreakAsk()){
     attShowBreakAsk();
     return;
   }
@@ -551,84 +552,66 @@ async function attPunch(kind){
     verified = await attBioVerify(email);
 
     // ٣) السيرفر هو اللي بيقرر
+    // ============================================================
+    // 📶🔒 (٢٠٢٦-١٠-٢٧) مفيش «✅ اتسجّل» ولا تغيير في الكارت غير لما
+    //    نقرا التسجيل نفسه من السيرفر ونلاقيه فعلاً.
+    //    • الطلب بيبعت، ولو النت هنّج → بعد ٢٠ ثانية بنبطّل نستنى الرد.
+    //    • في الحالتين بنسأل السيرفر: «فيه تسجيل جديد من النوع ده؟»
+    //      (تسجيل **جديد** = غير آخر تسجيل كان موجود قبل ما ندوس).
+    //    • لقيناه → الكارت يتحدّث، وبعدين الرسالة.
+    //    • مالقيناهوش → «📶 النت ضعيف — جرّب تاني» + زرار «🔄 جرّب تاني».
+    //      الزرار بيسأل السيرفر الأول: لو التسجيل الأولاني وصل خلاص →
+    //      ✅ من غير ما يتبعت تاني (مايتسجّلش مرتين). لو ماوصلش → بيبعته.
+    //      وفي الخلفية بنفضل نسأل لوحدنا كل ٥ ثواني لحد ٣ دقايق —
+    //      حتى لو قفل الشاشة وفتحها.
+    //    • السيرفر رفض فعلاً (برّه المحل مثلاً) → الخطأ على طول.
+    // ============================================================
+    let prevAt = _attState.last_at || null;        // آخر تسجيل قبل الدوسة
+    let answer = (kind === 'out' && _attAnswer) ? _attAnswer : null;
+    if(_retry){
+      // 🔄 «جرّب تاني»: يمكن الأولاني وصل والنت هو اللي ضيّع الرد — نسأل الأول
+      const old = _attPending;
+      attRender('⏳ بنتأكد إن التسجيل وصل السيرفر…');
+      if(await attConfirmOnServer(old, 2)){ await attFinishPunch(old); return; }
+      prevAt = old.prevAt;                           // نفس «قبل» بتاع الدوسة الأولانية
+      answer = answer || old.answer;
+    }
     attRender('⏳ بنسجّل…');
-    const t0 = Date.now();
-    let { data, error } = await sb.rpc('hr_punch', {
-      p_kind: kind,
-      p_lat: pos.coords.latitude,
-      p_lng: pos.coords.longitude,
-      p_accuracy: pos.coords.accuracy,
-      p_verified: verified,
-      p_device: (navigator.userAgent || '').slice(0, 120)
-    });
-    // ⚠️ Supabase مبيرميش خطأ — بيرجّعه في .error. لو ما بصّيناش
-    //    عليه، الفشل بيعدّي في صمت والموظف يفتكر إنه سجّل.
-    // 📶 (٢٠٢٦-١٠-٢٦) النت الضعيف: الطلب ممكن يوصل السيرفر ويتسجّل،
-    //    والرد هو اللي يضيع في السكة. قبل ما نقول «فشل» بنسأل السيرفر:
-    //    «آخر تسجيل ليا إيه؟» — لو لقيناه، يبقى نجح فعلاً.
-    if(error){
-      attRender('⏳ النت ضعيف — بنتأكد من السيرفر…');
-      if(await attConfirmOnServer(kind, t0, 2)){
-        data = { at: _attState.last_at, work_date: _attState.work_date };
-        error = null;
-      } else {
-        throw new Error(error.message || 'فشل التسجيل');
-      }
+    const pend = { kind, prevAt, t0: Date.now(), answer };
+    _attAnswer = null;
+    attSetPending(pend);
+    let data = null, error = null;
+    try{
+      ({ data, error } = await attTimeout(sb.rpc('hr_punch', {
+        p_kind: kind,
+        p_lat: pos.coords.latitude,
+        p_lng: pos.coords.longitude,
+        p_accuracy: pos.coords.accuracy,
+        p_verified: verified,
+        p_device: (navigator.userAgent || '').slice(0, 120)
+      }), 20000));
+    }catch(e){ error = e; }
+    // ⚠️ Supabase مبيرميش خطأ — بيرجّعه في .error.
+    // السيرفر رفض فعلاً (مش مشكلة نت) → مفيش تسجيل، نقول السبب على طول
+    if(error && !attIsNetErr(error)){
+      attSetPending(null);
+      if(pend.answer) _attAnswer = pend.answer;   // إجابة البريك تفضل — مايتسألش تاني
+      throw new Error(error.message || 'فشل التسجيل');
     }
+    if(data && data.at) pend.at = data.at;
+    if(data && data.work_date) pend.work_date = data.work_date;
+    attSetPending(pend);
 
-    // ✅ (٢٠٢٦-١٠-٢٦) رسالة التأكيد بتطلع **بعد** ما نقرا التسجيل من
-    //    السيرفر تاني ونلاقيه فعلاً — والكارت فوق بيتحدّث بيه الأول.
-    //    قبل كده كانت بتطلع والكارت لسه بيقول «لسه ما سجّلتش»، لأن
-    //    قراية الحالة بعد التسجيل كانت بتفشل في صمت مع النت الضعيف.
-    attRender('⏳ بنتأكد إن التسجيل وصل…');
-    if(!(await attConfirmOnServer(kind, t0, 4))){
-      // السيرفر قال «اتسجّل» (hr_punch رجّع نجاح) بس القراية مش راضية تيجي
-      // → نكتب اللي السيرفر رجّعه في الكارت، مانخترعش حالة تانية
-      _attErr = '';
-      _attState = Object.assign({}, _attState, { last_kind: kind, last_at: (data && data.at) || new Date().toISOString(),
-                                                  work_date: (data && data.work_date) || _attState.work_date });
-    }
-
-    // الانصراف تم ✅ — دلوقتي بس ننفّذ إقرار البريك (خصم/إعلان).
-    // 🔴 بعد النجاح مش قبله: اللي برّه نطاق المحل مكانش ينفع ياخد
-    //    خصم وهو أصلاً ما نجحش ينصرف.
-    if(kind === 'out' && _attAnswer){
-      const ans = _attAnswer; _attAnswer = null;
-      await attApplyAnswer(ans);
-      // 📶 لو القراية دي فشلت (نت ضعيف) مانرجّعش الكارت لـ«لسه ما سجّلتش»
-      const keep = Object.assign({}, _attState);
-      await attLoadState();
-      if(_attErr){ _attErr = ''; _attState = keep; }
-    }
-    attRender('');
-
-    // ⚠️ التنبيه بيتحط في **نفس الرسالة** مش في alert تانية.
-    //    اتنين ورا بعض على الموبايل: الأولى بتتقفل بالغلط والتانية
-    //    بتبان من غير سياق — والموظف يفتكر إن فيه حاجة بايظة.
-    // 🐞 اليوم بياخده من **التسجيل نفسه** (data.work_date) — مش من
-    //    _attState. بعد انصراف بعد نص الليل، attLoadState اللي فوق
-    //    كانت بترجّع اليوم الجديد (فاضي)، فالتنبيه كان بيدوّر على
-    //    ساعات يوم مفيهوش حاجة ويسكت — والموظف ما يعرفش إنه ناقص.
-    //    السيرفر (hr_punch) هو اللي قرر اليوم، فبناخده منه.
-    let extra = '';
-    try{ extra = await attDayWarning(kind, (data && data.work_date) || _attState.work_date); }
-    catch(e){ console.error('attDayWarning:', e); }
-
-    // 🖼️ الكارت يترسم على الشاشة **قبل** الرسالة — الـ alert بيوقّف الرسم،
-    //    فمن غير الاستنية دي الموظف كان بيشوف الكارت القديم ورا الرسالة.
-    attRender('');
-    await attPaint();
-    alert('✅ اتسجّل — ' + ATT_LABELS[kind].t + '\n' +
-          new Date(data.at).toLocaleString('ar-EG', { timeZone:'Africa/Cairo' }) +
-          extra);
-
-    // ⚠️ خصم التأخير بيتولد **لحظة التسجيل**، مش من HR. فمفيش
-    //    حاجة في قاعدة البيانات تنبّه شاشة «مرتبك» إنها تحدّث
-    //    نفسها (الريل تايم بتاعها بيسمع على جدول الخصومات اليدوية
-    //    بس). بنندهها بإيدينا هنا — ولو الملف مش محمّل في الصفحة
-    //    دي، السطر بيعدّي من غير ما يعمل حاجة.
-    if(typeof payLoad === 'function'){
-      try{ await payLoad(); }catch(e){ console.error('payLoad after punch:', e); }
+    attRender('⏳ بنتأكد إن التسجيل وصل السيرفر…');
+    const ok = await attConfirmOnServer(pend, 5);
+    if(ok){
+      await attFinishPunch(pend);
+    } else {
+      // لسه مش متأكدين — مانقولش «تمام» ومانغيّرش الكارت
+      attRender('');
+      attWatchPending();
+      await attPaint();
+      alert('📶 النت ضعيف — جرّب تاني');
     }
   }catch(e){
     console.error('attPunch failed:', e);
@@ -636,7 +619,7 @@ async function attPunch(kind){
     await attPaint();
     const msg = String((e && e.message) || e);
     // 📶 مشكلة نت (والسيرفر اتسأل ومالقاش التسجيل) → نقولها بالعربي الواضح
-    alert(/fetch|network|load failed|timeout/i.test(msg)
+    alert(attIsNetErr(e)
       ? '❌ ماتسجّلش — النت ضعيف ومقدرناش نوصل للسيرفر.\nاتأكد من النت وجرّب تاني.'
       : '❌ ' + msg);
   }finally{
@@ -644,21 +627,127 @@ async function attPunch(kind){
   }
 }
 
+// ============================================================
+// ✅ بعد ما اتأكدنا من السيرفر بس
+// ------------------------------------------------------------
+// الكارت اتحدّث من السيرفر (attConfirmOnServer)، ودلوقتي:
+// إقرار البريك (لو انصراف) → تنبيه التأخير/النقص → الرسالة → المرتب.
+// ============================================================
+async function attFinishPunch(pend){
+  const kind = pend.kind;
+  attSetPending(null);
+  // الانصراف تم ✅ — دلوقتي بس ننفّذ إقرار البريك (خصم/إعلان).
+  // 🔴 بعد النجاح مش قبله: اللي برّه نطاق المحل مكانش ينفع ياخد
+  //    خصم وهو أصلاً ما نجحش ينصرف.
+  if(kind === 'out' && pend.answer){
+    try{ await attApplyAnswer(pend.answer); }catch(e){ console.error('attApplyAnswer:', e); }
+    const keep = Object.assign({}, _attState);
+    await attLoadState();
+    if(_attErr){ _attErr = ''; _attState = keep; }
+  }
+  // 🐞 اليوم بياخده من **التسجيل نفسه** — مش من آخر حالة (انصراف
+  //    بعد نص الليل بيرجّع اليوم الجديد الفاضي).
+  let extra = '';
+  try{ extra = await attDayWarning(kind, pend.work_date || _attState.work_date); }
+  catch(e){ console.error('attDayWarning:', e); }
+
+  // 🖼️ الكارت يترسم على الشاشة **قبل** الرسالة — الـ alert بيوقّف الرسم
+  attRender('');
+  await attPaint();
+  alert('✅ اتسجّل — ' + ATT_LABELS[kind].t + '\n' +
+        new Date(_attState.last_at || pend.at).toLocaleString('ar-EG', { timeZone:'Africa/Cairo' }) +
+        extra);
+
+  // ⚠️ خصم التأخير بيتولد لحظة التسجيل — نحدّث «مرتبك» بإيدينا
+  if(typeof payLoad === 'function'){
+    try{ await payLoad(); }catch(e){ console.error('payLoad after punch:', e); }
+  }
+}
+
+// ============================================================
+// 📶 تسجيل مااتأكدش («النت ضعيف — جرّب تاني») — بيتحفظ على الموبايل
+// ------------------------------------------------------------
+// لو قفل الشاشة أو التطبيق وفتحه تاني، بنكمّل نسأل من مكان ما وقفنا.
+// بعد ٣ دقايق من غير تأكيد → بنقول «ماتسجّلش» ونفتح الأزرار.
+// ============================================================
+const ATT_PEND_KEY = 'ifix-att-pending';
+const ATT_PEND_MAX_MS = 3 * 60000;
+var _attPending = null;   // var عن قصد: attRender بتقراه، ممكن قبل السطر ده
+var _attWatchT = null;
+function attSetPending(p){
+  _attPending = p;
+  try{ if(p) localStorage.setItem(ATT_PEND_KEY, JSON.stringify(p)); else localStorage.removeItem(ATT_PEND_KEY); }catch(e){}
+  if(!p && _attWatchT){ clearTimeout(_attWatchT); _attWatchT = null; }
+}
+function attRestorePending(){
+  if(_attPending) return _attPending;
+  try{
+    const p = JSON.parse(localStorage.getItem(ATT_PEND_KEY) || 'null');
+    if(p && p.kind && Date.now() - p.t0 < ATT_PEND_MAX_MS + 60000) _attPending = p;
+    else localStorage.removeItem(ATT_PEND_KEY);
+  }catch(e){}
+  return _attPending;
+}
+function attWatchPending(){
+  if(_attWatchT) clearTimeout(_attWatchT);
+  _attWatchT = setTimeout(attCheckPending, 5000);
+}
+// بيتنده لوحده كل ٥ ثواني، أو من زرار «🔄 اتأكد دلوقتي»
+async function attCheckPending(manual){
+  _attWatchT = null;
+  const p = _attPending;
+  if(!p || _attBusy) { if(p) attWatchPending(); return; }
+  _attBusy = true;
+  try{
+    if(manual) attRender('⏳ بنتأكد إن التسجيل وصل السيرفر…');
+    const ok = await attConfirmOnServer(p, manual ? 3 : 1);
+    if(ok){ _attBusy = false; await attFinishPunch(p); return; }
+    if(Date.now() - p.t0 > ATT_PEND_MAX_MS){
+      attSetPending(null);
+      attRender('');
+      await attPaint();
+      alert('📶 النت ضعيف — جرّب تاني');
+      return;
+    }
+    attRender('');
+    attWatchPending();
+  }finally{
+    _attBusy = false;
+  }
+}
+
+// مشكلة نت ولا رفض من السيرفر؟ (رفض السيرفر بيبقى ليه كود زي P0001)
+function attIsNetErr(e){
+  if(!e) return false;
+  const m = String(e.message || e);
+  if(/fetch|network|load failed|timeout|abort|offline|connection/i.test(m)) return true;
+  return !e.code && !e.details && !e.hint && /TypeError/i.test(String(e.name || ''));
+}
+// أي طلب ياخد أكتر من ms → بنعتبره «النت هنّج» (الطلب نفسه ممكن يكون وصل)
+function attTimeout(promise, ms){
+  let t;
+  return Promise.race([
+    Promise.resolve(promise).finally(() => clearTimeout(t)),
+    new Promise((_, rej) => { t = setTimeout(() => rej(new Error('timeout — النت هنّج')), ms); })
+  ]);
+}
 
 // ============================================================
 // 📶 التأكد إن التسجيل وصل السيرفر فعلاً
 // ------------------------------------------------------------
-// بنقرا الحالة من السيرفر (hr_my_today) لحد ما آخر تسجيل يبقى هو
-// اللي لسه عاملينه (نفس النوع، ووقته بعد ما دوسنا الزرار بدقيقة على
-// الأكتر قبله — فرق الساعة بين الموبايل والسيرفر). بنحاول أكتر من
-// مرة مع استنية بتزيد — النت الضعيف بيرجع بعد ثانية أو اتنين.
+// بنقرا الحالة من السيرفر (hr_my_today) لحد ما نلاقي تسجيل **جديد**
+// من نفس النوع: آخر تسجيل نوعه هو اللي دوسناه، ووقته مش هو نفس آخر
+// تسجيل كان موجود قبل الدوسة. (كده فرق الساعة بين الموبايل والسيرفر
+// مايفرقش.) بنحاول كذا مرة مع استنية بتزيد — النت الضعيف بيرجع بعد
+// ثانية أو اتنين.
 // ============================================================
-async function attConfirmOnServer(kind, sinceMs, tries){
+async function attConfirmOnServer(p, tries){
   for(let i = 0; i < (tries || 3); i++){
-    if(i) await new Promise(r => setTimeout(r, 900 * i));
+    if(i) await new Promise(r => setTimeout(r, 1000 * i));
     await attLoadState();
-    if(!_attErr && _attState && _attState.last_kind === kind
-       && Date.parse(_attState.last_at) >= (sinceMs - 120000)) return true;
+    if(!_attErr && _attState && _attState.last_kind === p.kind && _attState.last_at
+       && _attState.last_at !== p.prevAt
+       && (!p.prevAt || Date.parse(_attState.last_at) > Date.parse(p.prevAt))) return true;
   }
   return false;
 }
@@ -770,7 +859,7 @@ let _attErr = '';   // آخر خطأ في قراءة الحالة
 async function attLoadState(){
   _attErr = '';
   try{
-    const { data, error } = await sb.rpc('hr_my_today');
+    const { data, error } = await attTimeout(sb.rpc('hr_my_today'), 10000);
     if(error) throw error;
     const r = Array.isArray(data) ? data[0] : data;
     _attState = r || { last_kind:null, last_at:null, work_date:null, punches:0 };
@@ -864,7 +953,7 @@ function attRender(busyMsg){
   const ov = document.getElementById('attOverlay');
   if(!ov) return;
   const btn = (k) => {
-    const on = attAllowed(k) && !busyMsg;
+    const on = attAllowed(k) && !busyMsg && !_attPending;
     return `<button class="att-btn att-${k}" ${on ? '' : 'disabled'}
       onclick="attPunch('${k}')">${ATT_LABELS[k].icon} ${ATT_LABELS[k].t}</button>`;
   };
@@ -876,9 +965,13 @@ function attRender(busyMsg){
       </div>
       <div class="att-body">
         <div class="att-status">${esc(attStatusText())}</div>
-        ${_attErr ? `<div class="att-warn">⚠️ مقدرناش نقرا حالتك — الأزرار مقفولة عشان
+        ${_attErr && !_attPending ? `<div class="att-warn">⚠️ مقدرناش نقرا حالتك — الأزرار مقفولة عشان
           ما نسجّلش حاجة غلط.<br><span class="att-warn-d">${esc(_attErr)}</span></div>` : ''}
         ${busyMsg ? `<div class="att-busy">${esc(busyMsg)}</div>` : ''}
+        ${_attPending && !busyMsg ? `<div class="att-pend">
+          📶 <b>النت ضعيف — جرّب تاني</b>
+          <button class="att-pend-btn" onclick="attPunch('${esc(_attPending.kind)}')">🔄 جرّب تاني — ${esc(ATT_LABELS[_attPending.kind].t)}</button>
+        </div>` : ''}
         <div class="att-grid">
           ${btn('in')}${btn('out')}${btn('break')}${btn('resume')}
         </div>
@@ -911,49 +1004,101 @@ function attRender(busyMsg){
 // 🗄️ جدول hr_staff_notes (ملف prod-hr-staff-notes.sql) — السيرفر
 //    بيكتب الإيميل والدور والوقت بنفسه.
 // ============================================================
-let _attMsgDraft = { body: '', date: '' };
+// 🆕 (٢٠٢٦-١٠-٢٧) بقت اختيارات واضحة بدل الكلام الحر:
+//    السبب (نسيت / النت كان معلّق) · الحالة (حضور / انصراف) ·
+//    الوقت والتاريخ — من غير أي كلام حر. (ملف prod-hr-notes-choices.sql)
+// ============================================================
+const ATT_MSG_REASONS = [ { k:'forgot', t:'🤦 نسيت' }, { k:'net', t:'📶 النت كان معلّق' } ];
+const ATT_MSG_KINDS   = [ { k:'in', t:'🟢 حضور' }, { k:'out', t:'🔴 انصراف' } ];
+let _attMsgDraft = { reason: '', kind: '', at: '' };
 let _attMsgSending = false;
 function _attToday(){
   // اليوم بتوقيت القاهرة (YYYY-MM-DD)
   return new Date().toLocaleDateString('en-CA', { timeZone:'Africa/Cairo' });
 }
+// دلوقتي بتوقيت القاهرة بصيغة خانة datetime-local ('YYYY-MM-DDTHH:MM')
+function _attCairoNowLocal(){
+  return new Date().toLocaleString('sv-SE', { timeZone:'Africa/Cairo' }).slice(0, 16).replace(' ', 'T');
+}
+// 'YYYY-MM-DDTHH:MM' بتوقيت القاهرة → ISO حقيقي (بيحسب التوقيت الصيفي/الشتوي)
+function _attCairoToIso(local){
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(local || '');
+  if(!m) return null;
+  const wall = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]);
+  const offAt = t => {   // فرق القاهرة عن UTC في اللحظة t (بالمللي)
+    const p = new Date(t).toLocaleString('sv-SE', { timeZone:'Africa/Cairo' });
+    const q = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/.exec(p);
+    return Date.UTC(+q[1], +q[2] - 1, +q[3], +q[4], +q[5], +q[6]) - Math.floor(t / 1000) * 1000;
+  };
+  let t = wall - offAt(wall);
+  t = wall - offAt(t);          // مرة تانية عشان يوم تغيير الساعة
+  return new Date(t).toISOString();
+}
+function _attMsgFmt(iso){
+  try{ return new Date(iso).toLocaleString('ar-EG', { timeZone:'Africa/Cairo', weekday:'long', day:'numeric', month:'long', hour:'numeric', minute:'2-digit' }); }
+  catch(e){ return iso; }
+}
+function _attMsgPick(k, v){
+  _attMsgDraft[k] = v;
+  document.querySelectorAll(`.att-msg-chip[data-k="${k}"]`).forEach(b => b.classList.toggle('on', b.dataset.v === v));
+}
 function attMsgHtml(busyMsg){
   const today = _attToday();
-  const min = new Date(Date.parse(today) - 30 * 86400000).toISOString().slice(0, 10);
-  const date = _attMsgDraft.date || today;
+  const min = new Date(Date.parse(today) - 30 * 86400000).toISOString().slice(0, 10) + 'T00:00';
+  const max = _attCairoNowLocal();
+  const at = _attMsgDraft.at || max;
+  const chips = (k, list) => list.map(x =>
+    `<button type="button" class="att-msg-chip${_attMsgDraft[k] === x.k ? ' on' : ''}" data-k="${k}" data-v="${x.k}" onclick="_attMsgPick('${k}','${x.k}')">${x.t}</button>`).join('');
   return `<div class="att-msg">
     <div class="att-msg-h">📨 رسالة لشؤون العاملين</div>
-    <div class="att-msg-p">مشيت ونسيت تعمل انصراف؟ أو حصلت حاجة في مواعيدك؟ اكتبها هنا وهتوصل لـ HR.</div>
-    <label class="att-msg-l">اليوم اللي بتتكلم عنه</label>
-    <input type="date" id="attMsgDate" class="att-msg-in" value="${esc(date)}" min="${min}" max="${today}"
-           onchange="_attMsgDraft.date=this.value">
-    <textarea id="attMsgBody" class="att-msg-in att-msg-ta" maxlength="1000"
-      placeholder="مثلاً: مشيت الساعة ١١ بالليل ونسيت أعمل انصراف"
-      oninput="_attMsgDraft.body=this.value">${esc(_attMsgDraft.body)}</textarea>
+    <div class="att-msg-p">ماعرفتش تسجّل حضور أو انصراف؟ اختار وابعت — HR هتسجّلهولك.</div>
+    <label class="att-msg-l">١) السبب</label>
+    <div class="att-msg-chips">${chips('reason', ATT_MSG_REASONS)}</div>
+    <label class="att-msg-l">٢) الحالة</label>
+    <div class="att-msg-chips">${chips('kind', ATT_MSG_KINDS)}</div>
+    <label class="att-msg-l">٣) الوقت والتاريخ اللي حصل فيه فعلاً</label>
+    <input type="datetime-local" id="attMsgAt" class="att-msg-in" value="${esc(at)}" min="${min}" max="${max}"
+           onchange="_attMsgDraft.at=this.value">
     <button class="att-msg-send" ${(busyMsg || _attMsgSending) ? 'disabled' : ''} onclick="attSendMsg()">📨 ابعت لـ HR</button>
     <div id="attMsgList"></div>
   </div>`;
 }
 async function attSendMsg(){
   if(_attMsgSending) return;
-  const body = ((document.getElementById('attMsgBody') || {}).value || '').trim();
-  const date = (document.getElementById('attMsgDate') || {}).value || _attToday();
-  if(!body){ alert('اكتب الرسالة الأول'); return; }
+  const reason = _attMsgDraft.reason, kind = _attMsgDraft.kind;
+  const atLocal = ((document.getElementById('attMsgAt') || {}).value || _attMsgDraft.at || '').trim();
+  if(!reason){ alert('اختار السبب: نسيت ولا النت كان معلّق؟'); return; }
+  if(!kind){ alert('اختار الحالة: حضور ولا انصراف؟'); return; }
+  const iso = _attCairoToIso(atLocal);
+  if(!iso){ alert('اكتب الوقت والتاريخ'); return; }
+  if(Date.parse(iso) > Date.now() + 5 * 60000){ alert('الوقت ده لسه ماجاش — اكتب الوقت اللي حصل فعلاً'); return; }
+  if(Date.parse(iso) < Date.now() - 30 * 86400000){ alert('الرسالة بتبقى عن آخر ٣٠ يوم بس'); return; }
+  const rT = (ATT_MSG_REASONS.find(x => x.k === reason) || {}).t || '';
+  const kT = (ATT_MSG_KINDS.find(x => x.k === kind) || {}).t || '';
+  // النص الكامل — بيتحفظ كمان عشان أي شاشة قديمة تفهمه
+  const body = `${kT} — ${_attMsgFmt(iso)}\nالسبب: ${rT}`;
   _attMsgSending = true;
   const btn = document.querySelector('.att-msg-send'); if(btn) btn.disabled = true;
   try{
-    const { error } = await sb.from('hr_staff_notes').insert({ body, work_date: date });
+    let { error } = await sb.from('hr_staff_notes')
+      .insert({ body, work_date: atLocal.slice(0, 10), reason, punch_kind: kind, punch_at: iso });
+    // الخانات الجديدة لسه مااتعملتش على السيرفر؟ نبعتها بالشكل القديم عشان الرسالة ماتضيعش
+    if(error && /reason|punch_kind|punch_at|column/i.test(error.message || '')){
+      console.warn('hr_staff_notes: الخانات الجديدة مش موجودة — بنبعت نص بس', error);
+      ({ error } = await sb.from('hr_staff_notes').insert({ body, work_date: atLocal.slice(0, 10) }));
+    }
     if(error) throw error;
-    _attMsgDraft = { body: '', date: '' };
-    const ta = document.getElementById('attMsgBody'); if(ta) ta.value = '';
+    _attMsgDraft = { reason: '', kind: '', at: '' };
+    const box = document.querySelector('.att-msg');
+    if(box) box.outerHTML = attMsgHtml();
     alert('✅ الرسالة وصلت لشؤون العاملين');
     attLoadMsgs();
   }catch(e){
     console.error('attSendMsg failed:', e);
-    alert('⚠️ الرسالة ماتبعتتش: ' + ((e && e.message) || e) + '\nالكلام لسه في الخانة — جرّب تاني.');
+    alert('⚠️ الرسالة ماتبعتتش: ' + ((e && e.message) || e) + '\nاختياراتك لسه موجودة — جرّب تاني.');
   }finally{
     _attMsgSending = false;
-    if(btn) btn.disabled = false;
+    const b2 = document.querySelector('.att-msg-send'); if(b2) b2.disabled = false;
   }
 }
 // آخر رسايلي (٥) — عشان يعرف وصلت وHR شافتها ولا لأ
@@ -963,13 +1108,17 @@ async function attLoadMsgs(){
   try{
     const me = await attMe();
     const { data, error } = await sb.from('hr_staff_notes')
-      .select('id,work_date,body,created_at,seen_at')
+      .select('*')
       .eq('user_email', me).order('created_at', { ascending:false }).limit(5);
     if(error) throw error;
     if(!data || !data.length){ box.innerHTML = ''; return; }
     box.innerHTML = `<div class="att-msg-lh">رسايلي الأخيرة</div>` + data.map(m => `
       <div class="att-msg-row">
-        <div class="att-msg-rt">${esc(m.body)}</div>
+        <div class="att-msg-rt">${m.punch_kind
+          ? `<b>${esc((ATT_MSG_KINDS.find(x => x.k === m.punch_kind) || {}).t || '')}</b> — ${esc(_attMsgFmt(m.punch_at))}`
+            + ` · ${esc((ATT_MSG_REASONS.find(x => x.k === m.reason) || {}).t || '')}`
+            + (m.body.split('\n').slice(2).join('\n') ? `<br>${esc(m.body.split('\n').slice(2).join('\n'))}` : '')
+          : esc(m.body)}</div>
         <div class="att-msg-rm">📅 ${esc(new Date(m.work_date + 'T12:00:00').toLocaleDateString('ar-EG', { weekday:'long', day:'numeric', month:'long' }))}
           · ${m.seen_at ? '<b class="att-msg-ok">✓ HR شافتها</b>' : '⏳ لسه'}</div>
       </div>`).join('');
@@ -1214,6 +1363,8 @@ async function openAttendance(){
   attRender('⏳ جاري التحميل…');
   await attLoadState();
   attRender('');
+  // ⏳ كان فيه تسجيل مستني تأكيد (قفل الشاشة قبل ما يتأكد)؟ نكمّل
+  if(attRestorePending()){ attRender(''); attCheckPending(true); }
 }
 function closeAttendance(){
   const ov = document.getElementById('attOverlay');
@@ -1329,6 +1480,15 @@ function closeAttendance(){
   .att-msg-row{border-top:1px solid var(--a-line); padding:8px 0;}
   .att-msg-rt{font-size:13.5px; line-height:1.7; color:var(--a-ink2); white-space:pre-wrap; word-break:break-word;}
   .att-msg-rm{font-size:11.5px; color:var(--a-mut); margin-top:3px;}
-  .att-msg-ok{color:#16A34A;}`;
+  .att-msg-ok{color:#16A34A;}
+  .att-pend{background:#FEF3C7; color:#78350F; border:1px solid #F59E0B; border-radius:12px;
+    padding:12px 13px; margin:10px 0; font-size:14px; line-height:1.8;}
+  .att-pend span{font-size:12.5px;}
+  .att-pend-btn{display:block; width:100%; margin-top:8px; border:none; border-radius:10px; padding:11px;
+    font-family:inherit; font-size:14px; font-weight:800; background:#B45309; color:#fff; cursor:pointer;}
+  .att-msg-chips{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px;}
+  .att-msg-chip{flex:1 1 0; min-width:120px; border:1.5px solid var(--a-line); background:var(--a-bg); color:var(--a-ink);
+    border-radius:12px; padding:11px 10px; font-family:inherit; font-size:14.5px; font-weight:800; cursor:pointer;}
+  .att-msg-chip.on{background:#4C1D95; border-color:#4C1D95; color:#fff;}`;
   (document.head || document.documentElement).appendChild(s);
 })();
