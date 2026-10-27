@@ -1454,7 +1454,8 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
     <button id="accountMenuBtn" class="hidden" onclick="openAccount()">👤 حسابي</button>
 
     <div class="mh mh-shop">🏪 المحل</div>   <!-- mh-shop: «📥 ترتيب الاستلامات» بيتحط تحتها (intake-board-view.js) -->
-    <button class="money-menu-item" onclick="openAnalytics()">📊 الملخص المالي</button>
+    <!-- 📊 للمحاسب العام بس (٢٠٢٦-١٠-٢٧) — toggleMenu بيخفيه عن الباقي -->
+    <button id="analyticsMenuBtn" class="money-menu-item" style="display:none;" onclick="openAnalytics()">📊 الملخص المالي</button>
     <button class="money-menu-item" onclick="openAccounts()">📒 الحسابات</button>
     <!-- 💬 للسوبر أدمن بس — syncWaHeldMenu بيظهّره ويحط عليه العدد -->
     <button id="waHeldMenuBtn" style="display:none;" onclick="openWaHeld()">💬 مسدجات الواتساب المتوقفة <span id="waHeldCount" style="display:none;background:#DC2626;color:#fff;border-radius:10px;padding:1px 7px;font-size:11.5px;font-weight:800;margin-inline-start:4px;"></span></button>
@@ -6955,6 +6956,8 @@ function toggleMenu(){
   const dd = document.getElementById('menuDropdown');
   if(dd.classList.contains('hidden')){
     // 📊 إحصائية ما بعد البيع — للمحاسب العام بس
+    // 📊 الملخص المالي — للمحاسب العام بس (المحاسبين التانيين مابيشوفوهوش)
+    try{ const anb = document.getElementById('analyticsMenuBtn'); if(anb) anb.style.display = isSuperAdmin() ? '' : 'none'; }catch(e){}
     try{ const asb = document.getElementById('asStatsMenuBtn'); if(asb) asb.style.display = (isSuperAdmin() && typeof openAfterSaleStats === 'function') ? '' : 'none'; }catch(e){}
     try{ dbArrangeMenu(dd); }catch(e){ console.warn('dbArrangeMenu:', e); }
     // 🗂️ العناوين اللي كل خاناتها مقفولة بالدور/الصلاحية تستخبى
@@ -9767,6 +9770,8 @@ function exportDeliveredUnpaidPdf(list){
 let anPeriod = { mode: 'month', from: '', to: '' };
 
 function openAnalytics(){
+  // 🔒 للمحاسب العام بس — حتى لو حد نده الدالة من مكان تاني
+  if(!isSuperAdmin()){ try{ closeAnalytics(); }catch(e){} return; }
   document.getElementById('menuDropdown').classList.add('hidden');
   shieldGhostClick();
   document.getElementById('analyticsOverlay').classList.remove('hidden');
