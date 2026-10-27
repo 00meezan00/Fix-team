@@ -113,6 +113,7 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
 <script src="statuses.js"></script>
 <script src="due-deposit.js"></script>   <!-- ⏳ الميعاد مع العميل + 💵 العربون (إخباري) — مؤقت للإنتاج -->
 <script src="intake-board-view.js" defer></script>   <!-- 📥 ترتيب الاستلامات (ملف prod-intake-board.sql) — زرار في قايمة ⋮ -->
+<script src="aftersale-stats.js"></script>   <!-- 📊 إحصائية ما بعد البيع — للمحاسب العام بس (مؤقت للإنتاج) -->
 <script src="accounts.js"></script>
 <script src="label.js"></script>
 <script src="attendance.js"></script>
@@ -1459,6 +1460,8 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
     <button id="waHeldMenuBtn" style="display:none;" onclick="openWaHeld()">💬 مسدجات الواتساب المتوقفة <span id="waHeldCount" style="display:none;background:#DC2626;color:#fff;border-radius:10px;padding:1px 7px;font-size:11.5px;font-weight:800;margin-inline-start:4px;"></span></button>
     <button class="admin-menu-item" onclick="openSummaries()">📋 الجرد</button>
     <button class="admin-menu-item" onclick="openTechEval()">🏆 تقييم الفنيين</button>
+    <!-- 📊 للمحاسب العام بس — toggleMenu بيظهّره (aftersale-stats.js) -->
+    <button id="asStatsMenuBtn" style="display:none;" onclick="openAfterSaleStats()">📊 إحصائية ما بعد البيع</button>
     <button class="money-menu-item" onclick="openStaff()">👥 الموظفين</button>
 
     <div class="mh">🔩 قطع الغيار</div>
@@ -4890,6 +4893,7 @@ function ccDetailHtml(d){
     h += `<div style="border:1.5px solid var(--${bad ? 'danger' : 'success'});border-radius:10px;padding:10px 12px;margin:0 0 12px;">
       <div style="font-size:13.5px;line-height:1.7;">🤝 ما بعد البيع: ${st}</div>
       ${a.tags && a.tags.length ? `<div style="font-size:12.5px;color:var(--muted);">اشتكى من: ${esc(a.tags.join(' · '))}</div>` : ''}
+      ${a.heardFrom ? `<div style="font-size:12.5px;color:var(--muted);">📣 عرفنا من: ${esc(({ facebook:'السوشيال ميديا — 📘 فيسبوك', instagram:'السوشيال ميديا — 📸 انستجرام', tiktok:'السوشيال ميديا — 🎵 تيك توك', referral:'🗣️ حد عرّفه بينا', passby:'🚶 قابلنا صدفة' })[a.heardFrom] || a.heardFrom)}</div>` : ''}
       ${a.note ? `<div style="font-size:13px;margin-top:4px;white-space:pre-wrap;">${esc(a.note)}</div>` : ''}
       <div style="font-size:11.5px;color:var(--muted);margin-top:4px;">📞 ${esc(a.by || '')}${a.reviewed ? ' · ✓ راجعه ' + esc(a.reviewed.by || '') : ''}</div>
       ${bad && !a.reviewed && isSuperAdmin() ? `<button class="appr-btn-yes" style="margin-top:8px;" onclick="ccReview('${d.id}')">✓ راجعته</button>` : ''}
@@ -6950,6 +6954,8 @@ document.addEventListener('keydown', (e) => {
 function toggleMenu(){
   const dd = document.getElementById('menuDropdown');
   if(dd.classList.contains('hidden')){
+    // 📊 إحصائية ما بعد البيع — للمحاسب العام بس
+    try{ const asb = document.getElementById('asStatsMenuBtn'); if(asb) asb.style.display = (isSuperAdmin() && typeof openAfterSaleStats === 'function') ? '' : 'none'; }catch(e){}
     try{ dbArrangeMenu(dd); }catch(e){ console.warn('dbArrangeMenu:', e); }
     // 🗂️ العناوين اللي كل خاناتها مقفولة بالدور/الصلاحية تستخبى
     if(typeof ifxTidyMenu === 'function') ifxTidyMenu(dd);

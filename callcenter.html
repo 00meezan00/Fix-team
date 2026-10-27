@@ -566,7 +566,8 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
 //   • «ماتتصلش بيا» بالدالة callcenter_nocall — على كل أجهزة الرقم.
 //
 // 🗄️ الخانات (نفس أسماء الاستيدج عشان البيانات تكمّل):
-//   afterSale{state done|noanswer|closed, stars, tags, working, note, at, by, tries, nextAt}
+//   afterSale{state done|noanswer|closed, stars, tags, working, heardFrom, note, at, by, tries, nextAt}
+//     heardFrom = عرفنا منين: facebook · instagram · tiktok · referral · passby
 //   callLog[{kind aftersale|due|sleep, result, text, at, by}]
 //   noCall{at, by, note} · drawerCall{at, by, how}
 //   dueAt · dueStart · dueLabel · dueLog (الميعاد — due-deposit.js)
@@ -582,6 +583,15 @@ const AS_KEEP_DAYS = 7;                  // اللي ماتكلّمش في يو�
 const AS_RETRY_H = 24;                   // مردّش → يرجع بكره
 const AS_MAX_TRIES = 3;                  // ٣ مرات مردّش → تتقفل
 const AS_TAGS = ['💰 السعر', '⏱️ الوقت', '😐 المعاملة', '🔧 جودة الصيانة', '✍️ حاجة تانية'];
+// 📣 «عرفتنا إزاي؟» — اختيار واحد. social = تحت «السوشيال ميديا»
+const AS_HEARD = [
+  { k:'facebook',  l:'📘 فيسبوك',        social:true },
+  { k:'instagram', l:'📸 انستجرام',      social:true },
+  { k:'tiktok',    l:'🎵 تيك توك',       social:true },
+  { k:'referral',  l:'🗣️ حد عرّفه بينا' },
+  { k:'passby',    l:'🚶 قابلنا صدفة' },
+];
+const asHeardTxt = k => { const h = AS_HEARD.find(x => x.k === k); return h ? (h.social ? 'السوشيال ميديا — ' : '') + h.l : ''; };
 const ACTIVE = ['waiting', 'diagnosing', 'repairing', 'returned'];
 const DELIVERED_WINDOW_DAYS = AS_KEEP_DAYS + 3;
 
@@ -604,7 +614,7 @@ let ME = '', MY_EMAIL = '';
 let devices = new Map();      // id → data
 let TAB = 'late';
 let searchQ = '', searchRows = null, searchT = null, searchSeq = 0;
-let asEdit = null;            // { id, stars, tags, working, note }
+let asEdit = null;            // { id, stars, tags, working, heard, note }
 let dueEditOpen = null;       // id الجهاز اللي فورم الميعاد مفتوح عليه
 
 // ---------- أدوات ----------
@@ -1099,15 +1109,17 @@ function asResultHtml(d){
   return `<div class="cc-box${a.working === 'no' || (a.stars && a.stars <= 2) ? ' late' : ' as'}">
     <div class="cc-done">🤝 ما بعد البيع: ${st}</div>
     ${a.tags && a.tags.length ? `<div class="fld-hint">اشتكى من: ${esc(a.tags.join(' · '))}</div>` : ''}
+    ${a.heardFrom ? `<div class="fld-hint">📣 عرفنا من: ${esc(asHeardTxt(a.heardFrom))}</div>` : ''}
     ${a.note ? `<div class="cc-done" style="white-space:pre-wrap;">${esc(a.note)}</div>` : ''}
     <div class="fld-hint">${esc(a.by || '')} · ${esc(fmtDate(a.at))}</div>
   </div>`;
 }
 function asFormHtml(d){
   const a = d.afterSale;
-  const e = asEdit && asEdit.id === d.id ? asEdit : (asEdit = { id: d.id, stars: 0, tags: [], working: '', note: '' });
+  const e = asEdit && asEdit.id === d.id ? asEdit : (asEdit = { id: d.id, stars: 0, tags: [], working: '', heard: '', note: '' });
   const star = n => `<button type="button" class="cc-star${e.stars >= n ? ' on' : ''}" onclick="asSet('stars',${n})">★</button>`;
   const tag = (t, i) => `<button type="button" class="cc-chip${e.tags.includes(t) ? ' on' : ''}" onclick="asTag(${i})">${t}</button>`;
+  const heard = h => `<button type="button" class="cc-chip${e.heard === h.k ? ' on' : ''}" onclick="asSet('heard','${h.k}')">${h.l}</button>`;
   return `<div class="cc-box as">
     <div class="cc-q">🤝 مكالمة ما بعد البيع — اتسلّم ${esc(agoTxt(deliveredAt(d)))}${a && a.tries ? ` · مردّش قبل كده ${a.tries} مرة` : ''}</div>
     <div class="cc-chips" style="margin-bottom:10px;">
@@ -1121,6 +1133,10 @@ function asFormHtml(d){
       <button type="button" class="cc-chip${e.working === 'yes' ? ' on' : ''}" onclick="asSet('working','yes')">✅ أيوه</button>
       <button type="button" class="cc-chip bad${e.working === 'no' ? ' on' : ''}" onclick="asSet('working','no')">🔧 لأ — فيه مشكلة</button>
     </div>
+    <div class="cc-q" style="margin-top:10px;">📣 عرفتنا إزاي؟ <b style="color:var(--rejected)">*</b></div>
+    <div class="fld-hint" style="margin:-4px 0 6px;">📱 من السوشيال ميديا:</div>
+    <div class="cc-chips">${AS_HEARD.filter(h => h.social).map(heard).join('')}</div>
+    <div class="cc-chips" style="margin-top:6px;">${AS_HEARD.filter(h => !h.social).map(heard).join('')}</div>
     <div class="cc-q" style="margin-top:10px;">😕 اشتكى من حاجة؟ <small style="font-weight:600;color:var(--muted);">(اختياري)</small></div>
     <div class="cc-chips">${AS_TAGS.map(tag).join('')}</div>
     <div class="cc-q" style="margin-top:10px;">${e.working === 'no' ? '✍️ المشكلة إيه؟ <b style="color:var(--rejected)">*</b>' : '✍️ قال إيه؟ <small style="font-weight:600;color:var(--muted);">(اختياري)</small>'}</div>
@@ -1149,13 +1165,15 @@ async function asSave(id){
   const note = String(($('asNote') || {}).value || e.note || '').trim();
   if(!e.stars){ alert('اختار عدد النجوم'); return; }
   if(!e.working){ alert('الجهاز شغال كويس؟ اختار أيوه أو لأ'); return; }
+  if(!e.heard){ alert('📣 العميل عرفنا إزاي؟ اختار إجابة'); return; }
   if(e.working === 'no' && note.length < 3){ alert('اكتب المشكلة — بتوصل للمحاسب العام'); return; }
   try{
     const d = await freshRow(id);
     const now = nowIso(), prev = d.afterSale || {};
-    const a = { state: 'done', stars: e.stars, tags: e.tags, working: e.working, note, at: now, by: ME, tries: prev.tries || 0 };
+    const a = { state: 'done', stars: e.stars, tags: e.tags, working: e.working, heardFrom: e.heard, note, at: now, by: ME, tries: prev.tries || 0 };
     const txt = '🤝 ما بعد البيع: ' + '⭐'.repeat(e.stars) + ` (${e.stars}/5)` + (e.working === 'no' ? ' · 🔧 الجهاز فيه مشكلة' : ' · ✅ الجهاز شغال')
-              + (e.tags.length ? ' · اشتكى من: ' + e.tags.join('، ') : '') + (note ? '\n' + note : '');
+              + (e.tags.length ? ' · اشتكى من: ' + e.tags.join('، ') : '')
+              + ' · 📣 عرفنا من: ' + asHeardTxt(e.heard) + (note ? '\n' + note : '');
     const ok = await ccPatch(id, {
       afterSale: a,
       callLog: [...(d.callLog || []), logEntry('aftersale', 'done', txt, { stars: e.stars })],
