@@ -766,7 +766,11 @@
         b.textContent = label;
       } else if (b) { b.remove(); }
     };
-    ensure('purMenuBtn', '🧾 ' + T('pur.menu'), () => PUR.open());
+    // 🏭 مدير الإنتاج مالوش «فواتير المشتريات» (الصفحة بتقول عن طريق ifixHidePurchases)
+    let hidePur = false;
+    try { hidePur = typeof window.ifixHidePurchases === 'function' && window.ifixHidePurchases() === true; } catch (e) {}
+    if (hidePur) { const pb = $('purMenuBtn'); if (pb) pb.remove(); }
+    else ensure('purMenuBtn', '🧾 ' + T('pur.menu'), () => PUR.open());
     ensure('invMenuBtn', '🧰 ' + T('inv.menu'), () => INV.open());
   }
 
@@ -1346,6 +1350,7 @@
   const PUR = window.PUR = {
     open() {
       const dd = $('menuDropdown'); if (dd) dd.classList.add('hidden');
+      try { if (typeof window.ifixHidePurchases === 'function' && window.ifixHidePurchases() === true) return; } catch (e) {}   // 🏭 مدير الإنتاج
       injectDom();
       $('purOverlay').classList.remove('hidden');
       resetEntry();

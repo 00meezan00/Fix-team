@@ -113,7 +113,8 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
 <script src="statuses.js"></script>
 <script src="due-deposit.js"></script>   <!-- ⏳ الميعاد مع العميل + 💵 العربون (إخباري) — مؤقت للإنتاج -->
 <script src="intake-board-view.js" defer></script>   <!-- 📥 ترتيب الاستلامات (ملف prod-intake-board.sql) — زرار في قايمة ⋮ -->
-<script src="aftersale-stats.js"></script>   <!-- 📊 إحصائية ما بعد البيع — للمحاسب العام بس (مؤقت للإنتاج) -->
+<script src="aftersale-stats.js"></script>
+<script src="prodmgr.js"></script>   <!-- 🏭 مدير الإنتاج: «الفنيين بتوعي» + موافقة الانصراف (ملف prod-prodmgr.sql) — مؤقت للإنتاج -->   <!-- 📊 إحصائية ما بعد البيع — للمحاسب العام بس (مؤقت للإنتاج) -->
 <script src="accounts.js"></script>
 <script src="label.js"></script>
 <script src="attendance.js"></script>
@@ -2036,7 +2037,7 @@ const ROLE_LABEL_KEYS = {
 };
 // دور HR اتضاف بعد ما الخريطة دي اتكتبت ومالوش مفتاح ترجمة،
 // فبيرجّع 'hr' خام. الخريطة دي بتغطّي أي دور مالوش مفتاح.
-const ROLE_LABEL_FALLBACK = { hr: 'موارد بشرية', staff: 'موظف', owner: 'المالك', callcenter: 'الكول سنتر' };
+const ROLE_LABEL_FALLBACK = { hr: 'موارد بشرية', staff: 'موظف', owner: 'المالك', callcenter: 'الكول سنتر', prodmgr: 'مدير الإنتاج' };
 function roleLabel(r){
   // 🧾 حساب السوبر أدمن **هو** «المحاسب العام» — ولوحة الأدمن باب جواه.
   //    فاسمه في كل حاجة الناس بتشوفها (ملاحظات الأجهزة · حسابي ·
@@ -2047,7 +2048,29 @@ function roleLabel(r){
   try{ return k ? t(k) : (ROLE_LABEL_FALLBACK[r] || r); }
   catch(e){ return ROLE_LABEL_FALLBACK[r] || r; }
 }
-function currentRoleLabel(){ return roleLabel(myRole()); }
+function currentRoleLabel(){ return isProdMgr() ? 'مدير الإنتاج' : roleLabel(myRole()); }
+
+// ============================================================
+// 🏭 مدير الإنتاج (prodmgr) — مؤقت للإنتاج
+// ------------------------------------------------------------
+// 🧸 «نفس صلاحيات المحاسب» بالحرف: عن قصد **مش** في ROLES، فـ myRole()
+//    بترجّع 'accountant' وكل حاجة المحاسب بيعملها بتشتغل له لوحدها.
+//    وعلى السيرفر نفس الكلام (my_app_role بترجّع accountant لأي دور
+//    مش معروف). الفرق بس:
+//      • مفيش «🧾 فواتير المشتريات» (قراءة الفواتير) — ai-invoice.js بيسأل ifixHidePurchases
+//      • مفيش «🔍 مراجعة قطع الغيار» — prCanUse
+//      • «📦 مخزن قطع الغيار» موجود عادي
+//      • زيادة: «👷 الفنيين بتوعي» + موافقة الانصراف (prodmgr.js)
+//      • اسمه في الملاحظات و«حسابي»: «مدير الإنتاج»
+// ⚠️ القفل ده في الشاشة بس (زي «الملخص المالي») — السيرفر بيعامله محاسب.
+// ============================================================
+function isProdMgr(){
+  try{
+    const en = roleEntry(currentUser.email);
+    return !!(en && en.role === 'prodmgr') && !isSuperAdmin();
+  }catch(e){ return false; }
+}
+window.ifixHidePurchases = () => isProdMgr();
 
 // بيخفي أدوات النظام (نسخ احتياطي/استيراد/مسح) عن غير الـ Super Admin،
 // وبيحط كلاس بالدور على body عشان الـ CSS يقدر يخفي حاجات حسب الدور
@@ -2057,6 +2080,7 @@ function applyRoleVisibility(){
   try{
     ROLES.forEach(r => document.body.classList.remove('role-' + r));
     document.body.classList.add('role-' + myRole());
+    document.body.classList.toggle('role-prodmgr', isProdMgr());   // 🏭 مدير الإنتاج
     document.body.classList.toggle('no-money', !canSeeMoney());
   }catch(e){}
   injectAdminMenu();   // نعيد الفحص بعد ما الأدوار تتحمّل
@@ -6959,6 +6983,8 @@ function toggleMenu(){
     // 📊 الملخص المالي — للمحاسب العام بس (المحاسبين التانيين مابيشوفوهوش)
     try{ const anb = document.getElementById('analyticsMenuBtn'); if(anb) anb.style.display = isSuperAdmin() ? '' : 'none'; }catch(e){}
     try{ const asb = document.getElementById('asStatsMenuBtn'); if(asb) asb.style.display = (isSuperAdmin() && typeof openAfterSaleStats === 'function') ? '' : 'none'; }catch(e){}
+    // 🏭 مدير الإنتاج: مفيش «فواتير المشتريات» ولا «مراجعة قطع الغيار»
+    if(isProdMgr()){ ['purMenuBtn', 'partsReviewMenuBtn'].forEach(id => { const b = document.getElementById(id); if(b) b.remove(); }); }
     try{ dbArrangeMenu(dd); }catch(e){ console.warn('dbArrangeMenu:', e); }
     // 🗂️ العناوين اللي كل خاناتها مقفولة بالدور/الصلاحية تستخبى
     if(typeof ifxTidyMenu === 'function') ifxTidyMenu(dd);
@@ -10822,7 +10848,7 @@ const PR_FLOOR = '2026-09-01';
 
 // الصلاحية: الأدمن والمحاسب تلقائياً. أي ديسباتشر لازم الأدمن يمنحه
 // صلاحية 'parts_review' من لوحة الأدمن (سويتش تحت اسمه).
-function prCanUse(){ return myCap('parts_review'); }
+function prCanUse(){ return myCap('parts_review') && !isProdMgr(); }   // 🏭 مدير الإنتاج: مفيش مراجعة قطع غيار
 
 // الزرار بيتعمل ديناميكياً عشان يفضل **آخر واحد** في القايمة —
 // تحت "مخزن قطع الغيار" (اللي ai-invoice.js بيضيفه قبل تسجيل الخروج).

@@ -498,6 +498,12 @@ async function attPunch(kind){
   // ⚠️ فحص البريك قبل أي حاجة — وبيرجع من غير await عشان تصريح
   //    الموقع في سفاري ما يضيعش (نفس سبب ترتيب السطور تحت).
   const _retry = !!(_attPending && _attPending.kind === kind);   // 🔄 «جرّب تاني» لتسجيل مااتأكدش
+  // 🏭 فني من فنيين مدير الإنتاج ومفيش موافقة؟ → نبعت طلب بدل الانصراف
+  //    (من الحالة المحفوظة — من غير await، عشان تصريح الموقع في سفاري)
+  if(kind === 'out' && !_retry && attMgrBlocks()){
+    attMgrAsk();
+    return;
+  }
   if(kind === 'out' && !_attAnswer && !_retry && attNeedBreakAsk()){
     attShowBreakAsk();
     return;
@@ -615,6 +621,8 @@ async function attPunch(kind){
     }
   }catch(e){
     console.error('attPunch failed:', e);
+    // 🏭 السيرفر رفض الانصراف (الموافقة خلصت مثلاً)؟ نقرا الحالة تاني
+    if(kind === 'out'){ try{ await attLoadMgr(); }catch(_){} }
     attRender('');
     await attPaint();
     const msg = String((e && e.message) || e);
@@ -864,6 +872,7 @@ async function attLoadState(){
     const r = Array.isArray(data) ? data[0] : data;
     _attState = r || { last_kind:null, last_at:null, work_date:null, punches:0 };
     await attLoadNoBreak();   // ☕🚫 هل أعلن «مطلعتش بريك» لليوم ده؟
+    await attLoadMgr();       // 🏭 موافقة مدير الإنتاج على الانصراف
     await attLoadDayKinds();  // أنواع تسجيلات اليوم — لفحص البريك
   }catch(e){
     // ⚠️ الفشل الصامت هنا كان أخطر من الخطأ نفسه.
@@ -972,6 +981,7 @@ function attRender(busyMsg){
           📶 <b>النت ضعيف — جرّب تاني</b>
           <button class="att-pend-btn" onclick="attPunch('${esc(_attPending.kind)}')">🔄 جرّب تاني — ${esc(ATT_LABELS[_attPending.kind].t)}</button>
         </div>` : ''}
+        ${attMgrHtml(busyMsg)}
         <div class="att-grid">
           ${btn('in')}${btn('out')}${btn('break')}${btn('resume')}
         </div>
@@ -1352,6 +1362,106 @@ async function attRenderLog(){
   }
 }
 
+// ============================================================
+// 🏭 موافقة مدير الإنتاج على الانصراف (مؤقت للإنتاج — ملف prod-prodmgr.sql)
+// ------------------------------------------------------------
+// 🧸 بالبلدي: لو مدير الإنتاج اختارك من «الفنيين بتوعي»، انصرافك
+//    محتاج موافقته. تدوس 🔴 انصراف → بيروحله طلب، وتظهرلك رسالة
+//    «اطلب من مدير الإنتاج (اسمه)». أول ما يوافق → رسالة خضرا،
+//    وتدوس 🔴 انصراف تاني → يتسجّل عادي بوقت الدوسة دي.
+//    الموافقة صالحة ٦٠ دقيقة، وبتتصرف مرة واحدة.
+// 🔒 الحماية الحقيقية على السيرفر (البوّاب على جدول attendance) —
+//    هنا بس عشان الفني يفهم ويبعت الطلب.
+// ⚠️ لو الدالة مش موجودة على السيرفر أو النت وقع → مابنوقّفش حاجة
+//    هنا (السيرفر هو اللي بيحكم، والرسالة بتاعته بتظهر).
+// ============================================================
+var _attMgr = null;      // { managed, mgr_name, req:{id,status,requested_at,decided_at,decided_by_name,valid_until} }
+var _attMgrT = null;
+async function attLoadMgr(){
+  try{
+    const { data, error } = await attTimeout(sb.rpc('prodmgr_out_state'), 8000);
+    if(error) throw error;
+    _attMgr = data || null;
+  }catch(e){ console.warn('prodmgr_out_state:', e); }
+}
+function attMgrStatus(){
+  const q = _attMgr && _attMgr.managed && _attMgr.req;
+  if(!q) return '';
+  if(q.status === 'approved' && q.valid_until && Date.parse(q.valid_until) <= Date.now()) return 'expired';
+  return q.status || '';
+}
+function attMgrBlocks(){ return !!(_attMgr && _attMgr.managed) && attMgrStatus() !== 'approved'; }
+function _attHm(iso){
+  try{ return new Date(iso).toLocaleTimeString('ar-EG', { hour:'2-digit', minute:'2-digit', timeZone:'Africa/Cairo' }); }
+  catch(e){ return ''; }
+}
+function attMgrHtml(busyMsg){
+  if(!(_attMgr && _attMgr.managed) || !attAllowed('out')) return '';
+  const nm = esc(_attMgr.mgr_name || 'مدير الإنتاج');
+  const q = _attMgr.req || {};
+  const st = attMgrStatus();
+  const by = esc(q.decided_by_name || _attMgr.mgr_name || '');
+  if(st === 'pending') return `<div class="att-mgr wait">⏳ مستني موافقة مدير الإنتاج «${nm}» على انصرافك
+      <small>طلبت الساعة ${esc(_attHm(q.requested_at))} — أول ما يوافق هتظهرلك رسالة هنا</small>
+      <button class="att-mgr-btn" ${busyMsg ? 'disabled' : ''} onclick="attMgrRefresh(true)">🔄 وافق ولا لسه؟</button></div>`;
+  if(st === 'approved') return `<div class="att-mgr ok">✅ «${by}» وافق على انصرافك — دوس 🔴 انصراف دلوقتي
+      <small>الموافقة صالحة لحد الساعة ${esc(_attHm(q.valid_until))}</small></div>`;
+  if(st === 'rejected') return `<div class="att-mgr no">✋ «${by}» قال لسه — كمّل شغلك
+      <small>لما تحب تمشي دوس 🔴 انصراف تاني وهيروحله طلب جديد</small></div>`;
+  return `<div class="att-mgr info">🔐 انصرافك محتاج موافقة مدير الإنتاج «${nm}»
+      <small>دوس 🔴 انصراف → الطلب بيروحله على طول</small></div>`;
+}
+async function attMgrAsk(){
+  if(_attBusy) return;
+  _attBusy = true;
+  attRender('⏳ بنبعت الطلب لمدير الإنتاج…');
+  let err = null;
+  try{
+    const { data, error } = await attTimeout(sb.rpc('prodmgr_out_request'), 15000);
+    if(error) throw error;
+    _attMgr = data || null;
+  }catch(e){ err = e; }
+  _attBusy = false;
+  attRender('');
+  await attPaint();
+  if(err){
+    alert(attIsNetErr(err) ? '❌ الطلب ماوصلش — النت ضعيف. جرّب تاني.' : '❌ ' + ((err && err.message) || err));
+    return;
+  }
+  const nm = (_attMgr && _attMgr.mgr_name) || 'مدير الإنتاج';
+  if(!(_attMgr && _attMgr.managed)){ alert('✅ انصرافك مش محتاج موافقة — دوس 🔴 انصراف تاني'); return; }
+  if(attMgrStatus() === 'approved'){ alert('✅ «' + nm + '» وافق خلاص — دوس 🔴 انصراف كمان مرة'); return; }
+  alert('📨 اطلب من مدير الإنتاج «' + nm + '» يوافق على انصرافك\n\n' +
+        'الطلب وصله ✅ — أول ما يوافق هتظهرلك رسالة خضرا هنا،\nوساعتها دوس 🔴 انصراف تاني.');
+  attMgrWatch();
+}
+// كل ١٠ ثواني وشاشة المواعيد مفتوحة والطلب لسه مستني
+function attMgrWatch(){
+  if(_attMgrT) clearTimeout(_attMgrT);
+  _attMgrT = setTimeout(() => attMgrRefresh(false), 10000);
+}
+async function attMgrRefresh(manual){
+  _attMgrT = null;
+  const ov = document.getElementById('attOverlay');
+  const open = ov && !ov.classList.contains('hidden');
+  if(!open && !manual) return;                       // قفل الشاشة — نكمّل لما يفتحها
+  const before = attMgrStatus();
+  await attLoadMgr();
+  const now = attMgrStatus();
+  if(!_attBusy) attRender('');
+  if(now === 'pending'){
+    attMgrWatch();
+    if(manual){ await attPaint(); alert('⏳ لسه — «' + ((_attMgr && _attMgr.mgr_name) || 'مدير الإنتاج') + '» ماردّش'); }
+    return;
+  }
+  if(before !== now || manual){
+    await attPaint();
+    const by = (_attMgr && _attMgr.req && _attMgr.req.decided_by_name) || 'مدير الإنتاج';
+    if(now === 'approved') alert('✅ «' + by + '» وافق على انصرافك\nدوس 🔴 انصراف دلوقتي');
+    else if(now === 'rejected') alert('✋ «' + by + '» قال لسه — كمّل شغلك');
+  }
+}
+
 async function openAttendance(){
   if(!attIsPhone()){
     alert('المواعيد بتتسجّل من الموبايل بس');
@@ -1365,6 +1475,8 @@ async function openAttendance(){
   attRender('');
   // ⏳ كان فيه تسجيل مستني تأكيد (قفل الشاشة قبل ما يتأكد)؟ نكمّل
   if(attRestorePending()){ attRender(''); attCheckPending(true); }
+  // 🏭 فيه طلب انصراف مستني مدير الإنتاج؟ نفضل نسأل
+  if(attMgrStatus() === 'pending') attMgrWatch();
 }
 function closeAttendance(){
   const ov = document.getElementById('attOverlay');
@@ -1489,6 +1601,14 @@ function closeAttendance(){
   .att-msg-chips{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px;}
   .att-msg-chip{flex:1 1 0; min-width:120px; border:1.5px solid var(--a-line); background:var(--a-bg); color:var(--a-ink);
     border-radius:12px; padding:11px 10px; font-family:inherit; font-size:14.5px; font-weight:800; cursor:pointer;}
-  .att-msg-chip.on{background:#4C1D95; border-color:#4C1D95; color:#fff;}`;
+  .att-msg-chip.on{background:#4C1D95; border-color:#4C1D95; color:#fff;}
+  .att-mgr{border-radius:12px; padding:12px 13px; margin:10px 0; font-size:14px; line-height:1.8; border:1px solid;}
+  .att-mgr small{display:block; font-size:12px; opacity:.85;}
+  .att-mgr.wait{background:#FEF3C7; color:#78350F; border-color:#F59E0B;}
+  .att-mgr.ok{background:#DCFCE7; color:#14532D; border-color:#22C55E;}
+  .att-mgr.no{background:#FEE2E2; color:#7F1D1D; border-color:#F87171;}
+  .att-mgr.info{background:var(--a-card); color:var(--a-ink); border-color:var(--a-line);}
+  .att-mgr-btn{display:block; width:100%; margin-top:8px; border:none; border-radius:10px; padding:10px;
+    font-family:inherit; font-size:13.5px; font-weight:800; background:rgba(0,0,0,.10); color:inherit; cursor:pointer;}`;
   (document.head || document.documentElement).appendChild(s);
 })();
