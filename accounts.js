@@ -660,7 +660,20 @@ function shopStatementRows(shop){
   const all = ledger.filter(e => (e.shop||'بدون محل') === shop)
     .slice().sort((a,b) => new Date(bd(a)) - new Date(bd(b)));
   let entries = all;
-  if(r){
+  if(r && r.cycle){
+    // 🔄 الدورة الحالية — شوف accCycleSplit تحت
+    const c = accCycleSplit(shop);
+    if(c){
+      entries = c.list.slice().sort((a,b) => new Date(bd(a)) - new Date(bd(b)));
+      if(c.before < -0.5 && c.at){
+        entries = [{
+          id: '__carry', _carry: true, _carryFrom: c.at.toISOString(),
+          shop, type: 'credit', amount: Math.abs(c.before),
+          date: new Date(c.at.getTime() - 1000).toISOString(), by: '', note: ''
+        }].concat(entries);
+      }
+    }
+  } else if(r){
     entries = all.filter(e => accInRange(bd(e), r));
     if(r.from){
       const fromT = r.from.getTime();
@@ -1451,6 +1464,10 @@ function accInRange(iso, r){
 
 function accRangeLabel(r){
   if(!r) return '';
+  if(r.cycle){
+    const c = accCycleSplit(r.shop);
+    return 'الفترة: الدورة الحالية — من ' + (c && c.at ? accFmtDay(c.at) : 'أولها') + ' لحد النهاردة';
+  }
   // «حسب تاريخ الدخول/الخروج» — بيتكتب على الورقة نفسها عشان اللي
   // ماسكها يعرف الفترة دي محسوبة على أنهي تاريخ
   const b = r.basis === 'in' ? ' (حسب تاريخ الدخول)' : (r.basis === 'out' ? ' (حسب تاريخ الخروج)' : '');
@@ -1537,6 +1554,47 @@ function accRangePrefSet(p){
   try{ localStorage.setItem(ACC_RANGE_PREF_KEY, JSON.stringify(p)); }catch(e){}
 }
 
+// ============================================================
+// 🔄 «من أول الدورة الحالية» — زي الاستيدج (customers.html)
+// ------------------------------------------------------------
+// 🧸 بالبلدي: «الدورة» = صفحة في كشكول حساب المحل. أول ما الحساب
+//    يبقى صفر (المحل سدّد كل اللي عليه) وبعدين ياخد جهاز آجل تاني →
+//    بتبدأ صفحة جديدة. الزرار ده بيطبع **الصفحة الحالية بس** — الأجهزة
+//    اللي على المحل دلوقتي ودفعاتها — من غير اللي اتسدّد قبل كده.
+//    وبيبقى **متختار لوحده** كل ما تفتح كشف محل.
+//
+// ⚠️ بنمشي على **ترتيب تسجيل الحركات** (وقت التسجيل date، والدفتر
+//    محفوظ الأحدث الأول) — مش تاريخ خروج الجهاز. ليه؟ دفعة وجهاز في
+//    نفس اليوم: لو رتّبنا بالخروج ممكن الجهاز ييجي قبل الدفعة، فالحساب
+//    «مايوصلش صفر» والدورة الجديدة ماتتعرفش.
+// ⚠️ ومش بنقطع بالـ«يوم»: بنقطع عند الحركة نفسها — فالدفعة القديمة
+//    اللي في نفس يوم أول جهاز جديد مابتدخلش.
+// ⚠️ المحل كان دافع زيادة قبل الدورة (رصيده بالسالب) → سطر «رصيد سابق
+//    (لصالح المحل)» في أول الكشف، عشان المتبقي يطلع صح.
+// ============================================================
+function accCycleSplit(shop){
+  if(!shop || !Array.isArray(ledger)) return null;
+  const n = ledger.length;
+  const rows = [];
+  ledger.forEach((e, i) => { if((e.shop||'بدون محل') === shop) rows.push({ e, i }); });
+  if(!rows.length) return null;
+  // الأقدم الأول: بوقت التسجيل، ولو نفس الوقت → الأبعد في الدفتر أقدم (الجديد بيتحط أوله)
+  rows.sort((a, b) => {
+    const ta = new Date(a.e.date || 0).getTime() || 0, tb = new Date(b.e.date || 0).getTime() || 0;
+    return (ta - tb) || (b.i - a.i);
+  });
+  let start = -1, bal = 0, before = 0;
+  rows.forEach((x, k) => {
+    const a = Number(x.e.amount) || 0;
+    const debt = isDebitLike(x.e);
+    if(debt && a > 0 && bal <= 0.5){ start = k; before = bal; }   // الحساب كان خالص وجه دين جديد
+    bal += debt ? a : -a;
+  });
+  if(start < 0) return null;
+  const d = new Date(rows[start].e.date || 0);
+  return { list: rows.slice(start).map(x => x.e), before, at: isNaN(d.getTime()) ? null : d, n: rows.length - start };
+}
+
 // الاختيارات السريعة → تاريخ «من» و«إلى» (كنص yyyy-mm-dd)
 var ACC_RANGE_PRESETS = [
   { k:'all',   n:'كل الفترة' },
@@ -1616,8 +1674,13 @@ function accRangeOpen(opts){
   ACC_RD = opts;
   const pref = accRangePrefGet();
   let mode = pref.mode || 'all';
+  if(mode === 'cycle') mode = 'all';
   let dates = mode === 'custom' ? { from: pref.from || '', to: pref.to || '' } : accPresetDates(mode);
   if(!ACC_RANGE_PRESETS.some(p => p.k === mode) && mode !== 'custom'){ mode = 'all'; dates = { from:'', to:'' }; }
+  // 🔄 كشف محل وليه دورة → «من أول الدورة الحالية» متختار لوحده (زي الاستيدج)
+  const cyc = opts.cycleShop ? accCycleSplit(opts.cycleShop) : null;
+  ACC_RD.cycle = cyc;
+  if(cyc){ mode = 'cycle'; dates = { from: cyc.at ? accYmd(cyc.at) : '', to: '' }; }
   ACC_RD.mode = mode;
   // 📥📤 «حسب أنهي تاريخ» — بيظهر بس لو الشاشة اللي فاتحاها طلبته
   //    (كشف المحل). شاشة «بانتظار الدفع» مالهاش دعوة بيه.
@@ -1648,6 +1711,8 @@ function accRangeOpen(opts){
           + '</div>'
         : '')
     + '<div class="arg-chips">'
+      + (cyc ? '<button type="button" class="arg-chip" data-k="cycle" onclick="accRangePick(\'cycle\')">🔄 من أول الدورة الحالية'
+               + (cyc.at ? ' · ' + esc(accFmtDay(cyc.at)) : '') + '</button>' : '')
       + ACC_RANGE_PRESETS.map(p =>
           '<button type="button" class="arg-chip" data-k="' + p.k + '" onclick="accRangePick(\'' + p.k + '\')">' + p.n + '</button>'
         ).join('')
@@ -1673,7 +1738,9 @@ function accRangeClose(){
 function accRangePick(k){
   if(!ACC_RD) return;
   ACC_RD.mode = k;
-  const d = accPresetDates(k);
+  const d = (k === 'cycle')
+    ? { from: (ACC_RD.cycle && ACC_RD.cycle.at) ? accYmd(ACC_RD.cycle.at) : '', to: '' }   // للعرض بس — الطباعة بتقطع عند الحركة نفسها
+    : accPresetDates(k);
   const f = document.getElementById('argFrom'), t2 = document.getElementById('argTo');
   if(f) f.value = d.from;
   if(t2) t2.value = d.to;
@@ -1697,6 +1764,9 @@ function accRangeCustom(){
 
 // الفترة اللي على الشاشة دلوقتي → { from, to } أو null (كل الفترة)
 function accRangeRead(){
+  if(ACC_RD && ACC_RD.mode === 'cycle' && ACC_RD.cycle && ACC_RD.cycleShop){
+    return { cycle: true, shop: ACC_RD.cycleShop, from: null, to: null, basis: ACC_RD.basisSel || 'out' };
+  }
   const fs = ((document.getElementById('argFrom') || {}).value || '').trim();
   const ts = ((document.getElementById('argTo') || {}).value || '').trim();
   if(!fs && !ts) return null;
@@ -1751,7 +1821,7 @@ function accRangeGo(){
     ? { mode:'custom',
         from: (document.getElementById('argFrom') || {}).value || '',
         to:   (document.getElementById('argTo') || {}).value || '' }
-    : { mode: opts.mode || 'all' });
+    : { mode: (opts.mode === 'cycle') ? 'all' : (opts.mode || 'all') });
   // بنقفل الشاشة الأول — عشان متبانش فوق الكشف ولا تتطبع معاه
   accRangeClose();
   ACC_RD = null;
@@ -1776,6 +1846,7 @@ function accRangeShop(fmt, shop){
     fmt: fmt,
     unit: 'حركة',
     basis: true,     // 📥📤 اعرض «حسب تاريخ الدخول / الخروج»
+    cycleShop: shop, // 🔄 «من أول الدورة الحالية»
     count: r => accWithRange(r, () => shopStatementRows(shop).entries.filter(e => !e._carry).length),
     run: r => accWithRange(r, () => isX
       ? accExcelStamped(accRangeLabel(r), () => exportShopExcel(shop))
