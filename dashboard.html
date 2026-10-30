@@ -114,6 +114,7 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
 <script src="due-deposit.js"></script>   <!-- ⏳ الميعاد مع العميل + 💵 العربون (إخباري) — مؤقت للإنتاج -->
 <script src="intake-board-view.js" defer></script>   <!-- 📥 ترتيب الاستلامات (ملف prod-intake-board.sql) — زرار في قايمة ⋮ -->
 <script src="aftersale-stats.js"></script>
+<script src="platform-stats.js"></script>   <!-- 📱 آيفون ↔ أندرويد في الملخص المالي (للمحاسب العام بس) — مؤقت للإنتاج -->
 <script src="prodmgr.js"></script>   <!-- 🏭 مدير الإنتاج: «الفنيين بتوعي» + موافقة الانصراف (ملف prod-prodmgr.sql) — مؤقت للإنتاج -->   <!-- 📊 إحصائية ما بعد البيع — للمحاسب العام بس (مؤقت للإنتاج) -->
 <script src="accounts.js"></script>
 <script src="label.js"></script>
@@ -10075,6 +10076,7 @@ function renderAnalytics(){
     ${filterBar}
     ${moneyCards}
     ${profitCards}
+    ${(window.IFixPlatformStats ? IFixPlatformStats.html({ delivered: deliveredInRange, inRange: inAnRange }) : '')}   <!-- 📱 آيفون ↔ أندرويد: مبيعات + نقاط + شغل كل فني (platform-stats.js) — مؤقت للإنتاج -->
     <div class="inv-section-title">⭐ ${t('an.topCustomers')}</div>
     <div style="font-size:12.5px; color:var(--muted-2); margin:-4px 0 10px; line-height:1.9;">
       ${VIP_MIN_DEVICES} أجهزة فأكتر خلال <b>${esc(monthName)}</b>
