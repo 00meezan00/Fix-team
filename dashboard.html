@@ -1875,6 +1875,13 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
           <input id="payNote" data-i18n-ph="acc.notePh" placeholder="ملاحظة (اختياري)" />
           <button class="btn-primary" style="box-shadow:none;" data-i18n="acc.submitPayment" onclick="recordPayment()">تسجيل الدفعة</button>
         </div>
+        <!-- 📅 تاريخ الدفعة — للمحاسب العام بس (بيتفتح من openAccounts في accounts.js، وrecordPayment بيتأكد تاني) -->
+        <div id="payDateBox" style="display:none; margin-top:10px; align-items:center; gap:10px; flex-wrap:wrap;">
+          <label for="payDate" style="font-size:13px; font-weight:800; color:var(--ink-2);">📅 تاريخ الدفعة</label>
+          <input id="payDate" type="date" style="border:1px solid var(--border); border-radius:8px; padding:9px 12px; font-size:14.5px; font-family:inherit;" />
+          <button type="button" class="acc-mini-btn" style="margin-top:0;" onclick="document.getElementById('payDate').value=''">النهاردة</button>
+          <span style="font-size:12px; color:var(--muted-2);">سيبه فاضي = الدفعة بتتسجّل بتاريخ النهاردة</span>
+        </div>
         <datalist id="accShopsList"></datalist>
         <button class="acc-mini-btn" style="margin-top:12px; color:var(--warn); border-color:var(--warn-border);" data-i18n="acc.openingBalance" onclick="addOpeningBalance()">➕ حساب محل جديد برصيد افتتاحي سابق</button>
       </div>
@@ -2520,12 +2527,11 @@ function startRealtimeSync(){
           return;
         }
         if(row.key !== LEDGER_KEY) return;
-        if(row.value === JSON.stringify(ledger)) return;
-        try{
-          ledger = JSON.parse(row.value);
-          try{ localStorage.setItem('ifix_ledger_cache', row.value); }catch(e){}
-          if(!document.getElementById('accountsOverlay').classList.contains('hidden')) renderAccounts();
-        }catch(e){}
+        // 📒 صورة جديدة من السيرفر — بنطبّق فوقها اللي لسه في الطابور (ledgerAdoptServer).
+        //    لو الرسالة جت من غير الورقة (كبيرة) → نجيبها إحنا.
+        if(typeof row.value !== 'string'){ ledgerRefresh(); return; }
+        try{ ledgerAdoptServer(JSON.parse(row.value)); }
+        catch(e){ ledgerRefresh(); }
       })
       .subscribe();
 
@@ -6529,6 +6535,10 @@ async function changeStatus(newStatus, paymentChoice, rejectedInShopChoice){
   let newPaymentStatus = null;
   let extra = {};
 
+  // 📒 تسليم آجل؟ الطازة من السيرفر الأول — عشان «متقيّد قبل كده ولا لأ»
+  //    يتحسب على الحقيقة مش على صورة قديمة في الصفحة
+  if(newStatus === 'delivered' && d.paymentType === 'deferred') await ledgerRefresh();
+
   if(newStatus === 'delivered'){
     const price  = parseInt(d.agreedPrice) || 0;
     // ⚠️ الفرق بين "متسعّر بصفر" و"لسه ماتسعّرش":
@@ -8235,6 +8245,7 @@ async function editPayType(t){
     extra.billedShop = shop;
     if(d.status === 'delivered'){
       // اتسلّم خلاص → يتقيّد على حساب المحل دلوقتي ويعتبر متسوّى
+      await ledgerRefresh();   // 📒 الطازة الأول (شوف changeStatus)
       if(!ledger.some(e => e.type === 'debit' && e.deviceId === d.id && !e.kind)){
         addLedgerDebit({ ...d, billedShop: shop }, price);
       }
@@ -8247,6 +8258,8 @@ async function editPayType(t){
     }
   } else {
     // رجوع لفوري: نشيل أي قيد آجل للجهاز عشان الفلوس ماتتحسبش مرتين
+    // 📒 الطازة من السيرفر الأول — عشان نشيل القيد حتى لو صورة الصفحة ماكانتش شايفاه
+    await ledgerRefresh();
     const had = ledger.some(e => e.type === 'debit' && e.deviceId === d.id && !e.kind);
     if(had){
       ledger = ledger.filter(e => !(e.type === 'debit' && e.deviceId === d.id && !e.kind));
@@ -8283,6 +8296,7 @@ async function editPrice(value){
   // تسعير جهاز متسلّم بالفعل ومحدد عليه آجل → يتقيّد على حساب المحل فوراً
   // (لو لسه في المحل، القيد بيستنى لحد التسليم)
   if(price && d.paymentType === 'deferred' && d.status === 'delivered' && !isPaidDevice(d)){
+    await ledgerRefresh();   // 📒 الطازة الأول (شوف changeStatus)
     const shop = (d.billedShop || d.shopName || '').trim();
     if(shop){
       extra.paymentStatus = 'paid';
@@ -8364,8 +8378,236 @@ async function cancelDeepInspection(){
 // دفتر الحسابات (آجل المحلات)
 // ============================================================
 // دفتر الحسابات (القراءة) اتنقل لـ accounts.js (الملف المشترك مع صفحة الديسباتشر). متعرّفهوش هنا تاني وإلا الصفحة هتقع.
+// ============================================================
+// 📒 حفظ دفتر الحسابات — «التغيير بس» (محتاج ملف prod-ledger-apply.sql)
+// ------------------------------------------------------------
+// 🔴 اللي كان بيحصل:
+//    الدفتر ورقة واحدة طويلة. والحفظ القديم كان بيكتب الورقة **كلها**
+//    من الصورة اللي في الصفحة. الموبايل لما ينام بيفوته التحديث اللحظي
+//    — فصورته بتبقى قديمة — وأول ما حد يسجّل أي حاجة، كان بيمسح كل
+//    اللي اتكتب بعدها (أجهزة المالك · أجهزة موظف تاني · دفعات).
+//    وكمان لو الحفظ فشل (نت ضعيف) كان بيسكت خالص — والجهاز يتعلّم
+//    «آجل» ورسالة المحل تتبعت، والسطر مايتكتبش.
+//
+// 🧸 دلوقتي بالبلدي:
+//    الصفحة فاكرة «آخر صورة شافتها من السيرفر» (_ledgerBase).
+//    كل ما حد يغيّر في الدفتر، بنقارن ونطلّع **الفرق بس**:
+//        ده سطر جديد (add) · ده اتشال (remove) · ده اتعدّل (replace)
+//    الفرق بيتحط في طابور محفوظ على الجهاز، وبيتبعت لدالة ledger_apply
+//    على السيرفر — اللي بتقفل الباب، تقرا الورقة الطازة، وتطبّق الفرق
+//    عليها. فمحدش بيمسح شغل حد.
+//
+//    • النت وقع؟ الطابور بيستنى وبيحاول تاني لوحده، وشريط أحمر بيفضل
+//      ظاهر لحد ما يتحفظ. (زي طابور الأجهزة بالظبط.)
+//    • رسالة المحل مابتطلعش غير بعد ما السطر يتأكد إنه اتحفظ.
+//    • إعادة المحاولة مابتعملش تكرار: السيرفر بيتجاهل السطر اللي
+//      رقمه موجود، والجهاز اللي متقيّد قبل كده.
+//
+// ⚠️ لو الدالة لسه ما اتركّبتش على السيرفر، بنشتغل بطريقة احتياطية:
+//    نجيب الورقة الطازة الأول، نطبّق الفرق عليها، ونكتبها. أحسن كتير
+//    من القديم — بس ركّب الملف عشان يبقى مقفول بجد.
+// ============================================================
+const LEDGER_Q_KEY = 'ifix_ledger_ops_v1';
+let _ledgerBase = new Map();        // رقم السطر → نسخته (JSON) في آخر صورة + اللي اتبعت
+let _ledgerServerIds = new Set();   // أرقام السطور اللي **اتأكدنا** إنها على السيرفر
+let _ledgerQ = (function(){ try{ const q = JSON.parse(localStorage.getItem(LEDGER_Q_KEY) || '[]'); return Array.isArray(q) ? q : []; }catch(e){ return []; } })();
+let _ledgerChain = Promise.resolve(true);
+let _ledgerFails = 0, _ledgerLastErr = null, _ledgerRetryT = null;
+
+function ledgerSetBase(arr){
+  _ledgerBase = new Map();
+  (arr || []).forEach(e => { if(e && e.id) _ledgerBase.set(String(e.id), JSON.stringify(e)); });
+}
+function ledgerQSave(){
+  try{
+    if(_ledgerQ.length) localStorage.setItem(LEDGER_Q_KEY, JSON.stringify(_ledgerQ));
+    else localStorage.removeItem(LEDGER_Q_KEY);
+  }catch(e){}
+}
+
+// الفرق بين الدفتر اللي في الصفحة وآخر صورة
+function ledgerDiffOps(){
+  const ops = [], seen = new Set();
+  (ledger || []).forEach(e => {
+    if(!e || !e.id) return;
+    const id = String(e.id); seen.add(id);
+    const j = JSON.stringify(e), b = _ledgerBase.get(id);
+    if(b === undefined) ops.push({ op:'add', entry: JSON.parse(j) });
+    else if(b !== j)    ops.push({ op:'replace', entry: JSON.parse(j) });
+  });
+  _ledgerBase.forEach((j, id) => { if(!seen.has(id)) ops.push({ op:'remove', id }); });
+  return ops;
+}
+
+// نفس قواعد ledger_apply بالظبط — بنستعملها عشان الصفحة تفضل شايفة
+// اللي لسه في الطابور فوق صورة السيرفر، وفي الطريقة الاحتياطية
+function ledgerApplyLocal(arr, ops){
+  let led = (arr || []).slice();
+  (ops || []).forEach(o => {
+    if(!o) return;
+    if(o.op === 'add'){
+      const e = o.entry;
+      if(!e || !e.id || led.some(x => x && x.id === e.id)) return;
+      if(e.type === 'debit' && e.deviceId && !e.kind
+         && led.some(x => x && x.type === 'debit' && x.deviceId === e.deviceId && !x.kind)) return;
+      led = [e, ...led];
+    } else if(o.op === 'remove'){
+      led = led.filter(x => !(x && x.id === o.id));
+    } else if(o.op === 'replace'){
+      const e = o.entry;
+      if(e && e.id) led = led.map(x => (x && x.id === e.id) ? e : x);
+    }
+  });
+  return led;
+}
+
+// صورة جديدة من السيرفر (رد الدالة · التحديث اللحظي · تحديث يدوي)
+// ⚠️ اللي لسه في الطابور بيتطبّق فوقها — عشان الشاشة ماتنساش تغييرك
+//    اللي لسه ما وصلش.
+function ledgerAdoptServer(arr){
+  if(!Array.isArray(arr)) return;
+  _ledgerServerIds = new Set(arr.filter(e => e && e.id).map(e => String(e.id)));
+  ledger = _ledgerQ.length ? ledgerApplyLocal(arr, _ledgerQ) : arr;
+  ledgerSetBase(ledger);
+  try{ localStorage.setItem('ifix_ledger_cache', JSON.stringify(arr)); }catch(e){}
+  try{
+    const ov = document.getElementById('accountsOverlay');
+    if(ov && !ov.classList.contains('hidden') && typeof renderAccounts === 'function') renderAccounts();
+  }catch(e){}
+}
+
+// نجيب الورقة الطازة من السيرفر (لما الصفحة تصحى · قبل الشيل · …)
+let _ledgerRefreshP = null;
+function ledgerRefresh(){
+  if(_ledgerRefreshP) return _ledgerRefreshP;
+  _ledgerRefreshP = (async () => {
+    try{
+      if(!isOnline()) return false;
+      const r = await withTimeout(sb.from('app_data').select('value').eq('key', LEDGER_KEY).maybeSingle(), 20000, 'تحديث الحسابات');
+      if(r.error) throw r.error;
+      if(!r.data) return false;
+      const v = r.data.value;
+      ledgerAdoptServer(typeof v === 'string' ? JSON.parse(v || '[]') : v);
+      return true;
+    }catch(e){ console.warn('تحديث الحسابات:', e && e.message ? e.message : e); return false; }
+  })().finally(() => { _ledgerRefreshP = null; });
+  return _ledgerRefreshP;
+}
+
+// الشريط الأحمر: فيه تغييرات لسه ما اتحفظتش
+function ledgerBanner(){
+  let b = document.getElementById('ledgerSaveBanner');
+  const n = _ledgerQ.length;
+  if(!n){ if(b) b.remove(); return; }
+  if(!b){
+    b = document.createElement('div');
+    b.id = 'ledgerSaveBanner';
+    b.setAttribute('dir', 'rtl');
+    b.style.cssText = 'position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));'
+      + 'z-index:99990;background:#B91C1C;color:#fff;border-radius:12px;padding:12px 14px;'
+      + 'font:800 13.5px/1.6 inherit;box-shadow:0 10px 30px rgba(0,0,0,.3);display:flex;gap:10px;align-items:center;cursor:pointer;';
+    b.onclick = () => ledgerFlush();
+    document.body.appendChild(b);
+  }
+  const err = _ledgerLastErr;
+  const perm = err && (err.code === '42501' || /صلاحية|permission/i.test(err.message || ''));
+  b.innerHTML = '<span>⚠️</span><span style="flex:1;">'
+    + n + ' تغيير في حسابات المحلات لسه ما اتحفظش على السيرفر'
+    + (perm ? ' — الحساب ده مالوش صلاحية يكتب في الحسابات' : ' — بنحاول تاني لوحدنا. متمسحش بيانات الموقع.')
+    + '</span><span style="text-decoration:underline;white-space:nowrap;">جرّب دلوقتي</span>';
+}
+
+function ledgerScheduleRetry(){
+  if(_ledgerRetryT) return;
+  _ledgerRetryT = setTimeout(() => { _ledgerRetryT = null; if(_ledgerQ.length) ledgerFlush(); }, 20000);
+}
+
+function ledgerMissingFn(err){
+  const m = String((err && (err.message || err.details || err.hint)) || '');
+  return !!err && (err.code === 'PGRST202' || err.code === '42883' || /ledger_apply/.test(m) && /(not find|does not exist|schema cache)/i.test(m));
+}
+
+async function ledgerFlushNow(){
+  if(!_ledgerQ.length){ ledgerBanner(); return true; }
+  const batch = _ledgerQ.slice();
+  try{
+    if(!isOnline()) throw new Error('مفيش نت');
+    let fresh = null;
+    const { data, error } = await withTimeout(sb.rpc('ledger_apply', { p_ops: batch }), 25000, 'حفظ الحسابات');
+    if(error && ledgerMissingFn(error)){
+      // ⚠️ الطريقة الاحتياطية (الملف لسه ما اتركّبش): الطازة الأول، وبعدين نكتب
+      const r = await withTimeout(sb.from('app_data').select('value').eq('key', LEDGER_KEY).maybeSingle(), 20000, 'قراية الحسابات');
+      if(r.error) throw r.error;
+      const v = r.data ? r.data.value : '[]';
+      const srv = typeof v === 'string' ? JSON.parse(v || '[]') : (v || []);
+      fresh = ledgerApplyLocal(srv, batch);
+      const w = await withTimeout(sb.from('app_data').upsert({ key: LEDGER_KEY, value: JSON.stringify(fresh), updated_at: new Date().toISOString() }), 25000, 'حفظ الحسابات');
+      if(w.error) throw w.error;
+    } else {
+      if(error) throw error;
+      if(!data || !Array.isArray(data.ledger)) throw new Error('رد غريب من السيرفر');
+      fresh = data.ledger;
+      if(data.skipped && data.skipped.length) console.warn('📒 اتجاهل:', data.skipped);
+    }
+    _ledgerQ = _ledgerQ.slice(batch.length);    // اللي اتضاف وإحنا مستنيين يفضل في الطابور
+    ledgerQSave();
+    ledgerAdoptServer(fresh);
+    _ledgerFails = 0; _ledgerLastErr = null;
+    ledgerBanner();
+    if(_ledgerQ.length) setTimeout(ledgerFlush, 0);
+    else if(_shopNoticeQueue.length) setTimeout(flushShopNotices, 0);   // رسايل كانت مستنية الحفظ
+    return true;
+  }catch(e){
+    _ledgerFails++; _ledgerLastErr = e;
+    console.warn('📒 حفظ الحسابات فشل — هنحاول تاني:', e && e.message ? e.message : e);
+    ledgerBanner();
+    ledgerScheduleRetry();
+    return false;
+  }
+}
+
+// واحد ورا التاني — عمرنا ما بنبعت حفظتين في نفس اللحظة
+function ledgerFlush(){
+  _ledgerChain = _ledgerChain.then(ledgerFlushNow, ledgerFlushNow);
+  return _ledgerChain;
+}
+
+// ⚠️ نفس الاسم القديم عشان كل الأماكن اللي بتنده عليه تفضل زي ما هي.
+//    بيرجّع true لو اتحفظ على السيرفر، false لو لسه في الطابور.
+//    الجزء الأول (الفرق + الطابور) **متزامن** — بيحصل قبل أي انتظار،
+//    فمفيش تحديث لحظي يقدر يدخل في النص ويضيّع تغيير.
 async function persistLedger(){
-  try{ await window.storage.set(LEDGER_KEY, JSON.stringify(ledger)); }catch(e){}
+  const ops = ledgerDiffOps();
+  if(ops.length){
+    _ledgerQ = _ledgerQ.concat(ops);
+    ledgerQSave();
+    ledgerSetBase(ledger);   // الصورة = السيرفر + اللي اتبعت — عشان الحفظ الجاي مايكررهوش
+    ledgerBanner();
+  }
+  return ledgerFlush();
+}
+
+// أول ما الصفحة تفتح: الصورة الأولى + أي طابور فاضل من مرة قبل كده
+function ledgerStartup(){
+  const arr = Array.isArray(ledger) ? ledger : [];
+  _ledgerServerIds = new Set(arr.filter(e => e && e.id).map(e => String(e.id)));
+  if(_ledgerQ.length) ledger = ledgerApplyLocal(arr, _ledgerQ);
+  ledgerSetBase(ledger);
+  ledgerBanner();
+  if(_ledgerQ.length) ledgerFlush();
+}
+
+// الصفحة صحيت / النت رجع → نجيب الطازة ونكمّل الطابور
+if(typeof document !== 'undefined'){
+  document.addEventListener('visibilitychange', () => {
+    if(document.visibilityState !== 'visible') return;
+    ledgerRefresh().then(() => { if(_ledgerQ.length) ledgerFlush(); });
+  });
+}
+if(typeof window !== 'undefined'){
+  window.addEventListener('online', () => setTimeout(() => {
+    ledgerRefresh().then(() => { if(_ledgerQ.length) ledgerFlush(); });
+  }, 1500));
 }
 
 // ============================================================
@@ -8646,7 +8888,24 @@ function shopNoticeMsg(items, shop, asOf){
 
 async function flushShopNotices(){
   if(!_shopNoticeQueue.length) return;
-  const q = _shopNoticeQueue; _shopNoticeQueue = [];
+  // 📒 نستنى حفظ الدفتر يخلص — الرسالة مابتطلعش لجهاز ماتسجّلش فعلاً.
+  //    • اتحفظ على السيرفر        → يتبعت دلوقتي
+  //    • لسه في طابور الحفظ        → يستنى، وبيتبعت أول ما الحفظ ينجح
+  //    • السيرفر تجاهله (الجهاز متقيّد قبل كده) → مفيش رسالة تانية
+  try{ await _ledgerChain; }catch(e){}
+  const pendingIds = new Set(_ledgerQ.filter(o => o && o.op === 'add' && o.entry).map(o => String(o.entry.id)));
+  const q = [], waiting = [];
+  _shopNoticeQueue.forEach(x => {
+    const id = String(x.entry && x.entry.id);
+    if(_ledgerServerIds.has(id)) q.push(x);
+    else if(pendingIds.has(id)) waiting.push(x);
+  });
+  _shopNoticeQueue = waiting;
+  if(waiting.length && !q.length){
+    alert('⚠️ الجهاز لسه ما اتسجّلش في حساب المحل على السيرفر (النت).\n'
+        + 'رسالة المحل هتستنى، وهتطلعلك أول ما الحفظ يتم — متبعتش حاجة للمحل دلوقتي.');
+  }
+  if(!q.length) return;
   // لو أكتر من جهاز لنفس المحل في نفس اللحظة → رسالة واحدة بيهم كلهم
   const byShop = {};
   q.forEach(x => { const sh = x.entry.shop || 'بدون محل'; (byShop[sh] = byShop[sh] || []).push(x); });
@@ -8797,6 +9056,7 @@ async function editReturnPayType(pt){
     noteKey = 'hist.returnToDeferred'; noteVars = { amount: price.toLocaleString('en-EG'), shop };
   } else {
     // رجوع لفوري: نشيل قيد المرتجع **بتاع الجولة دي بس** — لا الأصلي ولا جولة قديمة
+    await ledgerRefresh();   // 📒 الطازة الأول (شوف editPayType)
     const entry = curReturnEntry(d);
     if(entry){
       ledger = ledger.filter(e => e !== entry);
@@ -8833,20 +9093,62 @@ async function recordPayment(){
   const note = document.getElementById('payNote').value.trim();
   if(!shop){ alert(t('msg.needShopName')); return; }
   if(amount <= 0){ alert(t('msg.badAmount')); return; }
-  ledger = [{
+
+  // ============================================================
+  // 📅 دفعة بتاريخ معيّن — المحاسب العام بس
+  // ------------------------------------------------------------
+  // 🧸 بالبلدي: الدفعة بتتكتب في الدفتر بتاريخ «دلوقتي» عادةً. لو المحاسب
+  //    العام اختار يوم (مثلاً يوم ١٢ اللي فات) بنكتبها على اليوم ده،
+  //    الساعة ١٢ الضهر (عشان فرق التوقيت ما يرميهاش في يوم تاني).
+  //    ووقت التسجيل الحقيقي بيتحفظ جنبها (enteredAt) عشان نفضل نعرف
+  //    إنها اتسجّلت بعد الحدث — مفيش دفعة قديمة تتحط من غير أثر.
+  //
+  // ⚠️ الخانة مخفية عن غير المحاسب العام، بس **الحماية هنا** مش في الإخفاء:
+  //    لو حد غيره فتح الكونسول وكتب تاريخ، بنتجاهله.
+  // ⚠️ تاريخ في المستقبل مرفوض. واليوم نفسه = زي الدفعة العادية بالظبط.
+  // ============================================================
+  const nowIso = new Date().toISOString();
+  let whenIso = nowIso, backdated = false;
+  const pdEl = document.getElementById('payDate');
+  const pdStr = (pdEl && isSuperAdmin()) ? String(pdEl.value || '').trim() : '';
+  if(pdStr){
+    const picked = new Date(pdStr + 'T12:00:00');
+    if(isNaN(picked.getTime())){ alert('التاريخ مش مظبوط — اختاره تاني'); return; }
+    const todayStr = accYmd(new Date());          // yyyy-mm-dd بتوقيت الجهاز
+    if(pdStr > todayStr){ alert('مينفعش تسجّل دفعة بتاريخ في المستقبل'); return; }
+    if(pdStr < todayStr){
+      const pretty = picked.toLocaleDateString('ar-EG', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+      if(!confirm(`هتسجّل دفعة ${amount.toLocaleString('en-EG')} ج.م من "${shop}" بتاريخ ${pretty}.\n\nمتأكد من التاريخ؟`)) return;
+      whenIso = picked.toISOString();
+      backdated = true;
+    }
+  }
+
+  const entry = {
     id: 'led_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
     type: 'credit', shop, amount, note,
-    date: new Date().toISOString(), by: currentUser.name
-  }, ...ledger];
+    date: whenIso, by: currentUser.name
+  };
+  if(backdated){ entry.backdated = true; entry.enteredAt = nowIso; }
+  ledger = [entry, ...ledger];
   document.getElementById('payShop').value = '';
   document.getElementById('payAmount').value = '';
   document.getElementById('payNote').value = '';
-  await persistLedger();
+  if(pdEl) pdEl.value = '';
+  const saved = await persistLedger();
   renderAccounts();
+  // 📒 الحفظ لسه ما وصلش السيرفر (نت)؟ الدفعة في الطابور وهتتحفظ لوحدها —
+  //    بس منبعتش للمحل «استلمنا» قبل ما نتأكد.
+  if(!saved){
+    alert('⚠️ الدفعة اتسجّلت هنا بس لسه ما وصلتش للسيرفر (النت).\n'
+        + 'هتتحفظ لوحدها أول ما النت يرجع — والشريط الأحمر تحت هيختفي.\n'
+        + 'رسالة الواتساب للمحل ما اتبعتتش؛ ابعتها بعد ما الشريط يختفي.');
+    return;
+  }
   // 💬 رسالة واتساب للمحل «استلمنا دفعة» — **بعد** الحفظ عن قصد:
   //    الموبايل بيقلب على الواتس والصفحة بتنام، فلو فتحناه قبل الحفظ
   //    الدفعة ممكن متتحفظش (نفس درس flushShopNotices).
-  try{ await sendPaymentNotice(shop, amount); }catch(e){ console.warn('رسالة الدفعة:', e); }
+  try{ await sendPaymentNotice(shop, amount, backdated ? whenIso : null); }catch(e){ console.warn('رسالة الدفعة:', e); }
 }
 
 // ============================================================
@@ -8864,10 +9166,12 @@ async function recordPayment(){
 // ⚠️ مفيش رقم للمحل؟ بنسأل مرة ونحفظه. ولو اتلغى → الدفعة متسجّلة
 //    عادي ومفيش رسالة.
 // ============================================================
-function paymentNoticeMsg(shop, amount, balance){
+function paymentNoticeMsg(shop, amount, balance, whenIso){
+  // whenIso = تاريخ الدفعة لو اتسجّلت بتاريخ سابق — غير كده «النهاردة» زي ما كان
+  const at = whenIso ? new Date(whenIso) : new Date();
   let day = '';
-  try{ day = new Date().toLocaleDateString('ar-EG', { weekday:'long', year:'numeric', month:'long', day:'numeric' }); }
-  catch(e){ day = new Date().toLocaleDateString('ar-EG'); }
+  try{ day = at.toLocaleDateString('ar-EG', { weekday:'long', year:'numeric', month:'long', day:'numeric' }); }
+  catch(e){ day = at.toLocaleDateString('ar-EG'); }
   const n = v => Number(v || 0).toLocaleString('en-EG');
 
   const L = ['السلام عليكم 🌹'];
@@ -8879,13 +9183,13 @@ function paymentNoticeMsg(shop, amount, balance){
   return L.join('\n');
 }
 
-async function sendPaymentNotice(shop, amount){
+async function sendPaymentNotice(shop, amount, whenIso){
   if(!shop) return;
   let ph = shopPhones[shop];
   if(!ph){ ph = await setShopPhone(shop); if(!ph) return; }
   let bal = 0;
   try{ const st = shopStats()[shop]; bal = st ? st.balance : 0; }catch(e){}
-  openWa(ph, paymentNoticeMsg(shop, amount, bal), '💬 اضغط لإرسال رسالة الدفعة للمحل');
+  openWa(ph, paymentNoticeMsg(shop, amount, bal, whenIso), '💬 اضغط لإرسال رسالة الدفعة للمحل');
 }
 
 async function deletePayment(id){
@@ -8964,6 +9268,7 @@ async function addOpeningBalance(){
 
 // حذف حساب محل بالكامل + كتابة ملاحظة على أجهزته المربوطة
 async function deleteAccount(shop){
+  await ledgerRefresh();   // 📒 الطازة الأول — عشان الرصيد في السؤال والمسح يبقوا على الحقيقة
   const st = shopStats()[shop];
   const bal = st ? st.balance : 0;
   if(!confirm(`⚠️ متأكد إنك عايز تمسح حساب "${shop}" بالكامل؟\n\nهيتشال من الحسابات، ورصيده المتبقي (${bal.toLocaleString('en-EG')} ج.م) هيتخصم من إجمالي ديون السيستم.\nالأجهزة المربوطة بيه هتفضل موجودة، بس هتتكتب عليها ملاحظة إن الحساب اتمسح.\n\nالخطوة دي مش بترجع.`)) return;
@@ -10816,7 +11121,8 @@ requireAccess().then(ok => {
   loadDevices();
   loadBackupSettings().then(() => setTimeout(checkAutoBackup, 3000));
   setInterval(checkAutoBackup, 3600000);
-  loadLedger();
+  // 📒 بعد ما الدفتر يتحمّل: الصورة الأولى + أي طابور فاضل من مرة قبل كده
+  Promise.resolve(loadLedger()).catch(() => {}).then(() => { try{ ledgerStartup(); }catch(e){ console.warn('ledgerStartup:', e); } });
   loadShopPhones();
   startRealtimeSync();
   setupAddFormEnterNav();

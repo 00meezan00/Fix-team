@@ -106,6 +106,12 @@ function openAccounts(){
   // نرجّع طريقة العرض المحفوظة (بعد أي فتح كشف مؤقت حوّلها لقائمة)
   try{ const v = localStorage.getItem(ACC_VIEW_KEY); if(ACC_VIEW_MODES.includes(v)) accViewMode = v; }catch(e){}
   syncAccViewButtons();
+  // 📅 خانة «تاريخ الدفعة» — المحاسب العام بس. (الخانة موجودة في dashboard.html
+  //    وبس؛ والحماية الحقيقية جوه recordPayment مش هنا — ده مجرد إظهار.)
+  try{
+    const _pd = document.getElementById('payDateBox');
+    if(_pd) _pd.style.display = (ACC_CAN_EDIT && typeof isSuperAdmin === 'function' && isSuperAdmin()) ? 'flex' : 'none';
+  }catch(e){}
   document.getElementById('accountsOverlay').classList.remove('hidden');
   renderAccounts();
 }
@@ -201,29 +207,73 @@ function accEntryDatesHtml(e){
     + `</div>`;
 }
 
+// ============================================================
+// 👆 فتح تفاصيل الجهاز من جوه الحساب (المحاسب/الأدمن بس)
+// ------------------------------------------------------------
+// 🧸 بالبلدي: بتدوس على الجهاز في كشف المحل → بتفتح بطاقة تفاصيله
+//    **فوق** شاشة الحسابات (مش بدالها). تعدّل اللي عايزه وتقفلها،
+//    فترجع لنفس المحل ونفس مكانك في الكشف — من غير ما تخرج.
+//
+// ⚠️ accounts.js مبيعرفش يفتح التفاصيل لوحده — بينده openDetail
+//    بتاعة الداشبورد. لو الدالة دي مش موجودة (صفحة الديسباتشر
+//    والمالك مثلاً) الجهاز مابيبقاش قابل للضغط أصلاً.
+//
+// ⚠️ لما بطاقة التفاصيل تتقفل بنعيد رسم الحساب — عشان أي تعديل
+//    (موديل · لون · عطل · مندوب) يبان في الكشف فوراً. الرسم
+//    بيحافظ على المحل المفتوح ومكان السكرول.
+// ============================================================
+var _accDetailWatch = null;
+function accWatchDetailClose(){
+  try{
+    const ov = document.getElementById('detailOverlay');
+    if(!ov || typeof MutationObserver === 'undefined') return;
+    if(_accDetailWatch) _accDetailWatch.disconnect();
+    _accDetailWatch = new MutationObserver(() => {
+      if(!ov.classList.contains('hidden')) return;   // لسه مفتوحة
+      try{ _accDetailWatch.disconnect(); }catch(e){}
+      _accDetailWatch = null;
+      const acc = document.getElementById('accountsOverlay');
+      if(acc && !acc.classList.contains('hidden')) renderAccounts();
+    });
+    _accDetailWatch.observe(ov, { attributes:true, attributeFilter:['class'] });
+  }catch(e){ console.warn('مراقبة قفل التفاصيل:', e); }
+}
+function accOpenDevice(id){
+  if(!ACC_CAN_EDIT) return;
+  if(typeof openDetail !== 'function'){ alert('تفاصيل الجهاز مش متاحة في الصفحة دي'); return; }
+  const d = accDevices().find(x => x.id === id);
+  if(!d){ alert('الجهاز ده مش موجود (اتمسح، أو لسه بيتحمّل) — جرّب بعد ثواني'); return; }
+  accWatchDetailClose();
+  openDetail(id);
+}
+
 // رسم حركة واحدة في كشف المحل حسب نوعها
 function accEntryHtml(e){
   const amt = (e.amount||0).toLocaleString('en-EG');
-  const meta = `<div class="acc-entry-meta">${new Date(e.date).toLocaleString(accLocale())} — ${t('acc.by')} ${esc(e.by||'')}</div>`;
+  // 📅 دفعة اتسجّلت بتاريخ سابق: نكتب إمتى اتسجّلت فعلاً جنب التاريخ اللي عليها
+  const _bd = (e.backdated && e.enteredAt)
+    ? ` <span style="color:var(--warn);font-weight:700;">· 📅 بتاريخ سابق (اتسجّلت ${new Date(e.enteredAt).toLocaleString(accLocale())})</span>`
+    : '';
+  const meta = `<div class="acc-entry-meta">${new Date(e.date).toLocaleString(accLocale())} — ${t('acc.by')} ${esc(e.by||'')}${_bd}</div>`;
   if(e.type === 'credit'){
     return `<div class="acc-entry" style="background:var(--success-bg);">
       <div><div style="font-weight:700; color:var(--success);">💵 ${t('acc.entryPayment')}${e.note ? ` — ${esc(e.note)}` : ''}</div>${meta}</div>
       <div style="text-align:left;"><div style="font-weight:800; color:var(--success);">− ${amt} ج.م</div>
-        ${ACC_CAN_EDIT ? `<button class="acc-mini-btn" style="color:var(--danger);border-color:var(--danger-border);" onclick="deletePayment('${e.id}')">${t('acc.deleteEntry')}</button>` : ''}</div>
+        ${ACC_CAN_EDIT ? `<button class="acc-mini-btn" style="color:var(--danger);border-color:var(--danger-border);" onclick="deletePayment('${e.id}')">${t('acc.deleteEntry')}</button>` : ''}${accAtBtn(e)}</div>
     </div>`;
   }
   if(e.type === 'discount'){
     return `<div class="acc-entry" style="background:var(--info-bg);">
       <div><div style="font-weight:700; color:var(--info);">🏷️ ${t('acc.entryDiscount')}${e.note ? ` — ${esc(e.note)}` : ''}</div>${meta}</div>
       <div style="text-align:left;"><div style="font-weight:800; color:var(--info);">− ${amt} ج.م</div>
-        ${ACC_CAN_EDIT ? `<button class="acc-mini-btn" style="color:var(--danger);border-color:var(--danger-border);" onclick="deletePayment('${e.id}')">${t('acc.deleteEntry')}</button>` : ''}</div>
+        ${ACC_CAN_EDIT ? `<button class="acc-mini-btn" style="color:var(--danger);border-color:var(--danger-border);" onclick="deletePayment('${e.id}')">${t('acc.deleteEntry')}</button>` : ''}${accAtBtn(e)}</div>
     </div>`;
   }
   if(e.type === 'opening'){
     return `<div class="acc-entry" style="background:var(--warn-tint);">
       <div><div style="font-weight:700; color:var(--warn);">🧾 ${t('acc.entryOpening')}</div>${meta}</div>
       <div style="text-align:left;"><div style="font-weight:800; color:var(--warn);">+ ${amt} ج.م</div>
-        ${ACC_CAN_EDIT ? `<button class="acc-mini-btn" style="color:var(--danger);border-color:var(--danger-border);" onclick="deletePayment('${e.id}')">${t('acc.deleteEntry')}</button>` : ''}</div>
+        ${ACC_CAN_EDIT ? `<button class="acc-mini-btn" style="color:var(--danger);border-color:var(--danger-border);" onclick="deletePayment('${e.id}')">${t('acc.deleteEntry')}</button>` : ''}${accAtBtn(e)}</div>
     </div>`;
   }
   // debit (جهاز آجل)
@@ -243,15 +293,200 @@ function accEntryHtml(e){
   const bbLine = bb
     ? `<div class="acc-entry-meta" style="color:var(--ink-2);">🛵 ${esc(ACC_BB_LABEL)}: <b>${esc(bb)}</b></div>`
     : '';
+  // 👆 المحاسب/الأدمن يقدر يدوس على الجهاز ويفتح تفاصيله (شوف accOpenDevice)
+  const canOpen = !!(ACC_CAN_EDIT && e.deviceId && typeof openDetail === 'function');
+  const openAttr = canOpen
+    ? ` onclick="accOpenDevice('${esc(e.deviceId)}')" style="cursor:pointer;" title="اضغط لتفاصيل الجهاز"`
+    : '';
+  const openHint = canOpen
+    ? `<div class="acc-entry-meta" style="color:var(--info);font-weight:700;">👆 اضغط لتفاصيل الجهاز وتعديله</div>`
+    : '';
   return `<div class="acc-entry">
-    <div><div style="font-weight:700;">📱 ${esc(e.deviceLabel||'جهاز')}</div>
+    <div${openAttr}><div style="font-weight:700;">📱 ${esc(e.deviceLabel||'جهاز')}</div>
       ${extra}
       ${bbLine}
       ${accEntryDatesHtml(e)}
-      <div class="acc-entry-meta">${t('acc.by')} ${esc(e.by||'')}${e.prevShop ? ` — <span style="color:var(--warn);">منقول من حساب "${esc(e.prevShop)}"</span>` : ''}</div></div>
+      <div class="acc-entry-meta">${t('acc.by')} ${esc(e.by||'')}${e.prevShop ? ` — <span style="color:var(--warn);">منقول من حساب "${esc(e.prevShop)}"</span>` : ''}</div>${openHint}</div>
     <div style="text-align:left;"><div style="font-weight:800; color:var(--warn);">+ ${amt} ج.م</div>
-      ${ACC_CAN_EDIT ? `<button class="acc-mini-btn" onclick="transferDebit('${e.id}')">⇄ ${t('acc.moveShop')}</button>` : ''}</div>
+      ${ACC_CAN_EDIT ? `<button class="acc-mini-btn" onclick="transferDebit('${e.id}')">⇄ ${t('acc.moveShop')}</button>` : ''}${accAtBtn(e)}</div>
   </div>`;
+}
+
+// ============================================================
+// 📍 «الرصيد وقتها» — المحاسب العام بس
+// ------------------------------------------------------------
+// 🧸 بالبلدي: تخيّل كشكول حساب المحل. بتحط صباعك على سطر (جهاز أو
+//    دفعة) وتسأل: «في اللحظة دي كان المحل عليه كام؟». الشاشة بتقولك:
+//       • كان عليه كام قبل السطر ده
+//       • السطر ده زوّد/نقّص كام
+//       • فبقى عليه كام وقتها  ← ده اللي سألت عليه
+//       • وبعدها اتسجّل إيه (ولحد دلوقتي بقى كام)
+//    كأنك قفلت الكشكول عند السطر ده وقطعت كل الصفحات اللي بعده.
+//
+// 🔎 «وقتها» معناها: بترتيب **تسجيل الحركات في الحساب** (تاريخ القيد
+//    في الدفتر) — نفس الترتيب اللي بيحدد «الدورة» وزرار «آخر تحديث».
+//    فالدفعة اللي اتسجّلت بتاريخ سابق بتتحسب في مكان تاريخها هي.
+//    ولو جهاز اتقيّد آجل بعد تسليمه بيومين، بيتحسب من يوم القيد.
+//
+// ⚠️ عرض وحساب بس — مفيش ولا كتابة في الدفتر. والزرار مش بيتحط
+//    أصلاً لغير المحاسب العام (isSuperAdmin).
+// ============================================================
+function accIsHeadAcc(){
+  try{ return !!(ACC_CAN_EDIT && typeof isSuperAdmin === 'function' && isSuperAdmin()); }
+  catch(e){ return false; }
+}
+function accAtBtn(e){
+  if(!accIsHeadAcc() || !e || !e.id) return '';
+  return `<button class="acc-mini-btn" style="color:var(--info);border-color:var(--info-border);" onclick="accShowBalanceAt('${esc(e.id)}')">📍 الرصيد وقتها</button>`;
+}
+
+// الحساب: ترتيب حركات المحل بوقت التسجيل (ولو نفس الوقت → الأبعد في الدفتر أقدم،
+// لأن الجديد بيتحط في أول الدفتر) — نفس قاعدة accCycleSplit بالظبط
+function accBalanceAt(entryId){
+  const target = ledger.find(x => x.id === entryId);
+  if(!target) return null;
+  const shop = target.shop || 'بدون محل';
+  const rows = [];
+  ledger.forEach((x, i) => { if((x.shop || 'بدون محل') === shop) rows.push({ e:x, i }); });
+  rows.sort((a, b) => {
+    const ta = new Date(a.e.date || 0).getTime() || 0, tb = new Date(b.e.date || 0).getTime() || 0;
+    return (ta - tb) || (b.i - a.i);
+  });
+  const pos = rows.findIndex(r => r.e.id === entryId);
+  const sgn = x => (isDebitLike(x) ? 1 : -1) * (Number(x.amount) || 0);
+  let before = 0;
+  for(let k = 0; k < pos; k++) before += sgn(rows[k].e);
+  const effect = sgn(target);
+  const later = rows.slice(pos + 1).map(r => r.e);
+  const laterNet = later.reduce((s, x) => s + sgn(x), 0);
+  return { shop, e:target, before, effect, atThat: before + effect, later, laterNet, now: before + effect + laterNet };
+}
+
+// رقم الرصيد بلون وكلمة: عليه / خالص / ليه رصيد
+function accBalWords(v){
+  const n = Math.abs(v).toLocaleString('en-EG');
+  if(v > 0) return `<b style="color:var(--danger);">${n} ج.م</b> <small>(على المحل)</small>`;
+  if(v < 0) return `<b style="color:var(--success);">${n} ج.م</b> <small>(رصيد للمحل عندنا)</small>`;
+  return `<b style="color:var(--success);">صفر</b> <small>(خالص)</small>`;
+}
+
+function accShowBalanceAt(entryId){
+  if(!accIsHeadAcc()) return;
+  const r = accBalanceAt(entryId);
+  if(!r){ alert('الحركة دي مش موجودة'); return; }
+  accCloseBalanceAt();
+  const sign = r.effect > 0 ? '+' : '−';
+  const row = (a, b, hi) => `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;${hi ? 'background:var(--info-bg);border:1.5px solid var(--info-border);font-size:15px;' : 'background:var(--surface-2,#F8FAFC);'}"><span style="font-weight:700;">${a}</span><span>${b}</span></div>`;
+  const laterRows = r.later.slice(0, 30).map(x => {
+    const s = isDebitLike(x) ? '+' : '−';
+    return `<div style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--border,#E2E8F0);font-size:12.5px;">`
+      + `<span>${esc(accFmtShort(x.date))} — ${esc(stmtDesc(x))}</span>`
+      + `<b style="white-space:nowrap;color:${isDebitLike(x) ? 'var(--warn)' : 'var(--success)'};">${s} ${(Number(x.amount) || 0).toLocaleString('en-EG')}</b></div>`;
+  }).join('');
+  const more = r.later.length > 30 ? `<div style="font-size:12px;color:var(--muted-2);padding-top:6px;">… و${r.later.length - 30} حركة كمان</div>` : '';
+
+  const ov = document.createElement('div');
+  ov.id = 'accAtOv';
+  ov.setAttribute('dir', 'rtl');
+  ov.style.cssText = 'position:fixed;inset:0;z-index:2147483000;background:rgba(10,16,24,.55);display:flex;align-items:center;justify-content:center;padding:16px;';
+  ov.onclick = ev => { if(ev.target === ov) accCloseBalanceAt(); };
+  ov.innerHTML =
+    `<div style="background:var(--surface,#fff);color:var(--ink,#1A2332);border-radius:18px;width:100%;max-width:440px;max-height:90vh;overflow-y:auto;padding:18px;box-shadow:0 22px 60px rgba(0,0,0,.35);font-family:inherit;">`
+    + `<div style="font-weight:900;font-size:17px;">📍 الرصيد وقتها — ${esc(r.shop)}</div>`
+    + `<div style="font-size:12.5px;color:var(--muted,#64748B);margin:4px 0 12px;">${esc(accFmtShort(r.e.date))} — ${esc(stmtDesc(r.e))}</div>`
+    + `<div style="display:grid;gap:8px;">`
+      + row('قبل الحركة دي كان', accBalWords(r.before))
+      + row('الحركة دي', `<b style="color:${r.effect > 0 ? 'var(--warn)' : 'var(--success)'};">${sign} ${Math.abs(r.effect).toLocaleString('en-EG')} ج.م</b>`)
+      + row('✅ المتبقي وقتها', accBalWords(r.atThat), true)
+    + `</div>`
+    + `<div style="font-weight:800;font-size:13.5px;margin:16px 0 4px;">اللي اتسجّل بعدها (${r.later.length} حركة)</div>`
+    + (r.later.length ? `<div>${laterRows}${more}</div>` : `<div style="font-size:13px;color:var(--muted-2);">مفيش — دي آخر حركة في الحساب.</div>`)
+    + `<div style="display:grid;gap:8px;margin-top:12px;">${row('المتبقي دلوقتي', accBalWords(r.now))}</div>`
+    + `<button type="button" onclick="accCloseBalanceAt()" style="width:100%;margin-top:14px;border:none;border-radius:12px;padding:13px;font:800 14px/1 inherit;background:#1F3864;color:#fff;cursor:pointer;">تمام</button>`
+    + `</div>`;
+  document.body.appendChild(ov);
+}
+function accCloseBalanceAt(){ const o = document.getElementById('accAtOv'); if(o) o.remove(); }
+document.addEventListener('keydown', e => { if(e.key === 'Escape') accCloseBalanceAt(); });
+
+// ============================================================
+// 🔃 ترتيب الحركات جوه كل حساب
+// ------------------------------------------------------------
+// 🧸 بالبلدي: كل محل مفتوح فيه ٣ أزرار فوق الكشف:
+//      🕒 آخر تحديث  = وقت ما الحركة اتسجّلت في الحساب
+//                      (ده الترتيب القديم بالظبط — هو الافتراضي)
+//      📥 تاريخ الدخول  = يوم ما الجهاز دخل المحل
+//      📤 تاريخ الخروج  = يوم ما الجهاز اتسلّم
+//    دوس على الزرار ← بيرتّب الأحدث الأول. دوس عليه تاني ← بيقلب
+//    (الأقدم الأول). السهم ↓ ↑ بيقولك إنت ماشي إزاي.
+//
+// ⚠️ الدفعة والخصم والرصيد الافتتاحي مالهمش «دخول» ولا «خروج» —
+//    فبتتحط في مكانها بتاريخها هي (زي ما بنعمل في فترة الطباعة).
+// ⚠️ ترتيب كل محل لوحده. آخر اختيار بيتحفظ على الجهاز ويبقى
+//    الافتراضي للمحلات اللي لسه ماختارتش لها.
+// ⚠️ علامة «🔄 دورة جديدة» بتظهر بس مع «آخر تحديث ↓» — لأنها
+//    مبنية على ترتيب التسجيل، ومع أي ترتيب تاني كانت هتبقى
+//    في مكان غلط.
+// ============================================================
+const ACC_SORT_KEY = 'store_accounts_sort';
+const ACC_SORT_KINDS = [
+  { k:'update', n:'آخر تحديث',    ic:'🕒' },
+  { k:'in',     n:'تاريخ الدخول', ic:'📥' },
+  { k:'out',    n:'تاريخ الخروج', ic:'📤' },
+];
+let accSortByShop = {};
+
+function accSortDefault(){
+  try{
+    const v = JSON.parse(localStorage.getItem(ACC_SORT_KEY) || 'null');
+    if(v && ACC_SORT_KINDS.some(x => x.k === v.k) && (v.dir === 'asc' || v.dir === 'desc')) return v;
+  }catch(e){}
+  return { k:'update', dir:'desc' };
+}
+function accSortOf(shop){ return accSortByShop[shop] || accSortDefault(); }
+
+function accSetSort(shop, k){
+  const cur = accSortOf(shop);
+  const next = { k: k, dir: (cur.k === k) ? (cur.dir === 'desc' ? 'asc' : 'desc') : 'desc' };
+  accSortByShop[shop] = next;
+  try{ localStorage.setItem(ACC_SORT_KEY, JSON.stringify(next)); }catch(e){}
+  renderAccounts();
+}
+
+// وقت الحركة حسب نوع الترتيب (بالملّي) — 0 لو التاريخ بايظ
+function accSortTs(e, k){
+  let v;
+  if(k === 'in') v = accBasisDate(e, 'in');
+  else if(k === 'out') v = accBasisDate(e, 'out');
+  else v = e.date;
+  const tt = new Date(v || e.date || 0).getTime();
+  return isNaN(tt) ? 0 : tt;
+}
+
+// لو الوقتين متساويين، وقت تسجيل الحركة هو اللي بيحسم — الترتيب يبقى ثابت
+// ⚡ بنحسب تاريخ كل سطر **مرة واحدة** قبل الترتيب، مش جوه المقارنة.
+//    ليه؟ «الدخول/الخروج» بيدوّر على الجهاز وسط آلاف الأجهزة؛ لو اتحسب
+//    جوه المقارنة كان هيتكرر عشرات المرات لكل سطر والشاشة تتقل.
+function accSortEntries(entries, mode){
+  const dir = mode.dir === 'asc' ? 1 : -1;
+  return entries
+    .map((e, i) => ({ e, i, k: accSortTs(e, mode.k), u: new Date(e.date || 0).getTime() || 0 }))
+    .sort((a, b) => ((a.k - b.k) || (a.u - b.u)) * dir || (a.i - b.i))
+    .map(x => x.e);
+}
+
+function accSortBarHtml(n, safe){
+  const m = accSortOf(n);
+  const btns = ACC_SORT_KINDS.map(x => {
+    const on = m.k === x.k;
+    const arrow = on ? (m.dir === 'desc' ? ' ↓' : ' ↑') : '';
+    return `<button type="button" class="acc-viewbtn${on ? ' active' : ''}" onclick="accSetSort('${safe}','${x.k}')">`
+      + `<span class="acc-viewbtn-ic">${x.ic}</span><span>${x.n}${arrow}</span></button>`;
+  }).join('');
+  return `<div class="acc-viewbar" style="padding:4px 18px 8px;">`
+    + `<span class="acc-viewbar-label">🔃 رتّب حسب</span>`
+    + `<div class="acc-viewbtns" style="flex-wrap:wrap;">${btns}</div>`
+    + `</div>`;
 }
 
 // رسم كارت محل واحد (أكورديون) بحركاته وفواصل الدورات
@@ -260,7 +495,10 @@ function accShopBlockHtml(n, s){
   const open = accOpenShop === n;
   const safe = esc(n).replace(/'/g,"\\'");
   const starts = cycleStartIds(s.entries);
-  const sortedDesc = s.entries.slice().sort((a,b) => new Date(b.date) - new Date(a.date));
+  const sortMode = accSortOf(n);
+  // ⚡ الترتيب للمحل المفتوح بس — المقفول مش بيعرض حركات أصلاً
+  const sorted = open ? accSortEntries(s.entries, sortMode) : [];
+  const showCycles = sortMode.k === 'update' && sortMode.dir === 'desc';
   const cycleDivider = (e) => `<div style="text-align:center; margin:8px 0; color:#0891A8; font-size:12.5px; font-weight:800; border-top:1px dashed #CBD5E1; padding-top:8px;">🔄 ${t('acc.newCycle')} — ${new Date(e.date).toLocaleDateString('ar-EG')}</div>`;
   // ⚠️ في وضع القراءة-فقط الأزرار دي **مش بتترسم أصلاً** — مش
   //    مخفية بـ CSS. يعني حتى لو حد فتح أدوات المطوّر، مفيش زرار
@@ -279,7 +517,8 @@ function accShopBlockHtml(n, s){
   const entriesHtml = !open ? '' : `
     <div class="acc-toolbar">${toolbar}
     </div>
-    <div class="acc-entries">${sortedDesc.map(e => accEntryHtml(e) + (starts.has(e.id) ? cycleDivider(e) : '')).join('')}</div>`;
+    ${accSortBarHtml(n, safe)}
+    <div class="acc-entries">${sorted.map(e => accEntryHtml(e) + (showCycles && starts.has(e.id) ? cycleDivider(e) : '')).join('')}</div>`;
 
   return `<div class="acc-shop" data-accshop="${esc(n)}">
     <button class="acc-shop-head" onclick="accOpenShop = accOpenShop==='${safe}' ? null : '${safe}'; renderAccounts();">
@@ -695,7 +934,6 @@ function shopStatementRows(shop){
   const credit = entries.filter(e=>e.type==='credit'||e.type==='discount').reduce((t,e)=>t+(e.amount||0),0);
   return { entries, debit, credit, balance: debit - credit };
 }
-
 
 // ============================================================
 // الطباعة — من جوه الصفحة، مش في تاب جديد
