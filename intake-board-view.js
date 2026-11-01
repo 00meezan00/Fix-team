@@ -56,7 +56,7 @@
 (function(){
   if(window.IFixIntakeBoard) return;
 
-  var S              = { mode:'cm', ym:'', rows:null, loading:false, err:'', admin:null, seq:0 };
+  var S              = { mode:'cm', ym:'', rows:null, loading:false, err:'', admin:null, sa:null, seq:0 };
 
   function e(s         )         {
     return (typeof esc === 'function') ? esc(s)
@@ -126,6 +126,14 @@
       + '#ibvSheet td.n{text-align:start;font-weight:800;}'
       + '#ibvSheet .mut{color:var(--muted,#666);}'
       + '#ibvSheet .cash{font-weight:900;color:var(--ifx-ember-ink,#B8460A);white-space:nowrap;}'
+      // 🎯 التارجت
+      + '#ibvSheet .tbar{height:7px;border-radius:9px;background:var(--line,var(--border,#ddd));overflow:hidden;margin-top:4px;}'
+      + '#ibvSheet .tbar i{display:block;height:100%;border-radius:9px;background:var(--accent,#EE5B10);}'
+      + '#ibvSheet .tbar.done i{background:#16A34A;}'
+      + '#ibvSheet .tpct{font-weight:900;white-space:nowrap;}'
+      + '#ibvSheet .tset{border:1px dashed var(--line,var(--border,#ccc));background:transparent;color:var(--ink,#111);'
+      +   'border-radius:8px;padding:3px 8px;font:800 11.5px/1.3 inherit;cursor:pointer;white-space:nowrap;}'
+      + '#ibvSheet .tools{display:flex;gap:8px;flex-wrap:wrap;margin:-4px 0 12px;}'
       + '#ibvSheet .empty{text-align:center;color:var(--muted,#666);padding:26px 10px;font-size:13px;line-height:1.9;}';
     document.head.appendChild(st);
   }
@@ -137,6 +145,7 @@
     try{
       if(S.admin === null){
         try{ var a = await sb.rpc('is_super_admin'); S.admin = (a && a.data === true); }catch(x){ S.admin = false; }
+        S.sa = S.admin;   // 🎯 المحاسب العام بس اللي بيكتب التارجت (المالك بيشوف بس)
         // 👑 (ملف 114) المالك بيشوف فلوس الكل زي المحاسب العام — والسيرفر هو اللي بيقرر فعلاً
         if(!S.admin && /(^|\/)owner(\.html)?$/i.test(location.pathname.replace(/\/$/, ''))) S.admin = true;
       }
@@ -159,6 +168,71 @@
   }
 
   // ---------- الرسم ----------
+  // ---------- 🎯 التارجت الشهري ----------
+  //    بيظهر بس لما الفترة شهر — مش «النهارده»
+  function isMonth()          { return S.mode !== 'today'; }
+  function curYm()         { var a = range()[0]; return a.getFullYear() + '-' + String(a.getMonth() + 1).padStart(2, '0'); }
+  function pct(r     )         { var t = Number(r.target) || 0; return t > 0 ? Math.floor((Number(r.amount) || 0) * 100 / t) : 0; }
+  function tbar(p        )         {
+    return '<div class="tbar' + (p >= 100 ? ' done' : '') + '"><i style="width:' + Math.min(100, Math.max(0, p)) + '%;"></i></div>';
+  }
+  function hasT(r     )          { return r && r.target !== null && r.target !== undefined && Number(r.target) > 0; }
+
+  async function setTarget(name        , cur     ){
+    if(!S.sa) return;
+    var v = prompt('🎯 تارجت «' + name + '» لشهر ' + periodLabel() + ' (بالجنيه):\n'
+      + 'سيبه فاضي أو 0 = شيل التارجت', cur ? String(Math.round(Number(cur))) : '');
+    if(v === null) return;
+    v = String(v).replace(/[٠-٩]/g, function(d){ return String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)); }).replace(/[^0-9.]/g, '');
+    var n = v === '' ? 0 : Number(v);
+    if(!isFinite(n) || n < 0){ alert('رقم غلط'); return; }
+    var res = await sb.rpc('intake_target_set', { p_name: name, p_ym: curYm(), p_target: n });
+    if(res.error){
+      var m = res.error.message || String(res.error);
+      alert('⚠️ ما اتحفظش: ' + m + (/intake_target_set|schema cache|does not exist|PGRST202/i.test(m)
+        ? '\n\nشغّل ملف prod-intake-targets.sql الأول.' : ''));
+      return;
+    }
+    load();
+  }
+  async function addTarget(){
+    if(!S.sa) return;
+    var nm = prompt('اسم الموظف — زي ما بيتكتب في «اسم الموظف اللي بيسجّل الجهاز»:');
+    if(nm === null || !String(nm).trim()) return;
+    setTarget(String(nm).trim(), null);
+  }
+  // 📋 نفس تارجتات الشهر اللي قبله
+  async function copyPrev(){
+    if(!S.sa) return;
+    var a = range()[0], p0 = new Date(a.getFullYear(), a.getMonth() - 1, 1), p1 = new Date(a.getFullYear(), a.getMonth(), 1);
+    var res = await sb.rpc('intake_board', { p_from: p0.toISOString(), p_to: p1.toISOString() });
+    if(res.error){ alert('⚠️ ' + (res.error.message || res.error)); return; }
+    var prev = (res.data || []).filter(hasT);
+    if(!prev.length){ alert('الشهر اللي قبله مفيهوش تارجتات.'); return; }
+    var have = {}; (S.rows || []).filter(hasT).forEach(function(r){ have[String(r.name).trim().toLowerCase()] = 1; });
+    var todo = prev.filter(function(r){ return !have[String(r.name).trim().toLowerCase()]; });
+    if(!todo.length){ alert('كل اللي كان عليهم تارجت الشهر اللي فات عليهم تارجت دلوقتي.'); return; }
+    if(!confirm('هنحط لـ ' + todo.length + ' موظف نفس تارجت الشهر اللي فات:\n\n'
+      + todo.map(function(r){ return '• ' + r.name + ': ' + money(r.target); }).join('\n')
+      + '\n\n(اللي عليهم تارجت الشهر ده مش هيتغيّروا)')) return;
+    for(var i = 0; i < todo.length; i++){
+      var w = await sb.rpc('intake_target_set', { p_name: todo[i].name, p_ym: curYm(), p_target: Number(todo[i].target) });
+      if(w.error){ alert('⚠️ وقف عند «' + todo[i].name + '»: ' + (w.error.message || w.error)); break; }
+    }
+    load();
+  }
+
+  function tCell(r     )         {
+    // نهرّب لـ JS الأول وبعدين لـ HTML — عشان اسم فيه ' مايكسرش الزرار
+    var safe = e(String(r.name).replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
+    var edit = S.sa ? ' <button class="tset" onclick="IFixIntakeBoard.setTarget(\'' + safe + '\',' + (hasT(r) ? Number(r.target) : 0) + ')">✎</button>' : '';
+    if(!hasT(r)) return S.sa ? '<button class="tset" onclick="IFixIntakeBoard.setTarget(\'' + safe + '\',0)">＋ تارجت</button>' : '<span class="mut">—</span>';
+    if(r.amount === null || r.amount === undefined) return '<span class="mut">🔒</span>';
+    var p = pct(r);
+    return '<div class="tpct"' + (p >= 100 ? ' style="color:#16A34A;"' : '') + '>' + p + '٪' + edit + '</div>'
+      + '<div class="mut" style="font-size:11px;">من ' + money(r.target) + '</div>' + tbar(p);
+  }
+
   function medal(rank        )         { return rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : ''; }
 
   function paint(){
@@ -182,7 +256,15 @@
     var meBox = '';
     if(me) meBox = '<div class="me"><div class="r">' + (medal(me.rank) || '#' + me.rank) + '</div>'
       + '<div style="flex:1;"><div class="mut" style="font-size:12px;font-weight:700;">ترتيبك ' + me.rank + ' من ' + rows.length
-      + ' · ' + me.devices + ' جهاز اتسلّم</div><div class="m">💰 ' + money(me.amount) + '</div></div></div>';
+      + ' · ' + me.devices + ' جهاز اتسلّم</div><div class="m">💰 ' + money(me.amount) + '</div>'
+      + ((isMonth() && hasT(me))
+          ? '<div style="margin-top:6px;font-size:12.5px;font-weight:800;">🎯 التارجت ' + money(me.target) + ' · '
+            + (pct(me) >= 100
+                ? '<span style="color:#16A34A;">🎉 وصلت ' + pct(me) + '٪ — عدّيت التارجت</span>'
+                : 'وصلت <span class="tpct">' + pct(me) + '٪</span> — فاضلك ' + money(Number(me.target) - (Number(me.amount) || 0)))
+            + '</div>' + tbar(pct(me))
+          : '')
+      + '</div></div>';
     else if(S.rows && !seeAll) meBox = '<div class="sub">لسه مفيش أجهزة سجّلتها واتسلّمت في الفترة دي.</div>';
 
     var body;
@@ -192,16 +274,26 @@
     else{
       var total = rows.reduce(function(s, r){ return s + (Number(r.amount) || 0); }, 0);
       var cnt = rows.reduce(function(s, r){ return s + (Number(r.devices) || 0); }, 0);
-      body = '<table><tr><th style="text-align:start;">#</th><th style="text-align:start;">الاسم</th><th>أجهزة</th><th>💰 الفلوس</th></tr>'
+      // 🎯 عمود التارجت: لو فيه تارجت ظاهر، أو المحاسب العام (عشان يكتب)
+      var tCol = isMonth() && (S.sa || rows.some(hasT));
+      body = '<table><tr><th style="text-align:start;">#</th><th style="text-align:start;">الاسم</th><th>أجهزة</th><th>💰 الفلوس</th>'
+        + (tCol ? '<th>🎯 التارجت</th>' : '') + '</tr>'
         + rows.map(function(r){
             return '<tr style="' + (r.is_me ? 'background:rgba(252,104,24,' + (dark() ? '.14' : '.09') + ');' : '') + '">'
               + '<td class="mut" style="text-align:start;">' + (medal(r.rank) || r.rank) + '</td>'
               + '<td class="n">' + e(r.name) + (r.is_me ? ' <span class="mut" style="font-weight:600;">(إنت)</span>' : '') + '</td>'
               + '<td>' + e(r.devices) + '</td>'
               + '<td>' + (r.amount === null || r.amount === undefined ? '<span class="mut">🔒</span>' : '<span class="cash">' + money(r.amount) + '</span>') + '</td>'
+              + (tCol ? '<td style="min-width:92px;">' + tCell(r) + '</td>' : '')
               + '</tr>';
           }).join('')
-        + (seeAll ? '<tr><td></td><td class="n">∑ الإجمالي</td><td style="font-weight:900;">' + cnt + '</td><td class="cash">' + money(total) + '</td></tr>' : '')
+        + (seeAll ? '<tr><td></td><td class="n">∑ الإجمالي</td><td style="font-weight:900;">' + cnt + '</td><td class="cash">' + money(total) + '</td>'
+            + (tCol ? '<td>' + (function(){
+                var tt = rows.reduce(function(s, r){ return s + (hasT(r) ? Number(r.target) : 0); }, 0);
+                var got = rows.reduce(function(s, r){ return s + (hasT(r) ? (Number(r.amount) || 0) : 0); }, 0);
+                return tt ? '<div class="tpct">' + Math.floor(got * 100 / tt) + '٪</div><div class="mut" style="font-size:11px;">من ' + money(tt) + '</div>' : '';
+              })() + '</td>' : '')
+            + '</tr>' : '')
         + '</table>';
     }
 
@@ -214,6 +306,10 @@
       +   (seeAll ? '' : ' فلوس زمايلك 🔒 — كل واحد بيشوف فلوسه بس.') + '</div>'
       + '<div class="chips">' + chip('today', 'النهارده') + chip('cm', 'الشهر الحالي') + chip('pm', 'الشهر السابق') + picker + '</div>'
       + '<div class="mut" style="font-size:12.5px;font-weight:800;margin:-4px 2px 10px;">📅 ' + e(periodLabel()) + '</div>'
+      + ((S.sa && isMonth())
+          ? '<div class="tools"><button class="tset" onclick="IFixIntakeBoard.addTarget()">🎯 ＋ تارجت لموظف</button>'
+            + '<button class="tset" onclick="IFixIntakeBoard.copyPrev()">📋 انسخ تارجت الشهر اللي قبله</button></div>'
+          : '')
       + meBox + body
       + '</div>';
   }
@@ -270,6 +366,7 @@
 
   window.IFixIntakeBoard = {
     open: open, close: close, reload: load,
+    setTarget: setTarget, addTarget: addTarget, copyPrev: copyPrev,
     mode: function(m){ S.mode = m; load(); },
     ym:   function(v){ if(!v){ S.mode = 'cm'; } else { S.ym = v; S.mode = 'ym'; } load(); }
   };

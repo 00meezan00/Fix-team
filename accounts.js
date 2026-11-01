@@ -112,6 +112,8 @@ function openAccounts(){
     const _pd = document.getElementById('payDateBox');
     if(_pd) _pd.style.display = (ACC_CAN_EDIT && typeof isSuperAdmin === 'function' && isSuperAdmin()) ? 'flex' : 'none';
   }catch(e){}
+  // 🔒 قراية بس → فورم «تسجيل دفعة» + «رصيد افتتاحي» يستخبّوا (موجودين في dashboard.html بس)
+  try{ const _pf = document.getElementById('accPayForm'); if(_pf) _pf.style.display = ACC_CAN_EDIT ? '' : 'none'; }catch(e){}
   document.getElementById('accountsOverlay').classList.remove('hidden');
   renderAccounts();
 }
@@ -508,6 +510,8 @@ function accShopBlockHtml(n, s){
   const toolbar = ACC_CAN_EDIT ? `
       <button class="btn-secondary" style="color:#0E7490;border-color:#A5F3FC;" onclick="waShop('${safe}')">💬 ${t('acc.wa')}</button>
       <button class="acc-mini-btn" style="margin-top:0;align-self:center;" onclick="setShopPhone('${safe}')">✎ ${t('acc.phone')}</button>
+      ${(typeof isSuperAdmin === 'function' && isSuperAdmin() && typeof setShopGroup === 'function') ? `<button class="acc-mini-btn" style="margin-top:0;align-self:center;color:#0E7490;border-color:#A5F3FC;" onclick="setShopGroup('${safe}')">👥 ${(typeof shopGroups !== 'undefined' && shopGroups[n]) ? 'الجروب ✓' : 'الجروب'}</button>` : ''}
+      ${(typeof isSuperAdmin === 'function' && isSuperAdmin() && typeof toggleShopCreditLock === 'function') ? `<button class="acc-mini-btn" style="margin-top:0;align-self:center;color:#B91C1C;border-color:#FCA5A5;" onclick="toggleShopCreditLock('${safe}')">${(typeof isShopCreditLocked === 'function' && isShopCreditLocked(n)) ? '🔓 افتح الآجل' : '🔒 اقفل الآجل'}</button>` : ''}
       <button class="acc-mini-btn" style="margin-top:0;align-self:center;color:var(--info);border-color:var(--info-border);" onclick="addDiscount('${safe}')">🏷️ ${t('acc.discount')}</button>
       <button class="btn-secondary" style="color:#166534;border-color:var(--success-border);" onclick="accRangeShop('xlsx','${safe}')">📊 Excel</button>
       <button class="btn-secondary" style="color:var(--danger-strong);border-color:var(--danger-border);" onclick="accRangeShop('pdf','${safe}')">📄 PDF</button>
@@ -522,7 +526,7 @@ function accShopBlockHtml(n, s){
 
   return `<div class="acc-shop" data-accshop="${esc(n)}">
     <button class="acc-shop-head" onclick="accOpenShop = accOpenShop==='${safe}' ? null : '${safe}'; renderAccounts();">
-      <span style="font-weight:800; font-size:16px;">🏪 ${esc(n)}</span>
+      <span style="font-weight:800; font-size:16px;">🏪 ${esc(n)}${(typeof isShopCreditLocked === 'function' && isShopCreditLocked(n)) ? ' <span style="font-size:11.5px;font-weight:800;color:#B91C1C;background:#FEE2E2;border-radius:8px;padding:2px 7px;white-space:nowrap;">🔒 آجل مقفول</span>' : ''}</span>
       <span class="acc-nums">
         <span>${t('acc.owed')}: <b>${s.owed.toLocaleString('en-EG')}</b></span>
         <span>${t('acc.paidDisc')}: <b style="color:var(--success);">${s.paid.toLocaleString('en-EG')}</b></span>
@@ -636,7 +640,7 @@ function accShopCardSmall(n, s){
   const safe = esc(n).replace(/'/g,"\\'");
   const balColor = balance > 0 ? 'var(--danger)' : 'var(--success)';
   return `<button type="button" class="acc-card acc-card-sm" data-accshop="${esc(n)}" onclick="openShopFromCard('${safe}')">
-    <span class="acc-card-name">🏪 ${esc(n)}</span>
+    <span class="acc-card-name">${(typeof isShopCreditLocked === 'function' && isShopCreditLocked(n)) ? '🔒' : '🏪'} ${esc(n)}</span>
     <span class="acc-card-bal" style="color:${balColor};">${balance.toLocaleString('en-EG')}<small> ${t('acc.egp')}</small></span>
   </button>`;
 }
@@ -649,7 +653,7 @@ function accShopCardLarge(n, s){
   const balBg = balance > 0 ? 'var(--danger-bg)' : 'var(--success-bg)';
   return `<div class="acc-card acc-card-lg" data-accshop="${esc(n)}">
     <div class="acc-card-lg-head">
-      <button type="button" class="acc-card-open" onclick="openShopFromCard('${safe}')"><span>🏪 ${esc(n)}</span></button>
+      <button type="button" class="acc-card-open" onclick="openShopFromCard('${safe}')"><span>${(typeof isShopCreditLocked === 'function' && isShopCreditLocked(n)) ? '🔒' : '🏪'} ${esc(n)}</span></button>
       <button type="button" class="acc-card-print" title="${t('acc.printPdf')}" onclick="event.stopPropagation(); accRangeShop('pdf','${safe}')">🖨️</button>
     </div>
     <div class="acc-card-lg-body" onclick="openShopFromCard('${safe}')">

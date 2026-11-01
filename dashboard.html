@@ -1458,7 +1458,8 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
     <div class="mh mh-shop">🏪 المحل</div>   <!-- mh-shop: «📥 ترتيب الاستلامات» بيتحط تحتها (intake-board-view.js) -->
     <!-- 📊 للمحاسب العام بس (٢٠٢٦-١٠-٢٧) — toggleMenu بيخفيه عن الباقي -->
     <button id="analyticsMenuBtn" class="money-menu-item" style="display:none;" onclick="openAnalytics()">📊 الملخص المالي</button>
-    <button class="money-menu-item" onclick="openAccounts()">📒 الحسابات</button>
+    <!-- 📒 (1/11) الحسابات للمحاسب العادي قراية بس زي المالك — التعديل للمحاسب العام بس -->
+    <button class="money-menu-item" onclick="ACC_CAN_EDIT = isSuperAdmin(); openAccounts()">📒 الحسابات</button>
     <!-- 💬 للسوبر أدمن بس — syncWaHeldMenu بيظهّره ويحط عليه العدد -->
     <button id="waHeldMenuBtn" style="display:none;" onclick="openWaHeld()">💬 مسدجات الواتساب المتوقفة <span id="waHeldCount" style="display:none;background:#DC2626;color:#fff;border-radius:10px;padding:1px 7px;font-size:11.5px;font-weight:800;margin-inline-start:4px;"></span></button>
     <button class="admin-menu-item" onclick="openSummaries()">📋 الجرد</button>
@@ -1867,7 +1868,7 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
       <button class="close-btn" onclick="closeAccounts()">×</button>
     </div>
     <div style="padding:0 20px 8px;">
-      <div class="acc-payform">
+      <div class="acc-payform" id="accPayForm">
         <div style="font-size:14px;font-weight:800;margin-bottom:10px;" data-i18n="acc.recordPayment">تسجيل دفعة من محل</div>
         <div class="acc-payform-row">
           <input id="payShop" list="accShopsList" data-i18n-ph="acc.shopNamePh" placeholder="اسم المحل" />
@@ -1979,9 +1980,18 @@ async function loadUserRoles(){
 //    الأدمن هي اللي بتحدد الاسم الرسمي اللي بيتكتب في الملاحظات
 //    والتقارير. بيتنده بعد تحميل الأدوار، لأن الاسم الأول بيتحط
 //    وقت الدخول قبل ما الأدوار توصل.
+// 👑 (2/11 · تعديل مؤقت على الإنتاج) المحاسب العام اسمه «المحاسب العام» —
+//    مش أول جزء من إيميله ولا اسم ملف الحساب. إلا لو كتب لنفسه اسم
+//    مختصر من لوحة الأدمن (✎ اسمي المختصر) → يبقى هو.
+function superAdminName(){
+  const e = String(currentUser.email || '').toLowerCase();
+  if(!ADMIN_EMAIL_SET || !e) return '';                 // وضع آمن / مفيش إيميل → سيبه
+  if(!ADMIN_EMAILS.includes(e) && roleEntry(e).role !== 'super_admin') return '';
+  return (roleEntry(e).techName || '').trim() || 'المحاسب العام';
+}
 function applyRoleName(){
   try{
-    const n = (roleEntry(currentUser.email).techName || '').trim();
+    const n = superAdminName() || (roleEntry(currentUser.email).techName || '').trim();
     if(!n) return;
     currentUser.name = n;
     try{ localStorage.setItem('ifix_user', JSON.stringify(currentUser)); }catch(e){}
@@ -2387,6 +2397,8 @@ async function requireAccess(){
     currentUser.name = (prof && prof.full_name && prof.full_name.trim())
       ? prof.full_name.trim()
       : (currentUser.email.split('@')[0] || 'مستخدم');
+    // 👑 المحاسب العام: «المحاسب العام» من أول لحظة (الاسم المختصر بيتطبّق بعد تحميل الأدوار)
+    if(ADMIN_EMAIL_SET && ADMIN_EMAILS.includes(currentUser.email.toLowerCase())) currentUser.name = 'المحاسب العام';
     try{ localStorage.setItem('ifix_user', JSON.stringify(currentUser)); }catch(e){}
 
     await loadSystemConfig();
@@ -4589,8 +4601,11 @@ async function submitAdd(){
   }
   // 💵 العربون — إخباري (رقم للعلم بس، مابيدخلش في أي حساب)
   const depositNote = IFixDue.depDigits((document.getElementById('f_depositNote') || {}).value);
+  // 🔒 المحل مقفول للآجل؟ (المحاسب العام = موافقة على الجهاز ده)
+  const newId = 'dev_' + Date.now();
+  if(addPayType === 'deferred' && !(await creditAllowed(get('shopName'), newId))) return;
   const newDevice = {
-    id: 'dev_' + Date.now(),
+    id: newId,
     trackToken: genTrackToken(),
     customerName, deviceType, deviceColor,
     shopName: get('shopName'),
@@ -6549,6 +6564,9 @@ async function changeStatus(newStatus, paymentChoice, rejectedInShopChoice){
       // آجل: يتقيّد على حساب المحل (لو ماتقيّدش قبل كده) ويعتبر متسوّى
       newPaymentStatus = 'paid';
       const shop = (d.billedShop || d.shopName || 'بدون محل').trim() || 'بدون محل';
+      // 🔒 المحل مقفول للآجل ومفيش موافقة؟ → مايتسلّمش آجل
+      if(!ledger.some(e => e.type === 'debit' && e.deviceId === d.id && !e.kind)
+         && !(await creditAllowed(shop, creditOkKey(d)))){ renderDetail(); return; }
       extra.billedShop = shop;
       if(!ledger.some(e => e.type === 'debit' && e.deviceId === d.id && !e.kind)){
         addLedgerDebit({...d, billedShop: shop}, price);
@@ -8055,7 +8073,7 @@ function renderWaHeld(){
     return `<div class="appr-row">
       <div class="appr-row-info" style="cursor:pointer;" onclick="closeWaHeld();openDetail('${d.id}')">
         <div class="appr-row-dev">📱 ${esc(d.deviceType || '')} ${esc(d.model || '')}${d.customerName ? ' — ' + esc(d.customerName) : ''}</div>
-        <div class="appr-row-meta">${ord}🏬 ${esc(shop || 'من غير محل')} · 💰 ${(Number(entry.amount)||0).toLocaleString('en-EG')} ج.م${when ? ' · ' + esc(when) : ''}${hasPh ? '' : ' · <b style="color:var(--warn);">مفيش رقم للمحل</b>'}</div>
+        <div class="appr-row-meta">${ord}🏬 ${esc(shop || 'من غير محل')} · 💰 ${(Number(entry.amount)||0).toLocaleString('en-EG')} ج.م${when ? ' · ' + esc(when) : ''}${shopGroups[shop] ? ' · 👥 له جروب' : ''}${(hasPh || shopGroups[shop]) ? '' : ' · <b style="color:var(--warn);">مفيش رقم ولا جروب للمحل</b>'}</div>
         ${balAt !== null ? `<div class="appr-row-meta">📒 إجمالي الحساب وقتها: <b>${balAt.toLocaleString('en-EG')} ج.م</b></div>` : ''}
       </div>
       <div class="appr-row-actions" style="display:flex;gap:6px;flex-wrap:wrap;">
@@ -8070,7 +8088,7 @@ function renderWaHeld(){
       <button class="acc-mini-btn" style="margin:0;" onclick="closeWaHeld()">✕</button>
     </div>
     <div style="font-size:12.5px;color:var(--muted);margin-bottom:12px;line-height:1.7;">
-      أجهزة المالك قيّدها آجل على حساب محل. دوس «ابعت» والواتس هيفتح على رقم المحل والرسالة جاهزة.
+      أجهزة المالك قيّدها آجل على حساب محل. دوس «ابعت» واختار: 📞 رقم المحل · 👥 جروب المحل · 📤 قايمة المشاركة.
     </div>
     ${list.length ? rows : `<div class="empty-col">✅ مفيش رسايل مستنية</div>`}
   </div>`;
@@ -8087,10 +8105,9 @@ async function waHeldSend(id){
   const older = waHeldList().filter(x => x.id !== id && waHeldItem(x).shop === shop && waHeldTime(x) < waHeldTime(d));
   if(older.length && !confirm('فيه ' + older.length + ' جهاز أقدم لنفس المحل لسه ما اتبعتش.\n\n'
       + 'لو بعت ده الأول، المحل هيشوف إجمالي الحساب في الرسالة الجاية أقل من دي.\n\nتبعت ده برضه؟')) return;
-  let ph = shopPhones[shop];
-  if(!ph){ ph = await setShopPhone(shop); if(!ph) return; }
-  const ok = openWa(ph, shopNoticeMsg([{ entry, d }], shop, inLedger ? entry : null), '💬 اضغط لإرسال رسالة الحساب للمحل');
-  if(!ok) return;                      // النت مقطوع — منعلّمش إنه اتبعت
+  // 🚪 البوابة (المحاسب العام): رقم · جروب · قايمة المشاركة
+  const ok = await sendShopMsg(shop, shopNoticeMsg([{ entry, d }], shop, inLedger ? entry : null), '💬 اضغط لإرسال رسالة الحساب للمحل');
+  if(!ok) return;                      // اتلغى أو النت مقطوع — منعلّمش إنه اتبعت
   await waHeldMark(id, 'sent');
 }
 
@@ -8164,9 +8181,270 @@ async function setShopPhone(shop){
   return ph;
 }
 
+// ============================================================
+// 👥 جروبات واتساب المحلات — للمحاسب العام بس (تعديل مؤقت على الإنتاج)
+// ------------------------------------------------------------
+// 🧠 بالبلدي:
+//    واتساب بيسمح بلينك «افتح شات مع الرقم ده والرسالة مكتوبة جاهزة»
+//    للأرقام بس — **مفيش** لينك زي ده للجروبات.
+//    فالمحاسب العام بيطلعله شباك صغير يختار منه:
+//      📞 رقم المحل    → زي زمان بالظبط: الرسالة جاهزة وواقفة على الإرسال
+//      👥 جروب المحل   → الرسالة بتتنسخ + الجروب بيتفتح → تلصق وتبعت
+//      📤 قايمة المشاركة → (موبايل بس) تختار واتساب ثم الجروب، والرسالة جاهزة
+//    أي حد غير المحاسب العام → الرقم زي زمان، ومفيش شباك.
+//
+// 💾 لينكات الجروبات بتتحفظ على السيرفر (app_data → shop-groups)،
+//    مشتركة بين أجهزة المحاسب العام، جنب أرقام المحلات بالظبط.
+// ============================================================
+const SHOP_GROUPS_KEY = 'shop-groups';
+let shopGroups = {};
+async function loadShopGroups(){
+  try{
+    const r = await window.storage.get(SHOP_GROUPS_KEY);
+    shopGroups = r ? JSON.parse(r.value) : {};
+  }catch(e){ shopGroups = {}; }
+}
+async function persistShopGroups(){
+  // ⚠️ storage.set بيرجّع null لو فشل (Supabase مابيرميش error) — لازم نقول
+  let r = null;
+  try{ r = await window.storage.set(SHOP_GROUPS_KEY, JSON.stringify(shopGroups)); }catch(e){ r = null; }
+  if(!r){ alert('⚠️ لينك الجروب ما اتحفظش على السيرفر (النت؟) — جرّب تاني.'); return false; }
+  return true;
+}
+
+// كود الدعوة من لينك الجروب: https://chat.whatsapp.com/AbCd123...
+function waGroupCode(link){
+  const m = String(link || '').trim().match(/chat\.whatsapp\.com\/(?:invite\/)?([A-Za-z0-9_-]{10,})/i);
+  return m ? m[1] : '';
+}
+
+async function setShopGroup(shop){
+  if(!isSuperAdmin()){ showError('الخانة دي للمحاسب العام بس'); return null; }
+  const cur = shopGroups[shop] || '';
+  const raw = prompt(
+    `لينك جروب واتساب محل "${shop}":\n`
+    + '(من الجروب: اسم الجروب ← «دعوة عبر رابط» ← انسخ الرابط)\n'
+    + 'سيبه فاضي ودوس OK عشان تشيل الجروب.', cur);
+  if(raw === null) return null;                     // إلغاء
+  const v = raw.trim();
+  if(!v){
+    if(!cur) return null;
+    delete shopGroups[shop];
+    await persistShopGroups();
+    try{ if(typeof renderAccounts === 'function') renderAccounts(); }catch(e){}
+    return null;
+  }
+  const code = waGroupCode(v);
+  if(!code){ alert('ده مش لينك جروب واتساب.\nلازم يكون شكله: https://chat.whatsapp.com/...'); return null; }
+  shopGroups[shop] = 'https://chat.whatsapp.com/' + code;
+  if(!(await persistShopGroups())) return null;
+  try{ if(typeof renderAccounts === 'function') renderAccounts(); }catch(e){}
+  return shopGroups[shop];
+}
+
+// نسخ الرسالة — لازم يحصل **جوه الضغطة نفسها** (قبل أي await)
+function waCopyText(msg){
+  let ok = false;
+  try{
+    const ta = document.createElement('textarea');
+    ta.value = msg; ta.setAttribute('readonly', '');
+    ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;';
+    document.body.appendChild(ta);
+    ta.select(); ta.setSelectionRange(0, msg.length);
+    ok = document.execCommand('copy');
+    ta.remove();
+  }catch(e){}
+  try{ navigator.clipboard && navigator.clipboard.writeText(msg).catch(() => {}); ok = ok || !!navigator.clipboard; }catch(e){}
+  return ok;
+}
+
+function openWaGroup(link, msg, label){
+  const code = waGroupCode(link);
+  if(!code) return false;
+  if(!isOnline()){ alert('النت مقطوع — رسالة الواتساب مش هتتبعت دلوقتي.'); return false; }
+  const copied = waCopyText(msg);
+  const webUrl = 'https://chat.whatsapp.com/' + code;
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  if(isMobile && waMode() !== 'web'){
+    window.location.href = 'whatsapp://chat?code=' + code;
+    setTimeout(() => { if(!document.hidden) showWaPending(webUrl, label); }, 1500);
+  } else {
+    let w = null;
+    try{ w = window.open(webUrl, '_blank'); }catch(e){}
+    if(!w || w.closed || typeof w.closed === 'undefined') showWaPending(webUrl, label);
+  }
+  if(!copied) setTimeout(() => alert('⚠️ الموبايل ما سمحش بنسخ الرسالة.\nاستخدم «📞 رقم المحل» أو «📤 قايمة المشاركة» بدلها.'), 300);
+  return true;
+}
+
+// ============================================================
+// 🔒 قفل الآجل على محلات معيّنة — (1/11 · تعديل مؤقت على الإنتاج)
+// ------------------------------------------------------------
+// 🧸 بالبلدي:
+//    المحاسب العام بيعلّم على محل «🔒 الآجل مقفول» من شاشة الحسابات.
+//    أي حد غيره يحاول يقيّد جهاز آجل على المحل ده → رسالة «ممنوع» ويترفض.
+//    ✅ الموافقة: المحاسب العام يحدد «آجل» على الجهاز بنفسه → الجهاز
+//       بياخد «تصريح» (shop_credit_ok)، ولو المحاسب سلّمه آجل بعدين يعدّي.
+//
+// 🛡️ السيرفر بيتأكد كمان (prod-shop-credit-lock.sql). لو الملف لسه
+//    ما اتشغّلش، القايمة بتبقى فاضية والآجل شغّال عادي زي زمان.
+// ============================================================
+let shopCreditLocks = {};   // مفتاح المحل → { shop }
+function shopCreditKey(s){
+  return String(s == null ? '' : s).trim().toLowerCase()
+    .replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/\s+/g, ' ');
+}
+async function loadShopCreditLocks(){
+  try{
+    const { data, error } = await sb.from('shop_credit_locks').select('shop_key,shop');
+    if(error) throw error;
+    const m = {};
+    (data || []).forEach(r => { m[r.shop_key] = r; });
+    shopCreditLocks = m;
+    return true;
+  }catch(e){
+    console.warn('🔒 قايمة المحلات المقفولة للآجل:', e && e.message ? e.message : e);
+    return false;
+  }
+}
+function isShopCreditLocked(shop){ return !!shopCreditLocks[shopCreditKey(shop)]; }
+
+// مفتاح التصريح: الجهاز نفسه · أو جولة المرتجع
+function creditOkKey(d, isReturn){ return isReturn ? (d.id + ':r' + retRoundNo(d)) : d.id; }
+
+// ✋ قبل أي آجل: مسموح؟  (true = كمّل · false = اتمنع واتقالّه)
+async function creditAllowed(shop, okKey){
+  shop = String(shop || '').trim();
+  if(!shop || shop === 'بدون محل') return true;
+  if(isOnline()) await loadShopCreditLocks();       // الطازة — يمكن المحاسب العام لسه قافله
+  const key = shopCreditKey(shop);
+  if(!shopCreditLocks[key]) return true;
+  if(isSuperAdmin()){
+    // 👑 المحاسب العام نفسه = الموافقة → نسجّل تصريح للجهاز ده
+    if(okKey){
+      const { error } = await sb.from('shop_credit_ok').upsert({ ok_key: okKey, shop_key: key });
+      if(error) alert('⚠️ الآجل هيتسجّل، بس «التصريح» ما اتحفظش (' + (error.message || '') + ').\n'
+                    + 'لو حد تاني سلّم الجهاز ده آجل هيترفض — سلّمه انت.');
+    }
+    return true;
+  }
+  if(okKey){
+    try{
+      const { data, error } = await sb.from('shop_credit_ok').select('ok_key')
+        .eq('ok_key', okKey).eq('shop_key', key).maybeSingle();
+      if(!error && data) return true;                // ✅ المحاسب العام وافق على الجهاز ده
+    }catch(e){}
+  }
+  alert('🔒 محل «' + shop + '» مقفول للآجل.\n\n'
+      + 'ممنوع يتسجّل عليه جهاز آجل من غير موافقة المحاسب العام.\n'
+      + 'خليه فوري، أو اطلب من المحاسب العام يحدد الآجل بنفسه.');
+  return false;
+}
+
+// 👑 من شاشة الحسابات: اقفل / افتح الآجل لمحل
+async function toggleShopCreditLock(shop){
+  if(!isSuperAdmin()){ showError('الخانة دي للمحاسب العام بس'); return; }
+  if(!isOnline()){ alert('محتاج نت.'); return; }
+  await loadShopCreditLocks();
+  const key = shopCreditKey(shop);
+  const locked = !!shopCreditLocks[key];
+  const ok = confirm(locked
+    ? '🔓 تفتح الآجل لمحل «' + shop + '»؟\n\nأي محاسب هيقدر يقيّد عليه آجل عادي تاني.'
+    : '🔒 تقفل الآجل على محل «' + shop + '»؟\n\n'
+      + 'محدش غيرك هيقدر يقيّد عليه جهاز آجل (المحاسب · مدير الإنتاج · المالك).\n'
+      + 'وعشان توافق على جهاز: حدد «آجل» عليه انت بنفسك.\n'
+      + 'الأجهزة اللي متقيّدة قبل كده مش هتتأثر.');
+  if(!ok) return;
+  const r = locked
+    ? await sb.from('shop_credit_locks').delete().eq('shop_key', key)
+    : await sb.from('shop_credit_locks').upsert({ shop_key: key, shop: String(shop).trim() });
+  if(r.error){
+    const m = String(r.error.message || '');
+    alert('⚠️ ما اتحفظش: ' + m + (/shop_credit_locks|does not exist|schema cache/i.test(m)
+      ? '\n\nشغّل ملف prod-shop-credit-lock.sql على Supabase الأول.' : ''));
+    return;
+  }
+  await loadShopCreditLocks();
+  if(!!shopCreditLocks[key] === locked){ alert('⚠️ السيرفر ما سجّلش التغيير — جرّب تاني.'); return; }
+  try{ if(typeof renderAccounts === 'function') renderAccounts(); }catch(e){}
+}
+
+// 🚪 البوابة: كل رسالة آجل للمحل بتعدّي من هنا
+//    بترجع true لو الرسالة اتبعتت/اتفتحت، و false لو اتلغت
+async function sendShopMsg(shop, msg, label){
+  // 👤 أي حد غير المحاسب العام → الرقم زي زمان بالظبط
+  if(!isSuperAdmin()){
+    let ph = shopPhones[shop];
+    if(!ph){ ph = await setShopPhone(shop); if(!ph) return false; }
+    return openWa(ph, msg, label);
+  }
+  // 👑 المحاسب العام → شباك اختيار
+  //    🧾 طابور: لو جهازين اتقيّدوا ورا بعض، الشباك التاني يستنى الأول
+  const run = () => new Promise(resolve => _shopSendBox(shop, msg, label, resolve));
+  const p = _shopSendChain.then(run, run);
+  _shopSendChain = p.catch(() => false);
+  return p;
+}
+let _shopSendChain = Promise.resolve();
+function _shopSendBox(shop, msg, label, resolve){
+  {
+    const ov = document.createElement('div');
+    ov.id = 'shopSendOv';
+    ov.className = 'overlay';
+    ov.style.zIndex = '90';
+    let done = false;
+    const finish = v => { if(done) return; done = true; ov.remove(); resolve(v); };
+    ov.onclick = e => { if(e.target === ov) finish(false); };
+    const ph = shopPhones[shop], gr = shopGroups[shop];
+    const canShare = !!navigator.share;
+    const btn = (id, bg, txt, sub) =>
+      `<button id="${id}" class="oh-btn" style="display:block;width:100%;text-align:start;background:${bg};margin:0 0 8px;padding:12px 14px;">
+         <div style="font-size:15px;font-weight:800;">${txt}</div>
+         <div style="font-size:12px;opacity:.9;margin-top:3px;">${sub}</div></button>`;
+    ov.innerHTML = `<div class="modal" style="max-width:420px;width:100%;">
+      <h2 style="margin:0 0 4px;font-size:17px;">💬 رسالة لمحل «${esc(shop)}»</h2>
+      <div style="font-size:12.5px;color:var(--muted);margin-bottom:12px;">تبعتها فين؟</div>
+      ${btn('ssPhone', '#16A34A', '📞 رقم المحل', ph ? 'الرسالة جاهزة وواقفة على الإرسال · ' + esc(ph) : 'مفيش رقم — هيسألك عليه')}
+      ${btn('ssGroup', '#0E7490', '👥 جروب المحل', gr ? 'الرسالة بتتنسخ والجروب بيتفتح ← دوس مطوّلاً «لصق» وابعت' : 'مفيش جروب — هيسألك على اللينك')}
+      ${canShare ? btn('ssShare', '#7C3AED', '📤 قايمة المشاركة', 'اختار واتساب ← اختار الجروب بإيدك — الرسالة جاهزة') : ''}
+      ${gr ? `<button id="ssEditGr" class="acc-mini-btn" style="margin:2px 0 8px;">✎ غيّر لينك الجروب</button>` : ''}
+      <button id="ssCancel" class="oh-btn oh-cancel" style="width:100%;">إلغاء</button>
+    </div>`;
+    document.body.appendChild(ov);
+
+    document.getElementById('ssCancel').onclick = () => finish(false);
+    document.getElementById('ssPhone').onclick = async () => {
+      let p = shopPhones[shop];
+      if(!p){ p = await setShopPhone(shop); if(!p) return; }
+      finish(openWa(p, msg, label));
+    };
+    document.getElementById('ssGroup').onclick = async () => {
+      const g = shopGroups[shop];
+      if(g){ finish(openWaGroup(g, msg, label)); return; }
+      // أول مرة: نسجّل اللينك، وبعدين يدوس تاني (عشان الموبايل يسمح بالفتح والنسخ)
+      const ng = await setShopGroup(shop);
+      if(ng){ ov.remove(); done = true; _shopSendBox(shop, msg, label, resolve); }
+    };
+    const ee = document.getElementById('ssEditGr');
+    if(ee) ee.onclick = async () => {
+      await setShopGroup(shop);
+      ov.remove(); done = true; _shopSendBox(shop, msg, label, resolve);
+    };
+    const sh = document.getElementById('ssShare');
+    if(sh) sh.onclick = () => {
+      if(!isOnline()){ alert('النت مقطوع — رسالة الواتساب مش هتتبعت دلوقتي.'); return; }
+      // ⚠️ share لازم يتنادى جوه الضغطة على طول (من غير await قبله)
+      let pr;
+      try{ pr = navigator.share({ text: msg }); }catch(e){ alert('قايمة المشاركة مش شغالة هنا — استخدم الرقم أو الجروب.'); return; }
+      pr.then(() => finish(true)).catch(err => {
+        if(err && err.name === 'AbortError') return;   // قفل القايمة — الشباك يفضل مفتوح
+        alert('قايمة المشاركة مش شغالة هنا — استخدم الرقم أو الجروب.');
+      });
+    };
+  }
+}
+
 async function waShop(shop){
-  let ph = shopPhones[shop];
-  if(!ph){ ph = await setShopPhone(shop); if(!ph) return; }
   const { debit, credit, balance } = shopStatementRows(shop);
   const msg =
     `السلام عليكم 🌹\nده ملخص حسابكم عندنا في *I Fix Team* لغاية ${new Date().toLocaleDateString('ar-EG')}:\n\n` +
@@ -8174,7 +8452,8 @@ async function waShop(shop){
     `إجمالي المدفوع: *${credit.toLocaleString('en-EG')} ج.م*\n` +
     `المتبقي: *${balance.toLocaleString('en-EG')} ج.م*\n\n` +
     `ولو حابين كشف الحساب التفصيلي PDF نبعتهولكم في نفس الشات 📄`;
-  openWa(ph, msg);
+  // 🚪 البوابة (المحاسب العام): رقم · جروب · قايمة المشاركة
+  await sendShopMsg(shop, msg, '💬 اضغط لإرسال كشف الحساب للمحل');
 }
 
 // ============================================================
@@ -8242,6 +8521,7 @@ async function editPayType(t){
     if(!isPriced(d) || price <= 0){ alert(t('msg.needPriceForCredit')); return; }
     const shop = (d.billedShop || d.shopName || '').trim();
     if(!shop){ alert(t('msg.needShopForCredit')); return; }
+    if(!(await creditAllowed(shop, creditOkKey(d)))){ renderDetail(); return; }   // 🔒
     extra.billedShop = shop;
     if(d.status === 'delivered'){
       // اتسلّم خلاص → يتقيّد على حساب المحل دلوقتي ويعتبر متسوّى
@@ -8298,6 +8578,9 @@ async function editPrice(value){
   if(price && d.paymentType === 'deferred' && d.status === 'delivered' && !isPaidDevice(d)){
     await ledgerRefresh();   // 📒 الطازة الأول (شوف changeStatus)
     const shop = (d.billedShop || d.shopName || '').trim();
+    // 🔒 المحل مقفول للآجل ومفيش موافقة؟ → السعر مايتحفظش (حوّله فوري الأول)
+    if(shop && !ledger.some(e => e.type === 'debit' && e.deviceId === d.id && !e.kind)
+       && !(await creditAllowed(shop, creditOkKey(d)))){ renderDetail(); return; }
     if(shop){
       extra.paymentStatus = 'paid';
       extra.billedShop = shop;
@@ -8586,7 +8869,14 @@ async function ledgerFlushNow(){
       if(error) throw error;
       if(!data || !Array.isArray(data.ledger)) throw new Error('رد غريب من السيرفر');
       fresh = data.ledger;
-      if(data.skipped && data.skipped.length) console.warn('📒 اتجاهل:', data.skipped);
+      if(data.skipped && data.skipped.length){
+        console.warn('📒 اتجاهل:', data.skipped);
+        // 🔒 السيرفر رفض قيد آجل على محل مقفول (الصفحة كان عندها قايمة قديمة)
+        const blk = data.skipped.filter(x => x && x.why === 'المحل مقفول للآجل');
+        if(blk.length) setTimeout(() => alert('🔒 السيرفر رفض قيد آجل على حساب «'
+          + (blk[0].shop || '') + '» — المحل مقفول للآجل من غير موافقة المحاسب العام.\n\n'
+          + 'الجهاز ما اتقيّدش في الحساب. افتحه وحوّله فوري، أو كلّم المحاسب العام.'), 50);
+      }
     }
     _ledgerQ = _ledgerQ.slice(batch.length);    // اللي اتضاف وإحنا مستنيين يفضل في الطابور
     ledgerQSave();
@@ -8950,13 +9240,11 @@ async function flushShopNotices(){
   q.forEach(x => { const sh = x.entry.shop || 'بدون محل'; (byShop[sh] = byShop[sh] || []).push(x); });
   for(const shop of Object.keys(byShop)){
     if(shop === 'بدون محل') continue;
-    let ph = shopPhones[shop];
-    if(!ph){
-      // مفيش رقم للمحل؟ نسأل مرة — ولو اتلغى، الجهاز اتقيّد عادي ومفيش رسالة
-      ph = await setShopPhone(shop);
-      if(!ph) continue;
-    }
-    openWa(ph, shopNoticeMsg(byShop[shop], shop), '💬 اضغط لإرسال رسالة الحساب للمحل');
+    // 🚪 البوابة: غير المحاسب العام → الرقم زي زمان (ولو مفيش رقم بيسأل مرة)
+    //            المحاسب العام → يختار: رقم · جروب · قايمة المشاركة
+    //    لو اتلغى، الجهاز اتقيّد عادي ومفيش رسالة
+    const sent = await sendShopMsg(shop, shopNoticeMsg(byShop[shop], shop), '💬 اضغط لإرسال رسالة الحساب للمحل');
+    if(!sent) continue;
     break;   // واتساب واحد في المرة — الموبايل مبيفتحش اتنين ورا بعض
   }
 }
@@ -9041,6 +9329,7 @@ async function editReturnPrice(value){
   } else if(price && d.returnPaymentType === 'deferred' && d.returnPaymentStatus !== 'paid'){
     // محدد عليه آجل بالفعل واتسعّر دلوقتي → يتقيّد على حساب المحل فوراً
     const shop = (d.returnBilledShop || d.billedShop || d.shopName || '').trim();
+    if(shop && !(await creditAllowed(shop, creditOkKey(d, true)))){ renderDetail(); return; }   // 🔒
     if(shop){
       extra.returnPaymentStatus = 'paid';
       extra.returnBilledShop = shop;
@@ -9086,6 +9375,7 @@ async function editReturnPayType(pt){
     if(!isReturnPriced(d) || price <= 0){ alert(t('msg.needPriceForCredit')); return; }
     const shop = (d.returnBilledShop || d.billedShop || d.shopName || '').trim();
     if(!shop){ alert(t('msg.needShopForCredit')); return; }
+    if(!(await creditAllowed(shop, creditOkKey(d, true)))){ renderDetail(); return; }   // 🔒
     extra.returnBilledShop = shop;
     // الجهاز مرتجع (اتسلّم قبل كده) → القيد بيتعمل فوراً ويعتبر متسوّى
     if(!curReturnEntry(d)){
@@ -9125,7 +9415,23 @@ async function markReturnPaid(){
   renderDetail(); render(); await persist();
 }
 
+// ============================================================
+// 🔒 (1/11 · تعديل مؤقت على الإنتاج) الحسابات للمحاسب العادي قراية بس
+// ------------------------------------------------------------
+// 🧸 زي صفحة المالك: يشوف ويدوّر ويطبع PDF — بس مايسجّلش دفعة
+//    ولا خصم ولا ينقل ولا يمسح. التعديل للمحاسب العام (super_admin) بس.
+// ⚠️ ده بيقفل **شاشة الحسابات** بس. قيد الجهاز الآجل لما المحاسب
+//    يسلّمه (addLedgerDebit) والتحويل لفوري من تفاصيل الجهاز لسه
+//    شغالين عادي — عشان كده مفيش قفل في قاعدة البيانات.
+// ============================================================
+function accWriteOk(){
+  if(isSuperAdmin()) return true;
+  alert('📒 الحسابات للقراية بس — التسجيل والتعديل للمحاسب العام بس.');
+  return false;
+}
+
 async function recordPayment(){
+  if(!accWriteOk()) return;   // 🔒 الحسابات قراية بس لغير المحاسب العام
   if(!isOnline()){ alert(t('msg.payNeedNet')); return; }
   const shop = document.getElementById('payShop').value.trim();
   const amount = parseInt(document.getElementById('payAmount').value) || 0;
@@ -9224,14 +9530,14 @@ function paymentNoticeMsg(shop, amount, balance, whenIso){
 
 async function sendPaymentNotice(shop, amount, whenIso){
   if(!shop) return;
-  let ph = shopPhones[shop];
-  if(!ph){ ph = await setShopPhone(shop); if(!ph) return; }
   let bal = 0;
   try{ const st = shopStats()[shop]; bal = st ? st.balance : 0; }catch(e){}
-  openWa(ph, paymentNoticeMsg(shop, amount, bal, whenIso), '💬 اضغط لإرسال رسالة الدفعة للمحل');
+  // 🚪 البوابة (المحاسب العام): رقم · جروب · قايمة المشاركة
+  await sendShopMsg(shop, paymentNoticeMsg(shop, amount, bal, whenIso), '💬 اضغط لإرسال رسالة الدفعة للمحل');
 }
 
 async function deletePayment(id){
+  if(!accWriteOk()) return;   // 🔒 الحسابات قراية بس لغير المحاسب العام
   const e = ledger.find(x => x.id === id);
   if(!e || e.type === 'debit') return;   // الآجل بيتشال بالنقل أو بحذف الحساب، مش من هنا
   const kind = e.type === 'credit' ? 'دفعة' : (e.type === 'discount' ? 'خصم' : 'رصيد افتتاحي');
@@ -9243,6 +9549,7 @@ async function deletePayment(id){
 
 // نقل جهاز آجل من حساب محل لحساب محل تاني — مع تسجيل الأصل في تفاصيل الجهاز
 async function transferDebit(entryId){
+  if(!accWriteOk()) return;   // 🔒 الحسابات قراية بس لغير المحاسب العام
   const e = ledger.find(x => x.id === entryId);
   if(!e || e.type !== 'debit') return;
   const newShop = (prompt(`الجهاز ده متحاسب حالياً على "${e.shop}".\nاكتب اسم المحل اللي عايز تنقله على حسابه:`) || '').trim();
@@ -9271,6 +9578,7 @@ async function transferDebit(entryId){
 
 // إضافة خصم كحركة مالية مستقلة
 async function addDiscount(shop){
+  if(!accWriteOk()) return;   // 🔒 الحسابات قراية بس لغير المحاسب العام
   const raw = prompt(`إضافة خصم لحساب "${shop}".\nاكتب قيمة الخصم بالجنيه:`);
   if(raw === null) return;
   const amount = parseInt(raw) || 0;
@@ -9287,6 +9595,7 @@ async function addDiscount(shop){
 
 // إضافة حساب محل جديد برصيد افتتاحي (مديونية قديمة قبل السيستم)
 async function addOpeningBalance(){
+  if(!accWriteOk()) return;   // 🔒 الحسابات قراية بس لغير المحاسب العام
   const shop = (prompt('اسم المحل للحساب الجديد:') || '').trim();
   if(!shop) return;
   const raw = prompt(`الرصيد الافتتاحي السابق لمحل "${shop}" بالجنيه\n(المديونية القديمة قبل استخدام السيستم):`);
@@ -9307,6 +9616,7 @@ async function addOpeningBalance(){
 
 // حذف حساب محل بالكامل + كتابة ملاحظة على أجهزته المربوطة
 async function deleteAccount(shop){
+  if(!accWriteOk()) return;   // 🔒 الحسابات قراية بس لغير المحاسب العام
   await ledgerRefresh();   // 📒 الطازة الأول — عشان الرصيد في السؤال والمسح يبقوا على الحقيقة
   const st = shopStats()[shop];
   const bal = st ? st.balance : 0;
@@ -11163,6 +11473,8 @@ requireAccess().then(ok => {
   // 📒 بعد ما الدفتر يتحمّل: الصورة الأولى + أي طابور فاضل من مرة قبل كده
   Promise.resolve(loadLedger()).catch(() => {}).then(() => { try{ ledgerStartup(); }catch(e){ console.warn('ledgerStartup:', e); } });
   loadShopPhones();
+  loadShopGroups();   // 👥 لينكات جروبات المحلات (المحاسب العام)
+  loadShopCreditLocks();   // 🔒 المحلات المقفولة للآجل
   startRealtimeSync();
   setupAddFormEnterNav();
   initGlobalScanner();

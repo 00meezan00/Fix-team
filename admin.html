@@ -499,6 +499,13 @@ function render(){
       <div style="font-size:12.5px;color:var(--ink-2);line-height:1.9;margin-bottom:10px;">
         ${t('adm.envAdmins')} (${APP_ENV==='production'?t('adm.envProd'):t('adm.envStaging')}):
         <b style="font-family:monospace;">${esc(ADMIN_EMAILS.join('، '))}</b>
+        ${ADMIN_EMAILS.map(em => {
+          const nm = (normRole(userRoles[em]).techName || '').trim();
+          return `<div class="row">
+            <span style="font-size:12.5px;">👑 <span style="font-family:monospace;">${esc(em)}</span> — بيظهر باسم: <b>${esc(nm || 'المحاسب العام')}</b></span>
+            <button class="mini" onclick="setSuperName('${esc(em)}')">✎ الاسم المختصر</button>
+          </div>`;
+        }).join('')}
         ${Object.keys(userRoles).length
           ? Object.entries(userRoles).map(([em,rl]) => {
               const en = normRole(rl);
@@ -827,6 +834,27 @@ async function toggleCap(em, cap){
     render();
     toast(on ? 'اتقفلت 🔒' : 'اتفتحت ✅');
   }catch(e){ toast('فشل الحفظ: ' + (e.message||e), false); }
+}
+
+// 👑 (2/11) اسم المحاسب العام الظاهر — فاضي = «المحاسب العام»
+//    بيتحفظ في نفس الحقل (techName) زي باقي الأسماء الظاهرة.
+async function setSuperName(em){
+  const e = String(em || '').toLowerCase();
+  if(!ADMIN_EMAILS.includes(e)){ toast('ده مش إيميل محاسب عام', false); return; }
+  const cur = normRole(userRoles[e]).techName || '';
+  const nm = prompt('الاسم المختصر اللي يظهر بدل «المحاسب العام»:\n(سيبه فاضي = يظهر «المحاسب العام» بس)', cur);
+  if(nm === null) return;
+  const v = nm.trim();
+  if(v === cur.trim()) return;
+  try{
+    const prevCaps = normRole(userRoles[e]).caps;
+    if(v) userRoles[e] = Object.assign({ role: 'super_admin', techName: v }, prevCaps.length ? { caps: prevCaps } : {});
+    else if(userRoles[e] && !prevCaps.length) delete userRoles[e];
+    else if(userRoles[e]) userRoles[e] = Object.assign({ role: 'super_admin' }, prevCaps.length ? { caps: prevCaps } : {});
+    await saveRoles();
+    await addAudit('اسم المحاسب العام الظاهر لـ ' + e + ': ' + (v || 'المحاسب العام'));
+    render(); toast('اتحفظ ✅ — بيتطبّق لما الصفحة تتحدّث');
+  }catch(err){ toast('فشل الحفظ: ' + (err.message || err), false); }
 }
 
 async function addRole(){
