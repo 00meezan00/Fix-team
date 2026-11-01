@@ -8414,9 +8414,17 @@ let _ledgerQ = (function(){ try{ const q = JSON.parse(localStorage.getItem(LEDGE
 let _ledgerChain = Promise.resolve(true);
 let _ledgerFails = 0, _ledgerLastErr = null, _ledgerRetryT = null;
 
+// ⚠️ رقم السطر → **قايمة** نسخه، مش نسخة واحدة: الدفتر القديم ممكن
+//    يكون فيه سطرين بنفس الرقم (ملف 98 كان عامل حسابه). لو شلنا ده
+//    في الاعتبار، كنا هنفتكر إن السطر «اتعدّل» وهو ماتعدّلش.
 function ledgerSetBase(arr){
   _ledgerBase = new Map();
-  (arr || []).forEach(e => { if(e && e.id) _ledgerBase.set(String(e.id), JSON.stringify(e)); });
+  (arr || []).forEach(e => {
+    if(!e || !e.id) return;
+    const id = String(e.id);
+    if(!_ledgerBase.has(id)) _ledgerBase.set(id, []);
+    _ledgerBase.get(id).push(JSON.stringify(e));
+  });
 }
 function ledgerQSave(){
   try{
@@ -8426,16 +8434,30 @@ function ledgerQSave(){
 }
 
 // الفرق بين الدفتر اللي في الصفحة وآخر صورة
+// 🛡️ سطرين بنفس الرقم: عمرنا ما بنبعت «تعديل» عليهم (التعديل على السيرفر
+//    بيمسك كل السطور اللي بالرقم ده، فكان ممكن يغيّر سطر قديم بالغلط).
+//    بنضيف ونشيل بس.
 function ledgerDiffOps(){
-  const ops = [], seen = new Set();
+  const ops = [], local = new Map();
   (ledger || []).forEach(e => {
     if(!e || !e.id) return;
-    const id = String(e.id); seen.add(id);
-    const j = JSON.stringify(e), b = _ledgerBase.get(id);
-    if(b === undefined) ops.push({ op:'add', entry: JSON.parse(j) });
-    else if(b !== j)    ops.push({ op:'replace', entry: JSON.parse(j) });
+    const id = String(e.id);
+    if(!local.has(id)) local.set(id, []);
+    local.get(id).push(e);
   });
-  _ledgerBase.forEach((j, id) => { if(!seen.has(id)) ops.push({ op:'remove', id }); });
+  local.forEach((list, id) => {
+    const b = _ledgerBase.get(id);
+    if(!b){ list.forEach(e => ops.push({ op:'add', entry: JSON.parse(JSON.stringify(e)) })); return; }
+    if(list.length === 1 && b.length === 1){
+      const j = JSON.stringify(list[0]);
+      if(j !== b[0]) ops.push({ op:'replace', entry: JSON.parse(j) });
+      return;
+    }
+    // متكرر — لو اتغيّر حاجة فيه منبعتش تعديل، بنكتب ملاحظة بس
+    const a = list.map(e => JSON.stringify(e)).sort().join('\n'), c = b.slice().sort().join('\n');
+    if(a !== c) console.warn('📒 سطر رقمه متكرر في الدفتر واتغيّر — التعديل ده مش هيتبعت:', id);
+  });
+  _ledgerBase.forEach((j, id) => { if(!local.has(id)) ops.push({ op:'remove', id }); });
   return ops;
 }
 
@@ -8495,10 +8517,27 @@ function ledgerRefresh(){
 }
 
 // الشريط الأحمر: فيه تغييرات لسه ما اتحفظتش
+// 🧸 بيظهر بس لو فيه مشكلة فعلاً: الحفظ **فشل**، أو بقاله أكتر من ٤ ثواني
+//    مستني. الحفظ العادي بياخد أقل من ثانية — مش محتاج نخضّ حد بشريط
+//    أحمر بيظهر ويختفي (ده اللي كان بيحصل في أول نسخة).
+const LEDGER_BANNER_DELAY = 4000;
+let _ledgerPendingSince = 0, _ledgerBannerT = null;
 function ledgerBanner(){
   let b = document.getElementById('ledgerSaveBanner');
   const n = _ledgerQ.length;
-  if(!n){ if(b) b.remove(); return; }
+  if(!n){
+    _ledgerPendingSince = 0;
+    if(_ledgerBannerT){ clearTimeout(_ledgerBannerT); _ledgerBannerT = null; }
+    if(b) b.remove();
+    return;
+  }
+  if(!_ledgerPendingSince) _ledgerPendingSince = Date.now();
+  const waited = Date.now() - _ledgerPendingSince;
+  if(!_ledgerFails && waited < LEDGER_BANNER_DELAY){
+    // لسه بيتحفظ عادي — نبص تاني بعد شوية، ولو خلص الشريط عمره ما هيظهر
+    if(!_ledgerBannerT) _ledgerBannerT = setTimeout(() => { _ledgerBannerT = null; ledgerBanner(); }, LEDGER_BANNER_DELAY - waited + 50);
+    return;
+  }
   if(!b){
     b = document.createElement('div');
     b.id = 'ledgerSaveBanner';
