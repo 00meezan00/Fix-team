@@ -1604,7 +1604,7 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
       <label class="field"><span>🛵 اسم المندوب (اللي جاب الجهاز)</span><input id="f_broughtBy" list="broughtByList" autocomplete="off" placeholder="سيبه فاضي لو صاحب الجهاز جابه بنفسه" /></label>
       <datalist id="broughtByList"></datalist>
       <!-- 🔒 (2/11) اختيارات بس (مش كتابة) — المحاسب العام · المحاسبين · مدير الإنتاج · الديسباتشر · المالك -->
-      <label class="field"><span data-i18n="add.registeredBy">اسم المحاسب اللي بيسجل الجهاز</span><select id="f_registeredBy"></select></label>
+      <label class="field"><span data-i18n="add.registeredBy">اسم اللي سجّل الجهاز</span><select id="f_registeredBy"></select></label>
       <datalist id="accountantList"></datalist>
       <label class="field"><span data-i18n="add.phone">رقم التليفون</span><input id="f_customerPhone" list="phoneHistory" autocomplete="off" inputmode="tel" oninput="fixDigitsInput(this); this.dataset.autoFill='';" /></label>
       <datalist id="phoneHistory"></datalist>
@@ -3891,7 +3891,7 @@ function trashPanelHtml(){
       <div class="spn-info">
         <div class="spn-t"><span class="spn-kind del">🗑 حذف جهاز</span>
           <b>${esc(d.deviceType || '')} ${esc(d.model || '')}</b>${d.customerName ? ' — ' + esc(d.customerName) : ''}</div>
-        <div class="spn-m">🧾 ${esc(d.trashedBy || 'محاسب')} · ${splAgoTxt(d.trashedAt)} ·
+        <div class="spn-m">🧾 ${esc(d.trashedBy || 'الاستقبال')} · ${splAgoTxt(d.trashedAt)} ·
           ${new Date(d.trashedAt).toLocaleString(getLocale())}</div>
       </div>
       <button class="spn-ok" onclick="trashDismiss('${d.id}')">✓ تمام</button>
@@ -4588,7 +4588,7 @@ async function submitAdd(){
   if(!deviceColor)  missing.push('لون الجهاز');
   // 🏪 اسم المحل إجباري — عميل قطاعي = «I Fix Team»
   if(!get('shopName')) missing.push('اسم المحل (لو عميل قطاعي اكتب I Fix Team)');
-  if(!get('registeredBy')) missing.push('اسم الموظف اللي بيسجّل الجهاز');   // 🔒 (2/11)
+  if(!get('registeredBy')) missing.push('اسم اللي سجّل الجهاز');   // 🔒 (2/11)
   if(missing.length){
     alert('لازم تكتب: ' + missing.join('، '));
     const first = !customerName ? 'f_customerName' : (!deviceType ? 'f_deviceType' : (!deviceColor ? 'f_deviceColor' : 'f_shopName'));

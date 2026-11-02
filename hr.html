@@ -952,7 +952,7 @@ setInterval(() => { if(!document.hidden) loadStaffMsgs(); }, 120000);
 document.addEventListener('visibilitychange', () => { if(!document.hidden) loadStaffMsgs(); });
 
 function roleLabel(r){
-  return { super_admin:'أدمن', accountant:'محاسب', dispatcher:'مسؤول حركة',
+  return { super_admin:'أدمن', accountant:'الاستقبال', dispatcher:'مسؤول حركة',
            technician:'فني', hr:'شؤون العاملين', staff:'موظف',
            owner:'المالك', callcenter:'الكول سنتر', prodmgr:'مدير الإنتاج' }[r] || r;
 }

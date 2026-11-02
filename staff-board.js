@@ -81,7 +81,7 @@
   function roleTxt(r){
     var map = {
       super_admin: opts.adminLabel || 'المحاسب العام',
-      accountant:'محاسب', dispatcher:'مسؤول حركة', technician:'فني',
+      accountant:'الاستقبال', dispatcher:'مسؤول حركة', technician:'فني',
       hr:'شؤون العاملين', staff:'موظف', owner:'المالك', callcenter:'الكول سنتر', prodmgr:'مدير الإنتاج'
     };
     return map[r] || r || '';
