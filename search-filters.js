@@ -373,8 +373,19 @@
     else go();
   }
 
+  // الحالة الحالية — للصفحات اللي بتبحث في السيرفر (زي مسؤول الفحص)
+  //   { fields:['name',…], date:'YYYY-MM-DD'|'', to:'YYYY-MM-DD'|'', mode:'in'|'up' }
+  function state(id) {
+    var s = ST[id];
+    if (!s) return { fields: [], date: '', to: '', mode: 'in' };
+    return {
+      fields: FIELDS.filter(function (f) { return s.f[f.k]; }).map(function (f) { return f.k; }),
+      date: s.date || '', to: s.to || '', mode: s.mode === 'up' ? 'up' : 'in'
+    };
+  }
+
   window.IFixFilters = {
     watch: watch, attach: attach, match: match,
-    active: active, any: any, reset: reset, value: val
+    active: active, any: any, reset: reset, value: val, state: state
   };
 })();

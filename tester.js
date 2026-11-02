@@ -190,11 +190,62 @@ function render(){
   const app = $('app') ;
   if(!Q){ app.innerHTML = loadErr ? `<div class="err">⚠️ ${escH(loadErr)}</div><button class="big" onclick="load(true)">↻ جرّب تاني</button>` : '<div class="empty">⏳ جاري التحميل…</div>'; return; }
   const head = (loadErr ? `<div class="err">⚠️ آخر تحديث فشل: ${escH(loadErr)}</div>` : '')
-    + `<input class="search" id="qSearch" type="search" inputmode="search" autocomplete="off" value="${escH(S.q)}"
-         placeholder="🔍 رقم التذكرة أو السيريال — لأي جهاز" oninput="onSearch(this.value)">`
+    + `<div class="sbox" id="sBox"><input class="search" id="qSearch" type="search" inputmode="search" autocomplete="off" value="${escH(S.q)}"
+         placeholder="🔍 الاسم · العطل · السيريال · رقم التذكرة" oninput="onSearch(this.value)"></div>`
     + `<div id="foundHost">${foundHtml()}</div>`;
   app.innerHTML = head + (S.tab === 'recent' ? viewRecent() : viewPhase(S.tab));
+  mountSearchTools();
 }
+
+// ============================================================
+// 🔎 أدوات البحث: زرار الباركود (موبايل) + فلاتر زي الاستقبال
+//   الصفحة بتترسم من الأول كل تحديث، فبنركّبهم تاني كل مرة.
+//   الفلاتر حالتها محفوظة باسم الخانة (qSearch) فمش بتضيع.
+// ============================================================
+function mountSearchTools(){
+  const inp = $('qSearch'); if(!inp) return;
+  if(window.IFixScan && IFixScan.mountButton(inp, onScanned)) $('sBox')?.classList.add('has-scan');
+  if(window.IFixFilters) IFixFilters.attach(inp);
+}
+function fState(){
+  return (window.IFixFilters && IFixFilters.state) ? IFixFilters.state('qSearch') : { fields:[], date:'', to:'', mode:'in' };
+}
+
+// 📷 الباركود اتقرا (كاميرا أو ماسح سلكي): بندوّر بيه — ولو جهاز واحد بس طلع
+// بنفتح ورقة الفحص المناسبة على طول (استلام لو لسه مااتفحصش استلام، تسليم لو راجع من الورشة)
+async function onScanned(text        ){
+  const code = String(text || '').trim();
+  if(!code) return;
+  const inp = $('qSearch'); if(inp){ inp.value = code; }
+  S.q = code; clearTimeout(findT);
+  try{ S.found = await rpc('qc_find', { p_q: code }) || []; }
+  catch(e     ){ S.found = { err: errMsg(e) }; }
+  const h = $('foundHost'); if(h) h.innerHTML = foundHtml();
+  if(Array.isArray(S.found) && S.found.length === 1){
+    const x = S.found[0];
+    const q = devs().find(y => y.id === x.id && !y.done);       // مستني فحص في القايمة؟
+    openCheck(x.id, q ? q.phase : phaseOf(x));
+  } else if(Array.isArray(S.found) && !S.found.length){
+    toast('⚠️ الكود ده مش لأي جهاز في السيستم', true);
+  }
+}
+function phaseOf(x     )         {
+  return x.phase || (x.delivery || ['done','rejected','delivered'].includes(x.status) ? 'delivery' : 'intake');
+}
+
+// 🔫 الماسح السلكي على الكمبيوتر: بيكتب بسرعة جداً وينهي بـ Enter — حتى لو مفيش خانة عليها التركيز
+let gScanBuf = '', gScanLast = 0;
+document.addEventListener('keydown', e => {
+  const now = Date.now();
+  if(now - gScanLast > 120) gScanBuf = '';      // الإنسان أبطأ من كده بكتير
+  gScanLast = now;
+  if(e.key === 'Enter'){
+    const buf = gScanBuf; gScanBuf = '';
+    if(buf.replace(/[^0-9٠-٩]/g, '').length >= 10){ e.preventDefault(); closeSheet(); onScanned(buf); }
+    return;
+  }
+  if(e.key && e.key.length === 1){ gScanBuf += e.key; if(gScanBuf.length > 60) gScanBuf = gScanBuf.slice(-60); }
+}, true);
 function go(k        ){ S.tab = k; render(); window.scrollTo(0, 0); }
 
 function devCard(x       )         {
@@ -247,26 +298,39 @@ function viewRecent()         {
 
 // ---------- 🔎 البحث ----------
 let findT      = 0;
+let findSeq = 0;
 function onSearch(v        ){
   S.q = v;
   clearTimeout(findT);
   findT = setTimeout(async () => {
     const q = String(v || '').trim();
-    if(q.length < 3){ S.found = null; const h = $('foundHost'); if(h) h.innerHTML = ''; return; }
-    try{ S.found = await rpc('qc_find', { p_q: q }) || []; }
-    catch(e     ){ S.found = { err: errMsg(e) }; }
+    const f = fState();
+    // كلمتين على الأقل (أو تاريخ متحدد) — غير كده مفيش بحث
+    if(q.length < 2 && !f.date){ S.found = null; const h = $('foundHost'); if(h) h.innerHTML = ''; return; }
+    const my = ++findSeq;
+    let res     ;
+    try{
+      res = await rpc('qc_find', { p_q: q, p_fields: f.fields.length ? f.fields : null,
+                                   p_from: f.date || null, p_to: f.to || null, p_mode: f.mode });
+      res = res || [];
+    }
+    catch(e     ){ res = { err: errMsg(e) }; }
+    if(my !== findSeq) return;                 // جه بحث أحدث وإحنا مستنيين — سيبه هو
+    S.found = res;
     const h = $('foundHost'); if(h) h.innerHTML = foundHtml();
   }, 350);
 }
 function foundHtml()         {
   if(!S.found) return '';
   if(S.found.err) return `<div class="err">${escH(S.found.err)}</div>`;
-  if(!S.found.length) return '<div class="empty" style="margin-bottom:12px;">مفيش جهاز بالرقم ده</div>';
+  if(!S.found.length) return '<div class="empty" style="margin-bottom:12px;">مفيش جهاز بالبحث ده</div>';
   return `<div class="sec-h">🔎 نتيجة البحث <span class="c">${S.found.length}</span><span class="rule"></span></div>` + (S.found           ).map(x => {
-    const ph = x.phase || (x.delivery || ['done','rejected','delivered'].includes(x.status) ? 'delivery' : 'intake');
+    const ph = phaseOf(x);
     return `<div class="card">
       <div class="c-top"><div class="c-t">📱 ${escH(x.label)}</div><span class="pill">${escH(({ waiting:'قيد الانتظار', diagnosing:'جاري الكشف', repairing:'جاري الصيانة', done:'تم الصيانة', delivered:'اتسلّم', rejected:'تم الرفض', returned:'مرتجع' })[x.status] || x.status)}</span></div>
       <div class="c-s">${x.serial ? '<b dir="ltr">' + escH(x.serial) + '</b> · ' : ''}${x.intake ? '🛎️ اتفحص استلام' : '🛎️ ما اتفحصش استلام'} · ${x.delivery ? '📦 اتفحص تسليم' : '📦 ما اتفحصش تسليم'}</div>
+      ${(x.customer || x.shop) ? `<div class="c-who">👤 ${escH(x.customer || '—')}${x.shop ? ' · 🏪 ' + escH(x.shop) : ''}</div>` : ''}
+      ${x.issue ? `<div class="c-who">🛠️ ${escH(x.issue)}</div>` : ''}
       <div class="acts"><button class="btn${ph === 'intake' ? ' pri' : ''}" onclick="openCheck('${x.id}','intake',true)">🛎️ فحص استلام</button>
         <button class="btn${ph === 'delivery' ? ' pri' : ''}" onclick="openCheck('${x.id}','delivery',true)">📦 فحص تسليم</button></div>
     </div>`;
@@ -298,6 +362,7 @@ function openCheck(id        , phase        ){
     }
   }
   sheet();
+  fetchLock(id);
 }
 function saveDraft(){ if(F.dev) drafts[F.dev.id + '@' + F.phase] = { power:F.power, ans:F.ans, notes:F.notes, battery:F.battery }; }
 
@@ -330,6 +395,26 @@ function itemHtml(it           )         {
     ${regr ? `<div class="reg-t">⚠️ كان سليم وقت الاستلام</div>` : ''}
   </div>`;
 }
+// 🔒 باسورد الجهاز — عشان مسؤول الفحص يقدر يفتح الجهاز ويجرّبه
+//   بيتجاب لوحده لما الورقة تتفتح (qc_lock) — مش مع القايمة كلها عشان صور النمط تقيلة
+const LOCKS                      = {};   // id → { lockType, lockText, lockImage } | 'loading' | 'err'
+async function fetchLock(id        ){
+  if(LOCKS[id] && LOCKS[id] !== 'err') return;
+  LOCKS[id] = 'loading';
+  try{ LOCKS[id] = await rpc('qc_lock', { p_device_id: id }) || {}; }
+  catch(e     ){ LOCKS[id] = 'err'; }
+  if(F.dev && F.dev.id === id) reSheet();
+}
+function lockHtml(x     )         {
+  const L = LOCKS[x.id];
+  if(!L || L === 'loading') return '<div class="box">🔒 جاري تحميل باسورد الجهاز…</div>';
+  if(L === 'err') return `<div class="box">⚠️ الباسورد ما اتحمّلش — <a href="#" onclick="fetchLock('${escH(x.id)}');return false;">جرّب تاني</a></div>`;
+  if(L.lockType === 'text' && L.lockText)
+    return `<div class="box">🔒 باسورد الجهاز: <b dir="ltr" style="font-family:monospace;font-size:16px;letter-spacing:1px;">${escH(L.lockText)}</b></div>`;
+  if((L.lockType === 'pattern' || L.lockType === 'image') && L.lockImage)
+    return `<div class="box">🔒 ${L.lockType === 'pattern' ? 'نمط القفل' : 'صورة القفل'}:<br><img src="${escH(L.lockImage)}" alt="" style="margin-top:6px;width:130px;height:130px;object-fit:contain;border:1px solid var(--line);border-radius:10px;background:var(--card);"></div>`;
+  return '<div class="box">🔓 مفيش باسورد مسجّل للجهاز</div>';
+}
 function sheetBody()         {
   const x = F.dev ;
   const P = QC.PHASE[F.phase];
@@ -338,6 +423,7 @@ function sheetBody()         {
   return `<div class="dev">
       <div class="c-t">📱 ${escH(x.label)}</div>
       <div class="c-s">${x.color ? '🎨 ' + escH(x.color) + ' · ' : ''}${x.serial ? '<b dir="ltr">' + escH(x.serial) + '</b>' : 'مفيش سيريال'}</div>
+      ${lockHtml(x)}
       ${x.issue ? `<div class="box">🛠️ العطل اللي العميل قاله: ${escH(x.issue)}</div>` : ''}
       ${x.condition ? `<div class="box">📝 الاستقبال كتب: ${escH(x.condition)}</div>` : ''}
       ${F.phase === 'delivery' ? (x.outcome === 'fixed' ? '<div class="c-s"><b>✅ الورشة قالت: المشكلة اتحلّت</b></div>' : x.outcome === 'rejected' ? '<div class="c-s"><b>🚫 الورشة قالت: الجهاز اترفض</b></div>' : '') : ''}
