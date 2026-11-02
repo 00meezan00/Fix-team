@@ -9192,6 +9192,11 @@ function renderShareOwner(){
       + esc((d.deviceType || '') + ' ' + (d.model || '')) + ' — ' + esc(d.customerName || '') + '</span>'
       + '<span style="display:block;font-size:12px;color:var(--muted);margin-top:2px;">'
       + (shop ? esc(shop) + ' · ' : '') + price + '</span>'
+      // 🛠️ (٢-١١) العطل — عشان المحاسب العام يعرف الجهاز من غير ما يفتحه
+      + (String(d.reportedIssue || '').trim()
+          ? '<span style="display:block;font-size:12px;color:var(--ink-2);margin-top:2px;word-break:break-word;">🛠️ '
+            + esc(String(d.reportedIssue).trim()) + '</span>'
+          : '')
       + answer
       + '</span></label>';
   }).join('');
