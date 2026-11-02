@@ -9371,13 +9371,28 @@ function shopNoticeMsg(items, shop, asOf){
     else { const st = (typeof shopStats === 'function') ? shopStats()[shop] : null; bal = st ? st.balance : 0; }
   }catch(e){}
 
+  // ✂️ (٢-١١) الرسالة بقت أقصر + فيها العطل لكل جهاز
+  //    العطل = المكتوب على القيد (issue) ولو مش موجود → اللي على الجهاز (reportedIssue)
+  const issueOf = ({ entry, d }) => String(entry.issue || d.reportedIssue || '').trim().replace(/\s+/g, ' ');
+  const money = n => (Number(n) || 0).toLocaleString('en-EG');
+  let dd = '';
+  try{ dd = new Date().toLocaleDateString('ar-EG', { weekday:'long', day:'numeric', month:'numeric' }); }catch(e){ dd = day; }
   const L = ['السلام عليكم 🌹'];
-  L.push(items.length > 1
-    ? `تم تسجيل ${items.length === 2 ? 'جهازين' : items.length + ' أجهزة'} على حسابكم لدى *شركة Fix Team للصيانة* يوم ${day}: ${items.map(devName).join('، ')}.`
-    : `تم تسجيل جهاز *${devName(items[0])}* على حسابكم لدى *شركة Fix Team للصيانة* يوم ${day}.`);
-  L.push(`💰 قيمة الصيانة: *${sum.toLocaleString('en-EG')} ج.م*`);
-  if(bal > 0) L.push(`📒 إجمالي المستحق على حسابكم: *${bal.toLocaleString('en-EG')} ج.م*`);
-  L.push('نشكر ثقتكم، ولأي ملاحظة على الجهاز يُرجى التواصل معنا فورًا 🙏');
+  if(items.length > 1){
+    L.push(`تم تسجيل ${items.length === 2 ? 'جهازين' : items.length + ' أجهزة'} على حسابكم يوم ${dd}:`);
+    items.forEach(x => {
+      const iss = issueOf(x);
+      L.push(`• ${devName(x)}${iss ? ' — ' + iss : ''} — ${money(x.entry.amount)} ج.م`);
+    });
+    L.push(`💰 الإجمالي: *${money(sum)} ج.م*`);
+  } else {
+    L.push(`تم تسجيل جهاز *${devName(items[0])}* على حسابكم يوم ${dd}`);
+    const iss = issueOf(items[0]);
+    if(iss) L.push(`🛠️ العطل: ${iss}`);
+    L.push(`💰 الصيانة: *${money(sum)} ج.م*`);
+  }
+  if(bal > 0) L.push(`📒 إجمالي حسابكم: *${money(bal)} ج.م*`);
+  L.push('شكرًا لثقتكم 🙏 — Fix Team');
   return L.join('\n');
 }
 
@@ -10831,7 +10846,22 @@ function renderAnalytics(){
     .filter(e => e.type === 'credit' && inAnRange(e.date))
     .reduce((t, e) => t + (e.amount || 0), 0);
   const totalCashIn = cashCollected + shopPayments;
-  const totalOutstanding = ledger.reduce((t, e) => t + ((e.type === 'debit' || e.type === 'opening') ? (e.amount||0) : -(e.amount||0)), 0);
+  // 📒 (٣-١١) «إجمالي حساب العملاء لحد آخر الفترة» — بدل «كل الوقت»
+  //    🧸 بنجمع كل حركات دفتر المحلات (آجل · رصيد افتتاحي = عليه، دفعة · خصم = ليه)
+  //       اللي حصلت **لحد آخر يوم في الفترة المختارة**. الفترة اللي ملهاش نهاية
+  //       (النهارده · ٧ أيام · ٣٠ يوم · الكل · «من» من غير «لحد») = لحد دلوقتي.
+  //    ⚠️ أي حركة تاريخها بايظ أو فاضي بتتحسب (اعتبرناها قديمة) — زي ما كانت.
+  const anEnd = anRange()[1];
+  const totalOutstanding = ledger.reduce((t, e) => {
+    if(anEnd){
+      const d = new Date(e.date || '');
+      if(!isNaN(d.getTime()) && d > anEnd) return t;
+    }
+    return t + ((e.type === 'debit' || e.type === 'opening') ? (e.amount||0) : -(e.amount||0));
+  }, 0);
+  const outstandingLabel = anEnd
+    ? 'إجمالي حساب العملاء لحد ' + anEnd.toLocaleDateString('ar-EG', { day:'numeric', month:'numeric', year:'numeric' })
+    : 'إجمالي حساب العملاء لحد النهارده';
 
   const fmt = n => n.toLocaleString('en-EG');
   const moneyCards = `
@@ -10841,7 +10871,7 @@ function renderAnalytics(){
       <div class="inv-card"><div class="inv-card-num" style="color:var(--info);">${fmt(cashCollected)}</div><div class="inv-card-label">${t('an.fromDeliveries')}</div></div>
       <div class="inv-card"><div class="inv-card-num" style="color:#0E7490;">${fmt(shopPayments)}</div><div class="inv-card-label">${t('an.fromShops')}</div></div>
       <div class="inv-card"><div class="inv-card-num" style="color:var(--warn);">${fmt(deferredAdded)}</div><div class="inv-card-label">${t('an.deferredAdded')}</div></div>
-      <div class="inv-card"><div class="inv-card-num" style="color:${totalOutstanding > 0 ? 'var(--danger)' : 'var(--success)'};">${fmt(totalOutstanding)}</div><div class="inv-card-label">${t('an.outstanding')}</div></div>
+      <div class="inv-card"><div class="inv-card-num" style="color:${totalOutstanding > 0 ? 'var(--danger)' : 'var(--success)'};">${fmt(totalOutstanding)}</div><div class="inv-card-label">${esc(outstandingLabel)}</div></div>
     </div>`;
 
   // ============================================================
