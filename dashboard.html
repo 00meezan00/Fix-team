@@ -5307,35 +5307,64 @@ function broughtByOptions(){
 //    اكتبله اسم من لوحة الأدمن.
 // ============================================================
 const REG_BY_ROLES = ['super_admin', 'accountant', 'prodmgr', 'dispatcher', 'owner'];
-function registrantNames(){
-  const out = [], seen = new Set();
-  const add = n => {
+// 🗂️ (2/11) القايمة متقسّمة مجموعات بالترتيب ده — عشان يبان إن الكل موجود
+const REG_BY_GROUPS = [
+  ['super_admin', '👑 المحاسب العام'],
+  ['accountant',  '🧾 الاستقبال'],
+  ['dispatcher',  '🛵 الديسباتشر'],
+  ['prodmgr',     '🏭 مدير الإنتاج'],
+  ['owner',       '👤 المالك'],
+];
+// { super_admin:[...], accountant:[...], ... } — كل اسم في مجموعة دوره
+function registrantGroups(){
+  const g = {}; REG_BY_GROUPS.forEach(([r]) => g[r] = []);
+  const seen = new Set();
+  const add = (role, n, noName) => {
     n = String(n || '').trim();
-    if(!n) return;
+    if(!n || !g[role]) return;
     const k = n.toLowerCase().replace(/\s+/g, ' ');
     if(seen.has(k)) return;
-    seen.add(k); out.push(n);
+    seen.add(k); g[role].push({ n, noName: !!noName });
   };
   try{
-    (ADMIN_EMAILS || []).forEach(e => add((roleEntry(e).techName || '').trim() || 'المحاسب العام'));
+    (ADMIN_EMAILS || []).forEach(e => add('super_admin', (roleEntry(e).techName || '').trim() || 'المحاسب العام'));
     Object.keys(userRoles || {}).forEach(em => {
       const e = em.toLowerCase();
       if((ADMIN_EMAILS || []).includes(e)) return;
       const en = roleEntry(e);
       if(!REG_BY_ROLES.includes(en.role)) return;
-      add(en.techName || (en.role === 'super_admin' ? 'المحاسب العام' : e.split('@')[0]));
+      // نفس اللي صفحة الديسباتشر/المالك بتكتبه: الاسم من لوحة الأدمن، وإلا أول جزء من الإيميل
+      const nm = (en.techName || '').trim();
+      if(en.role === 'super_admin') add('super_admin', nm || 'المحاسب العام');
+      else add(en.role, nm || e.split('@')[0], !nm);
     });
   }catch(e){ console.warn('أسامي المسجّلين:', e); }
-  // اللي فاتح دلوقتي (لو من الأدوار دي) — دايماً موجود
-  try{ if(REG_BY_ROLES.includes(myRole()) || isProdMgr()) add(currentUser.name); }catch(e){}
-  return out.sort((a, b) => a.localeCompare(b, 'ar'));
+  // اللي فاتح دلوقتي — دايماً موجود
+  try{
+    const r = isProdMgr() ? 'prodmgr' : myRole();
+    if(REG_BY_ROLES.includes(r)) add(r, currentUser.name);
+  }catch(e){}
+  Object.values(g).forEach(list => list.sort((a, b) => a.n.localeCompare(b.n, 'ar')));
+  return g;
+}
+function registrantNames(){
+  const g = registrantGroups();
+  return REG_BY_GROUPS.flatMap(([r]) => g[r].map(x => x.n));
 }
 function registrantOptionsHtml(selected){
-  const names = registrantNames();
+  const g = registrantGroups();
   const sel = String(selected || '').trim();
-  if(sel && !names.includes(sel)) names.unshift(sel);   // اسم قديم مش في القايمة — يفضل ظاهر
-  return '<option value="">— اختار —</option>'
-    + names.map(n => `<option value="${esc(n)}"${n === sel ? ' selected' : ''}>${esc(n)}</option>`).join('');
+  const all = REG_BY_GROUPS.flatMap(([r]) => g[r].map(x => x.n));
+  let html = '<option value="">— اختار —</option>';
+  // اسم قديم مش في القايمة — يفضل ظاهر
+  if(sel && !all.includes(sel)) html += `<optgroup label="📜 مكتوب على الجهاز"><option value="${esc(sel)}" selected>${esc(sel)}</option></optgroup>`;
+  REG_BY_GROUPS.forEach(([r, label]) => {
+    if(!g[r].length) return;
+    html += `<optgroup label="${esc(label)}">`
+      + g[r].map(x => `<option value="${esc(x.n)}"${x.n === sel ? ' selected' : ''}>${esc(x.n)}${x.noName ? ' (مالوش اسم في لوحة الأدمن)' : ''}</option>`).join('')
+      + '</optgroup>';
+  });
+  return html;
 }
 // 👑 المحاسب العام بيصلّح الاسم → بيتسجّل في سجل الجهاز
 async function editRegisteredBy(sel){
