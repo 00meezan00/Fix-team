@@ -56,7 +56,7 @@
 (function(){
   if(window.IFixIntakeBoard) return;
 
-  var S              = { mode:'cm', ym:'', rows:null, loading:false, err:'', admin:null, sa:null, seq:0 };
+  var S              = { mode:'cm', ym:'', rows:null, loading:false, err:'', admin:null, sa:null, seq:0, at:null };
 
   function e(s         )         {
     return (typeof esc === 'function') ? esc(s)
@@ -164,6 +164,7 @@
         : msg;
       S.rows = null;
     }
+    if(my === S.seq && !S.err) S.at = new Date();   // 🔄 آخر تحديث نجح
     S.loading = false; paint();
   }
 
@@ -299,13 +300,18 @@
 
     sh.innerHTML =
         '<div class="h"><b>📥 ترتيب الاستلامات</b>'
-      +   '<button class="x" onclick="IFixIntakeBoard.reload()" title="تحديث">🔄</button>'
+      // 🔄 (2/11) الزرار بيبيّن إنه شغّال: ⏳ وهو بيحمّل + «اتحدّث الساعة …» تحت
+      //    (قبل كده لو الأرقام زي ما هي، الشاشة كانت بتترسم بنفس الشكل — كأنك مادستش)
+      +   '<button class="x" onclick="IFixIntakeBoard.reload()" title="تحديث"' + (S.loading ? ' disabled style="opacity:.6;"' : '') + '>' + (S.loading ? '⏳' : '🔄') + '</button>'
       +   '<button class="x" onclick="IFixIntakeBoard.close()" aria-label="قفل">✕</button></div>'
       + '<div class="wrap">'
       + '<div class="sub">بمجموع سعر الأجهزة اللي سجّلتها واتسلّمت — المرفوض مابيتحسبش.'
       +   (seeAll ? '' : ' فلوس زمايلك 🔒 — كل واحد بيشوف فلوسه بس.') + '</div>'
       + '<div class="chips">' + chip('today', 'النهارده') + chip('cm', 'الشهر الحالي') + chip('pm', 'الشهر السابق') + picker + '</div>'
-      + '<div class="mut" style="font-size:12.5px;font-weight:800;margin:-4px 2px 10px;">📅 ' + e(periodLabel()) + '</div>'
+      + '<div class="mut" style="font-size:12.5px;font-weight:800;margin:-4px 2px 10px;">📅 ' + e(periodLabel())
+      +   (S.loading ? ' · <span style="color:var(--accent,#EE5B10);">⏳ بيحدّث…</span>'
+          : (S.at ? ' · 🔄 اتحدّث الساعة ' + e(S.at.toLocaleTimeString('ar-EG', { hour:'numeric', minute:'2-digit', second:'2-digit' })) : ''))
+      + '</div>'
       + ((S.sa && isMonth())
           ? '<div class="tools"><button class="tset" onclick="IFixIntakeBoard.addTarget()">🎯 ＋ تارجت لموظف</button>'
             + '<button class="tset" onclick="IFixIntakeBoard.copyPrev()">📋 انسخ تارجت الشهر اللي قبله</button></div>'

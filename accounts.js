@@ -137,17 +137,64 @@ function shopNamesForDatalist(){
     const prev = seen.get(k);
     if(!prev || ts > prev.ts) seen.set(k, { name: n, ts });
   };
-  ledger.forEach(e => put(e.shop, new Date(e.date||0).getTime() || 0));
-  accDevices().forEach(d => put(d.shopName, new Date(d.intakeDate||0).getTime() || 0));
+  ledger.forEach(e => put(accShopOf(e.shop), new Date(e.date||0).getTime() || 0));   // 🪪 الاسم الرسمي
+  accDevices().forEach(d => put(accShopOf(d.shopName), new Date(d.intakeDate||0).getTime() || 0));
   return [...seen.values()]
     .sort((a,b) => b.ts - a.ts)
     .map(x => `<option value="${esc(x.name)}">`).join('');
 }
 
+// ============================================================
+// 🪪 (2/11 · تعديل مؤقت على الإنتاج) الحساب = المحل بكل أساميه
+// ------------------------------------------------------------
+// 🧸 بالبلدي: قبل كده كل اسم مكتوب كان حساب لوحده — «حفيلة» و«حفيله»
+//    و«حفيلة » = ٣ حسابات. دلوقتي بنسأل الكشكول (shop-picker.js):
+//    «الاسم ده تبع أنهي محل؟» → وكل أسامي المحل بتتجمّع تحت اسمه
+//    الرسمي وكوده (S-0162).
+//
+// ⚠️ الدفتر نفسه ماتغيّرش ولا حرف — القيد لسه مكتوب عليه الاسم زي
+//    ما اتكتب. التجميع في الشاشة بس.
+// ⚠️ الكشكول لسه ما وصلش / مفيش نت / الملف ما اتركّبش؟
+//    → الاسم زي ما هو (من غير مسافات أول وآخر) — زي زمان تقريباً.
+// ============================================================
+let _accShopCache = new Map();
+document.addEventListener('ifx-shops-ready', () => {
+  _accShopCache = new Map();
+  try{
+    const ov = document.getElementById('accountsOverlay');
+    if(ov && !ov.classList.contains('hidden')) renderAccounts();
+  }catch(e){}
+});
+function accShopOf(raw){
+  const t = String(raw == null ? '' : raw).trim() || 'بدون محل';
+  if(t === 'بدون محل') return t;
+  let v = _accShopCache.get(t);
+  if(v !== undefined) return v;
+  v = t;
+  try{ if(window.IFixShops && IFixShops.ready()) v = IFixShops.canon(t) || t; }catch(e){}
+  _accShopCache.set(t, v);
+  return v;
+}
+// كود الحساب (S-0162) — أو '' لو لسه مالوش
+function accShopCode(n){
+  try{ return (window.IFixShops && IFixShops.ready()) ? (IFixShops.codeOf(n) || '') : ''; }catch(e){ return ''; }
+}
+// الأسامي التانية اللي اتكتب بيها المحل ده فعلاً في الحسابات
+function accShopAliases(n, entries){
+  const seen = new Map();
+  (entries || []).forEach(e => {
+    const r = String(e.shop || '').trim();
+    if(!r || r === n) return;
+    const k = r.toLowerCase().replace(/\s+/g, ' ');
+    if(!seen.has(k)) seen.set(k, r);
+  });
+  return [...seen.values()];
+}
+
 function shopStats(){
   const shops = {};
   ledger.forEach(e => {
-    const k = e.shop || 'بدون محل';
+    const k = accShopOf(e.shop);   // 🪪 المحل بكل أساميه
     shops[k] = shops[k] || { debit:0, credit:0, discount:0, opening:0, entries:[] };
     const amt = e.amount||0;
     if(e.type === 'credit') shops[k].credit += amt;
@@ -347,9 +394,9 @@ function accAtBtn(e){
 function accBalanceAt(entryId){
   const target = ledger.find(x => x.id === entryId);
   if(!target) return null;
-  const shop = target.shop || 'بدون محل';
+  const shop = accShopOf(target.shop);   // 🪪
   const rows = [];
-  ledger.forEach((x, i) => { if((x.shop || 'بدون محل') === shop) rows.push({ e:x, i }); });
+  ledger.forEach((x, i) => { if(accShopOf(x.shop) === shop) rows.push({ e:x, i }); });
   rows.sort((a, b) => {
     const ta = new Date(a.e.date || 0).getTime() || 0, tb = new Date(b.e.date || 0).getTime() || 0;
     return (ta - tb) || (b.i - a.i);
@@ -512,13 +559,22 @@ function accShopBlockHtml(n, s){
       <button class="acc-mini-btn" style="margin-top:0;align-self:center;" onclick="setShopPhone('${safe}')">✎ ${t('acc.phone')}</button>
       ${(typeof isSuperAdmin === 'function' && isSuperAdmin() && typeof setShopGroup === 'function') ? `<button class="acc-mini-btn" style="margin-top:0;align-self:center;color:#0E7490;border-color:#A5F3FC;" onclick="setShopGroup('${safe}')">👥 ${(typeof shopGroups !== 'undefined' && shopGroups[n]) ? 'الجروب ✓' : 'الجروب'}</button>` : ''}
       ${(typeof isSuperAdmin === 'function' && isSuperAdmin() && typeof toggleShopCreditLock === 'function') ? `<button class="acc-mini-btn" style="margin-top:0;align-self:center;color:#B91C1C;border-color:#FCA5A5;" onclick="toggleShopCreditLock('${safe}')">${(typeof isShopCreditLocked === 'function' && isShopCreditLocked(n)) ? '🔓 افتح الآجل' : '🔒 اقفل الآجل'}</button>` : ''}
+      ${(typeof isSuperAdmin === 'function' && isSuperAdmin() && typeof accMergeShop === 'function') ? `<button class="acc-mini-btn" style="margin-top:0;align-self:center;color:#6D28D9;border-color:#C4B5FD;" onclick="accMergeShop('${safe}')">🔗 ده نفس محل تاني</button>
+      <button class="acc-mini-btn" style="margin-top:0;align-self:center;color:#6D28D9;border-color:#C4B5FD;" onclick="accUnmergeShop('${safe}')">↩️ فك دمج</button>
+      <button class="acc-mini-btn" style="margin-top:0;align-self:center;" onclick="accRenameShop('${safe}')">✏️ الاسم الرسمي</button>` : ''}
       <button class="acc-mini-btn" style="margin-top:0;align-self:center;color:var(--info);border-color:var(--info-border);" onclick="addDiscount('${safe}')">🏷️ ${t('acc.discount')}</button>
       <button class="btn-secondary" style="color:#166534;border-color:var(--success-border);" onclick="accRangeShop('xlsx','${safe}')">📊 Excel</button>
       <button class="btn-secondary" style="color:var(--danger-strong);border-color:var(--danger-border);" onclick="accRangeShop('pdf','${safe}')">📄 PDF</button>
       <button class="acc-mini-btn" style="margin-top:0;align-self:center;color:var(--danger);border-color:var(--danger-border);" onclick="deleteAccount('${safe}')">🗑 ${t('acc.deleteAccount')}</button>`
     : `<button class="btn-secondary" style="color:var(--danger-strong);border-color:var(--danger-border);" onclick="accRangeShop('pdf','${safe}')">📄 PDF</button>`;
 
+  // 🪪 الأسامي التانية اللي اتكتب بيها المحل ده
+  const _al = open ? accShopAliases(n, s.entries) : [];
+  const aliasLine = _al.length
+    ? `<div style="font-size:12px;color:var(--muted-2);margin:2px 2px 8px;line-height:1.8;">🔤 بيتكتب كمان: ${_al.map(x => '<b>«' + esc(x) + '»</b>').join(' · ')}</div>`
+    : '';
   const entriesHtml = !open ? '' : `
+    ${aliasLine}
     <div class="acc-toolbar">${toolbar}
     </div>
     ${accSortBarHtml(n, safe)}
@@ -526,7 +582,7 @@ function accShopBlockHtml(n, s){
 
   return `<div class="acc-shop" data-accshop="${esc(n)}">
     <button class="acc-shop-head" onclick="accOpenShop = accOpenShop==='${safe}' ? null : '${safe}'; renderAccounts();">
-      <span style="font-weight:800; font-size:16px;">🏪 ${esc(n)}${(typeof isShopCreditLocked === 'function' && isShopCreditLocked(n)) ? ' <span style="font-size:11.5px;font-weight:800;color:#B91C1C;background:#FEE2E2;border-radius:8px;padding:2px 7px;white-space:nowrap;">🔒 آجل مقفول</span>' : ''}</span>
+      <span style="font-weight:800; font-size:16px;">🏪 ${esc(n)}${accShopCode(n) ? ' <span style="font-family:ui-monospace,Menlo,monospace;font-size:11.5px;font-weight:800;color:var(--muted-2);background:var(--surface-2);border:1px solid var(--border);border-radius:7px;padding:1px 6px;direction:ltr;display:inline-block;">' + esc(accShopCode(n)) + '</span>' : ''}${(typeof isShopCreditLocked === 'function' && isShopCreditLocked(n)) ? ' <span style="font-size:11.5px;font-weight:800;color:#B91C1C;background:#FEE2E2;border-radius:8px;padding:2px 7px;white-space:nowrap;">🔒 آجل مقفول</span>' : ''}</span>
       <span class="acc-nums">
         <span>${t('acc.owed')}: <b>${s.owed.toLocaleString('en-EG')}</b></span>
         <span>${t('acc.paidDisc')}: <b style="color:var(--success);">${s.paid.toLocaleString('en-EG')}</b></span>
@@ -550,7 +606,13 @@ function renderAccounts(){
   const q = ((_sb && _sb.value) || '').trim();
   const shops = shopStats();
   let names = Object.keys(shops);
-  if(q) names = names.filter(n => n.includes(q));
+  // 🪪 البحث بالاسم · بالكود (S-0162) · أو بأي اسم تاني اتكتب بيه المحل
+  if(q){
+    const qn = q.toLowerCase();
+    names = names.filter(n => n.includes(q)
+      || accShopCode(n).toLowerCase().includes(qn)
+      || shops[n].entries.some(e => String(e.shop || '').includes(q)));
+  }
 
   if(names.length === 0){
     document.getElementById('accountsBody').innerHTML = `<div class="empty-col">${q ? t('acc.noMatch') : t('acc.empty')}</div>`;
@@ -900,7 +962,7 @@ function shopStatementRows(shop){
   const r = ACC_RANGE;
   const basis = (r && r.basis) || 'out';
   const bd = e => accBasisDate(e, basis);
-  const all = ledger.filter(e => (e.shop||'بدون محل') === shop)
+  const all = ledger.filter(e => accShopOf(e.shop) === shop)   // 🪪
     .slice().sort((a,b) => new Date(bd(a)) - new Date(bd(b)));
   let entries = all;
   if(r && r.cycle){
@@ -1818,7 +1880,7 @@ function accCycleSplit(shop){
   if(!shop || !Array.isArray(ledger)) return null;
   const n = ledger.length;
   const rows = [];
-  ledger.forEach((e, i) => { if((e.shop||'بدون محل') === shop) rows.push({ e, i }); });
+  ledger.forEach((e, i) => { if(accShopOf(e.shop) === shop) rows.push({ e, i }); });   // 🪪
   if(!rows.length) return null;
   // الأقدم الأول: بوقت التسجيل، ولو نفس الوقت → الأبعد في الدفتر أقدم (الجديد بيتحط أوله)
   rows.sort((a, b) => {

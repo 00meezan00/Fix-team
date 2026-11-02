@@ -116,6 +116,8 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
 <script src="aftersale-stats.js"></script>
 <script src="platform-stats.js"></script>   <!-- 📱 آيفون ↔ أندرويد في الملخص المالي (للمحاسب العام بس) — مؤقت للإنتاج -->
 <script src="prodmgr.js"></script>   <!-- 🏭 مدير الإنتاج: «الفنيين بتوعي» + موافقة الانصراف (ملف prod-prodmgr.sql) — مؤقت للإنتاج -->   <!-- 📊 إحصائية ما بعد البيع — للمحاسب العام بس (مؤقت للإنتاج) -->
+<!-- 🪪 (2/11) كود لكل محل + كل أساميه حساب واحد — prod-shop-codes.sql -->
+<script src="shop-picker.js"></script>
 <script src="accounts.js"></script>
 <script src="label.js"></script>
 <script src="attendance.js"></script>
@@ -8069,11 +8071,11 @@ function renderWaHeld(){
     const p = d.ownerPriced || {};
     let when = '';
     try{ when = p.at ? new Date(p.at).toLocaleString(getLocale()) : ''; }catch(e){}
-    const hasPh = !!shopPhones[shop];
+    const hasPh = !!shopPhoneOf(shop);
     return `<div class="appr-row">
       <div class="appr-row-info" style="cursor:pointer;" onclick="closeWaHeld();openDetail('${d.id}')">
         <div class="appr-row-dev">📱 ${esc(d.deviceType || '')} ${esc(d.model || '')}${d.customerName ? ' — ' + esc(d.customerName) : ''}</div>
-        <div class="appr-row-meta">${ord}🏬 ${esc(shop || 'من غير محل')} · 💰 ${(Number(entry.amount)||0).toLocaleString('en-EG')} ج.م${when ? ' · ' + esc(when) : ''}${shopGroups[shop] ? ' · 👥 له جروب' : ''}${(hasPh || shopGroups[shop]) ? '' : ' · <b style="color:var(--warn);">مفيش رقم ولا جروب للمحل</b>'}</div>
+        <div class="appr-row-meta">${ord}🏬 ${esc(shop || 'من غير محل')} · 💰 ${(Number(entry.amount)||0).toLocaleString('en-EG')} ج.م${when ? ' · ' + esc(when) : ''}${shopGroupOf(shop) ? ' · 👥 له جروب' : ''}${(hasPh || shopGroupOf(shop)) ? '' : ' · <b style="color:var(--warn);">مفيش رقم ولا جروب للمحل</b>'}</div>
         ${balAt !== null ? `<div class="appr-row-meta">📒 إجمالي الحساب وقتها: <b>${balAt.toLocaleString('en-EG')} ج.م</b></div>` : ''}
       </div>
       <div class="appr-row-actions" style="display:flex;gap:6px;flex-wrap:wrap;">
@@ -8172,8 +8174,25 @@ async function persistShopPhones(){
   try{ await window.storage.set(SHOP_PHONES_KEY, JSON.stringify(shopPhones)); }catch(e){}
 }
 
+// 🪪 (2/11) رقم/جروب المحل — ولو متسجّل على اسم تاني من أسامي نفس المحل
+function shopPhoneOf(shop){
+  if(shopPhones[shop]) return shopPhones[shop];
+  const c = accShopOf(shop);
+  if(shopPhones[c]) return shopPhones[c];
+  const k = Object.keys(shopPhones).find(x => accShopOf(x) === c);
+  return k ? shopPhones[k] : '';
+}
+function shopGroupOf(shop){
+  if(typeof shopGroups === 'undefined') return '';
+  if(shopGroups[shop]) return shopGroups[shop];
+  const c = accShopOf(shop);
+  if(shopGroups[c]) return shopGroups[c];
+  const k = Object.keys(shopGroups).find(x => accShopOf(x) === c);
+  return k ? shopGroups[k] : '';
+}
+
 async function setShopPhone(shop){
-  const cur = shopPhones[shop] || '';
+  const cur = shopPhoneOf(shop) || '';
   const ph = (prompt(`رقم واتساب محل "${shop}":`, cur) || '').trim();
   if(!ph) return null;
   shopPhones[shop] = ph;
@@ -8220,7 +8239,7 @@ function waGroupCode(link){
 
 async function setShopGroup(shop){
   if(!isSuperAdmin()){ showError('الخانة دي للمحاسب العام بس'); return null; }
-  const cur = shopGroups[shop] || '';
+  const cur = shopGroupOf(shop) || '';
   const raw = prompt(
     `لينك جروب واتساب محل "${shop}":\n`
     + '(من الجروب: اسم الجروب ← «دعوة عبر رابط» ← انسخ الرابط)\n'
@@ -8307,7 +8326,17 @@ async function loadShopCreditLocks(){
     return false;
   }
 }
-function isShopCreditLocked(shop){ return !!shopCreditLocks[shopCreditKey(shop)]; }
+// 🪪 (2/11) المحل كله بكل أساميه — لو أي اسم منهم مقفول (أو الاسم الرسمي)
+function shopCreditKeysOf(shop){
+  const keys = new Set([shopCreditKey(shop), shopCreditKey(accShopOf(shop))]);
+  try{
+    const c = (window.IFixShops && IFixShops.ready()) ? IFixShops.customer(shop) : null;
+    if(c) IFixShops.aliasesOf(c.id).forEach(a => keys.add(shopCreditKey(a)));
+  }catch(e){}
+  return [...keys].filter(Boolean);
+}
+function shopCreditLockKeyOf(shop){ return shopCreditKeysOf(shop).find(k => shopCreditLocks[k]) || ''; }
+function isShopCreditLocked(shop){ return !!shopCreditLockKeyOf(shop); }
 
 // مفتاح التصريح: الجهاز نفسه · أو جولة المرتجع
 function creditOkKey(d, isReturn){ return isReturn ? (d.id + ':r' + retRoundNo(d)) : d.id; }
@@ -8317,8 +8346,8 @@ async function creditAllowed(shop, okKey){
   shop = String(shop || '').trim();
   if(!shop || shop === 'بدون محل') return true;
   if(isOnline()) await loadShopCreditLocks();       // الطازة — يمكن المحاسب العام لسه قافله
-  const key = shopCreditKey(shop);
-  if(!shopCreditLocks[key]) return true;
+  const key = shopCreditLockKeyOf(shop);   // 🪪 المحل كله
+  if(!key) return true;
   if(isSuperAdmin()){
     // 👑 المحاسب العام نفسه = الموافقة → نسجّل تصريح للجهاز ده
     if(okKey){
@@ -8346,8 +8375,9 @@ async function toggleShopCreditLock(shop){
   if(!isSuperAdmin()){ showError('الخانة دي للمحاسب العام بس'); return; }
   if(!isOnline()){ alert('محتاج نت.'); return; }
   await loadShopCreditLocks();
-  const key = shopCreditKey(shop);
-  const locked = !!shopCreditLocks[key];
+  const lockedKey = shopCreditLockKeyOf(shop);   // 🪪 مقفول على أي اسم من أساميه؟
+  const locked = !!lockedKey;
+  const key = locked ? lockedKey : shopCreditKey(accShopOf(shop));
   const ok = confirm(locked
     ? '🔓 تفتح الآجل لمحل «' + shop + '»؟\n\nأي محاسب هيقدر يقيّد عليه آجل عادي تاني.'
     : '🔒 تقفل الآجل على محل «' + shop + '»؟\n\n'
@@ -8357,7 +8387,7 @@ async function toggleShopCreditLock(shop){
   if(!ok) return;
   const r = locked
     ? await sb.from('shop_credit_locks').delete().eq('shop_key', key)
-    : await sb.from('shop_credit_locks').upsert({ shop_key: key, shop: String(shop).trim() });
+    : await sb.from('shop_credit_locks').upsert({ shop_key: key, shop: accShopOf(shop) });
   if(r.error){
     const m = String(r.error.message || '');
     alert('⚠️ ما اتحفظش: ' + m + (/shop_credit_locks|does not exist|schema cache/i.test(m)
@@ -8365,7 +8395,7 @@ async function toggleShopCreditLock(shop){
     return;
   }
   await loadShopCreditLocks();
-  if(!!shopCreditLocks[key] === locked){ alert('⚠️ السيرفر ما سجّلش التغيير — جرّب تاني.'); return; }
+  if(isShopCreditLocked(shop) === locked){ alert('⚠️ السيرفر ما سجّلش التغيير — جرّب تاني.'); return; }
   try{ if(typeof renderAccounts === 'function') renderAccounts(); }catch(e){}
 }
 
@@ -8374,7 +8404,7 @@ async function toggleShopCreditLock(shop){
 async function sendShopMsg(shop, msg, label){
   // 👤 أي حد غير المحاسب العام → الرقم زي زمان بالظبط
   if(!isSuperAdmin()){
-    let ph = shopPhones[shop];
+    let ph = shopPhoneOf(shop);
     if(!ph){ ph = await setShopPhone(shop); if(!ph) return false; }
     return openWa(ph, msg, label);
   }
@@ -8395,7 +8425,7 @@ function _shopSendBox(shop, msg, label, resolve){
     let done = false;
     const finish = v => { if(done) return; done = true; ov.remove(); resolve(v); };
     ov.onclick = e => { if(e.target === ov) finish(false); };
-    const ph = shopPhones[shop], gr = shopGroups[shop];
+    const ph = shopPhoneOf(shop), gr = shopGroupOf(shop);   // 🪪
     const canShare = !!navigator.share;
     const btn = (id, bg, txt, sub) =>
       `<button id="${id}" class="oh-btn" style="display:block;width:100%;text-align:start;background:${bg};margin:0 0 8px;padding:12px 14px;">
@@ -8414,12 +8444,12 @@ function _shopSendBox(shop, msg, label, resolve){
 
     document.getElementById('ssCancel').onclick = () => finish(false);
     document.getElementById('ssPhone').onclick = async () => {
-      let p = shopPhones[shop];
+      let p = shopPhoneOf(shop);
       if(!p){ p = await setShopPhone(shop); if(!p) return; }
       finish(openWa(p, msg, label));
     };
     document.getElementById('ssGroup').onclick = async () => {
-      const g = shopGroups[shop];
+      const g = shopGroupOf(shop);
       if(g){ finish(openWaGroup(g, msg, label)); return; }
       // أول مرة: نسجّل اللينك، وبعدين يدوس تاني (عشان الموبايل يسمح بالفتح والنسخ)
       const ng = await setShopGroup(shop);
@@ -9164,7 +9194,7 @@ function queueShopNotice(entry, d){
 //    ([entry, ...ledger])، فاللي مكانه أبعد في المصفوفة هو الأقدم.
 // ============================================================
 function shopBalanceAt(shop, entry){
-  const key = s => String(s || 'بدون محل').trim();
+  const key = s => accShopOf(s);   // 🪪 المحل بكل أساميه
   const sh = key(shop);
   const tE = new Date(entry && entry.date || 0).getTime();
   const iE = ledger.indexOf(entry);
@@ -9424,6 +9454,90 @@ async function markReturnPaid(){
 //    يسلّمه (addLedgerDebit) والتحويل لفوري من تفاصيل الجهاز لسه
 //    شغالين عادي — عشان كده مفيش قفل في قاعدة البيانات.
 // ============================================================
+// ============================================================
+// 🪪 (2/11) أدوات المحاسب العام على أكواد المحلات (prod-shop-codes.sql)
+// ------------------------------------------------------------
+// 🔗 «ده نفس محل تاني» → كل أسامي المحل ده بتروح للمحل التاني،
+//    وحسابه بيتجمّع معاه في الشاشة. (الدفتر نفسه مابيتغيّرش.)
+// ↩️ فك دمج → الأسامي بترجع لصاحبها.
+// ✏️ الاسم الرسمي → الاسم اللي بيظهر في الحسابات والاقتراحات.
+// 🔒 السيرفر نفسه بيتأكد إنه المحاسب العام (erp_need_super).
+// ============================================================
+function accShopsMissing(m){
+  return /customer_merge|customer_unmerge|customer_rename|customer_merge_log|schema cache|does not exist|PGRST202/i.test(String(m || ''));
+}
+async function accShopsReload(){
+  _accShopCache = new Map();
+  try{ if(window.IFixShops) await IFixShops.load(true); }catch(e){}
+  _accShopCache = new Map();
+  renderAccounts();
+}
+function accShopCust(n){
+  try{ return (window.IFixShops && IFixShops.ready()) ? IFixShops.customer(n) : null; }catch(e){ return null; }
+}
+async function accMergeShop(n){
+  if(!isSuperAdmin()){ showError('الخانة دي للمحاسب العام بس'); return; }
+  if(!isOnline()){ alert('محتاج نت.'); return; }
+  const from = accShopCust(n);
+  if(!from){ alert('المحل ده لسه مالوش كود (أو الكشكول لسه بيحمّل) — جرّب بعد ثواني.\n\nلو المشكلة فضلت: شغّل prod-shop-codes.sql.'); accShopsReload(); return; }
+  const q = prompt('🔗 «' + from.name + '» ' + from.code + ' — هو نفس أنهي محل؟\n\nاكتب الكود (زي S-0162) أو الاسم بالظبط:');
+  if(q === null || !q.trim()) return;
+  const qt = q.trim();
+  let into = null;
+  if(/^[SR]-\d+$/i.test(qt)) into = IFixShops.list().find(c => c.code.toUpperCase() === qt.toUpperCase()) || null;
+  if(!into) into = accShopCust(qt);
+  if(!into){ alert('مش لاقي محل بالكود/الاسم ده.'); return; }
+  if(into.id === from.id){ alert('ده نفس الحساب أصلاً.'); return; }
+  const reason = prompt('هتدمج:\n«' + from.name + '» ' + from.code + '\nفي:\n«' + into.name + '» ' + into.code
+    + '\n\nكل أسامي الأول هتبقى تبع التاني، وحسابهم يبقى واحد.\nاكتب السبب (إجباري):', 'نفس المحل');
+  if(reason === null) return;
+  if(reason.trim().length < 3){ alert('اكتب سبب (٣ حروف على الأقل).'); return; }
+  const { error } = await sb.rpc('customer_merge', { p_from: from.id, p_into: into.id, p_reason: reason.trim() });
+  if(error){ alert('⚠️ ما اتدمجش: ' + (error.message || error) + (accShopsMissing(error.message) ? '\n\nشغّل prod-shop-codes.sql الأول.' : '')); return; }
+  accOpenShop = into.name;
+  await accShopsReload();
+  alert('✅ اتدمج — «' + from.name + '» بقى جوه حساب «' + into.name + '» ' + into.code);
+}
+async function accUnmergeShop(n){
+  if(!isSuperAdmin()){ showError('الخانة دي للمحاسب العام بس'); return; }
+  if(!isOnline()){ alert('محتاج نت.'); return; }
+  const c = accShopCust(n);
+  if(!c){ alert('المحل ده لسه مالوش كود.'); return; }
+  const { data, error } = await sb.from('customer_merge_log').select('id,from_id,aliases,reason,at')
+    .eq('into_id', c.id).is('undone_at', null).order('at', { ascending: false });
+  if(error){ alert('⚠️ ' + (error.message || error)); return; }
+  if(!data || !data.length){ alert('مفيش محلات اتدمجت في «' + c.name + '».'); return; }
+  const label = m => {
+    const al = (m.aliases || []).slice(0, 3).join(' / ');
+    return (al || '؟') + ' — ' + new Date(m.at).toLocaleDateString('ar-EG') + ' (' + (m.reason || '') + ')';
+  };
+  const pick = prompt('↩️ فك دمج من «' + c.name + '» — اكتب الرقم:\n\n' + data.map((m, i) => (i + 1) + ') ' + label(m)).join('\n'), '1');
+  if(pick === null) return;
+  const m = data[(parseInt(pick, 10) || 0) - 1];
+  if(!m){ alert('رقم غلط.'); return; }
+  const reason = prompt('سبب فك الدمج (إجباري):', 'اتدمج بالغلط');
+  if(reason === null) return;
+  if(reason.trim().length < 3){ alert('اكتب سبب (٣ حروف على الأقل).'); return; }
+  const r = await sb.rpc('customer_unmerge', { p_merge_id: m.id, p_reason: reason.trim() });
+  if(r.error){ alert('⚠️ ما اتفكش: ' + (r.error.message || r.error)); return; }
+  await accShopsReload();
+  alert('✅ اتفك الدمج — الأسامي رجعت لحسابها.');
+}
+async function accRenameShop(n){
+  if(!isSuperAdmin()){ showError('الخانة دي للمحاسب العام بس'); return; }
+  if(!isOnline()){ alert('محتاج نت.'); return; }
+  const c = accShopCust(n);
+  if(!c){ alert('المحل ده لسه مالوش كود.'); return; }
+  const v = prompt('✏️ الاسم الرسمي لـ ' + c.code + ':\n(الأسامي القديمة هتفضل توصل للحساب ده)', c.name);
+  if(v === null) return;
+  const nm = v.trim().replace(/\s+/g, ' ');
+  if(nm.length < 2 || nm === c.name) return;
+  const { error } = await sb.rpc('customer_rename', { p_id: c.id, p_name: nm });
+  if(error){ alert('⚠️ ما اتغيّرش: ' + (error.message || error) + (accShopsMissing(error.message) ? '\n\nشغّل prod-shop-codes.sql الأول.' : '')); return; }
+  accOpenShop = nm;
+  await accShopsReload();
+}
+
 function accWriteOk(){
   if(isSuperAdmin()) return true;
   alert('📒 الحسابات للقراية بس — التسجيل والتعديل للمحاسب العام بس.');
@@ -9622,7 +9736,7 @@ async function deleteAccount(shop){
   const bal = st ? st.balance : 0;
   if(!confirm(`⚠️ متأكد إنك عايز تمسح حساب "${shop}" بالكامل؟\n\nهيتشال من الحسابات، ورصيده المتبقي (${bal.toLocaleString('en-EG')} ج.م) هيتخصم من إجمالي ديون السيستم.\nالأجهزة المربوطة بيه هتفضل موجودة، بس هتتكتب عليها ملاحظة إن الحساب اتمسح.\n\nالخطوة دي مش بترجع.`)) return;
 
-  const linkedIds = new Set(ledger.filter(e => (e.shop||'بدون محل') === shop && e.deviceId).map(e => e.deviceId));
+  const linkedIds = new Set(ledger.filter(e => accShopOf(e.shop) === shop && e.deviceId).map(e => e.deviceId));   // 🪪 كل أسامي المحل
   if(linkedIds.size){
     const noteTxt = `⚠️ تم حذف الحساب الآجل المربوط بهذا الجهاز (حساب سابق: ${shop}) بتاريخ ${new Date().toLocaleDateString('ar-EG')}`;
     devices = devices.map(d => linkedIds.has(d.id)
@@ -9630,7 +9744,7 @@ async function deleteAccount(shop){
       : d);
     await persist();
   }
-  ledger = ledger.filter(e => (e.shop||'بدون محل') !== shop);
+  ledger = ledger.filter(e => accShopOf(e.shop) !== shop);   // 🪪
   await persistLedger();
   if(accOpenShop === shop) accOpenShop = null;
   renderAccounts();
