@@ -59,6 +59,75 @@ let Q                 = null, ROLE = '', ME = '', loadErr = '', loading = false;
 const S                                         = { tab: 'intake', q: '', found: null };
 const ROLE_LBL                         = { tester:'مسؤول الفحص', super_admin:'المحاسب العام' };
 
+// ============================================================
+// ⏰🔒 مربوط بالحضور — التيستر شغّال بس وهو «حاضر» (prod-tester-shift.sql)
+// ------------------------------------------------------------
+// 🧸 آخر تسجيل في «المواعيد»:
+//    🟢 حضور / ▶️ استئناف → الشاشة شغّالة
+//    ☕ بريك / 🔴 انصراف / لسه ماسجّلش → الشاشة مقفولة، وفاضل
+//       «⏰ المواعيد» و«💰 مرتبك» بس.
+//    نسي ينصرف؟ بعد ١٨ ساعة من آخر تسجيل بتتقفل لوحدها.
+// 🔒 القفل الحقيقي على السيرفر: دوال الفحص بترفض التيستر برّه الشيفت
+//    برسالة فيها «مقفولة برّه الشيفت». الصفحة بتشوف الرسالة دي وتقفل.
+//    كده المحاسب العام (اللي مابيسجّلش حضور) مش بيتقفل أبداً — السيرفر
+//    هو اللي بيقرر مين يتقفل، مش الصفحة.
+// ⚠️ الورقة اللي كانت مفتوحة: إجاباتها بتتحفظ (drafts) وترجع لما يفتح تاني.
+// ============================================================
+var TQ_LOCKED = false;      // var عن قصد: render() ممكن تتنده قبل السطر ده
+let SHIFT                 = null;   // { on, kind, at } من cc_shift_state
+const isShiftErr = (e     )          => /مقفولة برّه الشيفت/.test(String((e && (e.message || e.hint)) || e || ''));
+async function loadShift(){
+  try{
+    const { data, error } = await sb.rpc('cc_shift_state');
+    if(error) throw error;
+    SHIFT = data || { on:false };
+  }catch(e     ){ console.error('cc_shift_state failed:', e); SHIFT = null; }
+  return SHIFT;
+}
+function tqLockHtml()         {
+  const k = SHIFT && SHIFT.kind;
+  const tm = SHIFT && SHIFT.at ? new Date(SHIFT.at).toLocaleTimeString('ar-EG', { hour:'2-digit', minute:'2-digit', timeZone:'Africa/Cairo' }) : '';
+  const why = k === 'break' ? `☕ انت في بريك من ${tm}` : k === 'out' ? `🔴 انصرفت الساعة ${tm}` : '⚪ لسه ماسجّلتش حضور';
+  return `<div class="tq-lock">
+    <div class="ic">🔒</div>
+    <h2>الشاشة مقفولة برّه الشيفت</h2>
+    <p>${why}<br>سجّل ${k === 'break' ? '«استئناف»' : '«حضور»'} من «المواعيد» والشاشة هتفتح لوحدها.</p>
+    <button class="pri" onclick="openAttendance()">⏰ المواعيد</button>
+    <button onclick="openPayroll()">💰 مرتبك</button>
+    <button onclick="load(true)">↻ سجّلت — افتح</button>
+  </div>`;
+}
+async function tqLock(locked         ){
+  if(locked){
+    // الورقة المفتوحة: نحفظ إجاباتها ونقفلها
+    if($('sheetOv')){ try{ saveDraft(); }catch(e     ){} closeSheet(true); }
+    await loadShift();
+    Q = null; S.found = null; S.q = '';     // الأجهزة تتشال من الصفحة
+    try{ $('whoLbl') .textContent = (ME || '') + (ME ? ' — ' : '') + ROLE_LBL.tester; }catch(e     ){}
+  }
+  TQ_LOCKED = locked;
+  document.body.classList.toggle('tq-locked', locked);
+}
+// أي رد من السيرفر فيه «مقفولة برّه الشيفت» → اقفل وارسم
+async function shiftHit(e     )                   {
+  if(!isShiftErr(e)) return false;
+  await tqLock(true); render();
+  return true;
+}
+// بعد ما يقفل شاشة المواعيد (سجّل حضور أو بريك) → نشوف تاني على طول
+(function(){
+  const orig = window.closeAttendance;
+  if(typeof orig !== 'function') return;
+  window.closeAttendance = function(){ const r = orig.apply(this, arguments); if(navigator.onLine) setTimeout(() => load(), 300); return r; };
+})();
+// ⏰ وهو فاتح ورقة فحص (التحديث العادي واقف ساعتها): كل دقيقة نشوف
+//    لو دخل بريك أو انصرف — نقفل من غير ما يستنى يدوس «حفظ».
+setInterval(async () => {
+  if(document.hidden || !navigator.onLine || ROLE !== 'tester' || !$('sheetOv')) return;
+  const s = await loadShift();
+  if(s && !s.on){ await tqLock(true); render(); }
+}, 60000);
+
 // ---------- أدوات ----------
 function ago(iso        )         {
   const m = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
@@ -121,6 +190,7 @@ async function load(manual          ){
   loading = true;
   try{
     const d = await rpc('qc_queue');
+    if(TQ_LOCKED){ await tqLock(false); if(manual) manual = false, toast('🔓 الشاشة اتفتحت'); }
     Q = d; ROLE = d.role; ME = d.me; loadErr = '';
     try{ localStorage.setItem('ifix-last-role', ROLE); }catch(e     ){}
     $('whoLbl') .textContent = ME + ' — ' + (ROLE_LBL[ROLE] || ROLE);
@@ -138,6 +208,13 @@ async function load(manual          ){
     if(manual) toast('اتحدّثت ✅');
   }catch(e     ){
     console.error('qc_queue failed:', e);
+    // ⏰🔒 برّه الشيفت → كارت القفل بدل الأجهزة
+    if(isShiftErr(e)){
+      ROLE = 'tester'; loadErr = '';
+      await tqLock(true);
+      if(manual) toast('🔒 لسه مقفولة — سجّل حضور أو استئناف الأول', true);
+      loading = false; render(); return;
+    }
     const m = errMsg(e);
     if(/مش مسموحة لحسابك/.test(m) && !Q){
       // ⚠️ (١٩-١٠) قبل كده كنا بنحوّل على طول — ولو الحساب «تيستر» في لوحة الأدمن
@@ -186,6 +263,8 @@ function render(){
     { k:'delivery', l:'📦 تسليم', n:nd },
     { k:'recent', l:'🗂️ اتفحص قريب' }
   ];
+  // ⏰🔒 برّه الشيفت: مفيش تابات ولا بحث ولا أجهزة — كارت القفل بس
+  if(TQ_LOCKED){ $('tabs') .innerHTML = ''; $('app') .innerHTML = tqLockHtml(); return; }
   $('tabs') .innerHTML = tabs.map(x => `<button class="tab${S.tab === x.k ? ' on' : ''}" onclick="go('${x.k}')">${x.l}${x.n ? `<span class="n">${x.n}</span>` : ''}</button>`).join('');
   const app = $('app') ;
   if(!Q){ app.innerHTML = loadErr ? `<div class="err">⚠️ ${escH(loadErr)}</div><button class="big" onclick="load(true)">↻ جرّب تاني</button>` : '<div class="empty">⏳ جاري التحميل…</div>'; return; }
@@ -219,7 +298,7 @@ async function onScanned(text        ){
   const inp = $('qSearch'); if(inp){ inp.value = code; }
   S.q = code; clearTimeout(findT);
   try{ S.found = await rpc('qc_find', { p_q: code }) || []; }
-  catch(e     ){ S.found = { err: errMsg(e) }; }
+  catch(e     ){ if(await shiftHit(e)) return; S.found = { err: errMsg(e) }; }
   const h = $('foundHost'); if(h) h.innerHTML = foundHtml();
   if(Array.isArray(S.found) && S.found.length === 1){
     const x = S.found[0];
@@ -314,8 +393,8 @@ function onSearch(v        ){
                                    p_from: f.date || null, p_to: f.to || null, p_mode: f.mode });
       res = res || [];
     }
-    catch(e     ){ res = { err: errMsg(e) }; }
-    if(my !== findSeq) return;                 // جه بحث أحدث وإحنا مستنيين — سيبه هو
+    catch(e     ){ if(await shiftHit(e)) return; res = { err: errMsg(e) }; }
+    if(my !== findSeq) return;                // جه بحث أحدث وإحنا مستنيين — سيبه هو
     S.found = res;
     const h = $('foundHost'); if(h) h.innerHTML = foundHtml();
   }, 350);
@@ -402,7 +481,7 @@ async function fetchLock(id        ){
   if(LOCKS[id] && LOCKS[id] !== 'err') return;
   LOCKS[id] = 'loading';
   try{ LOCKS[id] = await rpc('qc_lock', { p_device_id: id }) || {}; }
-  catch(e     ){ LOCKS[id] = 'err'; }
+  catch(e     ){ LOCKS[id] = 'err'; if(await shiftHit(e)){ delete LOCKS[id]; return; } }
   if(F.dev && F.dev.id === id) reSheet();
 }
 function lockHtml(x     )         {
@@ -526,7 +605,12 @@ async function saveCheck(){
     toast('💾 ' + QC.PHASE[F.phase].t + ' اتحفظ' + (bad ? ' — ❌ ' + bad + ' فيه مشكلة' : ' — ✅ كله سليم'));
     S.found = null; S.q = '';
     load();
-  }catch(e     ){ F.busy = false; reSheet(); toast(errMsg(e), true); }
+  }catch(e     ){
+    F.busy = false;
+    // ⏰🔒 دخل بريك أو انصرف وهو بيفحص → الإجابات تتحفظ في الموبايل والشاشة تتقفل
+    if(isShiftErr(e)){ await shiftHit(e); toast('🔒 الفحص ما اتحفظش — انت برّه الشيفت. إجاباتك محفوظة، سجّل استئناف وكمّل', true); return; }
+    reSheet(); toast(errMsg(e), true);
+  }
 }
 
 // ============================================================

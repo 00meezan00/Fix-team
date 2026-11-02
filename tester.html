@@ -194,6 +194,18 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
   }
   /* 📱 قاعدة الآيفون — خط الخانات ١٦px، أقل من كده الأيفون بيكبّر الصفحة */
   @media (max-width:820px){ input, textarea, select{ font-size:16px !important; } }
+  /* ⏰🔒 برّه الشيفت (بريك / انصراف / لسه ماسجّلش) — كارت القفل بدل الأجهزة.
+     القفل الحقيقي على السيرفر (prod-tester-shift.sql) — ده عشان الشكل بس. */
+  body.tq-locked .tabs{display:none !important;}
+  .tq-lock{max-width:440px; margin:28px auto; padding:26px 20px; text-align:center;
+    background:var(--card); border:1px solid var(--line); border-radius:18px;}
+  .tq-lock .ic{font-size:46px; line-height:1; margin-bottom:10px;}
+  .tq-lock h2{margin:0 0 8px; font-size:19px; color:var(--ink);}
+  .tq-lock p{margin:0 0 18px; color:var(--muted); line-height:1.9; font-size:14.5px;}
+  .tq-lock button{display:block; width:100%; margin:8px 0 0; padding:13px; border-radius:12px;
+    font:inherit; font-weight:800; font-size:15px; cursor:pointer;
+    border:1px solid var(--line); background:var(--soft); color:var(--ink);}
+  .tq-lock button.pri{background:var(--chrome); color:var(--on-chrome); border-color:var(--chrome);}
 </style>
 </head>
 <body>
