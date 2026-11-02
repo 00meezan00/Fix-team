@@ -5716,7 +5716,7 @@ function renderDetailNow(){
       <label class="field">
         <span>${t('det.accountant')}</span>
         ${(String(d.registeredBy||'').trim() && !isSuperAdmin())
-          ? `<input value="${esc(d.registeredBy)}" readonly style="opacity:.85;" title="الاسم ده اتسجّل — المحاسب العام بس يقدر يغيّره" /><span style="font-size:11.5px;color:var(--muted-2);">🔒 اتسجّل — المحاسب العام بس يقدر يغيّره</span>`
+          ? `<input value="${esc(d.registeredBy)}" readonly style="opacity:.85;" title="الاسم ده اتسجّل — المحاسب العام بس يقدر يغيّره" />`
           : `<select${roI ? ' disabled' : ''} onchange="editRegisteredBy(this)">${registrantOptionsHtml(d.registeredBy)}</select>`}
       </label>
     </div>
