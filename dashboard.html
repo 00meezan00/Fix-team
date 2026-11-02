@@ -4626,6 +4626,8 @@ async function submitAdd(){
     customerName, deviceType, deviceColor,
     shopName: get('shopName'),
     registeredBy: get('registeredBy'),
+    // 🪪 (2/11) إيميل اللي سجّل — من القايمة (السيرفر بيكمّله لو فاضي — prod-reg-identity.sql)
+    registeredByEmail: (() => { try{ const o = document.getElementById('f_registeredBy').selectedOptions[0]; return (o && o.dataset.email) || ''; }catch(e){ return ''; } })(),
     broughtBy: get('broughtBy'),        // 🛵 المندوب
     customerPhone: get('customerPhone'),
     model: get('model'),
@@ -5323,15 +5325,16 @@ const REG_BY_GROUPS = [
 function registrantGroups(){
   const g = {}; REG_BY_GROUPS.forEach(([r]) => g[r] = []);
   const seen = new Set();
-  const add = (role, n, noName) => {
+  // em = إيميل الأكونت — بيتكتب على الجهاز (registeredByEmail) عشان الترتيب يتربط بالشخص مش بالاسم
+  const add = (role, n, noName, em) => {
     n = String(n || '').trim();
     if(!n || !g[role]) return;
     const k = n.toLowerCase().replace(/\s+/g, ' ');
     if(seen.has(k)) return;
-    seen.add(k); g[role].push({ n, noName: !!noName });
+    seen.add(k); g[role].push({ n, noName: !!noName, em: String(em || '').toLowerCase() });
   };
   try{
-    (ADMIN_EMAILS || []).forEach(e => add('super_admin', (roleEntrySafe(e).techName || '').trim() || 'المحاسب العام'));
+    (ADMIN_EMAILS || []).forEach(e => add('super_admin', (roleEntrySafe(e).techName || '').trim() || 'المحاسب العام', false, e));
     Object.keys(userRoles || {}).forEach(em => {
       const e = em.toLowerCase();
       if((ADMIN_EMAILS || []).includes(e)) return;
@@ -5339,14 +5342,14 @@ function registrantGroups(){
       if(!REG_BY_ROLES.includes(en.role)) return;
       // نفس اللي صفحة الديسباتشر/المالك بتكتبه: الاسم من لوحة الأدمن، وإلا أول جزء من الإيميل
       const nm = (en.techName || '').trim();
-      if(en.role === 'super_admin') add('super_admin', nm || 'المحاسب العام');
-      else add(en.role, nm || e.split('@')[0], !nm);
+      if(en.role === 'super_admin') add('super_admin', nm || 'المحاسب العام', false, e);
+      else add(en.role, nm || e.split('@')[0], !nm, e);
     });
   }catch(e){ console.warn('أسامي المسجّلين:', e); }
   // اللي فاتح دلوقتي — دايماً موجود
   try{
     const r = isProdMgr() ? 'prodmgr' : myRole();
-    if(REG_BY_ROLES.includes(r)) add(r, currentUser.name);
+    if(REG_BY_ROLES.includes(r)) add(r, currentUser.name, false, currentUser.email);
   }catch(e){}
   Object.values(g).forEach(list => list.sort((a, b) => a.n.localeCompare(b.n, 'ar')));
   return g;
@@ -5365,7 +5368,7 @@ function registrantOptionsHtml(selected){
   REG_BY_GROUPS.forEach(([r, label]) => {
     if(!g[r].length) return;
     html += `<optgroup label="${esc(label)}">`
-      + g[r].map(x => `<option value="${esc(x.n)}"${x.n === sel ? ' selected' : ''}>${esc(x.n)}${x.noName ? ' (مالوش اسم في لوحة الأدمن)' : ''}</option>`).join('')
+      + g[r].map(x => `<option value="${esc(x.n)}" data-email="${esc(x.em)}"${x.n === sel ? ' selected' : ''}>${esc(x.n)}${x.noName ? ' (مالوش اسم في لوحة الأدمن)' : ''}</option>`).join('')
       + '</optgroup>';
   });
   return html;
@@ -5380,10 +5383,13 @@ async function editRegisteredBy(sel){
   if(old && !isSuperAdmin()){ alert('🔒 الاسم ده اتسجّل خلاص — المحاسب العام بس يقدر يغيّره.'); renderDetail(); return; }
   if(!v){ renderDetail(); return; }
   if(old && !confirm('تغيّر «اللي سجّل الجهاز» من «' + old + '» لـ «' + v + '»؟\n\nهيتكتب في سجل الجهاز، وهيأثّر على ترتيب الاستلامات.')){ renderDetail(); return; }
-  if(old){
-    const note = { text: '✏️ اللي سجّل الجهاز اتغيّر: من «' + old + '» لـ «' + v + '»', at: new Date().toISOString(), by: currentUser.name, role: 'المحاسب العام' };
-    devices = devices.map(x => x.id === selectedId ? { ...x, activityNotes: [...(x.activityNotes || []), note] } : x);
-  }
+  // 🪪 إيميل الأكونت اللي اتختار (فاضي = السيرفر يدوّر عليه بالاسم)
+  let em = '';
+  try{ const o = sel.selectedOptions[0]; em = (o && o.dataset.email) || ''; }catch(e){}
+  const note = old ? { text: '✏️ اللي سجّل الجهاز اتغيّر: من «' + old + '» لـ «' + v + '»', at: new Date().toISOString(), by: currentUser.name, role: 'المحاسب العام' } : null;
+  devices = devices.map(x => x.id === selectedId
+    ? { ...x, registeredByEmail: em, ...(note ? { activityNotes: [...(x.activityNotes || []), note] } : {}) }
+    : x);
   await editField('registeredBy', v);
 }
 

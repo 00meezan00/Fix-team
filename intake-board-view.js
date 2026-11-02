@@ -179,7 +179,8 @@
   }
   function hasT(r     )          { return r && r.target !== null && r.target !== undefined && Number(r.target) > 0; }
 
-  async function setTarget(name        , cur     ){
+  // 🪪 (2/11) التارجت على الأكونت: key = pkey من السيرفر ('' = موظف جديد بالاسم)
+  async function setTarget(key, name        , cur     ){
     if(!S.sa) return;
     var v = prompt('🎯 تارجت «' + name + '» لشهر ' + periodLabel() + ' (بالجنيه):\n'
       + 'سيبه فاضي أو 0 = شيل التارجت', cur ? String(Math.round(Number(cur))) : '');
@@ -187,7 +188,9 @@
     v = String(v).replace(/[٠-٩]/g, function(d){ return String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)); }).replace(/[^0-9.]/g, '');
     var n = v === '' ? 0 : Number(v);
     if(!isFinite(n) || n < 0){ alert('رقم غلط'); return; }
-    var res = await sb.rpc('intake_target_set', { p_name: name, p_ym: curYm(), p_target: n });
+    var res = await sb.rpc('intake_target_set2', { p_key: key || '', p_name: name, p_ym: curYm(), p_target: n });
+    // السيرفر لسه على القديم (prod-reg-identity.sql ما اتشغّلش)؟ → بالاسم زي زمان
+    if(res.error && /intake_target_set2|schema cache|PGRST202/i.test(res.error.message || '')) res = await sb.rpc('intake_target_set', { p_name: name, p_ym: curYm(), p_target: n });
     if(res.error){
       var m = res.error.message || String(res.error);
       alert('⚠️ ما اتحفظش: ' + m + (/intake_target_set|schema cache|does not exist|PGRST202/i.test(m)
@@ -200,7 +203,7 @@
     if(!S.sa) return;
     var nm = prompt('اسم الموظف — زي ما بيتكتب في «اسم الموظف اللي بيسجّل الجهاز»:');
     if(nm === null || !String(nm).trim()) return;
-    setTarget(String(nm).trim(), null);
+    setTarget('', String(nm).trim(), null);
   }
   // 📋 نفس تارجتات الشهر اللي قبله
   async function copyPrev(){
@@ -210,14 +213,17 @@
     if(res.error){ alert('⚠️ ' + (res.error.message || res.error)); return; }
     var prev = (res.data || []).filter(hasT);
     if(!prev.length){ alert('الشهر اللي قبله مفيهوش تارجتات.'); return; }
-    var have = {}; (S.rows || []).filter(hasT).forEach(function(r){ have[String(r.name).trim().toLowerCase()] = 1; });
-    var todo = prev.filter(function(r){ return !have[String(r.name).trim().toLowerCase()]; });
+    var idOf = function(r){ return r.pkey || ('n:' + String(r.name).trim().toLowerCase()); };
+    var have = {}; (S.rows || []).filter(hasT).forEach(function(r){ have[idOf(r)] = 1; });
+    var todo = prev.filter(function(r){ return !have[idOf(r)]; });
     if(!todo.length){ alert('كل اللي كان عليهم تارجت الشهر اللي فات عليهم تارجت دلوقتي.'); return; }
     if(!confirm('هنحط لـ ' + todo.length + ' موظف نفس تارجت الشهر اللي فات:\n\n'
       + todo.map(function(r){ return '• ' + r.name + ': ' + money(r.target); }).join('\n')
       + '\n\n(اللي عليهم تارجت الشهر ده مش هيتغيّروا)')) return;
     for(var i = 0; i < todo.length; i++){
-      var w = await sb.rpc('intake_target_set', { p_name: todo[i].name, p_ym: curYm(), p_target: Number(todo[i].target) });
+      var w = todo[i].pkey
+        ? await sb.rpc('intake_target_set2', { p_key: todo[i].pkey, p_name: todo[i].name, p_ym: curYm(), p_target: Number(todo[i].target) })
+        : await sb.rpc('intake_target_set', { p_name: todo[i].name, p_ym: curYm(), p_target: Number(todo[i].target) });
       if(w.error){ alert('⚠️ وقف عند «' + todo[i].name + '»: ' + (w.error.message || w.error)); break; }
     }
     load();
@@ -225,9 +231,10 @@
 
   function tCell(r     )         {
     // نهرّب لـ JS الأول وبعدين لـ HTML — عشان اسم فيه ' مايكسرش الزرار
-    var safe = e(String(r.name).replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
-    var edit = S.sa ? ' <button class="tset" onclick="IFixIntakeBoard.setTarget(\'' + safe + '\',' + (hasT(r) ? Number(r.target) : 0) + ')">✎</button>' : '';
-    if(!hasT(r)) return S.sa ? '<button class="tset" onclick="IFixIntakeBoard.setTarget(\'' + safe + '\',0)">＋ تارجت</button>' : '<span class="mut">—</span>';
+    var js = function(x){ return e(String(x == null ? '' : x).replace(/\\/g, '\\\\').replace(/'/g, "\\'")); };
+    var args = '\'' + js(r.pkey || '') + '\',\'' + js(r.name) + '\',';
+    var edit = S.sa ? ' <button class="tset" onclick="IFixIntakeBoard.setTarget(' + args + (hasT(r) ? Number(r.target) : 0) + ')">✎</button>' : '';
+    if(!hasT(r)) return S.sa ? '<button class="tset" onclick="IFixIntakeBoard.setTarget(' + args + '0)">＋ تارجت</button>' : '<span class="mut">—</span>';
     if(r.amount === null || r.amount === undefined) return '<span class="mut">🔒</span>';
     var p = pct(r);
     return '<div class="tpct"' + (p >= 100 ? ' style="color:#16A34A;"' : '') + '>' + p + '٪' + edit + '</div>'
