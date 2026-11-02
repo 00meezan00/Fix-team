@@ -1989,12 +1989,12 @@ async function loadUserRoles(){
 function superAdminName(){
   const e = String(currentUser.email || '').toLowerCase();
   if(!ADMIN_EMAIL_SET || !e) return '';                 // وضع آمن / مفيش إيميل → سيبه
-  if(!ADMIN_EMAILS.includes(e) && roleEntry(e).role !== 'super_admin') return '';
-  return (roleEntry(e).techName || '').trim() || 'المحاسب العام';
+  if(!ADMIN_EMAILS.includes(e) && roleEntrySafe(e).role !== 'super_admin') return '';
+  return (roleEntrySafe(e).techName || '').trim() || 'المحاسب العام';
 }
 function applyRoleName(){
   try{
-    const n = superAdminName() || (roleEntry(currentUser.email).techName || '').trim();
+    const n = superAdminName() || (roleEntrySafe(currentUser.email).techName || '').trim();
     if(!n) return;
     currentUser.name = n;
     try{ localStorage.setItem('ifix_user', JSON.stringify(currentUser)); }catch(e){}
@@ -2014,6 +2014,10 @@ function roleEntry(email){
   if(v && typeof v === 'object') return { role: v.role || 'accountant', techName: v.techName || '', caps: Array.isArray(v.caps) ? v.caps : [] };
   return null;
 }
+// 🛟 (2/11) زي roleEntry بس عمرها ما بترجع null — الإيميل اللي مش في لوحة
+//    الأدمن (زي إيميل المحاسب العام الأساسي) بيرجع كائن فاضي بدل ما يوقّع
+//    الكود اللي بيقرا .techName منه.
+function roleEntrySafe(email){ return roleEntry(email) || { role: '', techName: '', caps: [] }; }
 
 function roleOf(email){
   if(!ADMIN_EMAIL_SET) return 'super_admin';   // وضع آمن: الإعداد لسه ماتعملش
@@ -5327,11 +5331,11 @@ function registrantGroups(){
     seen.add(k); g[role].push({ n, noName: !!noName });
   };
   try{
-    (ADMIN_EMAILS || []).forEach(e => add('super_admin', (roleEntry(e).techName || '').trim() || 'المحاسب العام'));
+    (ADMIN_EMAILS || []).forEach(e => add('super_admin', (roleEntrySafe(e).techName || '').trim() || 'المحاسب العام'));
     Object.keys(userRoles || {}).forEach(em => {
       const e = em.toLowerCase();
       if((ADMIN_EMAILS || []).includes(e)) return;
-      const en = roleEntry(e);
+      const en = roleEntrySafe(e);
       if(!REG_BY_ROLES.includes(en.role)) return;
       // نفس اللي صفحة الديسباتشر/المالك بتكتبه: الاسم من لوحة الأدمن، وإلا أول جزء من الإيميل
       const nm = (en.techName || '').trim();
