@@ -372,10 +372,13 @@ function accEntryHtml(e){
 //       • وبعدها اتسجّل إيه (ولحد دلوقتي بقى كام)
 //    كأنك قفلت الكشكول عند السطر ده وقطعت كل الصفحات اللي بعده.
 //
-// 🔎 «وقتها» معناها: بترتيب **تسجيل الحركات في الحساب** (تاريخ القيد
-//    في الدفتر) — نفس الترتيب اللي بيحدد «الدورة» وزرار «آخر تحديث».
-//    فالدفعة اللي اتسجّلت بتاريخ سابق بتتحسب في مكان تاريخها هي.
-//    ولو جهاز اتقيّد آجل بعد تسليمه بيومين، بيتحسب من يوم القيد.
+// 🔎 «وقتها» معناها: بنفس **الترتيب اللي إنت مختاره** فوق الكشف (٢-١١):
+//      🕒 آخر تحديث  → بوقت تسجيل الحركة في الحساب (زي زمان)
+//      📥 تاريخ الدخول → بيوم ما الجهاز دخل المحل
+//      📤 تاريخ الخروج → بيوم ما الجهاز اتسلّم
+//    الدفعة والخصم والرصيد الافتتاحي مالهمش دخول ولا خروج — بيتحطوا
+//    بتاريخهم هما (نفس قاعدة الترتيب بالظبط: accSortTs).
+//    السهم ↓ ↑ مالوش دعوة: الرصيد دايماً بيتحسب من الأقدم للأحدث.
 //
 // ⚠️ عرض وحساب بس — مفيش ولا كتابة في الدفتر. والزرار مش بيتحط
 //    أصلاً لغير المحاسب العام (isSuperAdmin).
@@ -389,18 +392,20 @@ function accAtBtn(e){
   return `<button class="acc-mini-btn" style="color:var(--info);border-color:var(--info-border);" onclick="accShowBalanceAt('${esc(e.id)}')">📍 الرصيد وقتها</button>`;
 }
 
-// الحساب: ترتيب حركات المحل بوقت التسجيل (ولو نفس الوقت → الأبعد في الدفتر أقدم،
-// لأن الجديد بيتحط في أول الدفتر) — نفس قاعدة accCycleSplit بالظبط
+// الحساب: ترتيب حركات المحل من الأقدم للأحدث **بالترتيب المختار** للمحل ده
+// (accSortOf). لو الوقتين متساويين → وقت التسجيل، ولو برضه متساويين →
+// الأبعد في الدفتر أقدم (لأن الجديد بيتحط في أول الدفتر) — زي accCycleSplit.
 function accBalanceAt(entryId){
   const target = ledger.find(x => x.id === entryId);
   if(!target) return null;
   const shop = accShopOf(target.shop);   // 🪪
+  const kind = accSortOf(shop).k;        // update · in · out
   const rows = [];
-  ledger.forEach((x, i) => { if(accShopOf(x.shop) === shop) rows.push({ e:x, i }); });
-  rows.sort((a, b) => {
-    const ta = new Date(a.e.date || 0).getTime() || 0, tb = new Date(b.e.date || 0).getTime() || 0;
-    return (ta - tb) || (b.i - a.i);
+  ledger.forEach((x, i) => {
+    if(accShopOf(x.shop) === shop)
+      rows.push({ e:x, i, k: accSortTs(x, kind), u: new Date(x.date || 0).getTime() || 0 });
   });
+  rows.sort((a, b) => (a.k - b.k) || (a.u - b.u) || (b.i - a.i));
   const pos = rows.findIndex(r => r.e.id === entryId);
   const sgn = x => (isDebitLike(x) ? 1 : -1) * (Number(x.amount) || 0);
   let before = 0;
@@ -408,7 +413,8 @@ function accBalanceAt(entryId){
   const effect = sgn(target);
   const later = rows.slice(pos + 1).map(r => r.e);
   const laterNet = later.reduce((s, x) => s + sgn(x), 0);
-  return { shop, e:target, before, effect, atThat: before + effect, later, laterNet, now: before + effect + laterNet };
+  const by = ACC_SORT_KINDS.find(x => x.k === kind) || ACC_SORT_KINDS[0];
+  return { shop, e:target, before, effect, atThat: before + effect, later, laterNet, now: before + effect + laterNet, kind, by };
 }
 
 // رقم الرصيد بلون وكلمة: عليه / خالص / ليه رصيد
@@ -429,7 +435,7 @@ function accShowBalanceAt(entryId){
   const laterRows = r.later.slice(0, 30).map(x => {
     const s = isDebitLike(x) ? '+' : '−';
     return `<div style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--border,#E2E8F0);font-size:12.5px;">`
-      + `<span>${esc(accFmtShort(x.date))} — ${esc(stmtDesc(x))}</span>`
+      + `<span>${esc(accFmtShort(r.kind === 'update' ? x.date : (accSortTs(x, r.kind) ? new Date(accSortTs(x, r.kind)).toISOString() : x.date)))} — ${esc(stmtDesc(x))}</span>`
       + `<b style="white-space:nowrap;color:${isDebitLike(x) ? 'var(--warn)' : 'var(--success)'};">${s} ${(Number(x.amount) || 0).toLocaleString('en-EG')}</b></div>`;
   }).join('');
   const more = r.later.length > 30 ? `<div style="font-size:12px;color:var(--muted-2);padding-top:6px;">… و${r.later.length - 30} حركة كمان</div>` : '';
@@ -442,13 +448,14 @@ function accShowBalanceAt(entryId){
   ov.innerHTML =
     `<div style="background:var(--surface,#fff);color:var(--ink,#1A2332);border-radius:18px;width:100%;max-width:440px;max-height:90vh;overflow-y:auto;padding:18px;box-shadow:0 22px 60px rgba(0,0,0,.35);font-family:inherit;">`
     + `<div style="font-weight:900;font-size:17px;">📍 الرصيد وقتها — ${esc(r.shop)}</div>`
-    + `<div style="font-size:12.5px;color:var(--muted,#64748B);margin:4px 0 12px;">${esc(accFmtShort(r.e.date))} — ${esc(stmtDesc(r.e))}</div>`
+    + `<div style="font-size:12.5px;color:var(--muted,#64748B);margin:4px 0 6px;">${esc(accFmtShort(r.kind === 'update' ? r.e.date : (r.e && accSortTs(r.e, r.kind) ? new Date(accSortTs(r.e, r.kind)).toISOString() : r.e.date)))} — ${esc(stmtDesc(r.e))}</div>`
+    + `<div style="display:inline-block;font-size:12px;font-weight:800;color:var(--info);background:var(--info-bg);border:1px solid var(--info-border);border-radius:999px;padding:3px 10px;margin-bottom:12px;">${r.by.ic} محسوب بترتيب «${esc(r.by.n)}»</div>`
     + `<div style="display:grid;gap:8px;">`
       + row('قبل الحركة دي كان', accBalWords(r.before))
       + row('الحركة دي', `<b style="color:${r.effect > 0 ? 'var(--warn)' : 'var(--success)'};">${sign} ${Math.abs(r.effect).toLocaleString('en-EG')} ج.م</b>`)
       + row('✅ المتبقي وقتها', accBalWords(r.atThat), true)
     + `</div>`
-    + `<div style="font-weight:800;font-size:13.5px;margin:16px 0 4px;">اللي اتسجّل بعدها (${r.later.length} حركة)</div>`
+    + `<div style="font-weight:800;font-size:13.5px;margin:16px 0 4px;">اللي بعدها بترتيب «${esc(r.by.n)}» (${r.later.length} حركة)</div>`
     + (r.later.length ? `<div>${laterRows}${more}</div>` : `<div style="font-size:13px;color:var(--muted-2);">مفيش — دي آخر حركة في الحساب.</div>`)
     + `<div style="display:grid;gap:8px;margin-top:12px;">${row('المتبقي دلوقتي', accBalWords(r.now))}</div>`
     + `<button type="button" onclick="accCloseBalanceAt()" style="width:100%;margin-top:14px;border:none;border-radius:12px;padding:13px;font:800 14px/1 inherit;background:#1F3864;color:#fff;cursor:pointer;">تمام</button>`
