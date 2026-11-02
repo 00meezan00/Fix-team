@@ -41,6 +41,8 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
 <script src="payroll.js"></script>
 <script src="i18n.js"></script>
 <script src="qr-scan.js"></script>
+<!-- 🧪 (2/11) كارت «فحص الجهاز» في تفاصيل الجهاز — prod-tester.sql (الفني بيشوف أجهزته بس) -->
+<script src="qc-view.js"></script>
 <script src="fuzzy-search.js"></script>
 <!-- 🔎 فلاتر البحث البيضاوية (تاريخ · موديل · اسم · محل · رقم · عطل · سريال) -->
 <script src="search-filters.js"></script>
@@ -2322,6 +2324,8 @@ function renderSheet(){
           <span class="k" data-i18n="rp.issue">العطل</span><span class="v issue">${esc(d.issue)||'—'}</span>
         </div>
       </div>
+
+      ${/* 🧪 نتيجة فحص التيستر (استلام · تسليم) — قراية بس */ (typeof QC !== 'undefined') ? QC.panelHtml({ id: d.id }, () => { if(sheetId === d.id) renderSheet(); }) : ''}
 
       <div class="panel">
         <div class="panel-h" data-i18n="tp.notes">📝 ملاحظات الفني</div>

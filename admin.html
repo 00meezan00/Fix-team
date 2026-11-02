@@ -759,7 +759,7 @@ async function toggleFlag(key){
 //    + فني في صفحة واحدة (owner.html)، وبيسعّر الأجهزة
 //    اللي السوبر أدمن بيشاركها معاه. مايقدرش يأكد دفع.
 //    ⚠️ الاسم الظاهر عنده **إجباري** — هو اللي بيربط أجهزته.
-const ROLES = ['super_admin', 'accountant', 'dispatcher', 'technician', 'hr', 'staff', 'owner', 'callcenter', 'prodmgr'];   // 📞 callcenter: ملف prod-callcenter.sql لازم يتشغّل الأول
+const ROLES = ['super_admin', 'accountant', 'dispatcher', 'technician', 'hr', 'staff', 'owner', 'callcenter', 'prodmgr', 'tester'];   // 🧪 tester: ملف prod-tester.sql لازم يتشغّل الأول   // 📞 callcenter: ملف prod-callcenter.sql لازم يتشغّل الأول
 // 🏭 prodmgr = مدير الإنتاج: نفس شاشة وصلاحيات المحاسب (السيرفر بيعامله محاسب عن قصد)
 //    من غير «فواتير المشتريات» و«مراجعة قطع الغيار»، وزيادة «الفنيين بتوعي»
 //    وموافقة انصرافهم. ملف prod-prodmgr.sql لازم يتشغّل الأول.
@@ -773,7 +773,7 @@ const ROLE_LABEL_KEYS = {
 };
 // الأدوار اللي لسه مالهاش مفتاح ترجمة — من غير ده بيظهر الاسم
 // الإنجليزي الخام (staff) قدّام الأدمن.
-const ROLE_LABEL_FALLBACK = { staff: 'موظف', owner: 'المالك', callcenter: 'الكول سنتر', prodmgr: 'مدير الإنتاج' };
+const ROLE_LABEL_FALLBACK = { staff: 'موظف', owner: 'المالك', callcenter: 'الكول سنتر', prodmgr: 'مدير الإنتاج', tester: 'مسؤول الفحص' };
 function roleLabel(r){
   const k = ROLE_LABEL_KEYS[r];
   try{ return k ? t(k) : (ROLE_LABEL_FALLBACK[r] || r); }

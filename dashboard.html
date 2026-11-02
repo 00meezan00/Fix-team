@@ -68,13 +68,14 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
       }
     }
 
-    if(!bounced && sameUser && (last === 'dispatcher' || last === 'technician' || last === 'hr' || last === 'staff' || last === 'owner' || last === 'callcenter')){
+    if(!bounced && sameUser && (last === 'dispatcher' || last === 'technician' || last === 'hr' || last === 'staff' || last === 'owner' || last === 'callcenter' || last === 'tester')){
       sessionStorage.setItem('ifix-bounced', '1');
       location.replace(last === 'dispatcher' ? 'dispatch.html'
                      : last === 'hr'         ? 'hr.html'
                      : last === 'staff'      ? 'staff.html'
                      : last === 'owner'      ? 'owner.html'
                      : last === 'callcenter' ? 'callcenter.html'
+                     : last === 'tester'     ? 'tester.html'
                      : 'my-devices.html');
       return;
     }
@@ -118,6 +119,8 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
 <script src="prodmgr.js"></script>   <!-- 🏭 مدير الإنتاج: «الفنيين بتوعي» + موافقة الانصراف (ملف prod-prodmgr.sql) — مؤقت للإنتاج -->   <!-- 📊 إحصائية ما بعد البيع — للمحاسب العام بس (مؤقت للإنتاج) -->
 <!-- 🪪 (2/11) كود لكل محل + كل أساميه حساب واحد — prod-shop-codes.sql -->
 <script src="shop-picker.js"></script>
+<!-- 🧪 كارت «فحص الجهاز» في التفاصيل — prod-tester.sql -->
+<script src="qc-view.js"></script>
 <script src="accounts.js"></script>
 <script src="label.js"></script>
 <script src="attendance.js"></script>
@@ -1969,7 +1972,7 @@ function isAdmin(){ return isSuperAdmin(); }
 // لو إيميل الأدمن لسه ماتحطش، بنسيب الصلاحيات مفتوحة عشان محدش يتقفل بره النظام
 const ADMIN_EMAIL_SET = ADMIN_EMAILS.length > 0;
 const ROLES_KEY = 'user-roles';
-const ROLES = ['super_admin', 'accountant', 'dispatcher', 'technician', 'hr', 'staff', 'owner', 'callcenter'];   // 📞 callcenter → callcenter.html
+const ROLES = ['super_admin', 'accountant', 'dispatcher', 'technician', 'hr', 'staff', 'owner', 'callcenter', 'tester'];   // 🧪 tester → tester.html   // 📞 callcenter → callcenter.html
 let userRoles = {};   // { "email": "super_admin" }  أو  { "email": {role, techName} }
 
 async function loadUserRoles(){
@@ -2062,7 +2065,7 @@ const ROLE_LABEL_KEYS = {
 };
 // دور HR اتضاف بعد ما الخريطة دي اتكتبت ومالوش مفتاح ترجمة،
 // فبيرجّع 'hr' خام. الخريطة دي بتغطّي أي دور مالوش مفتاح.
-const ROLE_LABEL_FALLBACK = { hr: 'موارد بشرية', staff: 'موظف', owner: 'المالك', callcenter: 'الكول سنتر', prodmgr: 'مدير الإنتاج' };
+const ROLE_LABEL_FALLBACK = { hr: 'موارد بشرية', staff: 'موظف', owner: 'المالك', callcenter: 'الكول سنتر', prodmgr: 'مدير الإنتاج', tester: 'مسؤول الفحص' };
 function roleLabel(r){
   // 🧾 حساب السوبر أدمن **هو** «المحاسب العام» — ولوحة الأدمن باب جواه.
   //    فاسمه في كل حاجة الناس بتشوفها (ملاحظات الأجهزة · حسابي ·
@@ -2135,6 +2138,8 @@ function applyRoleVisibility(){
   if(myRole() === 'owner'){ location.replace('owner.html'); return; }
   // 📞 الكول سنتر: صفحته callcenter.html — بتقرا من devices_callcenter
   if(myRole() === 'callcenter'){ location.replace('callcenter.html'); return; }
+  // 🧪 مسؤول الفحص: صفحته tester.html — مابيقراش الأجهزة خالص (prod-tester.sql)
+  if(myRole() === 'tester'){ location.replace('tester.html'); return; }
 
   // الدور اتحدد → نحفظه ونحدّث الكلاسات
   try{
@@ -5601,6 +5606,7 @@ function renderDetailNow(){
     ${pendingApprovalText(d) ? `<div class="pending-appr-banner">⏳ ${pendingApprovalText(d)} — ${t('appr.bannerHint')}</div>` : ''}
     ${dueDetailHtml(d)}
     ${ccDetailHtml(d)}
+    ${(typeof QC !== 'undefined') ? QC.panelHtml(d, renderDetail) : ''}
 
     <div class="row2">
       <label class="field"><span>${t('det.customerName')}</span><input value="${esc(d.customerName)}"${roI} onblur="editField('customerName', this.value)" /></label>
@@ -6652,6 +6658,18 @@ async function changeStatus(newStatus, paymentChoice, rejectedInShopChoice){
   // مسؤول الحركة: التسليم/الإرجاع بيتحوّلوا لطلب معلّق بدل تنفيذ فوري
   if(isDispatcher() && APPROVAL_STATUSES.includes(newStatus)){
     return requestApproval(newStatus === 'delivered' ? 'handover' : 'return', newStatus, paymentChoice);
+  }
+
+  // 🧪 (2/11) التيستر لقى حاجة كانت سليمة وقت الاستلام وباظت؟ → تحذير قبل التسليم
+  //    (تحذير بس — مابيمنعش. الكارت بيتقرا لما تفاصيل الجهاز بتتفتح.)
+  if(newStatus === 'delivered' && typeof QC !== 'undefined'){
+    try{
+      const qs = QC.state(d.id);
+      if(qs && qs.regress && qs.regress.length
+         && !confirm('⚠️ فحص التسليم لقى ' + qs.regress.length + ' حاجة كانت سليمة وقت الاستلام وبقت فيها مشكلة:\n\n'
+                     + qs.regress.map(it => '• ' + QC.label(it.k) + (it.n ? ' — ' + it.n : '')).join('\n')
+                     + '\n\nتسلّم الجهاز برضه؟')){ renderDetail(); return; }
+    }catch(e){ console.warn('تحذير الفحص:', e); }
   }
 
   if(d.status === 'waiting' && !['waiting','rejected','returned'].includes(newStatus) && !d.technician){
