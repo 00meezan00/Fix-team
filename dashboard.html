@@ -1603,7 +1603,8 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
            اسم الخانة متعرّف في مكان واحد: ACC_BB_LABEL في accounts.js -->
       <label class="field"><span>🛵 اسم المندوب (اللي جاب الجهاز)</span><input id="f_broughtBy" list="broughtByList" autocomplete="off" placeholder="سيبه فاضي لو صاحب الجهاز جابه بنفسه" /></label>
       <datalist id="broughtByList"></datalist>
-      <label class="field"><span data-i18n="add.registeredBy">اسم المحاسب اللي بيسجل الجهاز</span><input id="f_registeredBy" list="accountantList" /></label>
+      <!-- 🔒 (2/11) اختيارات بس (مش كتابة) — المحاسب العام · المحاسبين · مدير الإنتاج · الديسباتشر · المالك -->
+      <label class="field"><span data-i18n="add.registeredBy">اسم المحاسب اللي بيسجل الجهاز</span><select id="f_registeredBy"></select></label>
       <datalist id="accountantList"></datalist>
       <label class="field"><span data-i18n="add.phone">رقم التليفون</span><input id="f_customerPhone" list="phoneHistory" autocomplete="off" inputmode="tel" oninput="fixDigitsInput(this); this.dataset.autoFill='';" /></label>
       <datalist id="phoneHistory"></datalist>
@@ -4289,6 +4290,14 @@ function openAddModal(){
   ['customerName','shopName','broughtBy','registeredBy','customerPhone','deviceType','model','deviceColor','serialNumber','reportedIssue','conditionNotes','agreedPrice']
     .forEach(id => { const _e = document.getElementById('f_'+id); if(!_e) return; _e.value = ''; if(_e.dataset) _e.dataset.autoFill = ''; });
   document.getElementById('accountantList').innerHTML = accountantOptions();
+  // 🔒 اختيارات «مين سجّل الجهاز» — واسمي مختار لوحده
+  try{
+    const _rb = document.getElementById('f_registeredBy');
+    if(_rb && _rb.tagName === 'SELECT'){
+      _rb.innerHTML = registrantOptionsHtml('');
+      if(registrantNames().includes(String(currentUser.name || '').trim())) _rb.value = String(currentUser.name).trim();
+    }
+  }catch(e){ console.warn('خانة المسجّل:', e); }
   const _sec = document.getElementById('lockSection'), _back = document.getElementById('lockHostAdd');
   if(_sec && _back && _sec.parentElement !== _back) _back.appendChild(_sec);   // نضمن رجوعه لمكانه
   resetLock();
@@ -4579,6 +4588,7 @@ async function submitAdd(){
   if(!deviceColor)  missing.push('لون الجهاز');
   // 🏪 اسم المحل إجباري — عميل قطاعي = «I Fix Team»
   if(!get('shopName')) missing.push('اسم المحل (لو عميل قطاعي اكتب I Fix Team)');
+  if(!get('registeredBy')) missing.push('اسم الموظف اللي بيسجّل الجهاز');   // 🔒 (2/11)
   if(missing.length){
     alert('لازم تكتب: ' + missing.join('، '));
     const first = !customerName ? 'f_customerName' : (!deviceType ? 'f_deviceType' : (!deviceColor ? 'f_deviceColor' : 'f_shopName'));
@@ -5283,6 +5293,67 @@ function broughtByOptions(){
   return [...seen.values()].sort((a,b) => b.ts - a.ts)
     .map(x => `<option value="${esc(x.n)}"></option>`).join('');
 }
+// ============================================================
+// 🔒 (2/11 · تعديل مؤقت على الإنتاج) «مين سجّل الجهاز» — اختيارات بس
+// ------------------------------------------------------------
+// 🧸 بالبلدي: الخانة كانت كتابة حرة — فأي حد يقدر يكتب أي اسم
+//    (وده بيلخبط «ترتيب الاستلامات»). دلوقتي قايمة أسامي من لوحة
+//    الأدمن بس: المحاسب العام · المحاسبين · مدير الإنتاج · الديسباتشر
+//    · المالك. والاسم بعد ما يتكتب **بيتقفل** — المحاسب العام بس
+//    يصلّحه (وبيتسجّل في سجل الجهاز). والسيرفر بيرجّعه لو حد غيره
+//    حاول (prod-registered-by-lock.sql).
+// ⚠️ الاسم = الاسم الظاهر من لوحة الأدمن (نفس اللي الديسباتشر والمالك
+//    بيتكتب لهم لوحده). اللي مالوش اسم هناك بيظهر بأول جزء من إيميله —
+//    اكتبله اسم من لوحة الأدمن.
+// ============================================================
+const REG_BY_ROLES = ['super_admin', 'accountant', 'prodmgr', 'dispatcher', 'owner'];
+function registrantNames(){
+  const out = [], seen = new Set();
+  const add = n => {
+    n = String(n || '').trim();
+    if(!n) return;
+    const k = n.toLowerCase().replace(/\s+/g, ' ');
+    if(seen.has(k)) return;
+    seen.add(k); out.push(n);
+  };
+  try{
+    (ADMIN_EMAILS || []).forEach(e => add((roleEntry(e).techName || '').trim() || 'المحاسب العام'));
+    Object.keys(userRoles || {}).forEach(em => {
+      const e = em.toLowerCase();
+      if((ADMIN_EMAILS || []).includes(e)) return;
+      const en = roleEntry(e);
+      if(!REG_BY_ROLES.includes(en.role)) return;
+      add(en.techName || (en.role === 'super_admin' ? 'المحاسب العام' : e.split('@')[0]));
+    });
+  }catch(e){ console.warn('أسامي المسجّلين:', e); }
+  // اللي فاتح دلوقتي (لو من الأدوار دي) — دايماً موجود
+  try{ if(REG_BY_ROLES.includes(myRole()) || isProdMgr()) add(currentUser.name); }catch(e){}
+  return out.sort((a, b) => a.localeCompare(b, 'ar'));
+}
+function registrantOptionsHtml(selected){
+  const names = registrantNames();
+  const sel = String(selected || '').trim();
+  if(sel && !names.includes(sel)) names.unshift(sel);   // اسم قديم مش في القايمة — يفضل ظاهر
+  return '<option value="">— اختار —</option>'
+    + names.map(n => `<option value="${esc(n)}"${n === sel ? ' selected' : ''}>${esc(n)}</option>`).join('');
+}
+// 👑 المحاسب العام بيصلّح الاسم → بيتسجّل في سجل الجهاز
+async function editRegisteredBy(sel){
+  const d = devices.find(x => x.id === selectedId);
+  if(!d) return;
+  const old = String(d.registeredBy || '').trim();
+  const v = String(sel.value || '').trim();
+  if(v === old) return;
+  if(old && !isSuperAdmin()){ alert('🔒 الاسم ده اتسجّل خلاص — المحاسب العام بس يقدر يغيّره.'); renderDetail(); return; }
+  if(!v){ renderDetail(); return; }
+  if(old && !confirm('تغيّر «اللي سجّل الجهاز» من «' + old + '» لـ «' + v + '»؟\n\nهيتكتب في سجل الجهاز، وهيأثّر على ترتيب الاستلامات.')){ renderDetail(); return; }
+  if(old){
+    const note = { text: '✏️ اللي سجّل الجهاز اتغيّر: من «' + old + '» لـ «' + v + '»', at: new Date().toISOString(), by: currentUser.name, role: 'المحاسب العام' };
+    devices = devices.map(x => x.id === selectedId ? { ...x, activityNotes: [...(x.activityNotes || []), note] } : x);
+  }
+  await editField('registeredBy', v);
+}
+
 function accountantOptions(){
   const names = [...new Set(devices.map(d => d.registeredBy).filter(Boolean))];
   return names.map(n => `<option value="${esc(n)}"></option>`).join('');
@@ -5605,7 +5676,9 @@ function renderDetailNow(){
       </label>
       <label class="field">
         <span>${t('det.accountant')}</span>
-        <input list="accountantListDetail" value="${esc(d.registeredBy||'')}" placeholder="${t('det.accountantPh')}"${roI} onblur="editField('registeredBy', this.value)" />
+        ${(String(d.registeredBy||'').trim() && !isSuperAdmin())
+          ? `<input value="${esc(d.registeredBy)}" readonly style="opacity:.85;" title="الاسم ده اتسجّل — المحاسب العام بس يقدر يغيّره" /><span style="font-size:11.5px;color:var(--muted-2);">🔒 اتسجّل — المحاسب العام بس يقدر يغيّره</span>`
+          : `<select${roI ? ' disabled' : ''} onchange="editRegisteredBy(this)">${registrantOptionsHtml(d.registeredBy)}</select>`}
       </label>
     </div>
     <datalist id="accountantListDetail">${accountantOptions()}</datalist>
