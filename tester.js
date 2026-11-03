@@ -95,6 +95,7 @@ function tqLockHtml()         {
     <button class="pri" onclick="openAttendance()">⏰ المواعيد</button>
     <button onclick="openPayroll()">💰 مرتبك</button>
     <button onclick="load(true)">↻ سجّلت — افتح</button>
+    <div class="ulk-slot"></div>   <!-- 🔓 طلب فتح من المحاسب العام (shift-unlock.js بيملاه) -->
   </div>`;
 }
 async function tqLock(locked         ){
@@ -264,7 +265,8 @@ function render(){
     { k:'recent', l:'🗂️ اتفحص قريب' }
   ];
   // ⏰🔒 برّه الشيفت: مفيش تابات ولا بحث ولا أجهزة — كارت القفل بس
-  if(TQ_LOCKED){ $('tabs') .innerHTML = ''; $('app') .innerHTML = tqLockHtml(); return; }
+  if(TQ_LOCKED){ $('tabs') .innerHTML = ''; const lh = tqLockHtml(), ap = $('app') ; if(ap.dataset.h !== lh || !ap.querySelector('.tq-lock')){ ap.innerHTML = lh; ap.dataset.h = lh; } return; }   // 🔓 نفس الكارت → مانرسمش
+  $('app') .dataset.h = '';
   $('tabs') .innerHTML = tabs.map(x => `<button class="tab${S.tab === x.k ? ' on' : ''}" onclick="go('${x.k}')">${x.l}${x.n ? `<span class="n">${x.n}</span>` : ''}</button>`).join('');
   const app = $('app') ;
   if(!Q){ app.innerHTML = loadErr ? `<div class="err">⚠️ ${escH(loadErr)}</div><button class="big" onclick="load(true)">↻ جرّب تاني</button>` : '<div class="empty">⏳ جاري التحميل…</div>'; return; }

@@ -40,6 +40,7 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
 <script src="i18n.js"></script>
 <script src="attendance.js"></script>
 <script src="payroll.js"></script>
+<script src="shift-unlock.js"></script>   <!-- 🔓 طلب فتح الشاشة من المحاسب العام (ملف prod-shift-unlock.sql) — مؤقت للإنتاج -->
 <script src="due-deposit.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;800;900&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
@@ -1244,6 +1245,7 @@ function shiftLockHtml(){
     <p>${why}<br>سجّل ${k === 'break' ? '«استئناف»' : '«حضور»'} من «المواعيد» والشاشة هتفتح لوحدها.</p>
     <button class="act-btn act-primary att-menu-btn" onclick="openAttendance()">⏰ المواعيد</button>
     <button class="act-btn act-out pay-menu-btn" onclick="openPayroll()">💰 مرتبك</button>
+    <div class="ulk-slot"></div>   <!-- 🔓 طلب فتح من المحاسب العام (shift-unlock.js بيملاه) -->
   </div>`;
 }
 let _lockedNow = null;
@@ -1254,7 +1256,7 @@ async function applyShift(){
   if(locked){
     closeAct();
     devices = new Map(); searchRows = null;
-    $('ccList').innerHTML = shiftLockHtml();
+    { const h = shiftLockHtml(), el = $('ccList'); if(el.dataset.h !== h || !el.querySelector('.cc-lock')){ el.innerHTML = h; el.dataset.h = h; } }   // 🔓 نفس الكارت → مانرسمش (الكتابة ماتضيعش)
     try{ attSyncMenu(); }catch(e){}       // زرار المواعيد على الموبايل بس
   } else if(_lockedNow !== false){
     await loadDevices();

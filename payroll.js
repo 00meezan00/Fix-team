@@ -47,6 +47,8 @@ let _payRows   = [];   // الخصومات اليدوية
 let _payLate   = [];   // خصومات التأخير (محسوبة في السيرفر)
 let _payWaiv   = [];   // رسايل «الخصم اتشال»
 let _paySlips  = [];   // كشوف الرواتب — شهر بشهر
+let _payDebts = [];   // 💳 (prod-hr-debts) الديون بباقيها — للتذكير
+let _payDebtPays = []; // 💳 السدادات — أسبابها تحت سطر «سداد ديون»
 let _payBons  = [];   // 🎁 (prod-hr-bonus) الزيادات — عشان نكتب أسبابها تحت سطر الكشف
 let _payLeave = {}; // 💵 (prod-hr-leave) 'YYYY-MM-01' → { days, amount } — فلوس الإجازة المعتمدة
 // 🗄️ الدرجين: الشهر اللي بيعرضوه + مفتوحين ولا لأ
@@ -68,6 +70,11 @@ let _payErr    = '';
 let _payBusy   = false;
 let _payLoaded = false;
 // 🧾 المحاسب العام (ملف 68) — null = لسه مش عارفين · true/false
+// 🤝 (prod-hr-partners) الشريك: «💸 مسحوباتك» بدل «مرتبك»
+let _payPartner  = null;   // null = لسه ماسألناش · true/false
+let _ptWd        = [];     // مسحوباتي — من hr_my_withdrawals
+let _ptErr       = '';
+let _ptOpenOld   = {};     // 'YYYY-MM' → الشهر القديم مفتوح؟
 let _paySelf     = null;
 let _selfData    = null;   // رد hr_self_payroll
 let _selfErr     = '';
@@ -154,6 +161,19 @@ async function payLoad(){
     if(bn.error){ console.warn('hr_bonus_list:', bn.error); _payBons = []; }
     else _payBons = bn.data || [];
 
+    // 💳 الديون (prod-hr-debts) — تذكير بس. اللي بيتخصم فعلاً هو السداد
+    //    اللي HR اختارته للشهر (داخل في الصافي من السيرفر).
+    //    p_email = إيميلنا صراحةً (لو الحساب HR، السيرفر كان هيرجّع الكل)
+    const [dl, dp] = await Promise.all([
+      sb.rpc('hr_debt_list', { p_email: me }),
+      sb.from('hr_debt_payments').select('debt_id,period,amount')
+        .ilike('user_email', me).order('created_at', { ascending:false }).limit(500)
+    ]);
+    if(dl.error){ console.warn('hr_debt_list:', dl.error); _payDebts = []; }
+    else _payDebts = dl.data || [];
+    if(dp.error){ console.warn('hr_debt_payments:', dp.error); _payDebtPays = []; }
+    else _payDebtPays = dp.data || [];
+
     const lv = await sb.rpc('hr_leave_bonus_lines', { p_email: me });
     _payLeave = {};
     if(lv.error){ console.warn('hr_leave_bonus_lines:', lv.error); }
@@ -232,6 +252,18 @@ function paySyncBadge(){
     return;
   }
 
+  // 🤝 الشريك: «💸 مسحوباتك» بدل «مرتبك» — ومفيش نقطة ولا بانر
+  if(_payPartner === true){
+    document.querySelectorAll('.pay-menu-btn').forEach(b => {
+      b.style.display = show ? '' : 'none';
+      if(!b.dataset.payLabel) b.dataset.payLabel = b.textContent.trim();
+      b.textContent = '💸 مسحوباتك';
+    });
+    document.querySelectorAll('.pay-dot').forEach(x => x.remove());
+    payRenderBanner(false);
+    return;
+  }
+
   const n    = Number(_payTotals.unseen_count || 0);
 
   // (١) زرار القايمة: يظهر على الموبايل بس، وعليه العدد
@@ -283,12 +315,19 @@ async function openPayroll(){
   // المحاسب العام → شاشته هو (لو وصل هنا من أي زرار قديم)
   if(_paySelf === true) return openSelfPay();
   if(!payIsPhone()){
-    alert('شاشة «مرتبك» بتتفتح من الموبايل بس');
+    alert(_payPartner === true ? 'شاشة «مسحوباتك» بتتفتح من الموبايل بس' : 'شاشة «مرتبك» بتتفتح من الموبايل بس');
     return;
   }
   const ov = document.getElementById('payOverlay');
   if(!ov){ console.error('payroll: العنصر #payOverlay مش موجود في الصفحة'); return; }
   ov.classList.remove('hidden');
+  // 🤝 الشريك → «💸 مسحوباتك»
+  if(await payDetectPartner()){
+    ptWdRender('⏳ جاري التحميل…');
+    await ptWdLoad();
+    ptWdRender('');
+    return;
+  }
   payRender('⏳ جاري التحميل…');
   // ⚠️ درج الإكسل بيتقرا هنا بس (لما الشاشة تتفتح) — مش في payBoot.
   //    payBoot بيشتغل عند **كل** موظف مع كل رجوع للتطبيق، ومفيش
@@ -302,6 +341,8 @@ function closePayroll(){
 }
 
 function payRender(busyMsg){
+  // 🤝 الشريك: أي إعادة رسم بتروح لـ«💸 مسحوباتك» — عمره ما يشوف «مرتبك»
+  if(_payPartner === true) return ptWdRender(busyMsg);
   const ov = document.getElementById('payOverlay');
   if(!ov) return;
 
@@ -529,6 +570,29 @@ function payBonusLine(p){
       <span>• ${_payEsc(b.reason || '')}</span><span>+${payMoney(b.amount)}</span></div>`).join('')}`;
 }
 
+// 💳 سطر «سداد ديون» + كل سداد على أنهي دين (زي الاستيجنج — ملف 73)
+function payDebtLine(p){
+  const ym = String(p && p.period || '').slice(0, 7);
+  const rows = _payDebtPays.filter(x => String(x.period || '').slice(0, 7) === ym);
+  const v = Math.round(rows.reduce((a, x) => a + Number(x.amount || 0), 0) * 100) / 100;
+  if(!v) return '';
+  const title = id => ((_payDebts.find(d => d.id === id) || {}).title || 'دين');
+  return `<div><span>− 💳 سداد ديون</span><b class="minus">${payMoney(v)}</b></div>
+    ${rows.map(x => `<div style="font-size:12px;padding:0 10px 2px 0;color:var(--p-mut);">
+      <span>• ${_payEsc(title(x.debt_id))}</span><span>−${payMoney(x.amount)}</span></div>`).join('')}`;
+}
+// 💳 تذكير الديون — على الكشف اللي لسه ماتصرفش بس
+//    ⚠️ ده **مش** خصم: الصافي اللي فوقه مش متخصوم منه الباقي ده.
+function payDebtReminder(p){
+  if(!p || p.paid) return '';
+  const open = _payDebts.filter(d => Number(d.remaining) > 0);
+  if(!open.length) return '';
+  const tot = open.reduce((a, d) => a + Number(d.remaining || 0), 0);
+  return `<div class="pay-debt-note">💳 عليك ديون باقي منها <b>${payMoney(tot)}</b> ج.م
+    <small>(${open.map(d => _payEsc(d.title) + ' ' + payMoney(d.remaining)).join(' · ')})</small><br>
+    ⚠️ لسه ما اتخصمتش من الصافي المعروض.</div>`;
+}
+
 // 💵 سطر «إجازات ما اتاخدتش» — بالأخضر، دي فلوس ليه مش عليه
 function payLeaveLine(p){
   const x = _payLeave[String(p && p.period || '').slice(0, 10)];
@@ -575,8 +639,10 @@ function paySlipCard(p, big){
       ${paySlipOvertime(p)}
       ${payBonusLine(p)}
       ${payLeaveLine(p)}
+      ${payDebtLine(p)}
       <div class="eq"><span>= الصافي</span><b>${payMoney(p.net)}</b></div>
     </div>
+    ${payDebtReminder(p)}
 
     ${p.paid ? `<div class="pay-slip-meta">🔒 اتصرف
       ${_payEsc(new Date(p.paid_at).toLocaleDateString('ar-EG',
@@ -608,6 +674,7 @@ function payPaidSlipCard(p){
           payMoney(Math.abs(Number(p.overtime_amt)))}</b></div>` : ''}
       ${payBonusLine(p)}
       ${payLeaveLine(p)}
+      ${payDebtLine(p)}
       <div class="eq"><span>= اللي قبضته</span><b>${payMoney(p.net)}</b></div>
     </div>
     <button class="pay-ok-btn" onclick="payAckSlip('${_payEsc(p.period)}')">👍 فهمت</button>
@@ -665,6 +732,86 @@ async function payDetectSelf(){
   }
   return _paySelf;
 }
+
+// ============================================================
+// 🤝 الشريك؟ (prod-hr-partners.sql)
+// ------------------------------------------------------------
+// 🧸 الشريك مالوش «مرتبك» — بيشوف بداله «💸 مسحوباتك»: كارت لكل شهر
+//    فيه كل مسحوباته والإجمالي. الشهر الجديد بيفتح كارت جديد لوحده.
+// ⚠️ الدالة مش موجودة (الملف مااتشغّلش)؟ → «مرتبك» العادي زي زمان.
+// ============================================================
+async function payDetectPartner(){
+  if(_payPartner !== null) return _payPartner;
+  try{
+    const { data, error } = await sb.rpc('hr_my_partner');
+    if(error) throw error;
+    _payPartner = !!(data && data.partner);
+  }catch(e){
+    console.warn('payDetectPartner failed:', e);
+    return false;
+  }
+  return _payPartner;
+}
+async function ptWdLoad(){
+  try{
+    const { data, error } = await sb.rpc('hr_my_withdrawals');
+    if(error) throw error;
+    _ptWd = data || [];
+    _ptErr = '';
+  }catch(e){
+    console.error('hr_my_withdrawals failed:', e);
+    _ptErr = (e && e.message) ? e.message : String(e);
+  }
+}
+function ptWdRender(busyMsg){
+  const ov = document.getElementById('payOverlay');
+  if(!ov) return;
+  // شهر بشهر — الأحدث فوق، والشهر الحالي موجود دايماً حتى لو فاضي
+  const ymNow = (() => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); })();
+  const byM = {};
+  byM[ymNow] = [];
+  _ptWd.forEach(r => { const ym = String(r.work_date).slice(0, 7); (byM[ym] = byM[ym] || []).push(r); });
+  const months = Object.keys(byM).sort().reverse();
+  const card = (ym) => {
+    const rows = byM[ym];
+    const tot = rows.reduce((a, r) => a + Number(r.amount || 0), 0);
+    const cur = ym === ymNow;
+    const open = cur || _ptOpenOld[ym];
+    return `
+    <div class="pay-tot slip${cur ? '' : ' paid'}">
+      <div class="pay-slip-h" ${cur ? '' : `onclick="ptWdToggle('${ym}')" style="cursor:pointer;"`}>
+        <b>${_payEsc(_paySlipMonth(ym + '-01'))}</b>
+        <span class="pay-slip-tag ${cur ? 'wait' : 'ok'}">${cur ? '⏳ الشهر ده' : (open ? '▲' : '▼') + ' خلص'}</span>
+      </div>
+      <div class="pay-tot-big" style="margin-top:10px;">
+        <span class="pay-tot-n net">${payMoney(tot)}</span>
+        <span class="pay-tot-c net">ج.م</span>
+      </div>
+      <div class="pay-tot-l">إجمالي مسحوباتك${cur ? ' لحد دلوقتي' : ''} · ${rows.length} ${rows.length === 1 ? 'مسحوب' : 'مسحوبات'}</div>
+      ${open ? `<div class="pay-calc">
+        ${rows.length ? rows.map(r => `<div><span>📅 ${_payEsc(new Date(String(r.work_date).slice(0, 10) + 'T12:00:00')
+            .toLocaleDateString('ar-EG', { weekday:'short', day:'numeric', month:'short' }))}${r.note ? ` <small style="opacity:.75;">${_payEsc(r.note)}</small>` : ''}</span>
+            <b>${payMoney(r.amount)}</b></div>`).join('')
+          : '<div><span>مفيش مسحوبات الشهر ده لسه</span><b>—</b></div>'}
+        <div class="eq"><span>= الإجمالي</span><b>${payMoney(tot)}</b></div>
+      </div>` : ''}
+    </div>`;
+  };
+  ov.innerHTML = `
+    <div class="pay-page">
+      <div class="pay-head">
+        <h2>💸 مسحوباتك</h2>
+        <button class="pay-close" onclick="closePayroll()">×</button>
+      </div>
+      <div class="pay-body">
+        ${_ptErr ? `<div class="pay-warn">⚠️ مقدرناش نقرا مسحوباتك — حدّث الصفحة أو كلّم الإدارة.
+          <span class="pay-warn-d">${_payEsc(_ptErr)}</span></div>` : ''}
+        ${busyMsg ? `<div class="pay-busy">${_payEsc(busyMsg)}</div>` : ''}
+        ${months.map(card).join('')}
+      </div>
+    </div>`;
+}
+function ptWdToggle(ym){ _ptOpenOld[ym] = !_ptOpenOld[ym]; ptWdRender(''); }
 
 // زرار «🧾 كشف مرتبي» في القايمة — جنب «مرتبك» على طول.
 // ⚠️ لازم يبقى ابن مباشر للقايمة (نفس مكان «مرتبك») — common.js
@@ -1440,6 +1587,13 @@ function payUrlB64ToU8(s){
         if(_selfIsOpen()){ await selfLoad(); selfRender(''); }
         return;
       }
+      // 🤝 الشريك: «💸 مسحوباتك» بس — مفيش خصومات ولا أجراس
+      if(await payDetectPartner()){
+        paySyncBadge();
+        const ovp = document.getElementById('payOverlay');
+        if(ovp && !ovp.classList.contains('hidden')){ await ptWdLoad(); ptWdRender(''); }
+        return;
+      }
       await payLoad();
     }catch(e){ console.error('payBoot refresh failed:', e); }
     // لو الشاشة مفتوحة وإحنا بنحدّث، نعيد رسمها كمان
@@ -1590,6 +1744,12 @@ function payUrlB64ToU8(s){
     border-radius:16px; padding:18px 16px; text-align:center;}
   /* كروت كشف الراتب */
   .pay-tot.slip{margin-top:11px; padding:14px 16px; border-color:var(--p-line);}
+  /* 💳 تذكير الديون (prod-hr-debts) */
+  .pay-debt-note{margin-top:11px; background:rgba(180,83,9,.12); color:#B45309;
+    border:1px solid rgba(180,83,9,.3); border-radius:11px; padding:10px 12px;
+    font-size:12.5px; font-weight:700; line-height:1.9; text-align:start;}
+  .pay-debt-note small{font-weight:500; opacity:.85;}
+  html[data-theme="dark"] .pay-debt-note{color:#FBBF24;}
   .pay-tot.slip.paid{border-color:var(--p-green);}
   .pay-slip-h{display:flex; align-items:baseline; justify-content:space-between; gap:10px;}
   .pay-slip-h b{font-size:15px; color:var(--p-ink);}

@@ -300,6 +300,61 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
   .ded-mid span{font-size:11px; color:var(--muted);}
   .ded-del{flex:none; border:none; background:none; color:var(--muted);
     font-size:17px; cursor:pointer; padding:2px 4px;}
+  /* 💳 الديون */
+  .debt-card{background:var(--surface); border:1px solid var(--border); border-radius:13px;
+    padding:12px 13px; margin-bottom:10px;}
+  .debt-card.done{opacity:.7;}
+  .debt-h{display:flex; align-items:flex-start; gap:10px;}
+  .debt-h b{flex:1; min-width:0; font-size:14px; line-height:1.7; word-break:break-word;}
+  .debt-kind{flex:none; font-size:11px; font-weight:800; border-radius:7px; padding:3px 8px;
+    background:var(--surface-2); color:var(--ink-2);}
+  .debt-nums{display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-top:9px; text-align:center;}
+  .debt-nums b{display:block; font-family:'Cairo',sans-serif; font-weight:900; font-size:15px;}
+  .debt-nums span{font-size:11px; color:var(--muted);}
+  .debt-pay{display:flex; gap:7px; margin-top:10px;}
+  .debt-pay input{flex:1; min-width:0; border:1px solid var(--border); background:var(--surface-2);
+    color:var(--ink); border-radius:10px; padding:10px; font-family:inherit; font-size:15px; text-align:center;}
+  .debt-pay button{flex:none; border:none; border-radius:10px; padding:10px 12px; background:var(--red);
+    color:#fff; font-family:inherit; font-size:13px; font-weight:800; cursor:pointer;}
+  .debt-hist{margin-top:8px; font-size:12px; color:var(--muted); line-height:1.9;}
+  .debt-hist div{display:flex; justify-content:space-between; gap:8px; align-items:center;}
+  .debt-note{margin-top:10px; background:var(--waiting-bg); color:var(--waiting);
+    border-radius:10px; padding:9px 11px; font-size:12.5px; font-weight:700; line-height:1.8;}
+  /* 🧮 الحضور والغياب + 🤝 جاري الشركاء (v147) */
+  .att-modes{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+  .att-modes button{border:1.5px solid var(--border); background:var(--surface); color:var(--ink);
+    border-radius:12px; padding:10px 8px; font:inherit; font-size:12.5px; font-weight:800; line-height:1.5;
+    cursor:pointer; text-align:center;}
+  .att-modes button.on{border-color:var(--chrome); background:var(--chrome); color:var(--on-chrome);}
+  .pt-box{border:1.5px dashed var(--chrome); border-radius:13px; padding:12px; margin-bottom:14px;}
+  .pt-tabs{display:flex; gap:6px; overflow-x:auto; padding-bottom:4px; margin-bottom:10px;}
+  .pt-tabs button{flex:none; border:1px solid var(--border); background:var(--surface); color:var(--ink);
+    border-radius:999px; padding:7px 13px; font:inherit; font-size:12.5px; font-weight:800; cursor:pointer;}
+  .pt-tabs button.on{background:var(--chrome); border-color:var(--chrome); color:var(--on-chrome);}
+  .pt-bar{display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-bottom:10px;}
+  .pt-bar input{border:1px solid var(--border); border-radius:10px; padding:7px 8px; font:inherit;
+    font-size:13px; background:var(--surface); color:var(--ink);}
+  .pt-sum{display:grid; grid-template-columns:repeat(2, 1fr); gap:8px; margin-bottom:12px;}
+  .pt-sum div{background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:10px;}
+  .pt-sum b{display:block; font-size:16px; font-family:var(--mono); direction:ltr; text-align:right;}
+  .pt-sum span{font-size:11.5px; color:var(--muted); font-weight:700;}
+  .pt-sum .big{grid-column:1/-1; background:var(--chrome); color:var(--on-chrome); border-color:var(--chrome);}
+  .pt-sum .big span{color:inherit; opacity:.8;}
+  .pt-row{display:flex; gap:10px; align-items:flex-start; background:var(--surface); border:1px solid var(--border);
+    border-radius:12px; padding:10px 12px; margin-bottom:7px;}
+  .pt-row .m{flex:1; min-width:0; font-size:13px; line-height:1.7;}
+  .pt-row .m small{display:block; color:var(--muted); font-size:11.5px;}
+  .pt-row .a{text-align:left; font-family:var(--mono); font-weight:800; font-size:14px; direction:ltr; white-space:nowrap;}
+  .pt-row .a small{display:block; color:var(--muted); font-weight:600; font-size:11px;}
+  .pt-row.void{opacity:.5;} .pt-row.void .a{text-decoration:line-through;}
+  .pt-in{color:var(--done);} .pt-out{color:var(--red);}
+  .pt-tag{display:inline-block; font-size:10.5px; font-weight:800; border-radius:6px; padding:1px 6px;
+    background:var(--blue-bg); color:var(--blue); margin-inline-start:4px;}
+  .pt-tbl{width:100%; border-collapse:collapse; font-size:12.5px; margin-bottom:12px; background:var(--surface);
+    border-radius:12px; overflow:hidden;}
+  .pt-tbl th,.pt-tbl td{padding:8px 6px; border-bottom:1px solid var(--border); text-align:right;}
+  .pt-tbl td.n{font-family:var(--mono); direction:ltr; text-align:left; white-space:nowrap;}
+  .pt-tbl tr.tot td{font-weight:900; background:var(--surface-2);}
   .hintbox{background:var(--waiting-bg); color:var(--waiting); border-radius:11px;
     padding:12px 14px; font-size:12.5px; line-height:1.9; margin-bottom:16px;}
 
@@ -601,6 +656,8 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
       <button onclick="closeMenu(); openPayrollAdmin()">💰 المخصومات والمرتبات</button>
       <button onclick="closeMenu(); openExcelW()">📊 مسحوبات الإكسل</button>
       <button onclick="closeMenu(); openHrSettings()">⏰ إعدادات المواعيد</button>
+      <!-- 🤝 للمحاسب العام بس (prod-hr-partners.sql) — boot بيظهّره -->
+      <button class="super-only" style="display:none;" onclick="closeMenu(); openPartners()">🤝 جاري الشركاء</button>
       <button onclick="closeMenu(); openStaffMsgs()">📨 رسايل الموظفين <b id="hrMsgCount" class="msg-count" style="display:none;"></b></button>
 
       <!-- 🧰 أدوات الديسباتشر — مخفية لحد ما الأدمن يفعّلها للحساب ده
@@ -629,6 +686,26 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
             onclick="closeSheet('hrSet')">×</button>
   </div>
   <div class="sheet-body" id="hrSetBody"></div>
+</div>
+
+<!-- ===== 💳 ديون الموظف ===== -->
+<div class="sheet" id="debtSheet">
+  <div class="sheet-head">
+    <h2 id="debtTitle">💳 الديون</h2>
+    <button class="icon-btn" style="background:var(--surface-2); color:var(--ink);"
+            onclick="closeSheet('debtSheet')">×</button>
+  </div>
+  <div class="sheet-body" id="debtBody"></div>
+</div>
+
+<!-- ===== 🤝 جاري الشركاء (المحاسب العام بس) ===== -->
+<div class="sheet" id="ptSheet">
+  <div class="sheet-head">
+    <h2>🤝 جاري الشركاء</h2>
+    <button class="icon-btn" style="background:var(--surface-2); color:var(--ink);"
+            onclick="closeSheet('ptSheet')">×</button>
+  </div>
+  <div class="sheet-body" id="ptBody"></div>
 </div>
 
 <!-- ===== سجل الموظف — شاشة كاملة ===== -->
@@ -839,6 +916,7 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
 // ============================================================
 
 let ME = '', MY_ROLE = '', ROLES_MAP = {};
+let IS_SUPER = false;   // 🤝 المحاسب العام؟ — جاري الشركاء وعلامة الشريك ليه بس
 let MONTH = (() => { const d = new Date();
   return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'); })();
 let ROWS = [], OPEN_EMP = null, SEARCH = '';
@@ -868,6 +946,12 @@ const KIND = {
     ME + (MY_ROLE ? ' — ' + roleLabel(MY_ROLE) : '');
 
   attSyncMenu();          // زرار المواعيد على الموبايل بس
+  // 🤝 المحاسب العام؟ — السيرفر هو اللي بيقول (ممكن مايكونش في خريطة الأدوار)
+  try{
+    const r = await sb.rpc('my_app_role');
+    IS_SUPER = (!r.error && r.data === 'super_admin') || MY_ROLE === 'super_admin';
+  }catch(e){ IS_SUPER = MY_ROLE === 'super_admin'; }
+  document.querySelectorAll('.super-only').forEach(el => { el.style.display = IS_SUPER ? '' : 'none'; });
   loadStaffMsgs();        // 📨 رسايل الموظفين (التنبيه + العدد)
   await loadMonth();
 })();
@@ -1053,6 +1137,7 @@ async function loadMonth(){
     await loadLeaveBonus();         // 💵 الإجازات اللي ما اتاخدتش (prod-hr-leave)
     await loadLeaveLines();         // 💵 فلوس الإجازة المعتمدة — لسطر الكشف
     await loadBonuses();            // 🎁 الزيادات (prod-hr-bonus)
+    await loadDebts();              // 💳 الديون (prod-hr-debts)
     await loadNoBreak(from, to);    // ☕🚫 مين قال إنه مطلعش بريك
     await loadBreakDecl(from, to);  // ⚠️ إقرارات البريك وقت الانصراف
     render();
@@ -1128,7 +1213,32 @@ function groupEmps(){
     (emps[e] = emps[e] || {})[r.work_date] = (emps[e][r.work_date] || []);
     emps[e][r.work_date].push(r);
   }
+  // 🧮 «🏢 مالوش حضور» و«🤝 شريك» مالهمش تسجيلات — بس لازم يبقى ليهم كارت
+  //    (خصم · زيادة · نظام العمل). HR والمحاسب العام مايظهروش هنا زي زمان.
+  for(const e of Object.keys(EMP_SET || {})){
+    const c = EMP_SET[e] || {};
+    if(emps[e] || !(c.att_mode === 'none' || c.is_partner)) continue;
+    const v = ROLES_MAP[e];
+    const role = typeof v === 'string' ? v : (v && v.role) || '';
+    if(!role || role === 'hr' || role === 'super_admin') continue;
+    emps[e] = {};
+  }
   return emps;
+}
+
+// 🧮 سطر تحت اسم الموظف: ميعاده + «الحضور والغياب» + 🤝
+function attBadge(e, c){
+  if(!EMP_SET[e]) return '⚠️ مالوش «⏰ نظام عمل» — مش داخل حسبة الغياب';
+  const t = c.shift_start ? '🕙 ' + String(c.shift_start).slice(0,5) : '⚠️ مفيش ميعاد محدد';
+  const pt = c.is_partner ? ' · 🤝 شريك' : '';
+  if(c.att_mode === 'none') return '🏢 مالوش حضور ولا انصراف' + pt;
+  if(c.att_mode === 'no_absence') return t + ' · ⏸️ مايتحسبلوش غياب' + pt;
+  if(c.att_mode === 'from' && c.att_from) return t + ' · 📅 بيتحسب من ' + fmtDay(c.att_from) + pt;
+  return t + pt;
+}
+function fmtDay(d){
+  try{ return new Date(String(d).slice(0,10) + 'T12:00:00').toLocaleDateString('ar-EG', { day:'numeric', month:'numeric', year:'numeric' }); }
+  catch(x){ return String(d); }
 }
 
 function render(){
@@ -1240,7 +1350,7 @@ function cardHtml(e, days){
       <div class="avatar" style="background:${avatarColor(e)}">${esc(nameOf(e).charAt(0))}</div>
       <div class="card-id">
         <b>${esc(nameOf(e))}</b>
-        <span>${c.shift_start ? '🕙 ' + String(c.shift_start).slice(0,5) : '⚠️ مفيش ميعاد محدد'}</span>
+        <span>${esc(attBadge(e, c))}</span>
       </div>
     </div>
     <div class="card-bar">
@@ -1266,9 +1376,11 @@ function cardHtml(e, days){
       //    شهر واحد، والمسحوبات متجمعة معاه كمان.
       const m = manualDed(e, MONTH);
       const bn = bonusSum(e, MONTH);
-      if(!m.total && !m.wd && !m.unseen && !bn.total) return '';
+      const dr = debtRemaining(e);
+      if(!m.total && !m.wd && !m.unseen && !bn.total && !dr) return '';
       const bits = [];
       if(bn.total) bits.push(`<span style="color:var(--done)">🎁 زيادة: <b>+${bn.total}</b> ج.م</span>`);
+      if(dr) bits.push(`💳 ديون باقية: <b>${lbMoney(dr)}</b> ج.م`);
       if(m.total) bits.push(`💸 خصم يدوي: <b>${m.total}</b> ج.م`);
       if(m.wd)    bits.push(`🔩 مسحوبات: <b>${m.wd}</b> ج.م`);
       if(m.unseen) bits.push(`<i>${m.unseen} لسه ما اتقراش</i>`);
@@ -1279,6 +1391,7 @@ function cardHtml(e, days){
       <button onclick="openEmpLog('${esc(e)}')">📋 السجل</button>
       <button onclick="openDeduction('${esc(e)}')" title="خصم">💸</button>
       <button onclick="openBonus('${esc(e)}')" title="زيادة">🎁</button>
+      <button onclick="openDebts('${esc(e)}')" title="الديون">💳</button>
       <button onclick="openHrSettings('${esc(e)}')">⏰</button>
       <button onclick="exportEmpPdf('${esc(e)}')">📄</button>
       <button onclick="exportEmpExcel('${esc(e)}')">📊</button>
@@ -1341,6 +1454,7 @@ function renderEmpSheet(email, days){
     <div class="emp-acts">
       <button onclick="openDeduction('${esc(email)}')" style="background:var(--red);color:#fff;border-color:var(--red);">💸 خصم</button>
       <button onclick="openBonus('${esc(email)}')" style="background:var(--done);color:#fff;border-color:var(--done);">🎁 زيادة</button>
+      <button onclick="openDebts('${esc(email)}')">💳 الديون</button>
       <button onclick="openPunch('${esc(email)}')">✍️ تسجيل يدوي</button>
       <button onclick="openHrSettings('${esc(email)}')">⏰ المواعيد</button>
       <button onclick="exportEmpPdf('${esc(email)}')">📄 PDF</button>
@@ -1348,6 +1462,7 @@ function renderEmpSheet(email, days){
     </div>
 
     ${dedSectionHtml(email)}
+    ${debtSectionHtml(email)}
     ${bonusSectionHtml(email)}
 
     ${flags ? `<div class="hintbox" style="margin-top:14px;">⚠️ فيه ${flags} يوم ناقص انصراف —
@@ -2225,6 +2340,9 @@ function renderHrSettings(){
       </select>
     </label>
 
+    ${attModeHtml(c)}
+    ${IS_SUPER ? partnerFldHtml(c) : ''}
+
     <div class="hintbox">
       الحضور جوه فترة السماح بيتحسب كأنه في المعاد الأساسي — مفيش خصم ولا نقص ساعات.<br>
       اللي بييجي بعد السماح وقبل الاحتياطي: مفيش خصم فلوس، بس بيمشي متأخر بنفس القدر.<br>
@@ -2301,6 +2419,72 @@ function renderHrSettings(){
     ${daySchedHtml()}`;
 }
 
+// ============================================================
+// 🧮 الحضور والغياب (prod-hr-attmode.sql)
+// ------------------------------------------------------------
+// 🧸 إنت اللي بتقول للسيستم يحسب للموظف ده ولا لأ، ومن إمتى:
+//    🟢 auto        من أول حضور ليه (الافتراضي — زي زمان)
+//    📅 from        من يوم إنت بتختاره (الغياب والتأخير والأوفر تايم)
+//    ⏸️ no_absence  بيسجّل حضور عادي، بس مفيش غياب
+//    🏢 none        مالوش حضور ولا انصراف خالص
+// 🔒 الحسبة كلها على السيرفر — هنا الاختيار بس.
+// ============================================================
+const ATT_MODES = [
+  { k:'auto',       t:'🟢 من أول حضور ليه' },
+  { k:'from',       t:'📅 من يوم أنا أختاره' },
+  { k:'no_absence', t:'⏸️ مايتحسبلوش غياب' },
+  { k:'none',       t:'🏢 مالوش حضور ولا انصراف' }
+];
+const ATT_MODE_HINT = {
+  auto:       'السيستم بيبدأ يحسب الغياب من أول يوم الموظف سجّل فيه حضور. قبله «لسه ماابتداش».',
+  from:       'الغياب والتأخير والأوفر تايم والنقص كلهم بيبدأوا من اليوم ده — حتى لو عمره ماسجّل حضور. قبله ولا حاجة.',
+  no_absence: 'بيسجّل حضور وانصراف عادي، والتأخير والأوفر تايم شغّالين — بس الأيام اللي ماجاش فيها مابتتحسبش غياب.',
+  none:       'مفيش غياب ولا تأخير ولا أوفر تايم ولا كوبونات إجازة، وزراير الحضور بتستخبى عنده، ومابيتقفلش برّه الشيفت. مرتبه بيتصرف كامل (ناقص الخصومات اليدوية والمسحوبات).'
+};
+function attModeHtml(c){
+  const m = c.att_mode || 'auto';
+  return `<div class="fld"><span>🧮 الحضور والغياب</span>
+      <small>${esc(ATT_MODE_HINT[m] || '')}</small>
+      <div class="att-modes">
+        ${ATT_MODES.map(x => `<button type="button" class="${m === x.k ? 'on' : ''}" onclick="setAttMode('${x.k}')">${x.t}</button>`).join('')}
+      </div>
+    </div>
+    ${m === 'from' ? `<label class="fld"><span>📅 يبدأ يتحسب من يوم</span>
+      <input type="date" id="fAttFrom" value="${esc(c.att_from ? String(c.att_from).slice(0,10) : '')}">
+    </label>` : ''}`;
+}
+function setAttMode(k){
+  const c = EMP_SET[SET_EMAIL] = EMP_SET[SET_EMAIL] || { user_email: SET_EMAIL };
+  stashForm(c);
+  c.att_mode = k;
+  renderHrSettings();
+}
+
+// 🤝 علامة الشريك — للمحاسب العام بس (السيرفر بيرجّعها لو حد تاني غيّرها)
+function partnerFldHtml(c){
+  const on = c._pt != null ? c._pt : !!c.is_partner;
+  const since = c._ptSince != null ? c._ptSince : (c.partner_since ? String(c.partner_since).slice(0,10) : '');
+  return `<div class="pt-box">
+      <label style="display:flex; gap:8px; align-items:center; font-weight:900; font-size:14px; cursor:pointer;">
+        <input type="checkbox" id="fPartner" ${on ? 'checked' : ''} onchange="ptToggleFld(this.checked)" style="width:20px;height:20px;">
+        🤝 شريك
+      </label>
+      <small style="display:block; color:var(--muted); font-size:11.5px; line-height:1.8; margin:6px 0;">
+        من التاريخ ده مسحوباته (من الشيت أو بإيدك) <b>مابتتخصمش من مرتب</b> — بتروح على «🤝 جاري الشركاء».
+        قبله زي ما كانت. الشريك مالوش مرتب، بس تقدر تعمله مرتب عادي.
+      </small>
+      ${on ? `<label class="fld" style="margin:0;"><span>📅 شريك من يوم</span>
+        <input type="date" id="fPartnerSince" value="${esc(since || new Date().toISOString().slice(0,8) + '01')}">
+      </label>` : ''}
+    </div>`;
+}
+function ptToggleFld(on){
+  const c = EMP_SET[SET_EMAIL] = EMP_SET[SET_EMAIL] || { user_email: SET_EMAIL };
+  stashForm(c);
+  c._pt = on;
+  renderHrSettings();
+}
+
 function toggleOff(i){
   const c = EMP_SET[SET_EMAIL] = EMP_SET[SET_EMAIL] || { user_email: SET_EMAIL };
   const off = Array.isArray(c.off_days) ? c.off_days.slice() : [];
@@ -2329,12 +2513,21 @@ function stashForm(c){
   // 💵 فاضي = «تلقائي» (المرتب ÷ ٣٠) — مش صفر. صفر معناه «مفيش فلوس».
   if(g('fLeaveVal')   !== undefined) c.leave_day_value     = (g('fLeaveVal') === '' ? null : Math.max(0, parseFloat(g('fLeaveVal')) || 0));
   if(g('fNote')    !== undefined) c.note          = g('fNote') || null;
+  // 🧮 الحضور والغياب
+  if(g('fAttFrom') !== undefined) c.att_from = g('fAttFrom') || null;
+  // 🤝 الشريك (المحاسب العام بس)
+  const pc = document.getElementById('fPartner');
+  if(pc) c._pt = pc.checked;
+  if(g('fPartnerSince') !== undefined) c._ptSince = g('fPartnerSince') || '';
 }
 
 async function saveEmpSettings(){
   const c = EMP_SET[SET_EMAIL] = EMP_SET[SET_EMAIL] || { user_email: SET_EMAIL };
   stashForm(c);
-  if(!c.shift_start){ alert('اكتب المعاد الأساسي الأول'); return; }
+  const mode = c.att_mode || 'auto';
+  // 🏢 «مالوش حضور» مش محتاج ميعاد
+  if(!c.shift_start && mode !== 'none'){ alert('اكتب المعاد الأساسي الأول'); return; }
+  if(mode === 'from' && !c.att_from){ alert('اختار «يبدأ يتحسب من يوم» الأول'); return; }
   // الاحتياطي لازم يكون بعد الأساسي وإلا الحساب كله هيبقى غلط
   if(c.backup_start && c.backup_start <= c.shift_start){
     alert('المعاد الاحتياطي لازم يكون **بعد** المعاد الأساسي');
@@ -2354,6 +2547,9 @@ async function saveEmpSettings(){
     absence_penalty: c.absence_penalty || 0,
     leave_day_value: c.leave_day_value != null ? c.leave_day_value : null,
     note: c.note || null,
+    // 🧮 الحضور والغياب (prod-hr-attmode.sql)
+    att_mode: mode,
+    att_from: mode === 'from' ? c.att_from : null,
     updated_at: new Date().toISOString(),
     updated_by: ME
   };
@@ -2361,17 +2557,261 @@ async function saveEmpSettings(){
     const { error } = await sb.from('hr_employee_settings').upsert(payload);
     // ⚠️ Supabase مبيرميش خطأ — بيرجّعه في .error
     if(error) throw error;
-    EMP_SET[SET_EMAIL] = payload;
-    alert('اتحفظت ✅');
+    // 🤝 الشريك — دالة لوحدها (المحاسب العام بس، والسيرفر بيتأكد)
+    let ptMsg = '';
+    if(IS_SUPER && c._pt != null){
+      const was = !!c.is_partner;
+      const since = c._pt ? (c._ptSince || new Date().toISOString().slice(0,8) + '01') : null;
+      const wasSince = c.partner_since ? String(c.partner_since).slice(0,10) : '';
+      if(c._pt !== was || (c._pt && since !== wasSince)){
+        const r = await sb.rpc('partner_set', { p_email: SET_EMAIL, p_on: c._pt, p_since: since });
+        if(r.error) ptMsg = '\n⚠️ علامة الشريك ماتحفظتش: ' + (/partner_set|PGRST202|does not exist/i.test(r.error.message || '')
+          ? 'شغّل ملف prod-hr-partners.sql' : r.error.message);
+        else { c.is_partner = c._pt; c.partner_since = since; }
+      }
+    }
+    EMP_SET[SET_EMAIL] = Object.assign({}, c, payload, { is_partner: c.is_partner, partner_since: c.partner_since });
+    delete EMP_SET[SET_EMAIL]._pt; delete EMP_SET[SET_EMAIL]._ptSince;
+    alert('اتحفظت ✅' + ptMsg);
     render();
   }catch(e){
     console.error('saveEmpSettings failed:', e);
     const perm = e && (e.code === '42501' || /row-level security/i.test(e.message||''));
     const miss = /leave_day_value/i.test((e && e.message) || '');
+    if(/att_mode|att_from/i.test((e && e.message) || '')){
+      alert('❌ خانة «🧮 الحضور والغياب» لسه ماتركبتش — شغّل ملف prod-hr-attmode.sql');
+      return;
+    }
     alert(perm ? 'الحفظ اترفض من الصلاحيات — لازم تكون HR أو أدمن'
                : (miss ? '❌ خانة «قيمة يوم الإجازة» لسه ماتركبتش — شغّل ملف prod-hr-leave.sql'
                        : 'فشل الحفظ: ' + (e.message || e)));
   }
+}
+
+// ============================================================
+// 🤝 جاري الشركاء — للمحاسب العام بس (prod-hr-partners.sql)
+// ------------------------------------------------------------
+// 🧸 كل شريك ليه «حصّالة»:
+//    له (+)  : 🧾 رصيد افتتاحي له · 💰 إيداع/تمويل · 📈 نصيب أرباح · ⚖️ تسوية له
+//    عليه (−): 💸 مسحوبات (من الشيت لوحدها، أو بإيدك) · 🧾 افتتاحي عليه · ⚖️ تسوية عليه
+//    الرصيد = له − عليه. تاب «👥 الكل» بيجمع الشركاء كلهم.
+// 🔒 السيرفر بيرفض أي حد غير المحاسب العام. مفيش مسح — «🚫 إلغاء» بسبب.
+// ⚠️ مسحوبات الشيت مابتتلغيش من هنا — بتتظبط من شيت الإكسل نفسه
+//    (أو «شيل» الخصم من شاشة الخصومات) عشان يفضل طريق واحد للفلوس.
+// ============================================================
+const PT_KINDS = {
+  opening:    { t:'🧾 رصيد افتتاحي', dir:'ask' },
+  deposit:    { t:'💰 إيداع / تمويل', dir:'in'  },
+  profit:     { t:'📈 نصيب أرباح',    dir:'in'  },
+  adjust:     { t:'⚖️ تسوية',         dir:'ask' },
+  withdrawal: { t:'💸 مسحوب',          dir:'out' }
+};
+let PT = { sel:'all', from:'', to:'', board:null, rows:[], err:'', busy:false,
+           form:null };   // form = { email, kind, dir, amount, date, note }
+
+function ptMonthRange(off){
+  const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() + (off || 0));
+  const y = d.getFullYear(), m = d.getMonth() + 1;
+  const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  return [`${y}-${String(m).padStart(2,'0')}-01`, `${y}-${String(m).padStart(2,'0')}-${String(last).padStart(2,'0')}`];
+}
+function ptMoney(n){
+  const v = Math.round((Number(n) || 0) * 100) / 100;
+  return v.toLocaleString('en-US', { maximumFractionDigits:2 });
+}
+function ptSigned(n){
+  const v = Number(n) || 0;
+  return `<span class="${v < 0 ? 'pt-out' : (v > 0 ? 'pt-in' : '')}">${v < 0 ? '−' : (v > 0 ? '+' : '')}${ptMoney(Math.abs(v))}</span>`;
+}
+
+async function openPartners(){
+  if(!IS_SUPER){ alert('جاري الشركاء للمحاسب العام بس'); return; }
+  if(!PT.from){ const r = ptMonthRange(0); PT.from = r[0]; PT.to = new Date().toISOString().slice(0,10); }
+  openSheet('ptSheet');
+  await ptLoad();
+}
+async function ptLoad(){
+  PT.busy = true; ptRender();
+  try{
+    const [b, r] = await Promise.all([
+      sb.rpc('partner_board', { p_from: PT.from || null, p_to: PT.to || null }),
+      sb.rpc('partner_statement', { p_email: PT.sel === 'all' ? null : PT.sel, p_from: PT.from || null, p_to: PT.to || null })
+    ]);
+    if(b.error) throw b.error;
+    if(r.error) throw r.error;
+    PT.board = b.data || { partners:[], total:{} };
+    PT.rows = r.data || [];
+    PT.err = '';
+    if(PT.sel !== 'all' && !(PT.board.partners || []).some(p => p.email === PT.sel)) PT.sel = 'all';
+  }catch(e){
+    console.error('partners load failed:', e);
+    const t = (e && e.message) || String(e);
+    PT.err = /partner_board|partner_statement|PGRST202|does not exist/i.test(t)
+      ? 'الخدمة لسه ماتركبتش — شغّل ملف prod-hr-partners.sql' : t;
+  }
+  PT.busy = false; ptRender();
+}
+function ptPick(sel){ PT.sel = sel; PT.form = null; ptLoad(); }
+function ptPeriod(k){
+  const today = new Date().toISOString().slice(0,10);
+  if(k === 'this'){ const r = ptMonthRange(0); PT.from = r[0]; PT.to = today; }
+  else if(k === 'last'){ const r = ptMonthRange(-1); PT.from = r[0]; PT.to = r[1]; }
+  else if(k === 'year'){ PT.from = today.slice(0,4) + '-01-01'; PT.to = today; }
+  else if(k === 'all'){ PT.from = ''; PT.to = ''; }
+  ptLoad();
+}
+function ptDates(){
+  PT.from = (document.getElementById('ptFrom') || {}).value || '';
+  PT.to   = (document.getElementById('ptTo')   || {}).value || '';
+  ptLoad();
+}
+
+function ptRender(){
+  const box = document.getElementById('ptBody');
+  if(!box) return;
+  const B = PT.board || { partners:[], total:{} };
+  const parts = B.partners || [];
+  const cur = PT.sel === 'all' ? B.total || {} : (parts.find(p => p.email === PT.sel) || {});
+  const tab = (k, t) => `<button class="${PT.sel === k ? 'on' : ''}" onclick="ptPick('${esc(k)}')">${esc(t)}</button>`;
+  const head = `
+    <div class="pt-bar">
+      <input type="date" id="ptFrom" value="${esc(PT.from)}" onchange="ptDates()" aria-label="من">
+      <span style="font-size:12px;color:var(--muted);">لحد</span>
+      <input type="date" id="ptTo" value="${esc(PT.to)}" onchange="ptDates()" aria-label="لحد">
+    </div>
+    <div class="pt-bar">
+      <button class="mini-btn" onclick="ptPeriod('this')">الشهر ده</button>
+      <button class="mini-btn" onclick="ptPeriod('last')">الشهر اللي فات</button>
+      <button class="mini-btn" onclick="ptPeriod('year')">السنة دي</button>
+      <button class="mini-btn" onclick="ptPeriod('all')">كل الوقت</button>
+    </div>`;
+  if(PT.err){
+    box.innerHTML = head + `<div class="empty">⚠️ ${esc(PT.err)}</div>`;
+    return;
+  }
+  if(PT.busy && !PT.board){ box.innerHTML = head + '<div class="empty">جاري التحميل…</div>'; return; }
+  if(!parts.length){
+    box.innerHTML = head + `<div class="empty">مفيش شركاء لسه.<br>
+      <small>افتح «⏰ إعدادات المواعيد» للشخص وعلّم «🤝 شريك» واختار من يوم إمتى.</small></div>`;
+    return;
+  }
+  const sum = `
+    <div class="pt-sum">
+      <div><span>رصيد أول الفترة</span><b>${ptSigned(cur.open)}</b></div>
+      <div><span>رصيد آخر الفترة</span><b>${ptSigned(cur.close)}</b></div>
+      <div><span>له في الفترة</span><b class="pt-in">+${ptMoney(cur.in)}</b></div>
+      <div><span>عليه في الفترة (منها مسحوبات ${ptMoney(cur.wd)})</span><b class="pt-out">−${ptMoney(cur.out)}</b></div>
+      <div class="big"><span>💼 الرصيد دلوقتي ${PT.sel === 'all' ? '— كل الشركاء' : ''}</span><b>${ptSigned(cur.now)}</b></div>
+    </div>`;
+  // تاب «الكل»: جدول لكل شريك + الإجمالي
+  const tbl = PT.sel !== 'all' ? '' : `
+    <table class="pt-tbl">
+      <tr><th>الشريك</th><th>له</th><th>عليه</th><th>الرصيد دلوقتي</th></tr>
+      ${parts.map(p => `<tr onclick="ptPick('${esc(p.email)}')" style="cursor:pointer;">
+        <td>🤝 ${esc(p.name)}<br><small style="color:var(--muted)">من ${esc(fmtDay(p.since))}${Number(p.salary) ? ' · مرتب ' + ptMoney(p.salary) : ''}</small></td>
+        <td class="n pt-in">+${ptMoney(p.in)}</td><td class="n pt-out">−${ptMoney(p.out)}</td><td class="n">${ptSigned(p.now)}</td></tr>`).join('')}
+      <tr class="tot"><td>👥 الإجمالي</td><td class="n pt-in">+${ptMoney(B.total.in)}</td>
+        <td class="n pt-out">−${ptMoney(B.total.out)}</td><td class="n">${ptSigned(B.total.now)}</td></tr>
+    </table>`;
+  // الحركات + الرصيد الجاري (من رصيد أول الفترة)
+  let run = Number(cur.open) || 0;
+  const rows = PT.rows.map(r => {
+    const v = (r.dir === 'in' ? 1 : -1) * Number(r.amount || 0);
+    if(!r.voided) run += v;
+    const k = PT_KINDS[r.kind] || { t:r.kind };
+    return `<div class="pt-row${r.voided ? ' void' : ''}">
+      <div class="m">
+        <b>${esc(k.t)}</b>${r.source === 'sheet' ? '<span class="pt-tag">📊 من الشيت / الخصومات</span>' : ''}
+        ${PT.sel === 'all' ? ` · 🤝 ${esc(r.name)}` : ''}
+        <small>📅 ${esc(fmtDay(r.date))}${r.note ? ' · ' + esc(r.note) : ''}</small>
+        ${r.voided ? `<small>🚫 اتلغت — ${esc(r.void_reason || '')}</small>` : ''}
+        ${!r.voided && r.source === 'entry' ? `<button class="mini-btn danger" style="margin-top:6px;" onclick="ptVoid('${esc(r.id)}')">🚫 إلغاء</button>` : ''}
+      </div>
+      <div class="a">${ptSigned(v)}${PT.sel !== 'all' && !r.voided ? `<small>الرصيد ${ptMoney(run)}</small>` : ''}</div>
+    </div>`;
+  }).reverse().join('');
+
+  box.innerHTML = head
+    + `<div class="pt-tabs">${tab('all', '👥 الكل')}${parts.map(p => tab(p.email, '🤝 ' + p.name)).join('')}</div>`
+    + sum + tbl + ptFormHtml(parts)
+    + `<div style="font-weight:900; margin:14px 0 8px;">📜 الحركات ${PT.rows.length ? '(' + PT.rows.length + ')' : ''}</div>`
+    + (rows || '<div class="empty" style="padding:18px;">مفيش حركات في الفترة دي</div>');
+}
+
+function ptFormHtml(parts){
+  if(!PT.form) return `<button class="save" style="background:var(--chrome);" onclick="ptOpenForm()">➕ حركة جديدة</button>`;
+  const F = PT.form;
+  const k = PT_KINDS[F.kind] || PT_KINDS.deposit;
+  return `<div class="pt-box" style="border-style:solid;">
+    <label class="fld"><span>🤝 الشريك</span>
+      <select id="ptfEmail">${parts.map(p => `<option value="${esc(p.email)}"${p.email === F.email ? ' selected' : ''}>${esc(p.name)}</option>`).join('')}</select>
+    </label>
+    <label class="fld"><span>📌 نوع الحركة</span>
+      <select id="ptfKind" onchange="ptFormStash(); PT.form.kind=this.value; ptRender()">
+        ${Object.keys(PT_KINDS).map(x => `<option value="${x}"${x === F.kind ? ' selected' : ''}>${PT_KINDS[x].t}</option>`).join('')}
+      </select>
+      ${F.kind === 'withdrawal' ? '<small>💡 مسحوبات الشيت بتيجي لوحدها — دي للمسحوب اللي مش في الشيت بس.</small>' : ''}
+    </label>
+    ${k.dir === 'ask' ? `<label class="fld"><span>↕️ له ولا عليه؟</span>
+      <select id="ptfDir">
+        <option value="in"${F.dir !== 'out' ? ' selected' : ''}>➕ له (الشركة مديونة ليه)</option>
+        <option value="out"${F.dir === 'out' ? ' selected' : ''}>➖ عليه (هو مديون للشركة)</option>
+      </select></label>` : ''}
+    <label class="fld"><span>💵 المبلغ</span>
+      <input type="number" id="ptfAmount" min="0" step="0.01" inputmode="decimal" value="${esc(F.amount || '')}">
+    </label>
+    <label class="fld"><span>📅 التاريخ</span>
+      <input type="date" id="ptfDate" value="${esc(F.date || new Date().toISOString().slice(0,10))}">
+    </label>
+    <label class="fld"><span>📝 ملاحظة${F.kind === 'adjust' ? ' (إجباري للتسوية)' : ''}</span>
+      <input type="text" id="ptfNote" maxlength="300" value="${esc(F.note || '')}">
+    </label>
+    <div style="display:flex; gap:8px;">
+      <button class="save" style="flex:1;" onclick="ptSave()" ${PT.busy ? 'disabled' : ''}>💾 سجّل الحركة</button>
+      <button class="mini-btn" onclick="PT.form=null; ptRender()">إلغاء</button>
+    </div>
+  </div>`;
+}
+function ptOpenForm(){
+  const parts = (PT.board && PT.board.partners) || [];
+  PT.form = { email: PT.sel !== 'all' ? PT.sel : ((parts[0] || {}).email || ''), kind:'deposit', dir:'in',
+              amount:'', date:new Date().toISOString().slice(0,10), note:'' };
+  ptRender();
+}
+function ptFormStash(){
+  const F = PT.form; if(!F) return;
+  const g = id => (document.getElementById(id) || {}).value;
+  if(g('ptfEmail')  !== undefined) F.email  = g('ptfEmail');
+  if(g('ptfDir')    !== undefined) F.dir    = g('ptfDir');
+  if(g('ptfAmount') !== undefined) F.amount = g('ptfAmount');
+  if(g('ptfDate')   !== undefined) F.date   = g('ptfDate');
+  if(g('ptfNote')   !== undefined) F.note   = g('ptfNote');
+}
+async function ptSave(){
+  ptFormStash();
+  const F = PT.form;
+  const amt = parseFloat(String(F.amount || '').replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)));
+  if(!(amt > 0)){ alert('اكتب المبلغ'); return; }
+  if(F.kind === 'adjust' && !String(F.note || '').trim()){ alert('التسوية لازم يتكتب سببها'); return; }
+  const k = PT_KINDS[F.kind];
+  const dir = k.dir === 'ask' ? F.dir : k.dir;
+  const nm = (((PT.board && PT.board.partners) || []).find(p => p.email === F.email) || {}).name || F.email;
+  if(!confirm(`${k.t} ${ptMoney(amt)} ج.م ${dir === 'in' ? 'لـ' : 'على'} «${nm}» بتاريخ ${fmtDay(F.date)}؟`)) return;
+  PT.busy = true; ptRender();
+  const r = await sb.rpc('partner_entry_add', { p_email:F.email, p_kind:F.kind, p_dir:dir,
+                                                 p_amount:amt, p_date:F.date, p_note:F.note || null });
+  PT.busy = false;
+  if(r.error){ alert('❌ ' + r.error.message); ptRender(); return; }
+  PT.form = null;
+  await ptLoad();
+}
+async function ptVoid(id){
+  const why = prompt('سبب الإلغاء؟ (إجباري)', '');
+  if(why === null) return;
+  if(!why.trim()){ alert('اكتب السبب'); return; }
+  const r = await sb.rpc('partner_entry_void', { p_id:id, p_reason:why });
+  if(r.error){ alert('❌ ' + r.error.message); return; }
+  await ptLoad();
 }
 
 // ============================================================
@@ -2834,6 +3274,306 @@ function dedSectionHtml(email){
       </div>
       ${m.list.map(dedRowHtml).join('')}
     </div>`;
+}
+
+// ============================================================
+// 💳 ديون الموظف (ملف 73 في الاستيجنج — prod-hr-debts.sql في الإنتاج)
+// ------------------------------------------------------------
+// 🧸 بالبلدي: الدين «كشكول» لوحده. ممكن الموظف يبقى عليه كذا كشكول
+//    (دين قديم · قسط بنك · مشتريات · صيانة · لبوس…).
+//    • تسجيل الدين **مبيخصمش** — بيظهر كتذكير بس.
+//    • HR بتختار كل شهر هتخصم كام من أنهي دين → ده بس اللي بينزل
+//      من الصافي، والباقي بيترحّل لوحده.
+//    • الصافي طلع بالسالب يوم الصرف؟ السيرفر بيسجّل الفرق دين
+//      «عجز مرتب» ويترحّل مع الباقي.
+//
+// 🔴 كل الحسابات والحواجز في السيرفر (hr_debt_*). الصفحة بتعرض بس.
+// ============================================================
+const DEBT_KINDS = {
+  old:       { t:'مديونية قديمة',        i:'📜' },
+  external:  { t:'دين خارجي بضمان المرتب', i:'🏦' },
+  purchase:  { t:'مشتريات من المحل',     i:'🛒' },
+  repair:    { t:'صيانة',                i:'🔧' },
+  damage:    { t:'لبوس',                 i:'💥' },
+  carryover: { t:'عجز مرتب مترحّل',      i:'↪️' },
+  other:     { t:'أخرى',                 i:'📌' }
+};
+let DEBTS = {};       // إيميل → [ديون بباقيها] من hr_debt_list
+let DEBT_PAYS = {};   // رقم الدين → [سدادات]
+let DEBT_ERR = '';
+let DEBT_EMAIL = '';
+let DEBT_SHOW_DONE = false;
+
+async function loadDebts(){
+  DEBT_ERR = '';
+  try{
+    const [l, p] = await Promise.all([
+      hrAll(() => sb.rpc('hr_debt_list', { p_email: null }).order('id'), 'الديون'),
+      hrAll(() => sb.from('hr_debt_payments')
+        .select('id,debt_id,user_email,period,amount,note,created_by,created_at')
+        .order('created_at', { ascending:false }).order('id'), 'سداد الديون')
+    ]);
+    DEBTS = {}; DEBT_PAYS = {};
+    l.forEach(r => { const e = (r.user_email||'').toLowerCase(); (DEBTS[e] = DEBTS[e] || []).push(r); });
+    Object.keys(DEBTS).forEach(e => DEBTS[e].sort((a,b) =>
+      (Number(b.remaining) > 0) - (Number(a.remaining) > 0) ||
+      String(b.debt_date).localeCompare(String(a.debt_date))));
+    p.forEach(r => { (DEBT_PAYS[r.debt_id] = DEBT_PAYS[r.debt_id] || []).push(r); });
+  }catch(e){
+    // ⚠️ بنقول بصوت عالي — السكوت هنا = HR تفتكر إن الموظف مالوش ديون
+    console.error('loadDebts failed:', e);
+    DEBTS = {}; DEBT_PAYS = {};
+    const t = (e && e.message) ? e.message : String(e);
+    DEBT_ERR = /does not exist|42883|42P01|PGRST202|PGRST205/i.test(t)
+      ? 'ميزة الديون لسه ماتركبتش — شغّل ملف prod-hr-debts.sql' : t;
+  }
+}
+
+function debtRemaining(email){
+  const t = (DEBTS[(email||'').toLowerCase()] || [])
+    .reduce((a, d) => a + Math.max(0, Number(d.remaining || 0)), 0);
+  return Math.round(t * 100) / 100;
+}
+
+// تذكير تحت كشف الراتب: «عليه ديون — لسه ما اتخصمتش» + ترحيل السالب
+function slipDebtNoteHtml(r){
+  const bits = [];
+  if(r.paid && Number(r.net) < 0){
+    bits.push(`↪️ الصافي كان بالسالب — اترحّل <b>${lbMoney(-Number(r.net))}</b> ج.م دين على الشهر الجاي.`);
+  }
+  const rem = debtRemaining(SLIP.email);
+  if(!r.paid && rem){
+    bits.push(`💳 عليه ديون باقي منها <b>${lbMoney(rem)}</b> ج.م — <u>لسه ما اتخصمتش</u> من الصافي اللي فوق.`);
+  }
+  return bits.length ? `<div class="debt-note">${bits.join('<br>')}</div>` : '';
+}
+
+// ملخص صغير جوه سجل الموظف
+function debtSectionHtml(email){
+  const list = (DEBTS[(email||'').toLowerCase()] || []).filter(d => Number(d.remaining) > 0);
+  if(!list.length) return '';
+  return `
+    <div style="margin-top:18px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:9px;">
+        <b style="flex:1;font-size:14px;">💳 الديون الباقية</b>
+        <span style="font-size:12.5px;font-weight:800;color:var(--red);">${lbMoney(debtRemaining(email))} ج.م</span>
+      </div>
+      ${list.map(d => `<div class="ded-row">
+        <div class="ded-amt">${lbMoney(d.remaining)}</div>
+        <div class="ded-mid"><b>${(DEBT_KINDS[d.kind]||{}).i || ''} ${esc(d.title)}</b>
+          <span>${esc((DEBT_KINDS[d.kind]||{}).t || d.kind)} · من ${lbMoney(d.amount)}${
+            d.monthly_installment ? ' · قسط ' + lbMoney(d.monthly_installment) : ''}</span></div>
+      </div>`).join('')}
+      <button class="mini-btn" style="width:100%;margin-top:4px;padding:10px;" onclick="openDebts('${esc(email)}')">💳 افتح الديون واخصم</button>
+    </div>`;
+}
+
+async function openDebts(email){
+  DEBT_EMAIL = (email || '').toLowerCase();
+  DEBT_SHOW_DONE = false;
+  const list = allPeople();
+  if(!list.length){ alert('مفيش موظفين متسجّلين — ضيفهم من لوحة الأدمن الأول'); return; }
+  if(list.indexOf(DEBT_EMAIL) < 0) DEBT_EMAIL = list[0];
+  document.getElementById('debtBody').innerHTML = '<div class="empty">جاري التحميل…</div>';
+  openSheet('debtSheet');
+  await loadDebts();          // ⚠️ طازة — ممكن حد تاني سدّد من موبايل تاني
+  renderDebts();
+}
+
+function debtCardHtml(d){
+  const k = DEBT_KINDS[d.kind] || { t:d.kind, i:'📌' };
+  const rem = Number(d.remaining || 0);
+  const pays = DEBT_PAYS[d.id] || [];
+  const thisMonth = pays.filter(p => String(p.period).slice(0,7) === MONTH);
+  const def = rem > 0 ? Math.min(rem, Number(d.monthly_installment || 0) || rem) : 0;
+  return `
+    <div class="debt-card${rem > 0 ? '' : ' done'}">
+      <div class="debt-h">
+        <b>${k.i} ${esc(d.title)}</b>
+        <span class="debt-kind">${esc(k.t)}</span>
+      </div>
+      <div class="debt-nums">
+        <div><b>${lbMoney(d.amount)}</b><span>الدين</span></div>
+        <div><b style="color:var(--done)">${lbMoney(d.paid_total)}</b><span>اتسدّد</span></div>
+        <div><b style="color:${rem > 0 ? 'var(--red)' : 'var(--done)'}">${lbMoney(rem)}</b><span>الباقي</span></div>
+      </div>
+      <div class="debt-hist">
+        ${new Date(d.debt_date).toLocaleDateString('ar-EG', { day:'numeric', month:'long', year:'numeric' })}${
+        d.monthly_installment ? ' · القسط الشهري ' + lbMoney(d.monthly_installment) + ' ج.م' : ''}${
+        d.note ? ' · ' + esc(d.note) : ''}
+        ${pays.map(p => `<div><span>✔️ ${lbMoney(p.amount)} من مرتب ${esc(new Date(p.period).toLocaleDateString('ar-EG', { month:'long', year:'numeric' }))}</span>
+          <button class="ded-del" title="إلغاء السداد ده" onclick="debtUnpay('${esc(p.id)}')">↩️</button></div>`).join('')}
+      </div>
+      ${rem > 0 ? `
+        <div class="debt-pay">
+          <input type="number" id="dp_${esc(d.id)}" min="1" step="50" inputmode="decimal"
+                 placeholder="المبلغ" value="${thisMonth.length ? '' : (def || '')}">
+          <button onclick="debtPay('${esc(d.id)}')">💸 اخصم من مرتب ${esc(monthLabel())}</button>
+        </div>` : ''}
+      ${(!pays.length && d.kind !== 'carryover') ? `<button class="mini-btn danger" style="margin-top:8px;"
+          onclick="debtDelete('${esc(d.id)}')">🗑️ امسح الدين (اتسجّل غلط)</button>` : ''}
+    </div>`;
+}
+
+function renderDebts(){
+  const list = allPeople();
+  const all = DEBTS[DEBT_EMAIL] || [];
+  const open = all.filter(d => Number(d.remaining) > 0);
+  const done = all.filter(d => Number(d.remaining) <= 0);
+  const rem = debtRemaining(DEBT_EMAIL);
+  const paidMonth = (PAYROWS[DEBT_EMAIL] || {})[MONTH + '-01'];
+  document.getElementById('debtTitle').textContent = '💳 ديون — ' + nameOf(DEBT_EMAIL);
+  document.getElementById('debtBody').innerHTML = `
+    ${DEBT_ERR ? `<div class="hintbox" style="background:var(--rejected-bg,#FEF2F2);color:var(--red);">❌ ${esc(DEBT_ERR)}</div>` : ''}
+    <label class="fld"><span>👤 الموظف</span>
+      <select onchange="DEBT_EMAIL=this.value; renderDebts()">
+        ${list.map(e => `<option value="${esc(e)}"${e===DEBT_EMAIL?' selected':''}>${esc(nameOf(e))}</option>`).join('')}
+      </select>
+    </label>
+
+    <div class="kpis" style="margin:4px 0 12px;">
+      <div class="kpi"><div class="v" style="color:${rem ? 'var(--red)' : 'inherit'}">${lbMoney(rem)}</div><div class="l">إجمالي الباقي ج.م</div></div>
+      <div class="kpi"><div class="v">${open.length}</div><div class="l">دين مفتوح</div></div>
+    </div>
+    <div class="hintbox">
+      الخصم بيتحسب على مرتب <b>${esc(monthLabel())}</b> — غيّر الشهر من الشاشة الرئيسية.
+      ${paidMonth && paidMonth.paid ? '<br>⚠️ مرتب الشهر ده <b>اتصرف</b> — اختار الشهر الجاي عشان تخصم.' : ''}
+    </div>
+
+    ${open.length ? open.map(debtCardHtml).join('') : '<div class="empty" style="padding:16px;">مفيش ديون مفتوحة ✅</div>'}
+
+    ${done.length ? `<button class="mini-btn" style="width:100%;padding:10px;margin-bottom:10px;"
+        onclick="DEBT_SHOW_DONE=!DEBT_SHOW_DONE; renderDebts()">
+        ${DEBT_SHOW_DONE ? '▴' : '▾'} ✅ ديون اتسددت (${done.length})</button>
+      ${DEBT_SHOW_DONE ? done.map(debtCardHtml).join('') : ''}` : ''}
+
+    <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);">
+      <b style="display:block;font-size:14px;margin-bottom:10px;">➕ دين جديد</b>
+      <label class="fld"><span>📂 النوع</span>
+        <select id="dbKind">
+          ${Object.keys(DEBT_KINDS).filter(k => k !== 'carryover')
+            .map(k => `<option value="${k}">${DEBT_KINDS[k].i} ${DEBT_KINDS[k].t}</option>`).join('')}
+        </select>
+      </label>
+      <label class="fld"><span>📝 التفاصيل</span>
+        <input type="text" id="dbTitle" placeholder="مثال: لبوس شاشة · قرض بنك مصر · شاحن من المحل">
+      </label>
+      <label class="fld"><span>💰 المبلغ كله (بالجنيه)</span>
+        <input type="number" id="dbAmt" min="1" step="50" inputmode="decimal">
+      </label>
+      <label class="fld"><span>🗓️ القسط الشهري (اختياري)</span>
+        <small>لو متفقين على مبلغ ثابت كل شهر. بيتكتب مقترح في خانة الخصم — والقرار في الآخر ليك.</small>
+        <input type="number" id="dbInst" min="1" step="50" inputmode="decimal" placeholder="من غير قسط ثابت">
+      </label>
+      <label class="fld"><span>📅 تاريخ الدين</span>
+        <input type="date" id="dbDate" value="${esc(todayCairo())}">
+      </label>
+      <label class="fld"><span>📌 ملاحظة (اختياري)</span>
+        <input type="text" id="dbNote">
+      </label>
+      <label class="fld"><span>💸 اخصم منه دلوقتي من مرتب ${esc(monthLabel())} (اختياري)</span>
+        <small>سيبه فاضي = الدين يتسجّل تذكير بس، والصافي ميتأثرش.</small>
+        <input type="number" id="dbNow" min="1" step="50" inputmode="decimal" placeholder="ما تخصمش دلوقتي">
+      </label>
+      <button class="save" id="dbSave" style="background:var(--red);" onclick="debtAdd()">💳 سجّل الدين</button>
+    </div>`;
+}
+
+async function debtAfterChange(){
+  await loadDebts();
+  await payAdminReload();
+  render();
+  renderDebts();
+  if(document.getElementById('slipSheet').classList.contains('open') && SLIP.email){
+    await loadPayslips(); renderPayslips();
+  }
+}
+
+async function debtAdd(){
+  const g = id => ((document.getElementById(id) || {}).value || '').trim();
+  const kind = g('dbKind'), title = g('dbTitle'), note = g('dbNote'), day = g('dbDate');
+  const amt = parseFloat(g('dbAmt')), inst = g('dbInst') === '' ? null : parseFloat(g('dbInst'));
+  const now = g('dbNow') === '' ? 0 : parseFloat(g('dbNow'));
+  if(!title){ alert('اكتب تفاصيل الدين'); return; }
+  if(!amt || amt <= 0){ alert('اكتب المبلغ'); return; }
+  if(inst !== null && !(inst > 0)){ alert('القسط لازم يكون أكبر من صفر أو فاضي'); return; }
+  if(now && now > amt){ alert('اللي هيتخصم دلوقتي أكبر من الدين نفسه'); return; }
+  const k = DEBT_KINDS[kind] || {};
+  if(!confirm(`تسجيل دين\n\nالموظف: ${nameOf(DEBT_EMAIL)}\nالنوع: ${k.t}\nالتفاصيل: ${title}\nالمبلغ: ${amt} ج.م` +
+              (inst ? `\nالقسط: ${inst} ج.م/شهر` : '') +
+              (now ? `\n\n💸 هيتخصم دلوقتي ${now} ج.م من مرتب ${monthLabel()}` : '\n\n(تذكير بس — مش هيتخصم من الصافي)'))) return;
+  const btn = document.getElementById('dbSave');
+  if(btn){ btn.disabled = true; btn.textContent = '⏳ جاري الحفظ…'; }
+  try{
+    const { error } = await sb.rpc('hr_add_debt', {
+      p_email: DEBT_EMAIL, p_kind: kind, p_title: title, p_amount: amt,
+      p_installment: inst, p_date: day || null, p_note: note || null,
+      p_pay_now: now || null, p_pay_period: now ? MONTH + '-01' : null });
+    // ⚠️ Supabase مبيرميش خطأ — بيرجّعه في .error
+    if(error) throw error;
+    await notifyPay(DEBT_EMAIL, now
+      ? `💳 اتسجّل عليك دين ${amt} ج.م (${title}) — واتخصم منه ${now} ج.م من مرتب ${monthLabel()}`
+      : `💳 اتسجّل عليك دين ${amt} ج.م (${title}) — لسه ما اتخصمش من مرتبك`);
+    await debtAfterChange();
+    alert('✅ اتسجّل');
+  }catch(e){
+    console.error('debtAdd failed:', e);
+    alert('❌ ' + (e.message || e));
+  }finally{
+    if(btn){ btn.disabled = false; btn.textContent = '💳 سجّل الدين'; }
+  }
+}
+
+async function debtPay(id){
+  const d = (DEBTS[DEBT_EMAIL] || []).find(x => x.id === id);
+  const el = document.getElementById('dp_' + id);
+  const amt = parseFloat((el && el.value) || '');
+  if(!d) return;
+  if(!amt || amt <= 0){ alert('اكتب المبلغ'); return; }
+  if(amt > Number(d.remaining)){ alert('المبلغ أكبر من الباقي (' + lbMoney(d.remaining) + ')'); return; }
+  // ⚠️ تحذير لو الخصم هيخلّي الصافي بالسالب — مش منع، بس لازم تعرف
+  const row = (PAYROWS[DEBT_EMAIL] || {})[MONTH + '-01'];
+  const warn = (row && Number(row.net) - amt < 0)
+    ? `\n\n⚠️ الصافي هيبقى بالسالب (${lbMoney(Number(row.net) - amt)}) — والفرق هيترحّل دين يوم الصرف.` : '';
+  if(!confirm(`خصم ${amt} ج.م من مرتب ${monthLabel()}\nسداد: ${d.title}\nالباقي بعده: ${lbMoney(Number(d.remaining) - amt)}${warn}`)) return;
+  try{
+    const { error } = await sb.rpc('hr_debt_pay',
+      { p_debt_id: id, p_amount: amt, p_period: MONTH + '-01', p_note: null });
+    if(error) throw error;
+    await notifyPay(DEBT_EMAIL, `💳 اتخصم ${amt} ج.م من مرتب ${monthLabel()} — سداد: ${d.title}`);
+    await debtAfterChange();
+  }catch(e){
+    console.error('debtPay failed:', e);
+    alert('❌ ' + (e.message || e));
+  }
+}
+
+async function debtUnpay(payId){
+  if(!confirm('تلغي السداد ده؟\nالمبلغ هيرجع على الدين، وهيتشال من خصم المرتب.')) return;
+  try{
+    const { error } = await sb.rpc('hr_debt_unpay', { p_payment_id: payId });
+    if(error) throw error;
+    await debtAfterChange();
+  }catch(e){ alert('❌ ' + (e.message || e)); }
+}
+
+async function debtDelete(id){
+  if(!confirm('تمسح الدين ده خالص؟ (للدين اللي اتسجّل غلط بس)')) return;
+  try{
+    const { error } = await sb.rpc('hr_delete_debt', { p_id: id });
+    if(error) throw error;
+    await debtAfterChange();
+  }catch(e){ alert('❌ ' + (e.message || e)); }
+}
+
+// 💳 اتسدّد كام من الديون من مرتب شهر معيّن (من السدادات نفسها)
+function debtPaidIn(email, period){
+  const e = (email || '').toLowerCase(), ym = String(period || '').slice(0, 7);
+  let t = 0;
+  Object.keys(DEBT_PAYS).forEach(id => (DEBT_PAYS[id] || []).forEach(p => {
+    if((p.user_email || '').toLowerCase() === e && String(p.period).slice(0, 7) === ym) t += Number(p.amount || 0);
+  }));
+  return Math.round(t * 100) / 100;
 }
 
 // ===== شاشة إضافة خصم =====
@@ -3309,8 +4049,11 @@ function slipCard(r){
         return lv && lv.amount ? `<div><span>+ إجازات ما اتاخدتش
           <small style="opacity:.75;">(${lv.days} يوم)</small></span>
           <b style="color:var(--done)">${n(lv.amount)}</b></div>` : ''; })()}
+      ${(() => { const dv = debtPaidIn(SLIP.email, r.period);
+        return dv ? `<div><span>− 💳 سداد ديون</span><b class="minus">${n(dv)}</b></div>` : ''; })()}
       <div class="eq"><span>= الصافي</span><b>${n(r.net)} ج.م</b></div>
     </div>
+    ${slipDebtNoteHtml(r)}
 
     ${r.paid ? `
       <div class="slip-meta">
@@ -4188,6 +4931,8 @@ function prCardHtml(e){
       return b && b.total ? `<div class="pr-bell" style="color:var(--done);">🎁 زيادات: +${money(b.total)} ج.م</div>` : ''; })()}
     ${(() => { const lv = r ? leaveLineOf(e, r.period) : null;
       return lv && lv.amount ? `<div class="pr-bell" style="color:var(--done);">💵 إجازات ما اتاخدتش: ${lv.days} يوم = +${money(lv.amount)} ج.م</div>` : ''; })()}
+    ${(() => { const dv = r ? debtPaidIn(e, r.period) : 0; const dr = debtRemaining(e);
+      return (dv || dr) ? `<div class="pr-bell" style="color:var(--red);">💳 ${dv ? 'سداد ديون الشهر ده: −' + money(dv) + ' ج.م' : ''}${dv && dr ? ' · ' : ''}${dr ? 'باقي عليه ' + money(dr) + ' ج.م' : ''}</div>` : ''; })()}
     ${r && r.paid ? `<div class="pr-bell" style="color:var(--done);">🔒 مرتب الشهر ده اتصرف — الأرقام متقفلة</div>` : ''}
     ${!r && has ? `<div class="pr-bell" style="color:var(--muted);">مفيش كشف للشهر ده (مفيش حضور ولا خصومات فيه)</div>` : ''}
     ${lt.days ? `<div class="pr-bell" style="color:var(--waiting);">⏰ ${lt.days} يوم تأخير

@@ -874,6 +874,7 @@ async function attLoadState(){
     await attLoadNoBreak();   // ☕🚫 هل أعلن «مطلعتش بريك» لليوم ده؟
     await attLoadMgr();       // 🏭 موافقة مدير الإنتاج على الانصراف
     await attLoadDayKinds();  // أنواع تسجيلات اليوم — لفحص البريك
+    await attLoadMode();      // 🧮 «مالوش حضور ولا انصراف»؟ (prod-hr-attmode.sql)
   }catch(e){
     // ⚠️ الفشل الصامت هنا كان أخطر من الخطأ نفسه.
     //    لما قراءة الحالة كانت بتفشل، الصفحة كانت بتحط قيم فاضية
@@ -889,6 +890,23 @@ async function attLoadState(){
       .select('lat,lng,radius_m').eq('id',1).maybeSingle();
     if(data) _attSettings = data;
   }catch(e){}
+}
+
+// ============================================================
+// 🧮 «الحضور والغياب» بتاعي (prod-hr-attmode.sql)
+// ------------------------------------------------------------
+// 🧸 HR ممكن تعلّم الموظف «🏢 مالوش حضور ولا انصراف» من ⏰ نظام العمل.
+//    ساعتها مفيش داعي للزراير — بنقوله كده بدل ما يدوس وياخد رفض.
+//    ⚠️ الدالة مش موجودة (الملف مااتشغّلش) أو النت وقع؟ → الزراير زي زمان،
+//       والسيرفر هو اللي بيحكم في الآخر.
+// ============================================================
+let _attMode = 'auto';
+async function attLoadMode(){
+  try{
+    const { data, error } = await sb.rpc('hr_my_att_mode');
+    if(error) throw error;
+    _attMode = (data && data.mode) || 'auto';
+  }catch(e){ _attMode = 'auto'; }
 }
 
 // ============================================================
@@ -973,6 +991,10 @@ function attRender(busyMsg){
         <button class="att-close" onclick="closeAttendance()">×</button>
       </div>
       <div class="att-body">
+        ${_attMode === 'none' ? `<div class="att-busy" style="text-align:center;line-height:1.9;">
+          🏢 <b>إنت متعلّم «مالوش حضور ولا انصراف»</b><br>
+          مش محتاج تسجّل حضور ولا انصراف ولا بريك.<br>
+          <span style="font-size:12.5px;opacity:.8;">لو ده غلط كلّم شؤون العاملين.</span></div>` : `
         <div class="att-status">${esc(attStatusText())}</div>
         ${_attErr && !_attPending ? `<div class="att-warn">⚠️ مقدرناش نقرا حالتك — الأزرار مقفولة عشان
           ما نسجّلش حاجة غلط.<br><span class="att-warn-d">${esc(_attErr)}</span></div>` : ''}
@@ -992,7 +1014,7 @@ function attRender(busyMsg){
         <div class="att-note">
           📍 التسجيل من داخل المحل بس · 🔐 بيتطلب بصمتك أو وجهك
         </div>
-        ${attMsgHtml(busyMsg)}
+        ${attMsgHtml(busyMsg)}`}
         <div class="att-log-head">
           <b>سجلي</b>
           <input type="month" id="attMonth" value="${_attMonthValue()}" onchange="attRenderLog()">

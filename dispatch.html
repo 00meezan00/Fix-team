@@ -50,6 +50,7 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
 <script src="label.js"></script>
 <script src="attendance.js"></script>
 <script src="payroll.js"></script>
+<script src="shift-unlock.js"></script>   <!-- 🔓 طلب فتح الشاشة من المحاسب العام (ملف prod-shift-unlock.sql) — مؤقت للإنتاج -->
 <script src="due-deposit.js"></script>   <!-- ⏳ الميعاد مع العميل + 💵 العربون (إخباري) — مؤقت للإنتاج -->
 <script src="intake-board-view.js" defer></script>   <!-- 📥 ترتيب الاستلامات (ملف prod-intake-board.sql) — زرار في قايمة ⋮ -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -2942,13 +2943,14 @@ function dpLockHtml(){
     <p>${why}<br>سجّل ${k === 'break' ? '«استئناف»' : '«حضور»'} من «المواعيد» والشاشة هتفتح لوحدها.</p>
     <button class="pri att-menu-btn" onclick="openAttendance()">⏰ المواعيد</button>
     <button class="pay-menu-btn" onclick="openPayroll()">💰 مرتبك</button>
+    <div class="ulk-slot"></div>   <!-- 🔓 طلب فتح من المحاسب العام (shift-unlock.js بيملاه) -->
   </div>`;
 }
 function dpLockUI(locked){
   DP_LOCKED = locked;
   document.body.classList.toggle('dp-locked', locked);
   try{ localStorage.setItem(DP_LOCK_KEY, locked ? '1' : '0'); }catch(e){}
-  if(!locked){ $('dpLock').innerHTML = ''; return; }
+  if(!locked){ $('dpLock').innerHTML = ''; $('dpLock').dataset.h = ''; return; }
   // اقفل أي حاجة مفتوحة فيها أجهزة أو شغل
   try{ closeIntake(); }catch(e){}
   try{ closeAct(); }catch(e){}
@@ -2957,7 +2959,7 @@ function dpLockUI(locked){
   // الأجهزة تتشال من الصفحة ومن النسخة المحفوظة على الموبايل
   devices = []; try{ reindexSearch(); }catch(e){}
   try{ localStorage.removeItem(CACHE_KEY); }catch(e){}
-  $('dpLock').innerHTML = dpLockHtml();
+  { const h = dpLockHtml(), el = $('dpLock'); if(el.dataset.h !== h || !el.firstChild){ el.innerHTML = h; el.dataset.h = h; } }   // 🔓 نفس الكارت → مانرسمش (الكتابة ماتضيعش)
   try{ attSyncMenu(); }catch(e){}        // زرار المواعيد على الموبايل بس
   try{ if(typeof paySyncBadge === 'function') paySyncBadge(); }catch(e){}
   $('app').innerHTML = ''; $('tabs').innerHTML = '';
