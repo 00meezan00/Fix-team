@@ -47,6 +47,7 @@ let _payRows   = [];   // الخصومات اليدوية
 let _payLate   = [];   // خصومات التأخير (محسوبة في السيرفر)
 let _payWaiv   = [];   // رسايل «الخصم اتشال»
 let _paySlips  = [];   // كشوف الرواتب — شهر بشهر
+let _payBons  = [];   // 🎁 (prod-hr-bonus) الزيادات — عشان نكتب أسبابها تحت سطر الكشف
 let _payLeave = {}; // 💵 (prod-hr-leave) 'YYYY-MM-01' → { days, amount } — فلوس الإجازة المعتمدة
 // 🗄️ الدرجين: الشهر اللي بيعرضوه + مفتوحين ولا لأ
 //    (بيفضلوا زي ما هم لو الشاشة اترسمت تاني بعد «فهمت»)
@@ -147,6 +148,12 @@ async function payLoad(){
     // 💵 فلوس الإجازة اللي ما اتاخدتش (prod-hr-leave) — المبلغ داخل في
     //    الصافي من السيرفر، ده بس عشان نكتب سطره. لو الملف لسه
     //    ماتشغّلش مش بنوقّع الشاشة.
+    // 🎁 الزيادات (prod-hr-bonus) — المبلغ داخل في الصافي من السيرفر،
+    //    ده بس عشان نكتب السطر وأسبابه. لو الملف لسه ماتشغّلش مش بنوقّع الشاشة.
+    const bn = await sb.rpc('hr_bonus_list', { p_email: me });
+    if(bn.error){ console.warn('hr_bonus_list:', bn.error); _payBons = []; }
+    else _payBons = bn.data || [];
+
     const lv = await sb.rpc('hr_leave_bonus_lines', { p_email: me });
     _payLeave = {};
     if(lv.error){ console.warn('hr_leave_bonus_lines:', lv.error); }
@@ -510,6 +517,18 @@ function paySlipOvertime(p){
     </div>`;
 }
 
+// 🎁 سطر «زيادات» + أسبابها تحته — بالأخضر، دي فلوس ليه مش عليه
+function payBonusLine(p){
+  const ym = String(p && p.period || '').slice(0, 7);
+  const why = _payBons.filter(b => String(b.work_date || '').slice(0, 7) === ym);
+  const v = Math.round(why.reduce((a, b) => a + Number(b.amount || 0), 0) * 100) / 100;
+  if(!v) return '';
+  return `<div><span>+ 🎁 زيادات</span>
+    <b style="color:var(--p-green)">${payMoney(v)}</b></div>
+    ${why.map(b => `<div style="font-size:12px;padding:0 10px 2px 0;color:var(--p-mut);">
+      <span>• ${_payEsc(b.reason || '')}</span><span>+${payMoney(b.amount)}</span></div>`).join('')}`;
+}
+
 // 💵 سطر «إجازات ما اتاخدتش» — بالأخضر، دي فلوس ليه مش عليه
 function payLeaveLine(p){
   const x = _payLeave[String(p && p.period || '').slice(0, 10)];
@@ -554,6 +573,7 @@ function paySlipCard(p, big){
       <div><span>− إجمالي الخصومات</span><b class="minus">${
         payMoney(Number(p.manual_ded || 0) + Number(p.late_ded || 0))}</b></div>`}
       ${paySlipOvertime(p)}
+      ${payBonusLine(p)}
       ${payLeaveLine(p)}
       <div class="eq"><span>= الصافي</span><b>${payMoney(p.net)}</b></div>
     </div>
@@ -586,6 +606,7 @@ function payPaidSlipCard(p){
         Number(p.overtime_amt) >= 0 ? '+ أوفر تايم' : '− عجز ساعات'}</span>
         <b style="color:${Number(p.overtime_amt) >= 0 ? 'var(--p-green)' : 'var(--p-red)'}">${
           payMoney(Math.abs(Number(p.overtime_amt)))}</b></div>` : ''}
+      ${payBonusLine(p)}
       ${payLeaveLine(p)}
       <div class="eq"><span>= اللي قبضته</span><b>${payMoney(p.net)}</b></div>
     </div>

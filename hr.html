@@ -684,6 +684,16 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
   <div class="sheet-body" id="payBody"></div>
 </div>
 
+<!-- ===== 🎁 زيادة على المرتب (prod-hr-bonus) ===== -->
+<div class="sheet" id="bonSheet">
+  <div class="sheet-head">
+    <h2 id="bonTitle">🎁 زيادة جديدة</h2>
+    <button class="icon-btn" style="background:var(--surface-2); color:var(--ink);"
+            onclick="closeSheet('bonSheet')">×</button>
+  </div>
+  <div class="sheet-body" id="bonBody"></div>
+</div>
+
 <!-- ===== 💸 خصم جديد ===== -->
 <div class="sheet" id="dedSheet">
   <div class="sheet-head">
@@ -1042,6 +1052,7 @@ async function loadMonth(){
     await loadOffInfo(from, to);    // 🏖️ أيام الراحة اللي نزل فيها (prod-hr-leave)
     await loadLeaveBonus();         // 💵 الإجازات اللي ما اتاخدتش (prod-hr-leave)
     await loadLeaveLines();         // 💵 فلوس الإجازة المعتمدة — لسطر الكشف
+    await loadBonuses();            // 🎁 الزيادات (prod-hr-bonus)
     await loadNoBreak(from, to);    // ☕🚫 مين قال إنه مطلعش بريك
     await loadBreakDecl(from, to);  // ⚠️ إقرارات البريك وقت الانصراف
     render();
@@ -1254,8 +1265,10 @@ function cardHtml(e, days){
       //    والأوفر تايم). قبل كده كان مجموع كل الشهور جنب أرقام
       //    شهر واحد، والمسحوبات متجمعة معاه كمان.
       const m = manualDed(e, MONTH);
-      if(!m.total && !m.wd && !m.unseen) return '';
+      const bn = bonusSum(e, MONTH);
+      if(!m.total && !m.wd && !m.unseen && !bn.total) return '';
       const bits = [];
+      if(bn.total) bits.push(`<span style="color:var(--done)">🎁 زيادة: <b>+${bn.total}</b> ج.م</span>`);
       if(m.total) bits.push(`💸 خصم يدوي: <b>${m.total}</b> ج.م`);
       if(m.wd)    bits.push(`🔩 مسحوبات: <b>${m.wd}</b> ج.م`);
       if(m.unseen) bits.push(`<i>${m.unseen} لسه ما اتقراش</i>`);
@@ -1265,6 +1278,7 @@ function cardHtml(e, days){
     <div class="card-foot">
       <button onclick="openEmpLog('${esc(e)}')">📋 السجل</button>
       <button onclick="openDeduction('${esc(e)}')" title="خصم">💸</button>
+      <button onclick="openBonus('${esc(e)}')" title="زيادة">🎁</button>
       <button onclick="openHrSettings('${esc(e)}')">⏰</button>
       <button onclick="exportEmpPdf('${esc(e)}')">📄</button>
       <button onclick="exportEmpExcel('${esc(e)}')">📊</button>
@@ -1326,6 +1340,7 @@ function renderEmpSheet(email, days){
 
     <div class="emp-acts">
       <button onclick="openDeduction('${esc(email)}')" style="background:var(--red);color:#fff;border-color:var(--red);">💸 خصم</button>
+      <button onclick="openBonus('${esc(email)}')" style="background:var(--done);color:#fff;border-color:var(--done);">🎁 زيادة</button>
       <button onclick="openPunch('${esc(email)}')">✍️ تسجيل يدوي</button>
       <button onclick="openHrSettings('${esc(email)}')">⏰ المواعيد</button>
       <button onclick="exportEmpPdf('${esc(email)}')">📄 PDF</button>
@@ -1333,6 +1348,7 @@ function renderEmpSheet(email, days){
     </div>
 
     ${dedSectionHtml(email)}
+    ${bonusSectionHtml(email)}
 
     ${flags ? `<div class="hintbox" style="margin-top:14px;">⚠️ فيه ${flags} يوم ناقص انصراف —
       ساعاتهم مش محسوبة في الإجمالي.</div>` : ''}
@@ -2857,6 +2873,11 @@ function renderDeduction(){
       <textarea id="dedWhy" rows="3" placeholder="مثال: تأخير ساعتين يوم الأحد من غير إذن"></textarea>
     </label>
 
+    <label class="fld"><span>🗓️ على مرتب شهر</span>
+      <small>الخصم بينزل على مرتب الشهر بتاع التاريخ ده. الشهر اللي مرتبه اتصرف مقفول.</small>
+      <input type="date" id="dedDate" value="${esc(hrDefDate())}">
+    </label>
+
     <button class="save" id="dedSave" style="background:var(--red);"
             onclick="saveDeduction()">💸 اعمل الخصم</button>
 
@@ -2872,26 +2893,31 @@ async function saveDeduction(){
   const btn = document.getElementById('dedSave');
   const amt = parseFloat((document.getElementById('dedAmt') || {}).value);
   const why = ((document.getElementById('dedWhy') || {}).value || '').trim();
+  // 📅 (prod) الخصم على مرتب الشهر اللي HR اختارته — السيرفر بيرفض الشهر المصروف
+  const day = ((document.getElementById('dedDate') || {}).value || '').trim();
 
   // ⚠️ الفحص هنا **مجاملة للمستخدم بس**. الفحص الحقيقي جوه دالة
   //    hr_add_deduction في السيرفر — لو شيلنا السطرين دول، محدش
   //    هيقدر يعدّي خصم فاضي برضه.
   if(!amt || amt <= 0){ alert('اكتب مبلغ أكبر من صفر'); return; }
   if(!why){ alert('لازم تكتب سبب الخصم'); return; }
-  if(!confirm(`تأكيد الخصم\n\nالموظف: ${nameOf(DED_EMAIL)}\nالمبلغ: ${amt} ج.م\nالسبب: ${why}`)) return;
+  if(!day){ alert('اختار التاريخ'); return; }
+  const mon = hrMonthName(day);
+  if(!confirm(`تأكيد الخصم\n\nالموظف: ${nameOf(DED_EMAIL)}\nالمبلغ: ${amt} ج.م\nعلى مرتب: ${mon}\nالسبب: ${why}`)) return;
 
   if(btn){ btn.disabled = true; btn.textContent = '⏳ جاري الحفظ…'; }
   try{
     const { data, error } = await sb.rpc('hr_add_deduction', {
-      p_email:  DED_EMAIL,
-      p_amount: amt,
-      p_reason: why
+      p_email:     DED_EMAIL,
+      p_amount:    amt,
+      p_reason:    why,
+      p_work_date: day
     });
     // ⚠️ Supabase مبيرميش خطأ — بيرجّعه في .error. من غير السطر ده
     //    الشاشة هتقول «اتحفظ ✅» والخصم ما اتكتبش.
     if(error) throw error;
 
-    await notifyDeduction(DED_EMAIL, amt, why);   // إشعار برّه التطبيق (اختياري)
+    await notifyDeduction(DED_EMAIL, amt, why + ' (على مرتب ' + mon + ')');   // إشعار برّه التطبيق (اختياري)
     await loadDeductions();
     render();
     renderDeduction();
@@ -2900,7 +2926,7 @@ async function saveDeduction(){
     await payAdminReload();   // الكارت بياخد أرقامه من الكشف — لازم يتقرا تاني
     const a = document.getElementById('dedAmt'); if(a) a.value = '';
     const w = document.getElementById('dedWhy'); if(w) w.value = '';
-    alert('✅ اتسجّل الخصم — هيوصل للموظف في شاشة «مرتبك»');
+    alert('✅ اتسجّل الخصم على مرتب ' + mon + ' — هيوصل للموظف في شاشة «مرتبك»');
   }catch(e){
     console.error('saveDeduction failed:', e);
     const t = (e && e.message) ? e.message : String(e);
@@ -2909,6 +2935,193 @@ async function saveDeduction(){
       : '❌ فشل الخصم: ' + t);
   }finally{
     if(btn){ btn.disabled = false; btn.textContent = '💸 اعمل الخصم'; }
+  }
+}
+
+// ============================================================
+// 📅 التاريخ الافتراضي لخصم/زيادة جديدة
+// ------------------------------------------------------------
+// الشهر المعروض هو الشهر الحالي → النهاردة · شهر قديم → أول يوم فيه
+// ============================================================
+function hrDefDate(){
+  const today = todayCairo();
+  return today.slice(0, 7) === MONTH ? today : MONTH + '-01';
+}
+function hrMonthName(day){
+  return new Date(day + 'T12:00:00').toLocaleDateString('ar-EG', { month:'long', year:'numeric' });
+}
+
+// ============================================================
+// 🎁 الزيادة على المرتب (prod-hr-bonus — زي «الحوافز» في الاستيجنج)
+// ------------------------------------------------------------
+// 🧸 بالبلدي: HR بتكتب زيادة (مبلغ + سبب + شهر) → بتتزاد على صافي
+//    مرتب الشهر ده على طول، والموظف بيشوفها في «مرتبك» بسطر أخضر.
+//
+// 🔴 الزيادات في جدول لوحدها (hr_bonuses) مش مع الخصومات — عشان
+//    مفيش أي مكان بيجمع «الخصومات» يخصمها بالغلط من الموظف.
+// 🔴 الكتابة والقراية من السيرفر بس (hr_add_bonus · hr_delete_bonus ·
+//    hr_bonus_list). والشهر اللي اتصرف متقفل — السيرفر بيرفض.
+// ============================================================
+let BONS = {};          // إيميل → [زيادات] (كل الشهور)
+let BON_EMAIL = '';
+let BONS_ERR = '';
+
+async function loadBonuses(){
+  BONS_ERR = '';
+  try{
+    const { data, error } = await sb.rpc('hr_bonus_list', { p_email: null });
+    // ⚠️ Supabase مبيرميش خطأ — بيرجّعه في .error
+    if(error) throw error;
+    BONS = {};
+    (data || []).forEach(r => {
+      const e = (r.user_email || '').toLowerCase();
+      (BONS[e] = BONS[e] || []).push(r);
+    });
+  }catch(e){
+    // ⚠️ بنقول بصوت عالي — السكوت هنا = HR تفتكر إن مفيش زيادات
+    console.error('loadBonuses failed:', e);
+    BONS = {};
+    const t = (e && e.message) ? e.message : String(e);
+    BONS_ERR = /does not exist|42883|PGRST202|Could not find the function/i.test(t)
+      ? 'ميزة الزيادة لسه ماتركبتش — شغّل ملف prod-hr-bonus.sql' : t;
+  }
+}
+
+// مجموع زيادات موظف في شهر ('YYYY-MM')
+function bonusSum(email, ym){
+  const list = (BONS[(email||'').toLowerCase()] || [])
+    .filter(r => String(r.work_date || '').slice(0,7) === ym);
+  const total = Math.round(list.reduce((a, r) => a + Number(r.amount || 0), 0) * 100) / 100;
+  return { total, list };
+}
+
+function bonusRowHtml(r){
+  const d = new Date(r.work_date + 'T12:00:00').toLocaleDateString('ar-EG',
+    { day:'numeric', month:'long', year:'numeric' });
+  return `
+    <div class="ded-row" style="border-color:var(--done);">
+      <div class="ded-amt" style="color:var(--done);">+${Number(r.amount)}</div>
+      <div class="ded-mid">
+        <b>🎁 ${esc(r.reason)}</b>
+        <span>على مرتب ${esc(hrMonthName(String(r.work_date).slice(0, 10)))} · ${esc(d)} · ${esc(nameOf(r.created_by || ''))}</span>
+      </div>
+      <button class="ded-del" title="مسح" onclick="deleteBonus('${esc(r.id)}')">🗑️</button>
+    </div>`;
+}
+
+// قسم الزيادات جوه سجل الموظف — الشهر المختار من الشاشة الرئيسية
+function bonusSectionHtml(email){
+  const b = bonusSum(email, MONTH);
+  if(!b.list.length) return '';
+  return `
+    <div style="margin-top:18px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:9px;">
+        <b style="flex:1;font-size:14px;">🎁 الزيادات — ${esc(monthLabel())}</b>
+        <span style="font-size:12.5px;font-weight:800;color:var(--done);">+${b.total} ج.م</span>
+      </div>
+      ${b.list.map(bonusRowHtml).join('')}
+    </div>`;
+}
+
+function openBonus(email){
+  BON_EMAIL = (email || '').toLowerCase();
+  const list = allPeople();
+  if(!list.length){ alert('مفيش موظفين متسجّلين — ضيفهم من لوحة الأدمن الأول'); return; }
+  if(list.indexOf(BON_EMAIL) < 0) BON_EMAIL = list[0];
+  renderBonus();
+  openSheet('bonSheet');
+}
+
+function renderBonus(){
+  const list = allPeople();
+  const recent = (BONS[BON_EMAIL] || []).slice(0, 5);
+  document.getElementById('bonTitle').textContent = '🎁 زيادة — ' + nameOf(BON_EMAIL);
+  document.getElementById('bonBody').innerHTML = `
+    ${BONS_ERR ? `<div class="hintbox" style="background:var(--rejected-bg,#FEF2F2);color:var(--red);">❌ ${esc(BONS_ERR)}</div>` : ''}
+    <label class="fld"><span>👤 الموظف</span>
+      <select onchange="BON_EMAIL=this.value; renderBonus()">
+        ${list.map(e => `<option value="${esc(e)}"${e===BON_EMAIL?' selected':''}>${esc(nameOf(e))}</option>`).join('')}
+      </select>
+    </label>
+
+    <div class="hintbox" style="background:var(--done-bg);color:var(--done);">
+      الزيادة بتتزاد على <b>صافي مرتب</b> الشهر اللي تختاره، والموظف بيشوفها
+      في «مرتبك» بسطر أخضر وتحته السبب.<br>
+      لو غلطت، تقدر تمسحها طول ما مرتب الشهر ده لسه ماتصرفش.
+    </div>
+
+    <label class="fld"><span>💰 المبلغ (بالجنيه)</span>
+      <input type="number" id="bonAmt" min="1" step="5" inputmode="decimal" placeholder="500">
+    </label>
+
+    <label class="fld"><span>📝 السبب</span>
+      <small>الموظف هيشوفه زي ما هو في «مرتبك».</small>
+      <textarea id="bonWhy" rows="2" placeholder="مثال: حافز تارجت الشهر"></textarea>
+    </label>
+
+    <label class="fld"><span>🗓️ على مرتب شهر</span>
+      <small>الزيادة بتتزاد على مرتب الشهر بتاع التاريخ ده.</small>
+      <input type="date" id="bonDate" value="${esc(hrDefDate())}">
+    </label>
+
+    <button class="save" id="bonSave" style="background:var(--done);" onclick="saveBonus()">🎁 اعمل الزيادة</button>
+
+    ${recent.length ? `<div style="margin-top:22px;">
+      <b style="font-size:13.5px;">آخر زيادات ${esc(nameOf(BON_EMAIL))}</b>
+      <div style="margin-top:10px;">${recent.map(bonusRowHtml).join('')}</div>
+    </div>` : ''}`;
+}
+
+async function saveBonus(){
+  const btn = document.getElementById('bonSave');
+  const amt = parseFloat((document.getElementById('bonAmt') || {}).value);
+  const why = ((document.getElementById('bonWhy') || {}).value || '').trim();
+  const day = ((document.getElementById('bonDate') || {}).value || '').trim();
+  // ⚠️ الفحص هنا مجاملة بس — الحقيقي جوه hr_add_bonus في السيرفر
+  if(!amt || amt <= 0){ alert('اكتب مبلغ أكبر من صفر'); return; }
+  if(!why){ alert('لازم تكتب سبب الزيادة'); return; }
+  if(!day){ alert('اختار التاريخ'); return; }
+  const mon = hrMonthName(day);
+  if(!confirm(`تأكيد الزيادة\n\nالموظف: ${nameOf(BON_EMAIL)}\nالمبلغ: +${amt} ج.م\nعلى مرتب: ${mon}\nالسبب: ${why}`)) return;
+
+  if(btn){ btn.disabled = true; btn.textContent = '⏳ جاري الحفظ…'; }
+  try{
+    const { error } = await sb.rpc('hr_add_bonus',
+      { p_email: BON_EMAIL, p_amount: amt, p_reason: why, p_date: day });
+    // ⚠️ Supabase مبيرميش خطأ — بيرجّعه في .error
+    if(error) throw error;
+    await notifyPay(BON_EMAIL, `🎁 زيادة ${amt} ج.م على مرتب ${mon} — ${why}`);
+    await loadBonuses();
+    render();
+    renderBonus();
+    if(typeof OPEN_EMP !== 'undefined' && OPEN_EMP) renderEmpSheet(OPEN_EMP, daysOf(OPEN_EMP));
+    await payAdminReload();
+    const a = document.getElementById('bonAmt'); if(a) a.value = '';
+    const w = document.getElementById('bonWhy'); if(w) w.value = '';
+    alert('✅ اتسجّلت الزيادة — هتظهر في كشف مرتب ' + mon);
+  }catch(e){
+    console.error('saveBonus failed:', e);
+    const t = (e && e.message) ? e.message : String(e);
+    alert(/does not exist|42883|PGRST202|Could not find the function/i.test(t)
+      ? '❌ الميزة لسه ماتركبتش — شغّل ملف prod-hr-bonus.sql' : '❌ ' + t);
+  }finally{
+    if(btn){ btn.disabled = false; btn.textContent = '🎁 اعمل الزيادة'; }
+  }
+}
+
+async function deleteBonus(id){
+  if(!confirm('تمسح الزيادة دي؟\nهتتشال من صافي المرتب.')) return;
+  try{
+    const { error } = await sb.rpc('hr_delete_bonus', { p_id: id });
+    if(error) throw error;
+    await loadBonuses();
+    render();
+    if(document.getElementById('bonSheet').classList.contains('open')) renderBonus();
+    if(typeof OPEN_EMP !== 'undefined' && OPEN_EMP) renderEmpSheet(OPEN_EMP, daysOf(OPEN_EMP));
+    await payAdminReload();
+  }catch(e){
+    console.error('deleteBonus failed:', e);
+    alert('❌ ' + (e.message || e));
   }
 }
 
@@ -3088,6 +3301,10 @@ function slipCard(r){
         <b class="minus">${n(r.withdraw_ded)}</b></div>` : ''}
       <div><span>− خصومات تأخير</span><b class="minus">${n(r.late_ded)}</b></div>
       ${slipOvertimeLines(r)}
+      ${(() => { const b = bonusSum(SLIP.email, String(r.period || '').slice(0, 7));
+        return b.total ? `<div><span>+ 🎁 زيادات
+          <small style="opacity:.75;">(${b.list.map(x => esc(x.reason)).join(' · ')})</small></span>
+          <b style="color:var(--done)">${n(b.total)}</b></div>` : ''; })()}
       ${(() => { const lv = leaveLineOf(SLIP.email, r.period);
         return lv && lv.amount ? `<div><span>+ إجازات ما اتاخدتش
           <small style="opacity:.75;">(${lv.days} يوم)</small></span>
@@ -3967,6 +4184,8 @@ function prCardHtml(e){
         <span style="opacity:.75;font-weight:400;">(زيادة ${fmtDur(om)} · ناقص ${fmtDur(sm)})</span>
       </div>`;
     })()}
+    ${(() => { const b = r ? bonusSum(e, String(r.period || '').slice(0, 7)) : null;
+      return b && b.total ? `<div class="pr-bell" style="color:var(--done);">🎁 زيادات: +${money(b.total)} ج.م</div>` : ''; })()}
     ${(() => { const lv = r ? leaveLineOf(e, r.period) : null;
       return lv && lv.amount ? `<div class="pr-bell" style="color:var(--done);">💵 إجازات ما اتاخدتش: ${lv.days} يوم = +${money(lv.amount)} ج.م</div>` : ''; })()}
     ${r && r.paid ? `<div class="pr-bell" style="color:var(--done);">🔒 مرتب الشهر ده اتصرف — الأرقام متقفلة</div>` : ''}
@@ -3978,6 +4197,8 @@ function prCardHtml(e){
     <div style="display:flex;gap:8px;margin-top:10px;">
       <button class="pr-ded-btn" style="margin:0;flex:1;"
               onclick="openDeduction('${esc(e)}')">💸 خصم</button>
+      <button class="pr-ded-btn" style="margin:0;flex:1;background:var(--done);border-color:var(--done);color:#fff;"
+              onclick="openBonus('${esc(e)}')">🎁 زيادة</button>
       <button class="pr-slip-btn" onclick="openPayslips('${esc(e)}')">🧾 الكشوف</button>
     </div>
   </div>`;
