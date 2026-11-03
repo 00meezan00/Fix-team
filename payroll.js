@@ -47,6 +47,7 @@ let _payRows   = [];   // الخصومات اليدوية
 let _payLate   = [];   // خصومات التأخير (محسوبة في السيرفر)
 let _payWaiv   = [];   // رسايل «الخصم اتشال»
 let _paySlips  = [];   // كشوف الرواتب — شهر بشهر
+let _payLeave = {}; // 💵 (prod-hr-leave) 'YYYY-MM-01' → { days, amount } — فلوس الإجازة المعتمدة
 // 🗄️ الدرجين: الشهر اللي بيعرضوه + مفتوحين ولا لأ
 //    (بيفضلوا زي ما هم لو الشاشة اترسمت تاني بعد «فهمت»)
 let _payPeriod = null;               // { from:'YYYY-MM-01', to:'YYYY-MM-DD' }
@@ -142,6 +143,14 @@ async function payLoad(){
     const sl = await sb.rpc('hr_payroll_periods', { p_email: me });
     if(sl.error) throw sl.error;
     _paySlips = sl.data || [];
+
+    // 💵 فلوس الإجازة اللي ما اتاخدتش (prod-hr-leave) — المبلغ داخل في
+    //    الصافي من السيرفر، ده بس عشان نكتب سطره. لو الملف لسه
+    //    ماتشغّلش مش بنوقّع الشاشة.
+    const lv = await sb.rpc('hr_leave_bonus_lines', { p_email: me });
+    _payLeave = {};
+    if(lv.error){ console.warn('hr_leave_bonus_lines:', lv.error); }
+    else (lv.data || []).forEach(x => { _payLeave[String(x.period).slice(0, 10)] = x; });
 
     // ============================================================
     // 🗄️ شهر الدرجين = أقدم شهر **لسه ماتصرفش**
@@ -501,6 +510,16 @@ function paySlipOvertime(p){
     </div>`;
 }
 
+// 💵 سطر «إجازات ما اتاخدتش» — بالأخضر، دي فلوس ليه مش عليه
+function payLeaveLine(p){
+  const x = _payLeave[String(p && p.period || '').slice(0, 10)];
+  const v = Number(x && x.amount || 0);
+  if(!v) return '';
+  return `<div><span>+ إجازات ما اتاخدتش
+      <small style="opacity:.75;">${Number(x.days || 0)} يوم ما خدتهوش</small></span>
+    <b style="color:var(--p-green)">${payMoney(v)}</b></div>`;
+}
+
 // big = الكشف الحالي: الرقم الكبير فوق. الباقي مضغوط.
 function paySlipCard(p, big){
   return `
@@ -535,6 +554,7 @@ function paySlipCard(p, big){
       <div><span>− إجمالي الخصومات</span><b class="minus">${
         payMoney(Number(p.manual_ded || 0) + Number(p.late_ded || 0))}</b></div>`}
       ${paySlipOvertime(p)}
+      ${payLeaveLine(p)}
       <div class="eq"><span>= الصافي</span><b>${payMoney(p.net)}</b></div>
     </div>
 
@@ -566,6 +586,7 @@ function payPaidSlipCard(p){
         Number(p.overtime_amt) >= 0 ? '+ أوفر تايم' : '− عجز ساعات'}</span>
         <b style="color:${Number(p.overtime_amt) >= 0 ? 'var(--p-green)' : 'var(--p-red)'}">${
           payMoney(Math.abs(Number(p.overtime_amt)))}</b></div>` : ''}
+      ${payLeaveLine(p)}
       <div class="eq"><span>= اللي قبضته</span><b>${payMoney(p.net)}</b></div>
     </div>
     <button class="pay-ok-btn" onclick="payAckSlip('${_payEsc(p.period)}')">👍 فهمت</button>
