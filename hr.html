@@ -153,7 +153,10 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
     -webkit-overflow-scrolling:touch;}
 
   /* ===== الشاشات المنبثقة ===== */
-  .sheet{position:fixed; inset:0; z-index:60; background:var(--bg); overflow-y:auto; display:none;}
+  .sheet{position:fixed; inset:0; z-index:60; background:var(--bg); overflow-y:auto; display:none;
+         -webkit-overflow-scrolling:touch; overscroll-behavior:contain;}
+  /* 🔒 فيه شاشة مفتوحة → الصفحة اللي ورا ماتتحركش بالسكرول (شوف openSheet) */
+  html.sheet-lock, html.sheet-lock body{overflow:hidden !important; overscroll-behavior:none;}
   .sheet.open{display:block;}
   .sheet-head{position:sticky; top:0; z-index:2; display:flex; align-items:center; gap:10px;
     background:var(--surface); border-bottom:1px solid var(--border);
@@ -1724,8 +1727,38 @@ function toggleMenu(ev){
 function closeMenu(){ document.getElementById('menuDrop').classList.remove('open'); }
 document.addEventListener('click', closeMenu);
 
-function openSheet(id){ document.getElementById(id).classList.add('open'); }
-function closeSheet(id){ document.getElementById(id).classList.remove('open'); }
+// ============================================================
+// 🗂️ الشاشات فوق بعض
+// ------------------------------------------------------------
+// 🧸 المشكلة: كل الشاشات كانت واخدة نفس الدور (z-index)، فاللي يتفتح من
+//    جوه «سجل الموظف» (خصم · زيادة · الديون · نظام العمل…) كان بيطلع
+//    **تحته**، ولازم تقفل السجل عشان تشوفه. وكمان السكرول كان بيحرّك
+//    الصفحة الرئيسية اللي ورا بدل الشاشة.
+//    الحل: أي شاشة بتتفتح بتاخد دور أعلى من كل اللي مفتوح (عدّاد بيزيد)،
+//    ولما تتقفل ترجع لدورها. وطول ما فيه شاشة مفتوحة، الصفحة اللي ورا
+//    مقفولة على السكرول.
+// ============================================================
+let SHEET_Z = 70;
+function sheetSyncLock(){
+  const any = !!document.querySelector('.sheet.open');
+  document.documentElement.classList.toggle('sheet-lock', any);
+}
+function openSheet(id){
+  const el = document.getElementById(id);
+  if(!el) return;
+  if(el.dataset.z0 === undefined) el.dataset.z0 = el.style.zIndex || '';
+  el.style.zIndex = String(++SHEET_Z);     // فوق كل اللي مفتوح
+  el.classList.add('open');
+  sheetSyncLock();
+}
+function closeSheet(id){
+  const el = document.getElementById(id);
+  if(!el) return;
+  el.classList.remove('open');
+  if(el.dataset.z0 !== undefined) el.style.zIndex = el.dataset.z0;
+  if(!document.querySelector('.sheet.open')) SHEET_Z = 70;
+  sheetSyncLock();
+}
 
 // ===== الإعدادات العامة =====
 function openGeneral(){
@@ -2009,12 +2042,10 @@ let ABS_EMAIL = '';
 function openAbsences(email){
   ABS_EMAIL = email;
   renderAbsences();
-  const sh = document.getElementById('absSheet');
-  if(sh) sh.classList.add('open');
+  openSheet('absSheet');      // 🗂️ فوق أي شاشة مفتوحة
 }
 function closeAbsences(){
-  const sh = document.getElementById('absSheet');
-  if(sh) sh.classList.remove('open');
+  closeSheet('absSheet');
 }
 
 function renderAbsences(){
