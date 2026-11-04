@@ -56,7 +56,18 @@
 (function(){
   if(window.IFixIntakeBoard) return;
 
-  var S              = { mode:'cm', ym:'', rows:null, loading:false, err:'', admin:null, sa:null, seq:0, at:null };
+  // 🗓️ (v148) mode: 'day' (يوم من الشهر الحالي — S.day) · 'cm' · 'pm' · 'ym'
+  var S              = { mode:'cm', ym:'', day:'', rows:null, loading:false, err:'', admin:null, sa:null, seq:0, at:null };
+  function pad2(n){ return String(n).padStart(2, '0'); }
+  function ymdOf(d){ return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
+  function todayStr(){ return ymdOf(new Date()); }
+  function dayLabel(v){
+    if(v === todayStr()) return 'النهارده';
+    var n = new Date(), y = new Date(n.getFullYear(), n.getMonth(), n.getDate() - 1);
+    if(v === ymdOf(y)) return 'امبارح';
+    var d = new Date(+v.slice(0, 4), +v.slice(5, 7) - 1, +v.slice(8, 10));
+    return d.toLocaleDateString('ar-EG', { weekday:'long', day:'numeric', month:'long' });
+  }
 
   function e(s         )         {
     return (typeof esc === 'function') ? esc(s)
@@ -72,6 +83,10 @@
   function range()         {
     var n = new Date(), y = n.getFullYear(), m = n.getMonth();
     if(S.mode === 'today'){ var a = new Date(y, m, n.getDate()); return [a, new Date(y, m, n.getDate() + 1)]; }
+    if(S.mode === 'day' && /^\d{4}-\d{2}-\d{2}$/.test(S.day)){
+      var dy = +S.day.slice(0, 4), dm = +S.day.slice(5, 7) - 1, dd = +S.day.slice(8, 10);
+      return [new Date(dy, dm, dd), new Date(dy, dm, dd + 1)];
+    }
     if(S.mode === 'pm') return [new Date(y, m - 1, 1), new Date(y, m, 1)];
     if(S.mode === 'ym' && /^\d{4}-\d{2}$/.test(S.ym)){
       var yy = +S.ym.slice(0, 4), mm = +S.ym.slice(5, 7) - 1;
@@ -82,6 +97,7 @@
   function periodLabel()         {
     var n = new Date();
     if(S.mode === 'today') return 'النهارده';
+    if(S.mode === 'day' && S.day) return dayLabel(S.day);
     if(S.mode === 'pm'){ var p = new Date(n.getFullYear(), n.getMonth() - 1, 1); return monthName(p.getFullYear(), p.getMonth()) + ' ' + p.getFullYear(); }
     if(S.mode === 'ym' && S.ym) return monthName(+S.ym.slice(0, 4), +S.ym.slice(5, 7) - 1) + ' ' + S.ym.slice(0, 4);
     return monthName(n.getFullYear(), n.getMonth()) + ' ' + n.getFullYear();
@@ -171,7 +187,7 @@
   // ---------- الرسم ----------
   // ---------- 🎯 التارجت الشهري ----------
   //    بيظهر بس لما الفترة شهر — مش «النهارده»
-  function isMonth()          { return S.mode !== 'today'; }
+  function isMonth()          { return S.mode !== 'today' && S.mode !== 'day'; }
   function curYm()         { var a = range()[0]; return a.getFullYear() + '-' + String(a.getMonth() + 1).padStart(2, '0'); }
   function pct(r     )         { var t = Number(r.target) || 0; return t > 0 ? Math.floor((Number(r.amount) || 0) * 100 / t) : 0; }
   function tbar(p        )         {
@@ -253,6 +269,16 @@
 
     function chip(m        , l        ){ return '<button class="chip' + (S.mode === m ? ' on' : '') + '" onclick="IFixIntakeBoard.mode(\'' + m + '\')">' + l + '</button>'; }
     var n = new Date(), pm = new Date(n.getFullYear(), n.getMonth() - 1, 1);
+    // 🗓️ (v148) أيام الشهر الحالي كلها (من ١ لحد النهارده) — الأحدث فوق.
+    //    زي «اختار شهر»: كلام ظاهر والقايمة الحقيقية شفافة فوقه.
+    var days = [];
+    for(var di = n.getDate(); di >= 1; di--) days.push(ymdOf(new Date(n.getFullYear(), n.getMonth(), di)));
+    var dayOn = S.mode === 'day';
+    var dayPick = '<label class="mpick' + (dayOn ? ' on' : '') + '" style="border-style:solid;">🗓️ ' + (dayOn ? e(dayLabel(S.day)) : 'اختار يوم')
+      + '<select onchange="IFixIntakeBoard.day(this.value)" aria-label="اختار يوم من الشهر الحالي" style="position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer;font-size:16px;">'
+      + '<option value=""' + (dayOn ? '' : ' selected') + ' disabled>اختار يوم</option>'
+      + days.map(function(v){ return '<option value="' + v + '"' + (dayOn && S.day === v ? ' selected' : '') + '>' + e(dayLabel(v)) + '</option>'; }).join('')
+      + '</select></label>';
     // 📅 المحاسب العام: أي شهر في أي سنة — كلام ظاهر والخانة الحقيقية شفافة فوقه
     //    (الأيفون كان بيرسم <input type=month> فاضي = مربع من غير كلام)
     var picker = (S.admin || seeAll)
@@ -314,7 +340,7 @@
       + '<div class="wrap">'
       + '<div class="sub">بمجموع سعر الأجهزة اللي سجّلتها واتسلّمت — المرفوض مابيتحسبش.'
       +   (seeAll ? '' : ' فلوس زمايلك 🔒 — كل واحد بيشوف فلوسه بس.') + '</div>'
-      + '<div class="chips">' + chip('today', 'النهارده') + chip('cm', 'الشهر الحالي') + chip('pm', 'الشهر السابق') + picker + '</div>'
+      + '<div class="chips">' + dayPick + chip('cm', 'الشهر الحالي') + chip('pm', 'الشهر السابق') + picker + '</div>'
       + '<div class="mut" style="font-size:12.5px;font-weight:800;margin:-4px 2px 10px;">📅 ' + e(periodLabel())
       +   (S.loading ? ' · <span style="color:var(--accent,#EE5B10);">⏳ بيحدّث…</span>'
           : (S.at ? ' · 🔄 اتحدّث الساعة ' + e(S.at.toLocaleTimeString('ar-EG', { hour:'numeric', minute:'2-digit', second:'2-digit' })) : ''))
@@ -381,6 +407,7 @@
     open: open, close: close, reload: load,
     setTarget: setTarget, addTarget: addTarget, copyPrev: copyPrev,
     mode: function(m){ S.mode = m; load(); },
+    day:  function(v){ if(!/^\d{4}-\d{2}-\d{2}$/.test(v || '')) return; S.day = v; S.mode = 'day'; load(); },
     ym:   function(v){ if(!v){ S.mode = 'cm'; } else { S.ym = v; S.mode = 'ym'; } load(); }
   };
 })();

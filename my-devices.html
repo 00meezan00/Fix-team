@@ -2888,7 +2888,7 @@ function applyTheme(){
 // زمايله، مش أجهزتهم. ده مقصود — قايمة الأجهزة فيها أسامي عملاء
 // وأرقامهم، وde مش شغل الفني.
 let techBoard = null;
-let tbMode = 'month';        // 'today' | 'month'
+let tbMode = 'month';        // 'today' | 'yesterday' | 'month' | 'prev'  (🗓️ v148)
 
 // ⚠️ الصفحة دي مافيهاش --accent (اللي موجود: --blue · --gold · --card).
 //    الشرايح كانت بتستخدمه، فالخلفية بتفشل والخط الأبيض يقع على
@@ -2903,6 +2903,9 @@ function tbT(k){
     title:   ['ترتيب الفنيين', 'Technician ranking'],
     today:   ['النهارده', 'Today'],
     d30:     ['آخر ٣٠ يوم', 'Last 30 days'],
+    yesterday: ['امبارح', 'Yesterday'],
+    month:   ['الشهر الحالي', 'This month'],
+    prev:    ['الشهر السابق', 'Last month'],
     tech:    ['الفني', 'Technician'],
     points:  ['النقاط', 'Points'],
     done:    ['أجهزة', 'Devices'],
@@ -2937,7 +2940,9 @@ function openTechBoard(){
 function setTbMode(m){ tbMode = m; renderTechBoard(); }
 
 function renderTechBoard(){
-  const rows = (techBoard && techBoard[tbMode === 'today' ? 'today' : 'd30']) || [];
+  // 🗓️ (v148) النهارده · امبارح · الشهر الحالي · الشهر السابق
+  //    «الشهر الحالي» لو الداشبورد لسه على النسخة القديمة → آخر ٣٠ يوم
+  const rows = (techBoard && (tbMode === 'month' ? (techBoard.month || techBoard.d30) : techBoard[tbMode])) || [];
   const at = techBoard && techBoard.at;
   const chip = (m, lbl) =>
     `<button onclick="setTbMode('${m}')" style="border:1px solid ${tbMode===m?TB_BLUE:'var(--line)'};`
@@ -3038,8 +3043,8 @@ function renderTechBoard(){
   $('sheet').innerHTML = `
     <div style="padding:16px 16px 22px;">
       <div style="font:900 16px/1.4 'Cairo',sans-serif;margin-bottom:12px;">🏆 ${tbT('title')}</div>
-      <div style="display:flex;gap:8px;margin-bottom:14px;">
-        ${chip('today', tbT('today'))}${chip('month', tbT('d30'))}
+      <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+        ${chip('today', tbT('today'))}${chip('yesterday', tbT('yesterday'))}${chip('month', tbT('month'))}${chip('prev', tbT('prev'))}
       </div>
       ${staleBar}
       ${body}
