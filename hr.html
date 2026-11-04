@@ -1469,7 +1469,7 @@ function openEmpLog(email){
   renderEmpSheet(email, daysOf(email));
   openSheet('empSheet');
 }
-function closeEmpLog(){ OPEN_EMP = null; WD_DRAWER_OPEN = false; closeSheet('empSheet'); }
+function closeEmpLog(){ OPEN_EMP = null; closeSheet('empSheet'); }
 
 function renderEmpSheet(email, days){
   const box = document.getElementById('empSheetBody');
@@ -3336,8 +3336,9 @@ function dedRowHtml(r){
       <div class="ded-mid">
         <b ${w ? 'style="text-decoration:line-through;opacity:.6;"' : ''}>${
           r.kind === 'withdrawal' ? '🔩 ' : ''}${esc(r.reason)}</b>
-        <span>${new Date(r.created_at).toLocaleDateString('ar-EG',
-          { day:'numeric', month:'long', year:'numeric' })}
+        <span>${/* 🔩 المسحوب: يوم السحب نفسه (من الشيت) مش يوم ما اتبعت — عشان يطابق الشهر المختار */
+          (r.kind === 'withdrawal' && r.work_date ? new Date(String(r.work_date).slice(0, 10) + 'T12:00:00') : new Date(r.created_at))
+          .toLocaleDateString('ar-EG', { day:'numeric', month:'long', year:'numeric' })}
           · ${w ? '✋ اتشال' : (r.seen_at ? '✔️ قراه الموظف' : '🔔 لسه ما قراهوش')}</span>
         ${w ? `<span style="color:var(--done);">سبب الشيل: ${esc(r.waive_reason || '—')}</span>` : ''}
       </div>
@@ -3349,11 +3350,8 @@ function dedRowHtml(r){
 }
 
 // ============================================================
-// 🗄️ درج المسحوبات (زي الاستيجنج) — المسحوبات لوحدها في درج بيتفتح
-//    ويتقفل، والخصومات اليدوية تحته لوحدها. الدرج بيوري الشهر
-//    المعروض في الشاشة الرئيسية بس.
+// 🔩 المسحوبات بالشهر — درجها بقى في «📊 مسحوبات الإكسل» (renderExcelW)
 // ============================================================
-let WD_DRAWER_OPEN = false;   // الدرج مفتوح ولا مقفول — بيفضل زي ما سبته لحد ما تقفل السجل
 
 function wdMonthOf(r){
   return String(r.work_date || r.created_at || '').slice(0,7);
@@ -3364,40 +3362,6 @@ function wdListFor(email, ym){
     .filter(r => r.kind === 'withdrawal' && wdMonthOf(r) === ym)
     .sort((a,b) => String(b.work_date || b.created_at).localeCompare(String(a.work_date || a.created_at)));
 }
-function wdDrawerHtml(email){
-  const list = wdListFor(email, MONTH);
-  const c = EMP_SET[(email || '').toLowerCase()] || {};
-  // المجموع من غير اللي اتشال — زي باقي المجاميع في الصفحة
-  let total = 0, waived = 0;
-  list.forEach(r => { if(r.waived_at) waived++; else total += Number(r.amount || 0); });
-  total = Math.round(total * 100) / 100;
-  return `
-    <div class="wd-drawer">
-      <button class="wd-head" onclick="toggleWdDrawer()">
-        <span class="wd-ttl">🗄️ درج المسحوبات <small>— ${esc(monthLabel())}</small></span>
-        <span class="wd-sum">${list.length
-          ? `${list.length} سحبة · <b>${total.toLocaleString('en-US')}</b> ج.م`
-          : 'فاضي'}</span>
-        <span id="wdDrawerArrow" class="wd-arw">${WD_DRAWER_OPEN ? '▴' : '▾'}</span>
-      </button>
-      <div id="wdDrawerBody" class="wd-body${WD_DRAWER_OPEN ? '' : ' hidden'}">
-        ${c.is_partner ? `<div class="wd-note">🤝 شريك — مسحوباته من ${esc(fmtDay(c.partner_since))} بتروح على «جاري الشركاء» مش على مرتبه</div>` : ''}
-        ${list.length
-          ? list.map(dedRowHtml).join('') +
-            (waived ? `<div class="wd-note">✋ ${waived} سحبة متشالة — مش داخلة في المجموع</div>` : '')
-          : `<div class="wd-note">مفيش مسحوبات في ${esc(monthLabel())}.<br>
-               غيّر الشهر من فوق في الشاشة الرئيسية عشان تشوف شهر تاني.</div>`}
-      </div>
-    </div>`;
-}
-function toggleWdDrawer(){
-  WD_DRAWER_OPEN = !WD_DRAWER_OPEN;
-  const box = document.getElementById('wdDrawerBody');
-  const arw = document.getElementById('wdDrawerArrow');
-  if(box) box.classList.toggle('hidden', !WD_DRAWER_OPEN);
-  if(arw) arw.textContent = WD_DRAWER_OPEN ? '▴' : '▾';
-}
-
 function dedSectionHtml(email){
   const all = DEDS[(email||'').toLowerCase()] || [];
   // 💸 الخصومات اليدوية بس — المسحوبات راحت الدرج
@@ -3408,11 +3372,16 @@ function dedSectionHtml(email){
     if(!r.waived_at) mTotal += Number(r.amount || 0);
   });
   mTotal = Math.round(mTotal * 100) / 100;
-  const hasWd = all.some(r => r.kind === 'withdrawal');
-  if(!manual.length && !hasWd) return '';
+  // 🗄️ درج المسحوبات اتنقل لـ«📊 مسحوبات الإكسل» (طلب بلال ٤/١١) —
+  //    هنا سطر صغير بس بيفتحه على الشهر ده والموظف ده مفتوح.
+  const wdN = wdListFor(email, MONTH).filter(r => !r.waived_at);
+  const wdT = Math.round(wdN.reduce((a, r) => a + Number(r.amount || 0), 0) * 100) / 100;
+  if(!manual.length && !wdN.length) return '';
 
   return `
-    ${hasWd ? wdDrawerHtml(email) : ''}
+    ${wdN.length ? `<button class="mini-btn" style="width:100%;margin-top:18px;padding:11px;"
+        onclick="openExcelW('${esc(email)}', MONTH)">🔩 مسحوبات ${esc(monthLabel())}: <b style="color:var(--red)">${wdT.toLocaleString('en-US')}</b> ج.م
+        (${wdN.length}) — التفاصيل في 📊 مسحوبات الإكسل ›</button>` : ''}
     ${manual.length ? `
     <div style="margin-top:18px;">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:9px;">
@@ -4021,6 +3990,7 @@ async function deleteDeduction(id){
     await loadDeductions();
     render();
     if(document.getElementById('dedSheet').classList.contains('open')) renderDeduction();
+    if(document.getElementById('exwSheet').classList.contains('open')) renderExcelW();   // 🗄️ درج المسحوبات
     await payAdminReload();   // الكارت بياخد أرقامه من الكشف — لازم يتقرا تاني
     alert('اتمسح ✅');
   }catch(e){
@@ -4794,6 +4764,7 @@ async function waiveDeduction(id){
     await loadDeductions();
     render();
     if(document.getElementById('dedSheet').classList.contains('open')) renderDeduction();
+    if(document.getElementById('exwSheet').classList.contains('open')) renderExcelW();   // 🗄️ درج المسحوبات
     await payAdminReload();   // الكارت بياخد أرقامه من الكشف — لازم يتقرا تاني
     alert('✅ الخصم اتشال — والموظف هيشوف السبب');
   }catch(e){
@@ -4810,6 +4781,7 @@ async function unwaiveDeduction(id){
     await loadDeductions();
     render();
     if(document.getElementById('dedSheet').classList.contains('open')) renderDeduction();
+    if(document.getElementById('exwSheet').classList.contains('open')) renderExcelW();   // 🗄️ درج المسحوبات
     await payAdminReload();   // الكارت بياخد أرقامه من الكشف — لازم يتقرا تاني
   }catch(e){
     console.error('unwaiveDeduction failed:', e);
@@ -5162,12 +5134,67 @@ const STATE_LBL = {
 // ============================================================
 let EXW = { pending: [], linked: [], busy: false };
 
-async function openExcelW(){
+// 🗄️ (٤/١١) الشاشة دي فيها كمان «درج المسحوبات» لكل موظف تحت إجماليه،
+//    بشهر بتختاره. فتحها من سجل الموظف = الشهر ده والموظف ده مفتوح.
+let EXW_MONTH = '';          // 'YYYY-MM' — الشهر اللي مسحوباته ظاهرة
+let EXW_OPEN  = {};          // إيميل → الدرج مفتوح؟
+async function openExcelW(email, ym){
+  EXW_MONTH = ym || MONTH;     // افتراضي = الشهر المعروض في الشاشة الرئيسية
+  EXW_OPEN = {};
+  if(email) EXW_OPEN[String(email).toLowerCase()] = true;
   const box = document.getElementById('exwBody');
   if(box) box.innerHTML = '<div class="empty">جاري التحميل…</div>';
   openSheet('exwSheet');
-  await loadExcelW();
+  await Promise.all([loadExcelW(), loadDeductions()]);   // ⚠️ طازة — ممكن الشيت يكون بعت دلوقتي
   renderExcelW();
+  if(email){
+    const el = document.getElementById('exwEmp_' + String(email).toLowerCase().replace(/[^a-z0-9]/gi, '_'));
+    if(el) el.scrollIntoView({ block:'start' });
+  }
+}
+function exwSetMonth(v){
+  if(!v) return;
+  EXW_MONTH = v;
+  renderExcelW();
+}
+function exwToggle(email){
+  EXW_OPEN[email] = !EXW_OPEN[email];
+  renderExcelW();
+}
+function exwMonthLabel(){
+  try{ return new Date(EXW_MONTH + '-15').toLocaleDateString('ar-EG', { month:'long', year:'numeric' }); }
+  catch(x){ return EXW_MONTH; }
+}
+// كارت موظف: الإجمالي + الأسامي اللي في الشيت + الدرج (مسحوبات الشهر المختار)
+function exwEmpCard(email, aliases){
+  const list = wdListFor(email, EXW_MONTH);
+  let total = 0, waived = 0;
+  list.forEach(r => { if(r.waived_at) waived++; else total += Number(r.amount || 0); });
+  total = Math.round(total * 100) / 100;
+  const open = !!EXW_OPEN[email];
+  const c = EMP_SET[email] || {};
+  const uid = 'exwEmp_' + email.replace(/[^a-z0-9]/gi, '_');
+  return `
+    <div class="wd-drawer" id="${uid}" style="margin-top:10px;">
+      <button class="wd-head" onclick="exwToggle('${esc(email)}')">
+        <span class="wd-ttl">👤 ${esc(nameOf(email))}${c.is_partner ? ' <small>· 🤝 شريك</small>' : ''}
+          ${aliases.length ? `<small style="display:block;">في الشيت: ${aliases.map(a => esc(a)).join(' · ')}</small>` : ''}</span>
+        <span class="wd-sum">${list.length
+          ? `${list.length - waived} سحبة · <b>${total.toLocaleString('en-US')}</b> ج.م`
+          : 'مفيش'}</span>
+        <span class="wd-arw">${open ? '▴' : '▾'}</span>
+      </button>
+      ${open ? `<div class="wd-body">
+        ${c.is_partner ? `<div class="wd-note">🤝 شريك — مسحوباته من ${esc(fmtDay(c.partner_since))} بتروح على «جاري الشركاء» مش على مرتبه</div>` : ''}
+        ${list.length
+          ? list.map(dedRowHtml).join('') +
+            (waived ? `<div class="wd-note">✋ ${waived} سحبة متشالة — مش داخلة في المجموع</div>` : '')
+          : `<div class="wd-note">مفيش مسحوبات في ${esc(exwMonthLabel())}.</div>`}
+        ${aliases.length ? `<div style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;padding:4px 0 10px;">
+          ${aliases.map(a => `<button class="mini-btn danger" onclick="exwUnmap('${esc(a)}')">✖ فك ربط «${esc(a)}»</button>`).join('')}
+        </div>` : ''}
+      </div>` : ''}
+    </div>`;
 }
 
 async function loadExcelW(){
@@ -5225,16 +5252,30 @@ function renderExcelW(){
       </div>
     </div>`).join('');
 
-  const lnk = EXW.linked.map(r => `
-    <div class="ded-row">
-      <div class="ded-amt" style="color:var(--done);">${exwMoney(r.total)}</div>
-      <div class="ded-mid">
-        <b>${esc(r.raw_name)} ← ${esc(nameOf(r.user_email))}</b>
-        <span>${r.rows_cnt} سحبة · ${esc(r.user_email)}</span>
-      </div>
-      <button class="ded-del" title="فك الربط"
-              onclick="exwUnmap('${esc(r.raw_name)}')">✖</button>
-    </div>`).join('');
+  // 🗄️ الموظفين: اللي ليهم اسم مربوط في الشيت + أي حد ليه مسحوبات في الشهر المختار
+  if(!EXW_MONTH) EXW_MONTH = MONTH;
+  const hideSuper = e => !IS_SUPER && (() => { const v = ROLES_MAP[e];
+    return (typeof v === 'string' ? v : (v && v.role)) === 'super_admin'; })();
+  const byEmail = {};
+  EXW.linked.forEach(r => {
+    const e = (r.user_email || '').toLowerCase(); if(!e || hideSuper(e)) return;
+    (byEmail[e] = byEmail[e] || []).push(r.raw_name);
+  });
+  Object.keys(DEDS).forEach(e => {
+    if(hideSuper(e) || byEmail[e]) return;
+    if(wdListFor(e, EXW_MONTH).length) byEmail[e] = [];
+  });
+  const emails = Object.keys(byEmail).sort((a, b) => {
+    const ta = wdListFor(a, EXW_MONTH).filter(r => !r.waived_at).reduce((x, r) => x + Number(r.amount || 0), 0);
+    const tb = wdListFor(b, EXW_MONTH).filter(r => !r.waived_at).reduce((x, r) => x + Number(r.amount || 0), 0);
+    return (tb - ta) || nameOf(a).localeCompare(nameOf(b), 'ar');
+  });
+  let monTotal = 0, monCount = 0;
+  emails.forEach(e => wdListFor(e, EXW_MONTH).forEach(r => {
+    if(!r.waived_at){ monTotal += Number(r.amount || 0); monCount++; }
+  }));
+  monTotal = Math.round(monTotal * 100) / 100;
+  const lnk = emails.map(e => exwEmpCard(e, byEmail[e])).join('');
 
   box.innerHTML = `
     <div class="hintbox">
@@ -5251,8 +5292,16 @@ function renderExcelW(){
       : '<div class="empty" style="padding:18px;">مفيش أسماء واقفة ✅</div>'}
 
     <div style="font-weight:900; font-size:13.5px; margin:20px 0 10px; color:var(--done);">
-      ✅ مربوطة ومتخصومة (${EXW.linked.length})</div>
-    ${EXW.linked.length ? lnk
+      ✅ المسحوبات بالشهر — مربوطة ومتخصومة (${EXW.linked.length} اسم)</div>
+    <div class="bar" style="margin:0 0 6px;">
+      <input type="month" value="${esc(EXW_MONTH)}" onchange="exwSetMonth(this.value)" aria-label="الشهر">
+    </div>
+    <div class="kpis" style="margin:0 0 4px;">
+      <div class="kpi"><div class="v" style="color:${monTotal ? 'var(--red)' : 'inherit'}">${monTotal.toLocaleString('en-US')}</div><div class="l">إجمالي مسحوبات ${esc(exwMonthLabel())} ج.م</div></div>
+      <div class="kpi"><div class="v">${monCount}</div><div class="l">سحبة</div></div>
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:4px;">دوس على اسم الموظف عشان تشوف مسحوباته سحبة سحبة.</div>
+    ${emails.length ? lnk
       : '<div class="empty" style="padding:18px;">لسه مفيش</div>'}`;
 }
 
@@ -5290,8 +5339,9 @@ async function exwUnmap(alias){
   try{
     const { data, error } = await sb.rpc('hr_excel_unmap_name', { p_alias: alias });
     if(error) throw error;
-    await loadExcelW();
+    await Promise.all([loadExcelW(), loadDeductions()]);   // الخصومات اللي طلعت منه اتشالت
     renderExcelW();
+    render();
     const d = data || {};
     alert('اتفك ✅\n\nخصومات اتشالت: ' + (d.unlinked || 0) +
           '\nفضلت (شهور اتصرفت): ' + (d.kept_paid || 0));
