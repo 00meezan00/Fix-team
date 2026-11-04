@@ -675,11 +675,14 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
       <button onclick="closeMenu(); openHrSettings()">⚙️ نظام العمل</button>
       <!-- 👋 (v148) اللي اترفدوا أو سابوا — prod-hr-left.sql -->
       <button onclick="closeMenu(); openOldEmps()">👋 موظفين قدام</button>
-      <!-- 🤝 للمحاسب العام بس (prod-hr-partners.sql) — boot بيظهّره -->
-      <button class="super-only" style="display:none;" onclick="closeMenu(); openPartners()">🤝 جاري الشركاء</button>
-      <!-- 👑 (v148) المحاسب العام بيوصل هنا من قايمته — ده زرار الرجوع لشاشته -->
-      <button class="super-only" style="display:none;" onclick="closeMenu(); location.href='dashboard.html'">↩️ رجوع لشاشة المحاسب العام</button>
       <button onclick="closeMenu(); openStaffMsgs()">📨 رسايل الموظفين <b id="hrMsgCount" class="msg-count" style="display:none;"></b></button>
+
+      <!-- 👑 (v148) خيارات المحاسب العام بس — boot بيظهّرهم (super-only).
+           المحاسب العام بيوصل هنا من «👥 شؤون العاملين» في قايمته. -->
+      <div class="mh super-only" style="display:none;">👑 المحاسب العام</div>
+      <button class="super-only" style="display:none;" onclick="closeMenu(); openPartners()">🤝 جاري الشركاء</button>
+      <button class="super-only" style="display:none;" onclick="closeMenu(); openOwnerShare()">👑 ابعت كروت مرتبات للمالك</button>
+      <button class="super-only" style="display:none;" onclick="closeMenu(); location.href='dashboard.html'">↩️ رجوع لشاشة المحاسب العام</button>
 
       <!-- 🧰 أدوات الديسباتشر — مخفية لحد ما الأدمن يفعّلها للحساب ده
            (applyHrCaps تحت بتسأل السيرفر has_cap وبتظهّر اللي مسموح بس) -->
@@ -717,6 +720,16 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
             onclick="closeSheet('debtSheet')">×</button>
   </div>
   <div class="sheet-body" id="debtBody"></div>
+</div>
+
+<!-- ===== 👑 ابعت كروت المرتبات للمالك (v148 — المحاسب العام بس) ===== -->
+<div class="sheet" id="osSheet">
+  <div class="sheet-head">
+    <h2>👑 كروت المرتبات للمالك</h2>
+    <button class="icon-btn" style="background:var(--surface-2); color:var(--ink);"
+            onclick="closeSheet('osSheet')">×</button>
+  </div>
+  <div class="sheet-body" id="osBody"></div>
 </div>
 
 <!-- ===== 👋 موظفين قدام (v148) ===== -->
@@ -989,6 +1002,10 @@ const KIND = {
   if(location.hash === '#partners' && IS_SUPER){
     try{ history.replaceState(null, '', location.pathname); }catch(e){}
     openPartners();
+  }else if(location.hash === '#payroll' && IS_SUPER){
+    // 👥 جاي من «شؤون العاملين والمرتبات» في قايمة المحاسب العام
+    try{ history.replaceState(null, '', location.pathname); }catch(e){}
+    openPayrollAdmin();
   }
 })();
 
@@ -3671,9 +3688,19 @@ function debtSectionHtml(email){
     </div>`;
 }
 
+// 🗓️ (v148) شهر الخصم في شاشة الديون — لوحده، مش لازم يبقى شهر الشاشة الرئيسية
+let DEBT_MONTH = '';
+function debtMonthLabel(){ return slipMonthName((DEBT_MONTH || MONTH) + '-01'); }
+function debtPickMonth(v){
+  if(!/^\d{4}-\d{2}$/.test(v || '')) return;
+  DEBT_MONTH = v;
+  renderDebts();
+}
+
 async function openDebts(email){
   DEBT_EMAIL = (email || '').toLowerCase();
   DEBT_SHOW_DONE = false;
+  DEBT_MONTH = MONTH;          // 🗓️ (v148) الافتراضي = الشهر المعروض — وتقدر تغيّره من الشاشة
   const list = allPeople();
   if(!list.length){ alert('مفيش موظفين متسجّلين — ضيفهم من لوحة الأدمن الأول'); return; }
   if(list.indexOf(DEBT_EMAIL) < 0) DEBT_EMAIL = list[0];
@@ -3711,7 +3738,7 @@ function debtCardHtml(d){
         <div class="debt-pay">
           <input type="number" id="dp_${esc(d.id)}" min="1" step="50" inputmode="decimal"
                  placeholder="المبلغ" value="${thisMonth.length ? '' : (def || '')}">
-          <button onclick="debtPay('${esc(d.id)}')">💸 اخصم من مرتب ${esc(monthLabel())}</button>
+          <button onclick="debtPay('${esc(d.id)}')">💸 اخصم من مرتب ${esc(debtMonthLabel())}</button>
         </div>` : ''}
       ${(!pays.length && d.kind !== 'carryover') ? `<button class="mini-btn danger" style="margin-top:8px;"
           onclick="debtDelete('${esc(d.id)}')">🗑️ امسح الدين (اتسجّل غلط)</button>` : ''}
@@ -3724,7 +3751,7 @@ function renderDebts(){
   const open = all.filter(d => Number(d.remaining) > 0);
   const done = all.filter(d => Number(d.remaining) <= 0);
   const rem = debtRemaining(DEBT_EMAIL);
-  const paidMonth = (PAYROWS[DEBT_EMAIL] || {})[MONTH + '-01'];
+  const paidMonth = (PAYROWS[DEBT_EMAIL] || {})[(DEBT_MONTH || MONTH) + '-01'];
   document.getElementById('debtTitle').textContent = '💳 ديون — ' + nameOf(DEBT_EMAIL);
   document.getElementById('debtBody').innerHTML = `
     ${DEBT_ERR ? `<div class="hintbox" style="background:var(--rejected-bg,#FEF2F2);color:var(--red);">❌ ${esc(DEBT_ERR)}</div>` : ''}
@@ -3738,9 +3765,12 @@ function renderDebts(){
       <div class="kpi"><div class="v" style="color:${rem ? 'var(--red)' : 'inherit'}">${lbMoney(rem)}</div><div class="l">إجمالي الباقي ج.م</div></div>
       <div class="kpi"><div class="v">${open.length}</div><div class="l">دين مفتوح</div></div>
     </div>
+    <label class="fld" style="margin-bottom:8px;"><span>🗓️ اخصم من مرتب شهر</span>
+      <input type="month" value="${esc(DEBT_MONTH || MONTH)}" onchange="debtPickMonth(this.value)">
+    </label>
     <div class="hintbox">
-      الخصم بيتحسب على مرتب <b>${esc(monthLabel())}</b> — غيّر الشهر من الشاشة الرئيسية.
-      ${paidMonth && paidMonth.paid ? '<br>⚠️ مرتب الشهر ده <b>اتصرف</b> — اختار الشهر الجاي عشان تخصم.' : ''}
+      الخصم بيتحسب على مرتب <b>${esc(debtMonthLabel())}</b>.
+      ${paidMonth && paidMonth.paid ? '<br>⚠️ مرتب الشهر ده <b>اتصرف</b> — اختار شهر تاني عشان تخصم.' : ''}
     </div>
 
     ${open.length ? open.map(debtCardHtml).join('') : '<div class="empty" style="padding:16px;">مفيش ديون مفتوحة ✅</div>'}
@@ -3774,7 +3804,7 @@ function renderDebts(){
       <label class="fld"><span>📌 ملاحظة (اختياري)</span>
         <input type="text" id="dbNote">
       </label>
-      <label class="fld"><span>💸 اخصم منه دلوقتي من مرتب ${esc(monthLabel())} (اختياري)</span>
+      <label class="fld"><span>💸 اخصم منه دلوقتي من مرتب ${esc(debtMonthLabel())} (اختياري)</span>
         <small>سيبه فاضي = الدين يتسجّل تذكير بس، والصافي ميتأثرش.</small>
         <input type="number" id="dbNow" min="1" step="50" inputmode="decimal" placeholder="ما تخصمش دلوقتي">
       </label>
@@ -3804,18 +3834,18 @@ async function debtAdd(){
   const k = DEBT_KINDS[kind] || {};
   if(!confirm(`تسجيل دين\n\nالموظف: ${nameOf(DEBT_EMAIL)}\nالنوع: ${k.t}\nالتفاصيل: ${title}\nالمبلغ: ${amt} ج.م` +
               (inst ? `\nالقسط: ${inst} ج.م/شهر` : '') +
-              (now ? `\n\n💸 هيتخصم دلوقتي ${now} ج.م من مرتب ${monthLabel()}` : '\n\n(تذكير بس — مش هيتخصم من الصافي)'))) return;
+              (now ? `\n\n💸 هيتخصم دلوقتي ${now} ج.م من مرتب ${debtMonthLabel()}` : '\n\n(تذكير بس — مش هيتخصم من الصافي)'))) return;
   const btn = document.getElementById('dbSave');
   if(btn){ btn.disabled = true; btn.textContent = '⏳ جاري الحفظ…'; }
   try{
     const { error } = await sb.rpc('hr_add_debt', {
       p_email: DEBT_EMAIL, p_kind: kind, p_title: title, p_amount: amt,
       p_installment: inst, p_date: day || null, p_note: note || null,
-      p_pay_now: now || null, p_pay_period: now ? MONTH + '-01' : null });
+      p_pay_now: now || null, p_pay_period: now ? (DEBT_MONTH || MONTH) + '-01' : null });
     // ⚠️ Supabase مبيرميش خطأ — بيرجّعه في .error
     if(error) throw error;
     await notifyPay(DEBT_EMAIL, now
-      ? `💳 اتسجّل عليك دين ${amt} ج.م (${title}) — واتخصم منه ${now} ج.م من مرتب ${monthLabel()}`
+      ? `💳 اتسجّل عليك دين ${amt} ج.م (${title}) — واتخصم منه ${now} ج.م من مرتب ${debtMonthLabel()}`
       : `💳 اتسجّل عليك دين ${amt} ج.م (${title}) — لسه ما اتخصمش من مرتبك`);
     await debtAfterChange();
     alert('✅ اتسجّل');
@@ -3835,15 +3865,15 @@ async function debtPay(id){
   if(!amt || amt <= 0){ alert('اكتب المبلغ'); return; }
   if(amt > Number(d.remaining)){ alert('المبلغ أكبر من الباقي (' + lbMoney(d.remaining) + ')'); return; }
   // ⚠️ تحذير لو الخصم هيخلّي الصافي بالسالب — مش منع، بس لازم تعرف
-  const row = (PAYROWS[DEBT_EMAIL] || {})[MONTH + '-01'];
+  const row = (PAYROWS[DEBT_EMAIL] || {})[(DEBT_MONTH || MONTH) + '-01'];
   const warn = (row && Number(row.net) - amt < 0)
     ? `\n\n⚠️ الصافي هيبقى بالسالب (${lbMoney(Number(row.net) - amt)}) — والفرق هيترحّل دين يوم الصرف.` : '';
-  if(!confirm(`خصم ${amt} ج.م من مرتب ${monthLabel()}\nسداد: ${d.title}\nالباقي بعده: ${lbMoney(Number(d.remaining) - amt)}${warn}`)) return;
+  if(!confirm(`خصم ${amt} ج.م من مرتب ${debtMonthLabel()}\nسداد: ${d.title}\nالباقي بعده: ${lbMoney(Number(d.remaining) - amt)}${warn}`)) return;
   try{
     const { error } = await sb.rpc('hr_debt_pay',
-      { p_debt_id: id, p_amount: amt, p_period: MONTH + '-01', p_note: null });
+      { p_debt_id: id, p_amount: amt, p_period: (DEBT_MONTH || MONTH) + '-01', p_note: null });
     if(error) throw error;
-    await notifyPay(DEBT_EMAIL, `💳 اتخصم ${amt} ج.م من مرتب ${monthLabel()} — سداد: ${d.title}`);
+    await notifyPay(DEBT_EMAIL, `💳 اتخصم ${amt} ج.م من مرتب ${debtMonthLabel()} — سداد: ${d.title}`);
     await debtAfterChange();
   }catch(e){
     console.error('debtPay failed:', e);
@@ -5124,17 +5154,221 @@ async function openPayrollAdmin(){
   renderPayrollAdmin();
 }
 
+// ============================================================
+// ⏸️ «ملهمش مرتب محدد» (v148 — prod-hr-nosalary.sql)
+// ------------------------------------------------------------
+// 🧸 HR بتعلّم الموظف إن مالوش مرتب محدد دلوقتي ← كارته بيتشال من
+//    تحت وبيظهر كسطر صغير في خانة فوق. «↩️ رجّعه» بترجّعه كارت عادي.
+// ⚠️ ترتيب شاشة بس — الكشف والفلوس ماتلمستش.
+// ============================================================
+function isNoSalary(e){ return !!(EMP_SET[(e || '').toLowerCase()] || {}).no_salary; }
+async function setNoSalary(e, on){
+  e = (e || '').toLowerCase();
+  if(on && !confirm(`تنقل «${nameOf(e)}» لـ«⏸️ ملهمش مرتب محدد»؟\nكارته هيتشال من تحت ويظهر فوق — الفلوس والكشوف زي ما هي.`)) return;
+  try{
+    const { error } = await sb.from('hr_employee_settings').upsert({
+      user_email: e, no_salary: !!on, updated_at: new Date().toISOString(), updated_by: ME
+    });
+    if(error) throw error;
+  }catch(x){
+    const t = (x && x.message) || String(x);
+    alert('❌ ' + (/no_salary/i.test(t) ? 'الخدمة لسه ماتركبتش — شغّل ملف prod-hr-nosalary.sql' : t));
+    return;
+  }
+  const c = EMP_SET[e] = EMP_SET[e] || { user_email: e };
+  c.no_salary = !!on;
+  renderPayrollAdmin();
+}
+let NOSAL_OPEN = true;
+function noSalaryHtml(list){
+  if(!list.length) return '';
+  const money = v => (Math.round(Number(v || 0) * 100) / 100).toLocaleString('en-US');
+  return `<div class="pt-box" style="margin:14px 0 4px;">
+    <button type="button" onclick="NOSAL_OPEN=!NOSAL_OPEN; renderPayrollAdmin()"
+            style="all:unset; cursor:pointer; display:flex; width:100%; justify-content:space-between; align-items:center; font-weight:900; font-size:14px;">
+      <span>⏸️ ملهمش مرتب محدد <span style="font-weight:400; color:var(--muted); font-size:12px;">(${list.length})</span></span>
+      <span>${NOSAL_OPEN ? '▴' : '▾'}</span>
+    </button>
+    ${NOSAL_OPEN ? list.map(e => {
+      const r = payRowOf(e);
+      const wdr = r ? Number(r.withdraw_ded || 0) : 0;
+      const pt = (EMP_SET[e] || {}).is_partner;
+      return `<div style="display:flex; align-items:center; gap:8px; padding:10px 0; border-top:1px solid var(--line, rgba(127,127,127,.2)); margin-top:8px;">
+        <div class="avatar" style="background:${avatarColor(e)}; width:34px; height:34px; font-size:14px; flex:none;">${esc(nameOf(e).charAt(0))}</div>
+        <div style="flex:1; min-width:0;">
+          <b style="font-size:13.5px;">${esc(nameOf(e))}</b>${pt ? ' <small>🤝</small>' : ''}
+          <small style="display:block; color:var(--muted); font-size:11.5px;">${wdr ? '🔩 مسحوبات الشهر: ' + money(wdr) + ' ج.م' : 'مفيش مسحوبات الشهر ده'}</small>
+        </div>
+        <button class="pr-slip-btn" style="flex:none;" title="الكشوف" onclick="openPayslips('${esc(e)}')">🧾</button>
+        <button class="pr-slip-btn" style="flex:none;" title="رجّعه" onclick="setNoSalary('${esc(e)}', false)">↩️ رجّعه</button>
+      </div>`;
+    }).join('') : ''}
+  </div>`;
+}
+
+// ============================================================
+// 👑 ابعت كروت المرتبات للمالك (v148 — prod-owner-paycards.sql)
+// ------------------------------------------------------------
+// 🧸 المحاسب العام بيختار كروت ← «📤 ابعت للمالك».
+//    اللي بيتبعت = صورة من الكارت دلوقتي (أرقام شهر الشاشة).
+//    بعد الإرسال الاختيار بيتمسح — المرة الجاية يختار تاني.
+//    الأرقام اتغيّرت؟ المالك مابيشوفش الجديد لوحده — ابعت الكارت تاني.
+// 🔒 السيرفر بيرفض أي حد غير المحاسب العام، وبيرفض كروت HR.
+// ============================================================
+let OS = { sel:{}, note:'', hist:[], histErr:'', busy:false, month:'' };   // month = 'YYYY-MM'
+function osRoleOf(e){
+  const v = ROLES_MAP[e]; return typeof v === 'string' ? v : (v && v.role) || '';
+}
+function osPeople(){
+  // HR والمحاسب العام مايتبعتوش للمالك (قاعدة: موظفين HR للمحاسب العام بس)
+  return allPeople().filter(e => osRoleOf(e) !== 'hr' && osRoleOf(e) !== 'super_admin');
+}
+function osCardOf(e){
+  const ym = OS.month || MONTH;
+  const r = (PAYROWS[(e || '').toLowerCase()] || {})[ym + '-01'] || null;
+  const b = r ? bonusSum(e, String(r.period || '').slice(0, 7)) : { total:0 };
+  const lv = r ? leaveLineOf(e, r.period) : null;
+  const nm = r ? Number(r.net_min || 0) : 0;
+  return {
+    name: nameOf(e), role: osRoleOf(e) ? roleLabel(osRoleOf(e)) : '',
+    month: slipMonthName(ym + '-01'), period: ym + '-01',
+    partner: !!(EMP_SET[e] || {}).is_partner,
+    salary: r && r.salary != null ? Number(r.salary) : (SALS[e] != null ? Number(SALS[e]) : null),
+    has_slip: !!r, paid: !!(r && r.paid),
+    manual: r ? Number(r.manual_ded || 0) : 0,
+    late: r ? Number(r.late_ded || 0) : 0,
+    withdraw: r ? Number(r.withdraw_ded || 0) : 0,
+    overtime: r ? (nm >= 0 ? 1 : -1) * Math.abs(Number(r.overtime_amt || 0)) : 0,
+    overtime_min: nm,
+    bonus: b && b.total ? Number(b.total) : 0,
+    leave: lv && lv.amount ? Number(lv.amount) : 0, leave_days: lv ? lv.days : 0,
+    debt_paid: r ? debtPaidIn(e, r.period) : 0,
+    debt_left: debtRemaining(e),
+    net: r ? Number(r.net || 0) : null
+  };
+}
+async function openOwnerShare(){
+  if(!IS_SUPER){ alert('ده للمحاسب العام بس'); return; }
+  OS.sel = {}; OS.note = ''; OS.month = MONTH;
+  const box = document.getElementById('osBody'); if(box) box.innerHTML = '<div class="empty">جاري التحميل…</div>';
+  openSheet('osSheet');
+  // ⚠️ ممكن يتفتح من القايمة على طول — فبنحمّل أرقام الكشوف كلها الأول
+  try{ await Promise.all([loadSalaries(), loadBonuses(), loadDebts(), loadPayRows(), loadLeaveBonus()]); }
+  catch(e){ console.error('owner share load:', e); }
+  renderOwnerShare();
+  await osLoadHist();
+}
+async function osLoadHist(){
+  try{
+    const { data, error } = await sb.rpc('owner_paycards_list', { p_limit: 60 });
+    if(error) throw error;
+    OS.hist = data || []; OS.histErr = '';
+  }catch(e){
+    const t = (e && e.message) || String(e);
+    OS.histErr = /owner_paycards|PGRST202|does not exist/i.test(t) ? 'الخدمة لسه ماتركبتش — شغّل ملف prod-owner-paycards.sql' : t;
+  }
+  renderOwnerShare();
+}
+function osPickMonth(v){
+  if(!/^\d{4}-\d{2}$/.test(v || '')) return;
+  OS.month = v; OS.sel = {};   // شهر جديد = اختيار جديد
+  renderOwnerShare();
+}
+function osToggle(e, on){ if(on) OS.sel[e] = 1; else delete OS.sel[e]; renderOwnerShare(); }
+function osAll(on){ OS.sel = {}; if(on) osPeople().forEach(e => { OS.sel[e] = 1; }); renderOwnerShare(); }
+function renderOwnerShare(){
+  const box = document.getElementById('osBody');
+  if(!box) return;
+  const nEl = document.getElementById('osNote'); if(nEl) OS.note = nEl.value;
+  const money = v => v == null ? '—' : (Math.round(Number(v) * 100) / 100).toLocaleString('en-US');
+  const people = osPeople();
+  const cnt = Object.keys(OS.sel).length;
+  const hist = OS.hist.slice(0, 40).map(h => {
+    const c = h.card || {};
+    return `<div style="display:flex; gap:8px; align-items:center; padding:8px 0; border-top:1px solid var(--line, rgba(127,127,127,.2));">
+      <div style="flex:1; min-width:0; font-size:12.5px;">
+        <b>${esc(c.name || h.user_email)}</b> · ${esc(c.month || slipMonthName(h.period))} · الصافي <b>${money(c.net)}</b>
+        <small style="display:block; color:var(--muted);">📤 ${esc(new Date(h.sent_at).toLocaleString('ar-EG', { day:'numeric', month:'short', hour:'numeric', minute:'2-digit' }))}
+          · ${h.seen_at ? '✅ المالك شافه' : '🔔 لسه ماشافوش'}${h.note ? ' · ' + esc(h.note) : ''}</small>
+      </div>
+      <button class="mini-btn danger" onclick="osWithdraw('${esc(h.id)}')">↩️ اسحب</button>
+    </div>`;
+  }).join('');
+  box.innerHTML = `
+    <div class="hintbox">
+      اختار الكروت اللي عايز تبعتها ← «📤 ابعت للمالك».<br>
+      بيتبعت <b>صورة</b> من الكارت دلوقتي بأرقام الشهر اللي هتختاره تحت.<br>
+      لو الأرقام اتغيّرت بعد كده، المالك مش هيشوف الجديد لوحده — لازم تختار الكارت وتبعته تاني.
+    </div>
+    <label class="fld" style="margin-top:12px;"><span>🗓️ كروت شهر</span>
+      <input type="month" value="${esc(OS.month || MONTH)}" onchange="osPickMonth(this.value)">
+    </label>
+    ${PAYROWS_ERR ? `<div class="hintbox" style="color:var(--red);">❌ مقدرناش نقرا الكشوف — الأرقام <b>مش مضمونة</b>.<br><small>${esc(PAYROWS_ERR)}</small></div>` : ''}
+    <div style="display:flex; gap:8px; margin:10px 0;">
+      <button class="mini-btn" onclick="osAll(true)">☑️ اختار الكل</button>
+      <button class="mini-btn" onclick="osAll(false)">⬜ شيل الكل</button>
+    </div>
+    ${people.map(e => {
+      const c = osCardOf(e);
+      return `<label style="display:flex; gap:10px; align-items:center; padding:9px 4px; border-top:1px solid var(--line, rgba(127,127,127,.2)); cursor:pointer;">
+        <input type="checkbox" ${OS.sel[e] ? 'checked' : ''} onchange="osToggle('${esc(e)}', this.checked)" style="width:20px; height:20px; flex:none;">
+        <div style="flex:1; min-width:0;">
+          <b style="font-size:13.5px;">${esc(c.name)}</b>${c.partner ? ' <small>🤝</small>' : ''}
+          <small style="display:block; color:var(--muted); font-size:11.5px;">
+            ${c.salary != null ? 'مرتب ' + money(c.salary) + ' · ' : ''}${c.has_slip ? 'الصافي ' + money(c.net) + (c.paid ? ' · 🔒 اتصرف' : '') : 'مفيش كشف للشهر ده'}</small>
+        </div>
+      </label>`;
+    }).join('') || '<div class="empty">مفيش موظفين</div>'}
+    <label class="fld" style="margin-top:12px;"><span>📝 ملاحظة للمالك (اختياري)</span>
+      <input type="text" id="osNote" maxlength="300" value="${esc(OS.note)}" placeholder="مثال: مرتبات أكتوبر قبل الصرف">
+    </label>
+    <button class="save" ${cnt && !OS.busy ? '' : 'disabled style="opacity:.5;"'} onclick="osSend()">${OS.busy ? '⏳ بيتبعت…' : '📤 ابعت للمالك (' + cnt + ')'}</button>
+
+    <div style="font-weight:900; margin:20px 0 4px;">📜 اللي اتبعت قبل كده</div>
+    ${OS.histErr ? `<div class="empty">⚠️ ${esc(OS.histErr)}</div>` : (hist || '<div class="empty" style="padding:14px;">لسه مااتبعتش حاجة</div>')}`;
+}
+async function osSend(){
+  const list = Object.keys(OS.sel);
+  if(!list.length){ alert('اختار كارت واحد على الأقل'); return; }
+  const nEl = document.getElementById('osNote'); OS.note = nEl ? nEl.value : OS.note;
+  const ym = OS.month || MONTH;
+  if(!confirm(`تبعت ${list.length} كارت للمالك — أرقام ${slipMonthName(ym + '-01')}؟`)) return;
+  OS.busy = true; renderOwnerShare();
+  const cards = list.map(e => ({ email: e, period: ym + '-01', card: osCardOf(e) }));
+  const r = await sb.rpc('owner_paycards_send', { p_cards: cards, p_note: OS.note || null });
+  OS.busy = false;
+  if(r.error){
+    alert('❌ ' + (/owner_paycards|PGRST202|does not exist/i.test(r.error.message || '')
+      ? 'الخدمة لسه ماتركبتش — شغّل ملف prod-owner-paycards.sql' : r.error.message));
+    renderOwnerShare(); return;
+  }
+  // 🧸 الاختيار بيتمسح — المرة الجاية لازم تختار تاني
+  OS.sel = {}; OS.note = '';
+  alert(`✅ اتبعت ${list.length} كارت للمالك`);
+  await osLoadHist();
+}
+async function osWithdraw(id){
+  if(!confirm('تسحب الكارت ده من عند المالك؟')) return;
+  const r = await sb.rpc('owner_paycards_withdraw', { p_id: id });
+  if(r.error){ alert('❌ ' + r.error.message); return; }
+  await osLoadHist();
+}
+
 function renderPayrollAdmin(){
   const box = document.getElementById('payBody');
   if(!box) return;
 
   let list = allPeople();
+  // ⏸️ ملهمش مرتب محدد — خانة لوحدهم فوق
+  let noSal = list.filter(isNoSalary);
+  list = list.filter(e => !isNoSalary(e));
   if(PAY_Q){
     const q = PAY_Q.trim().toLowerCase();
     list = list.filter(e => e.includes(q) || nameOf(e).toLowerCase().includes(q));
+    noSal = noSal.filter(e => e.includes(q) || nameOf(e).toLowerCase().includes(q));
   }
 
-  if(!list.length){
+  if(!list.length && !noSal.length){
     box.innerHTML = '<div class="empty">' +
       (PAY_Q ? 'مفيش موظف بالاسم ده' :
        'مفيش موظفين متسجّلين<br><small>ضيفهم من لوحة الأدمن الأول</small>') +
@@ -5145,7 +5379,8 @@ function renderPayrollAdmin(){
   // ملخص فوق: كام مرتب متحدد، وإجمالي المرتبات والخصومات والصافي
   // ⚠️ كله للشهر المعروض بس — من نفس صفوف الكشف
   let setN = 0, totSal = 0, totDed = 0, totNet = 0;
-  allPeople().forEach(e => {
+  const mainAll = allPeople().filter(e => !isNoSalary(e));   // ⏸️ مش داخلين في الأرقام دي
+  mainAll.forEach(e => {
     if(SALS[e] != null){ setN++; totSal += SALS[e]; }
     const r = payRowOf(e);
     if(r){
@@ -5165,8 +5400,10 @@ function renderPayrollAdmin(){
     ${PAYROWS_ERR ? `<div class="hintbox" style="margin-top:10px;background:var(--rejected-bg,#FEF2F2);color:var(--red);">
       ❌ مقدرناش نقرا الكشوف — الأرقام تحت <b>مش مضمونة</b>.<br><small>${esc(PAYROWS_ERR)}</small></div>` : ''}
 
+    ${noSalaryHtml(noSal)}
+
     <div class="kpis" style="margin:10px 0 16px;">
-      <div class="kpi"><div class="v">${setN}/${allPeople().length}</div><div class="l">مرتب متحدد</div></div>
+      <div class="kpi"><div class="v">${setN}/${mainAll.length}</div><div class="l">مرتب متحدد</div></div>
       <div class="kpi"><div class="v">${n(totSal).toLocaleString('en-US')}</div><div class="l">إجمالي المرتبات</div></div>
       <div class="kpi"><div class="v" style="color:${totDed?'var(--red)':'inherit'}">${n(totDed).toLocaleString('en-US')}</div><div class="l">خصومات الشهر</div></div>
       <div class="kpi"><div class="v" style="color:var(--done)">${n(totNet).toLocaleString('en-US')}</div><div class="l">إجمالي الصافي</div></div>
@@ -5257,6 +5494,8 @@ function prCardHtml(e){
       <button class="pr-slip-btn" style="flex:none;" title="الديون" onclick="openDebts('${esc(e)}')">💳</button>
       <button class="pr-slip-btn" onclick="openPayslips('${esc(e)}')">🧾 الكشوف</button>
     </div>
+    <button type="button" class="mini-btn" style="margin-top:8px; width:100%;"
+            onclick="setNoSalary('${esc(e)}', true)">⏸️ مالوش مرتب محدد دلوقتي</button>
   </div>`;
 }
 
