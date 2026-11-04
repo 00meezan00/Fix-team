@@ -142,6 +142,15 @@
             + '<b style="color:var(--done,#15803D);">' + money(d.paid_month) + '</b>'
             + '<b style="color:var(--red,#E8321E);">' + money(d.left) + '</b></div>';
         }).join('')
+      // 🧮 (v148) مجموع الديون كلها
+      + (function(){
+          var a = 0, p = 0, l = 0;
+          list.forEach(function(d){ a += Number(d.amount || 0); p += Number(d.paid_month || 0); l += Number(d.left || 0); });
+          return '<div class="opc-dt" style="border-top:1px dashed var(--line,#E4E9EF);margin-top:4px;padding-top:6px;">'
+            + '<span style="font-weight:900;">🧮 المجموع</span><b>' + money(a) + '</b>'
+            + '<b style="color:var(--done,#15803D);">' + money(p) + '</b>'
+            + '<b style="color:var(--red,#E8321E);">' + money(l) + '</b></div>';
+        })()
       + '</div>';
   }
 
