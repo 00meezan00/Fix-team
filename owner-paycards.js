@@ -50,6 +50,11 @@
       '.opc-net{display:flex;justify-content:space-between;align-items:baseline;margin-top:6px;padding-top:6px;border-top:1px dashed var(--line,#E4E9EF);font-weight:900;font-size:15px;}',
       '.opc-tag{display:inline-block;font-size:11px;border-radius:8px;padding:1px 7px;margin-inline-start:6px;background:var(--done-bg,#EAF6EE);color:var(--done,#15803D);font-weight:800;}',
       '.opc-empty{text-align:center;color:var(--muted,#6B7A8C);padding:40px 10px;line-height:1.9;}',
+      '.opc-debts{margin-top:10px;padding:8px 10px;border-radius:10px;background:var(--paper,#EBEEF2);font-size:12px;}',
+      '.opc-dh{font-weight:900;font-size:12.5px;margin-bottom:4px;}',
+      '.opc-dt{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:6px;align-items:baseline;padding:3px 0;}',
+      '.opc-dt span:not(:first-child){color:var(--muted,#6B7A8C);font-size:11px;}',
+      '.opc-dt b{font-weight:800;}',
       '.opc-badge{background:#DC2626;color:#fff;border-radius:10px;padding:1px 7px;font-size:11.5px;font-weight:800;margin-inline-start:6px;}'
     ].join('\n');
     document.head.appendChild(st);
@@ -121,7 +126,22 @@
           ? '<div class="opc-lines"><div><span>مفيش كشف للشهر ده</span><b>—</b></div></div>'
           : '<div class="opc-lines">' + lines.join('') + '</div>'
             + '<div class="opc-net"><span>= الصافي</span><span style="color:' + (Number(c.net) < 0 ? 'var(--red,#E8321E)' : 'var(--done,#15803D)') + ';">' + money(c.net) + ' ج.م</span></div>')
-      + (c.debt_left ? '<div class="r" style="margin-top:4px;">💳 باقي عليه ديون ' + money(c.debt_left) + ' ج.م</div>' : '')
+      + debtsHtml(c)
+      + '</div>';
+  }
+
+  // 💳 ديونه في الشهر ده — الأساسي · اتخصم في الشهر · الباقي (لحد آخر الشهر)
+  function debtsHtml(c){
+    var list = Array.isArray(c.debts) ? c.debts : null;
+    if(!list) return c.debt_left ? '<div class="r" style="margin-top:4px;">💳 باقي عليه ديون ' + money(c.debt_left) + ' ج.م</div>' : '';
+    if(!list.length) return '';
+    return '<div class="opc-debts"><div class="opc-dh">💳 الديون</div>'
+      + '<div class="opc-dt"><span></span><span>الأساسي</span><span>اتخصم الشهر ده</span><span>الباقي</span></div>'
+      + list.map(function(d){
+          return '<div class="opc-dt"><span>' + esc(d.title) + '</span><b>' + money(d.amount) + '</b>'
+            + '<b style="color:var(--done,#15803D);">' + money(d.paid_month) + '</b>'
+            + '<b style="color:var(--red,#E8321E);">' + money(d.left) + '</b></div>';
+        }).join('')
       + '</div>';
   }
 

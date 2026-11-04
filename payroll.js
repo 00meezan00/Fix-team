@@ -367,6 +367,8 @@ function payRender(busyMsg){
 
         ${paySlipsHtml()}
 
+        ${payDebtsBoxHtml()}
+
         ${(busyMsg || _payErr || !_payPeriod) ? '' : payDrawersHtml()}
 
         ${payPushBtnHtml()}
@@ -581,6 +583,32 @@ function payDebtLine(p){
     ${rows.map(x => `<div style="font-size:12px;padding:0 10px 2px 0;color:var(--p-mut);">
       <span>• ${_payEsc(title(x.debt_id))}</span><span>−${payMoney(x.amount)}</span></div>`).join('')}`;
 }
+// ============================================================
+// 💳 (v148) كارت «ديونك» — بيظهر بس لو عليه دين لسه باقي منه
+// ------------------------------------------------------------
+// 🧸 لكل دين: المبلغ الأساسي · اتخصم منه كام لحد دلوقتي · الباقي.
+//    الأرقام من hr_debt_list (السيرفر بيدّي الموظف ديونه هو بس).
+// ============================================================
+function payDebtsBoxHtml(){
+  const open = (_payDebts || []).filter(d => Number(d.remaining) > 0);
+  if(!open.length) return '';
+  const tot = open.reduce((a, d) => a + Number(d.remaining || 0), 0);
+  return `<div class="pay-tot slip">
+    <div class="pay-slip-h"><b>💳 ديونك</b><span class="pay-slip-tag wait">${open.length} ${open.length === 1 ? 'دين' : 'ديون'}</span></div>
+    <div class="pay-tot-big" style="margin-top:10px;">
+      <span class="pay-tot-n" style="color:var(--p-red);">${payMoney(tot)}</span>
+      <span class="pay-tot-c">ج.م</span>
+    </div>
+    <div class="pay-tot-l">إجمالي الباقي عليك</div>
+    ${open.map(d => `<div class="pay-calc">
+      <div style="font-weight:900;"><span>${_payEsc(d.title || 'دين')}</span><span style="font-size:12px;opacity:.75;font-weight:400;">${_payEsc(String(d.debt_date || '').slice(0, 10))}</span></div>
+      <div><span>الدين الأساسي</span><b>${payMoney(d.amount)}</b></div>
+      <div><span>اتخصم منه</span><b style="color:var(--p-green, #15803D);">${payMoney(d.paid_total)}</b></div>
+      <div class="eq"><span>= الباقي</span><b class="minus">${payMoney(d.remaining)}</b></div>
+    </div>`).join('')}
+  </div>`;
+}
+
 // 💳 تذكير الديون — على الكشف اللي لسه ماتصرفش بس
 //    ⚠️ ده **مش** خصم: الصافي اللي فوقه مش متخصوم منه الباقي ده.
 function payDebtReminder(p){

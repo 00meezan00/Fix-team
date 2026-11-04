@@ -5244,9 +5244,25 @@ function osCardOf(e){
     leave: lv && lv.amount ? Number(lv.amount) : 0, leave_days: lv ? lv.days : 0,
     debt_paid: r ? debtPaidIn(e, r.period) : 0,
     debt_left: debtRemaining(e),
+    // 💳 (v148) كل دين: الأساسي · اتخصم منه في الشهر ده · الباقي لحد آخر الشهر ده
+    debts: osDebtsOf(e, ym),
     net: r ? Number(r.net || 0) : null
   };
 }
+function osDebtsOf(e, ym){
+  const end = new Date(Date.UTC(+ym.slice(0, 4), +ym.slice(5, 7), 0)).toISOString().slice(0, 10);
+  return (DEBTS[(e || '').toLowerCase()] || [])
+    .filter(d => String(d.debt_date || '').slice(0, 10) <= end)          // اتسجّل لحد آخر الشهر ده
+    .map(d => {
+      const pays = DEBT_PAYS[d.id] || [];
+      const inM = pays.filter(p => String(p.period).slice(0, 7) === ym).reduce((a, p) => a + Number(p.amount || 0), 0);
+      const upto = pays.filter(p => String(p.period).slice(0, 7) <= ym).reduce((a, p) => a + Number(p.amount || 0), 0);
+      const left = Math.round((Number(d.amount || 0) - upto) * 100) / 100;
+      return { title: d.title || 'دين', amount: Number(d.amount || 0), paid_month: Math.round(inM * 100) / 100, left };
+    })
+    .filter(x => x.left > 0 || x.paid_month > 0);
+}
+
 async function openOwnerShare(){
   if(!IS_SUPER){ alert('ده للمحاسب العام بس'); return; }
   OS.sel = {}; OS.note = ''; OS.month = MONTH;

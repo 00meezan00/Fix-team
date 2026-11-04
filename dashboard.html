@@ -11230,6 +11230,61 @@ function techBoardFor(mode){
   return rows;
 }
 
+// ⭐ (v148) نفس الحسبة لفترة من تاريخ لتاريخ — لشاشة «نقاط الفنيين» عند المالك
+function techBoardRange(from, to){
+  const save = { mode: tePeriod.mode, from: tePeriod.from, to: tePeriod.to };
+  let rows = [];
+  try{
+    tePeriod.mode = 'custom'; tePeriod.from = from; tePeriod.to = to;
+    renderTechEval();
+    rows = (teRows || []).map(r => ({
+      t: r.t, points: r.points, count: r.count,
+      avg: r.avg, ret: r.returns, rate: r.rate
+    }));
+  }catch(e){ rows = []; }
+  tePeriod.mode = save.mode; tePeriod.from = save.from; tePeriod.to = save.to;
+  return rows;
+}
+
+// ============================================================
+// ⭐ (v148) نشر نقاط الفنيين بالشهر — للمالك
+// ------------------------------------------------------------
+// 🧸 المالك مابيشوفش كل الأجهزة، فمش هيقدر يحسب النقاط بنفسه.
+//    فالداشبورد (زي «ترتيب الفنيين» بالظبط) بيحسبها وبينشرها جاهزة
+//    في app_data['tech-board-months']: النهارده + الشهر ده + ١١ شهر قبله.
+//    الحسبة نفسها هي هي (renderTechEval) — مكان واحد، فمابتختلفش.
+// ⚠️ بيتكتب لما الأرقام تتغيّر بس (أو كل ١٥ دقيقة عشان الوقت).
+// ============================================================
+const TECH_MONTHS_KEY = 'tech-board-months';
+let _lastMonthsSig = '', _lastMonthsAt = 0, _lastMonthsCalc = 0;
+async function publishTechMonths(){
+  try{
+    if(!Array.isArray(devices) || !devices.length || !devicesComplete) return;
+    // ⏱️ ١٣ حسبة — مرة كل دقيقتين بالكتير عشان الشاشة ماتتقّلش
+    if(Date.now() - _lastMonthsCalc < 2 * 60 * 1000) return;
+    _lastMonthsCalc = Date.now();
+    const pad = n => String(n).padStart(2, '0');
+    const now = new Date();
+    const months = {};
+    for(let i = 0; i < 12; i++){
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const ym = d.getFullYear() + '-' + pad(d.getMonth() + 1);
+      const last = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+      months[ym] = techBoardRange(ym + '-01', ym + '-' + pad(last.getDate()));
+    }
+    const today = techBoardFor('today');
+    const sig = JSON.stringify({ today, months });
+    const t = Date.now();
+    if(sig === _lastMonthsSig && (t - _lastMonthsAt) < 15 * 60 * 1000) return;
+    _lastMonthsSig = sig; _lastMonthsAt = t;
+    await sb.from('app_data').upsert({
+      key: TECH_MONTHS_KEY,
+      value: JSON.stringify({ at: new Date(t).toISOString(), today, months }),
+      updated_at: new Date().toISOString()
+    });
+  }catch(e){ /* النشر مايوقفش أي حاجة */ }
+}
+
 // النشر بيتأجّل شوية عشان لو ٥ أجهزة اتغيّروا ورا بعض ننشر مرة واحدة
 let _boardTimer = null;
 function publishTechBoardSoon(){
@@ -11241,6 +11296,8 @@ function publishTechBoardSoon(){
 const BOARD_HEARTBEAT_MS = 5 * 60 * 1000;
 
 async function publishTechBoard(){
+  // ⭐ (v148) نقاط الشهور للمالك — لوحدها (عندها مقارنتها هي) وقبل أي return تحت
+  try{ publishTechMonths(); }catch(e){}
   try{
     if(!Array.isArray(devices) || !devices.length) return;
     // ⚠️ الترتيب محسوب على آخر ٣٠ يوم — لو الأرشيف لسه بيتحمّل
