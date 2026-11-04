@@ -762,3 +762,40 @@ const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
     if(wouldLeak(scrollerIn(menu, e.target), -e.deltaY)) e.preventDefault();
   }, { passive:false, capture:true });
 })();
+
+
+// ============================================================
+// 🖥️ «حساب جهاز ثابت» (كمبيوتر المحل) — v148 · prod-station.sql
+// ------------------------------------------------------------
+// 🧸 الحساب ده متركّب على كمبيوتر المحل ومالوش موظف، فبنخبّي عنه
+//    «⏰ المواعيد» و«💰 مرتبك» و«🧾 كشف مرتبي».
+// ⚠️ الإخفاء ده شكل بس — الرفض الحقيقي على السيرفر (hr_punch) ·
+//    واللوحات بتشيله على السيرفر (hr_staff_board · hr_today_presence).
+// ⚠️ الدالة مش موجودة (الملف مااتشغّلش)؟ → ولا حاجة بتتغيّر.
+// ============================================================
+(function(){
+  try{
+    var page = (location.pathname.split('/').pop() || '').toLowerCase().replace(/\.html$/, '') || 'index';
+    if(['index', 'admin', 'track', 'assist', 'checkout'].indexOf(page) !== -1) return;
+    if(!document.getElementById('ifxStationCss')){
+      var st = document.createElement('style');
+      st.id = 'ifxStationCss';
+      // !important عشان attendance.js و payroll.js بيظهّروا الزراير بنفسهم كل شوية
+      st.textContent = 'html.ifx-station .att-menu-btn,html.ifx-station .pay-menu-btn,'
+                     + 'html.ifx-station .pay-self-menu-btn,html.ifx-station #deskHint{display:none !important;}';
+      (document.head || document.documentElement).appendChild(st);
+    }
+    var ask = async function(){
+      try{
+        var ses = await sb.auth.getSession();
+        if(!ses || !ses.data || !ses.data.session) return;
+        var r = await sb.rpc('my_is_station');
+        if(!r.error && r.data === true){
+          document.documentElement.classList.add('ifx-station');
+          window.IFX_STATION = true;
+        }
+      }catch(e){ console.warn('my_is_station:', e); }
+    };
+    if(document.readyState === 'loading') addEventListener('DOMContentLoaded', ask); else ask();
+  }catch(e){ console.error('station:', e); }
+})();

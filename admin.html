@@ -819,7 +819,11 @@ const CAPS = [
   //    "مدفوع/غير مدفوع" في الجرد بتاعه — الاتنين محتاجين بيانات فلوس مش موجودة أصلاً.
   { key:'inventory_view', icon:'📋', label:'الجرد (قراءة فقط)',
     hint:'كروت أعداد (استلام/قيد التنفيذ/تسليم/واقفة) + أداء الفنيين — من غير أسعار',
-    forRoles:['dispatcher','owner','hr'] }
+    forRoles:['dispatcher','owner','hr'] },
+  // 🖥️ (v148 — prod-station.sql، زي ملف 117 في الاستيجنج) حساب متركّب على كمبيوتر المحل ومالوش موظف
+  { key:'station', icon:'🖥️', label:'حساب جهاز ثابت (كمبيوتر المحل)',
+    hint:'مالوش حضور ولا انصراف ولا مرتب · مابيظهرش في شؤون العاملين ولا لوحة الموظفين · مابيتقفلش برّه الشيفت',
+    forRoles:['accountant','prodmgr','dispatcher','callcenter','tester','staff'] }
 ];
 function hasCap(en, cap){ return (en.caps || []).includes(cap); }
 

@@ -673,8 +673,12 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
       <button onclick="closeMenu(); openPayrollAdmin()">💰 المخصومات والمرتبات</button>
       <button onclick="closeMenu(); openExcelW()">📊 مسحوبات الإكسل</button>
       <button onclick="closeMenu(); openHrSettings()">⚙️ نظام العمل</button>
+      <!-- 👋 (v148) اللي اترفدوا أو سابوا — prod-hr-left.sql -->
+      <button onclick="closeMenu(); openOldEmps()">👋 موظفين قدام</button>
       <!-- 🤝 للمحاسب العام بس (prod-hr-partners.sql) — boot بيظهّره -->
       <button class="super-only" style="display:none;" onclick="closeMenu(); openPartners()">🤝 جاري الشركاء</button>
+      <!-- 👑 (v148) المحاسب العام بيوصل هنا من قايمته — ده زرار الرجوع لشاشته -->
+      <button class="super-only" style="display:none;" onclick="closeMenu(); location.href='dashboard.html'">↩️ رجوع لشاشة المحاسب العام</button>
       <button onclick="closeMenu(); openStaffMsgs()">📨 رسايل الموظفين <b id="hrMsgCount" class="msg-count" style="display:none;"></b></button>
 
       <!-- 🧰 أدوات الديسباتشر — مخفية لحد ما الأدمن يفعّلها للحساب ده
@@ -713,6 +717,16 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
             onclick="closeSheet('debtSheet')">×</button>
   </div>
   <div class="sheet-body" id="debtBody"></div>
+</div>
+
+<!-- ===== 👋 موظفين قدام (v148) ===== -->
+<div class="sheet" id="oldSheet">
+  <div class="sheet-head">
+    <h2>👋 موظفين قدام</h2>
+    <button class="icon-btn" style="background:var(--surface-2); color:var(--ink);"
+            onclick="closeSheet('oldSheet')">×</button>
+  </div>
+  <div class="sheet-body" id="oldBody"></div>
 </div>
 
 <!-- ===== 🤝 جاري الشركاء (المحاسب العام بس) ===== -->
@@ -971,6 +985,11 @@ const KIND = {
   document.querySelectorAll('.super-only').forEach(el => { el.style.display = IS_SUPER ? '' : 'none'; });
   loadStaffMsgs();        // 📨 رسايل الموظفين (التنبيه + العدد)
   await loadMonth();
+  // 👑 (v148) جاي من «🤝 جاري الشركاء» في قايمة المحاسب العام → افتح الشاشة على طول
+  if(location.hash === '#partners' && IS_SUPER){
+    try{ history.replaceState(null, '', location.pathname); }catch(e){}
+    openPartners();
+  }
 })();
 
 // ============================================================
@@ -1223,6 +1242,29 @@ function fmtTime(iso){
 // ============================================================
 
 // تجميع: موظف → يوم → تسجيلات
+// ============================================================
+// 👋 «موظفين قدام» (v148 — prod-hr-left.sql)
+// ------------------------------------------------------------
+// 🧸 HR بتنقل اللي اترفد أو ساب لـ«👋 موظفين قدام» بآخر يوم شغل ليه.
+//    من **الشهر اللي بعده** بيختفي من الكروت وكل القوايم. في شهره
+//    الأخير (والشهور اللي قبله) لسه ظاهر — عشان مرتبه الأخير يتخلّص.
+//    بياناته كلها محفوظة، وينفع يرجع بدوسة. الحساب نفسه ماتلمسش.
+// ============================================================
+// 🖥️ (v148 — prod-station.sql) «حساب جهاز ثابت» = كمبيوتر المحل، مالوش موظف —
+//    مابيظهرش في شؤون العاملين خالص (لا كارت ولا قايمة ولا مرتبات).
+//    العلامة: 'station' جوه caps في لوحة الأدمن (نفس اللي السيرفر بيقراه).
+function isStationEmp(email){
+  const em = String(email || '').toLowerCase();
+  let v = ROLES_MAP[em];
+  if(v === undefined){ const k = Object.keys(ROLES_MAP || {}).find(x => x.toLowerCase() === em); if(k) v = ROLES_MAP[k]; }
+  return !!(v && typeof v === 'object' && Array.isArray(v.caps) && v.caps.indexOf('station') !== -1);
+}
+
+function isOldEmp(email){
+  const c = EMP_SET[String(email || '').toLowerCase()] || {};
+  return !!c.left_at && String(c.left_at).slice(0,7) < MONTH;
+}
+
 function groupEmps(){
   const emps = {};
   for(const r of ROWS){
@@ -1240,6 +1282,8 @@ function groupEmps(){
     if(!role || role === 'hr' || role === 'super_admin') continue;
     emps[e] = {};
   }
+  // 👋 موظفين قدام — مش ظاهرين في الشهور اللي بعد آخر يوم شغل
+  Object.keys(emps).forEach(e => { if(isOldEmp(e) || isStationEmp(e)) delete emps[e]; });   // 👋 · 🖥️
   return emps;
 }
 
@@ -1268,11 +1312,9 @@ function adminCardHtml(e){
       <div class="avatar" style="background:${avatarColor(e)}">${esc(nameOf(e).charAt(0))}</div>
       <div class="card-id">
         <b>${esc(nameOf(e))}</b>
-        <span>🏢 إداري${rl ? ' · ' + esc(roleLabel(rl)) : ''}${c.is_partner ? ' · 🤝 شريك' : ''}</span>
+        <span>🕊️ مواعيد حرة${rl ? ' · ' + esc(roleLabel(rl)) : ''}${c.is_partner ? ' · 🤝 شريك' : ''}</span>
       </div>
     </div>
-    <div class="card-ded" style="color:var(--muted);">🏢 حساب إداري — مالوش حضور ولا انصراف، فمفيش ساعات ولا تأخير ولا غياب.
-      المرتب والكشف من «💰 المخصومات والمرتبات».</div>
     ${bits.length ? `<div class="card-ded">${bits.join(' · ')}</div>` : ''}
     <div class="card-foot">
       <button onclick="openEmpLog('${esc(e)}')">📋 السجل</button>
@@ -2399,7 +2441,8 @@ function allEmployees(){
     const e = (r.user_email||'').toLowerCase();
     if(e && out.indexOf(e) < 0) out.push(e);
   });
-  return out.sort((a,b) => nameOf(a).localeCompare(nameOf(b),'ar'));
+  return out.filter(e => !isOldEmp(e) && !isStationEmp(e))   // 👋 موظفين قدام · 🖥️ جهاز ثابت
+            .sort((a,b) => nameOf(a).localeCompare(nameOf(b),'ar'));
 }
 
 async function openHrSettings(email){
@@ -2502,7 +2545,86 @@ function renderHrSettings(){
 
     <button class="save" onclick="saveEmpSettings()">💾 حفظ نظام عمل ${esc(nameOf(SET_EMAIL))}</button>
 
-    ${daySchedHtml()}`;
+    ${daySchedHtml()}
+
+    <div class="pt-box" style="margin-top:22px;">
+      <b style="font-size:14px;">👋 اترفد أو ساب الشغل؟</b>
+      <small style="display:block; color:var(--muted); font-size:11.5px; line-height:1.8; margin:6px 0 8px;">
+        هيتنقل لـ«👋 موظفين قدام» ويختفي من الكروت وكل القوايم من الشهر اللي بعد آخر يوم شغل.
+        بياناته كلها بتفضل محفوظة، وينفع يرجع في أي وقت. الحساب نفسه بيتقفل من لوحة الأدمن.</small>
+      <label class="fld" style="margin:0 0 8px;"><span>📅 آخر يوم شغل</span>
+        <input type="date" id="fLeftAt" value="${esc(new Date().toISOString().slice(0,10))}">
+      </label>
+      <label class="fld" style="margin:0 0 8px;"><span>📝 ملاحظة (اختياري)</span>
+        <input type="text" id="fLeftNote" maxlength="200" placeholder="مثال: اترفد · ساب بمزاجه">
+      </label>
+      <button class="save" style="margin:0; background:var(--red);" onclick="markOldEmp()">👋 انقل ${esc(nameOf(SET_EMAIL))} لموظفين قدام</button>
+    </div>`;
+}
+
+async function markOldEmp(){
+  const em = SET_EMAIL;
+  const d = (document.getElementById('fLeftAt') || {}).value || '';
+  const note = ((document.getElementById('fLeftNote') || {}).value || '').trim();
+  if(!em){ alert('اختار الموظف الأول'); return; }
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(d)){ alert('اختار آخر يوم شغل'); return; }
+  if(!confirm(`تنقل «${nameOf(em)}» لـ«👋 موظفين قدام»؟\n\nآخر يوم شغل: ${fmtDay(d)}\nهيختفي من الشاشة من الشهر اللي بعده، وبياناته كلها بتفضل محفوظة.`)) return;
+  await setOldEmp(em, d, note || null);
+}
+async function setOldEmp(em, d, note){
+  try{
+    const { error } = await sb.from('hr_employee_settings').upsert({
+      user_email: em, left_at: d, left_note: note,
+      updated_at: new Date().toISOString(), updated_by: ME
+    });
+    if(error) throw error;
+  }catch(e){
+    const t = (e && e.message) || String(e);
+    alert('❌ ' + (/left_at|left_note/i.test(t) ? 'الخدمة لسه ماتركبتش — شغّل ملف prod-hr-left.sql' : t));
+    return false;
+  }
+  const c = EMP_SET[em] = EMP_SET[em] || { user_email: em };
+  c.left_at = d; c.left_note = note;
+  if(d){
+    alert(`✅ «${nameOf(em)}» اتنقل لموظفين قدام`);
+    closeSheet('hrSet');
+  }
+  render();
+  return true;
+}
+
+// 👋 شاشة «موظفين قدام» — كل اللي اتنقلوا + «↩️ رجّعه»
+function openOldEmps(){ renderOldEmps(); openSheet('oldSheet'); }
+function renderOldEmps(){
+  const box = document.getElementById('oldBody');
+  if(!box) return;
+  const list = Object.keys(EMP_SET || {}).filter(e => (EMP_SET[e] || {}).left_at)
+    .sort((a,b) => String(EMP_SET[b].left_at).localeCompare(String(EMP_SET[a].left_at)));
+  box.innerHTML = `<div class="hintbox">
+      دول اللي اتنقلوا من «⚙️ نظام العمل». مش ظاهرين في الكروت ولا القوايم من الشهر اللي بعد آخر يوم شغل ليهم.<br>
+      عايز تشوف حضوره ومرتبه القديم؟ غيّر الشهر فوق لشهر كان شغّال فيه — هيظهر عادي.</div>`
+    + (list.length ? list.map(e => {
+        const c = EMP_SET[e] || {};
+        const v = ROLES_MAP[e] || {};
+        const rl = typeof v === 'string' ? v : (v.role || '');
+        return `<div class="card" style="margin-bottom:10px;">
+          <div class="card-top">
+            <div class="avatar" style="background:${avatarColor(e)}">${esc(nameOf(e).charAt(0))}</div>
+            <div class="card-id">
+              <b>${esc(nameOf(e))}</b>
+              <span>${rl ? esc(roleLabel(rl)) + ' · ' : ''}${esc(e)}</span>
+            </div>
+          </div>
+          <div class="card-ded">👋 آخر يوم شغل: <b>${esc(fmtDay(c.left_at))}</b>${c.left_note ? ' · ' + esc(c.left_note) : ''}</div>
+          <div class="card-foot">
+            <button onclick="restoreOldEmp('${esc(e)}')">↩️ رجّعه للموظفين</button>
+          </div>
+        </div>`;
+      }).join('') : '<div class="empty">مفيش موظفين قدام</div>');
+}
+async function restoreOldEmp(em){
+  if(!confirm(`ترجّع «${nameOf(em)}» للموظفين؟\nهيظهر تاني في الكروت وكل القوايم.`)) return;
+  if(await setOldEmp(em, null, null)) renderOldEmps();
 }
 
 // ============================================================
@@ -2549,19 +2671,15 @@ function setAttMode(k){
 // 🤝 علامة الشريك — للمحاسب العام بس (السيرفر بيرجّعها لو حد تاني غيّرها)
 function partnerFldHtml(c){
   const on = c._pt != null ? c._pt : !!c.is_partner;
-  const since = c._ptSince != null ? c._ptSince : (c.partner_since ? String(c.partner_since).slice(0,10) : '');
   return `<div class="pt-box">
       <label style="display:flex; gap:8px; align-items:center; font-weight:900; font-size:14px; cursor:pointer;">
         <input type="checkbox" id="fPartner" ${on ? 'checked' : ''} onchange="ptToggleFld(this.checked)" style="width:20px;height:20px;">
         🤝 شريك
       </label>
       <small style="display:block; color:var(--muted); font-size:11.5px; line-height:1.8; margin:6px 0;">
-        من التاريخ ده مسحوباته (من الشيت أو بإيدك) <b>مابتتخصمش من مرتب</b> — بتروح على «🤝 جاري الشركاء».
-        قبله زي ما كانت. الشريك مالوش مرتب، بس تقدر تعمله مرتب عادي.
+        <b>كل</b> مسحوباته (القديمة والجديدة — من الشيت أو بإيدك) بتروح على «🤝 جاري الشركاء» و<b>مابتتخصمش من مرتب</b>.
+        الشريك مالوش مرتب، بس تقدر تعمله مرتب عادي.
       </small>
-      ${on ? `<label class="fld" style="margin:0;"><span>📅 شريك من يوم</span>
-        <input type="date" id="fPartnerSince" value="${esc(since || new Date().toISOString().slice(0,8) + '01')}">
-      </label>` : ''}
     </div>`;
 }
 function ptToggleFld(on){
@@ -2647,10 +2765,10 @@ async function saveEmpSettings(){
     let ptMsg = '';
     if(IS_SUPER && c._pt != null){
       const was = !!c.is_partner;
-      const since = c._pt ? (c._ptSince || new Date().toISOString().slice(0,8) + '01') : null;
-      const wasSince = c.partner_since ? String(c.partner_since).slice(0,10) : '';
-      if(c._pt !== was || (c._pt && since !== wasSince)){
-        const r = await sb.rpc('partner_set', { p_email: SET_EMAIL, p_on: c._pt, p_since: since });
+      // 🤝 (v148) مفيش «شريك من يوم» — السيرفر بيحسب كل مسحوباته من أول يوم
+      const since = c._pt ? '2000-01-01' : null;
+      if(c._pt !== was){
+        const r = await sb.rpc('partner_set', { p_email: SET_EMAIL, p_on: c._pt, p_since: null });
         if(r.error) ptMsg = '\n⚠️ علامة الشريك ماتحفظتش: ' + (/partner_set|PGRST202|does not exist/i.test(r.error.message || '')
           ? 'شغّل ملف prod-hr-partners.sql' : r.error.message);
         else { c.is_partner = c._pt; c.partner_since = since; }
@@ -2778,7 +2896,7 @@ function ptRender(){
   if(PT.busy && !PT.board){ box.innerHTML = head + '<div class="empty">جاري التحميل…</div>'; return; }
   if(!parts.length){
     box.innerHTML = head + `<div class="empty">مفيش شركاء لسه.<br>
-      <small>افتح «⚙️ نظام العمل» للشخص وعلّم «🤝 شريك» واختار من يوم إمتى.</small></div>`;
+      <small>اختار الشخص من تحت ودوس «🤝 خلّيه شريك».</small></div>` + ptAddHtml(parts);
     return;
   }
   const sum = `
@@ -2794,7 +2912,7 @@ function ptRender(){
     <table class="pt-tbl">
       <tr><th>الشريك</th><th>له</th><th>عليه</th><th>الرصيد دلوقتي</th></tr>
       ${parts.map(p => `<tr onclick="ptPick('${esc(p.email)}')" style="cursor:pointer;">
-        <td>🤝 ${esc(p.name)}<br><small style="color:var(--muted)">من ${esc(fmtDay(p.since))}${Number(p.salary) ? ' · مرتب ' + ptMoney(p.salary) : ''}</small></td>
+        <td>🤝 ${esc(p.name)}<br>${Number(p.salary) ? '<small style="color:var(--muted)">مرتب ' + ptMoney(p.salary) + '</small>' : ''}</td>
         <td class="n pt-in">+${ptMoney(p.in)}</td><td class="n pt-out">−${ptMoney(p.out)}</td><td class="n">${ptSigned(p.now)}</td></tr>`).join('')}
       <tr class="tot"><td>👥 الإجمالي</td><td class="n pt-in">+${ptMoney(B.total.in)}</td>
         <td class="n pt-out">−${ptMoney(B.total.out)}</td><td class="n">${ptSigned(B.total.now)}</td></tr>
@@ -2819,7 +2937,7 @@ function ptRender(){
 
   box.innerHTML = head
     + `<div class="pt-tabs">${tab('all', '👥 الكل')}${parts.map(p => tab(p.email, '🤝 ' + p.name)).join('')}</div>`
-    + sum + tbl + ptFormHtml(parts)
+    + sum + tbl + ptFormHtml(parts) + ptAddHtml(parts)
     + `<div style="font-weight:900; margin:14px 0 8px;">📜 الحركات ${PT.rows.length ? '(' + PT.rows.length + ')' : ''}</div>`
     + (rows || '<div class="empty" style="padding:18px;">مفيش حركات في الفترة دي</div>');
 }
@@ -2858,6 +2976,59 @@ function ptFormHtml(parts){
     </div>
   </div>`;
 }
+// ============================================================
+// ➕ (v148) المحاسب العام يخلّي أي حد شريك — أو يشيله
+// ------------------------------------------------------------
+// 🧸 قايمة فيها كل الحسابات (من لوحة الأدمن) اللي مش شركاء لسه
+//    ← اختار ← «🤝 خلّيه شريك». السيرفر (partner_set) بيعلّمه، ولو
+//    مالوش «⚙️ نظام عمل» بيعمله واحد «مالوش حضور ولا انصراف».
+//    كل مسحوباته — القديمة والجديدة — بتروح على الجاري على طول.
+//    في تاب الشريك نفسه: «✖ شيله من الشركاء» (مسحوباته ترجع على مرتبه
+//    في الشهور اللي لسه ماتصرفتش، والحركات اللي اتكتبت بإيدك بتفضل).
+// ============================================================
+function ptAddHtml(parts){
+  const isPt = {}; (parts || []).forEach(p => { isPt[p.email] = 1; });
+  if(PT.sel !== 'all' && isPt[PT.sel]){
+    return `<button class="mini-btn danger" style="margin-top:10px;" onclick="ptSetPartner('${esc(PT.sel)}', false)">✖ شيله من الشركاء</button>`;
+  }
+  if(PT.sel !== 'all') return '';
+  const cand = allPeople().filter(e => !isPt[e] && e !== ME);
+  if(!cand.length) return '';
+  return `<div class="pt-box" style="margin-top:12px;">
+    <label class="fld" style="margin:0 0 8px;"><span>➕ ضيف شريك</span>
+      <select id="ptAddEmail">
+        <option value="">— اختار الشخص —</option>
+        ${cand.map(e => `<option value="${esc(e)}">${esc(nameOf(e))}${nameOf(e) !== e ? ' · ' + esc(e) : ''}</option>`).join('')}
+      </select>
+    </label>
+    <small style="display:block; color:var(--muted); font-size:11.5px; line-height:1.8; margin-bottom:8px;">
+      كل مسحوباته — القديمة والجديدة — هتروح على «جاري الشركاء» ومش هتتخصم من مرتبه.</small>
+    <button class="save" style="margin:0;" onclick="ptSetPartner((document.getElementById('ptAddEmail') || {}).value, true)">🤝 خلّيه شريك</button>
+  </div>`;
+}
+async function ptSetPartner(email, on){
+  email = String(email || '').toLowerCase();
+  if(!email){ alert('اختار الشخص الأول'); return; }
+  const nm = nameOf(email);
+  if(!confirm(on
+      ? `تخلّي «${nm}» شريك؟\nكل مسحوباته (القديمة والجديدة) هتروح على جاري الشركاء ومش هتتخصم من مرتبه.`
+      : `تشيل «${nm}» من الشركاء؟\nمسحوباته هترجع تتخصم من مرتبه في الشهور اللي لسه ماتصرفتش.`)) return;
+  PT.busy = true; ptRender();
+  const r = await sb.rpc('partner_set', { p_email: email, p_on: !!on, p_since: null });
+  PT.busy = false;
+  if(r.error){
+    alert('❌ ' + (/partner_set|PGRST202|does not exist/i.test(r.error.message || '')
+      ? 'الخدمة لسه ماتركبتش — شغّل ملف prod-hr-partners.sql' : r.error.message));
+    ptRender(); return;
+  }
+  const c = EMP_SET[email] = EMP_SET[email] || { user_email: email };
+  c.is_partner = !!on; c.partner_since = on ? '2000-01-01' : c.partner_since;
+  if(!on && PT.sel === email) PT.sel = 'all';
+  if(on) PT.sel = email;
+  await ptLoad();
+  try{ render(); }catch(e){}
+}
+
 function ptOpenForm(){
   const parts = (PT.board && PT.board.partners) || [];
   PT.form = { email: PT.sel !== 'all' ? PT.sel : ((parts[0] || {}).email || ''), kind:'deposit', dir:'in',
@@ -3456,7 +3627,22 @@ function debtRemaining(email){
 function slipDebtNoteHtml(r){
   const bits = [];
   if(r.paid && Number(r.net) < 0){
-    bits.push(`↪️ الصافي كان بالسالب — اترحّل <b>${lbMoney(-Number(r.net))}</b> ج.م دين على الشهر الجاي.`);
+    // ⚠️ (v148) الرسالة دي كانت بتقول «اترحّل» من غير ما تتأكد إن الدين
+    //    اتعمل فعلاً. الشهور اللي اتصرفت **قبل** ما ملف الديون يتركّب
+    //    الجرس ماكانش موجود ساعتها، فمافيش دين. دلوقتي بنبص في الديون الأول.
+    const ym = String(r.period || '').slice(0, 7);
+    const carried = (DEBTS[(SLIP.email || '').toLowerCase()] || [])
+      .some(d => d.source_period && String(d.source_period).slice(0, 7) === ym);
+    const c = EMP_SET[(SLIP.email || '').toLowerCase()] || {};
+    if(carried){
+      bits.push(`↪️ الصافي كان بالسالب — اترحّل <b>${lbMoney(-Number(r.net))}</b> ج.م دين على الشهر الجاي (في «💳 الديون»).`);
+    }else if(c.is_partner){
+      bits.push(`🤝 شريك — الصافي ده بالسالب عشان الكشف اتصرف والمسحوبات كانت لسه بتتخصم من المرتب.
+        <u>مفيش دين</u>. المسحوبات بقت على «جاري الشركاء». عايز الكشف يتصلّح؟ رجّع الصرف واصرفه تاني.`);
+    }else{
+      bits.push(`⚠️ الصافي كان بالسالب <b>${lbMoney(-Number(r.net))}</b> ج.م — بس <u>مااتعملش دين</u>
+        (الشهر اتصرف قبل ما ميزة الديون تتركّب). عايزه دين؟ ضيفه بإيدك من «💳 الديون».`);
+    }
   }
   const rem = debtRemaining(SLIP.email);
   if(!r.paid && rem){
@@ -4852,7 +5038,8 @@ function allPeople(){
     const e = (r.user_email||'').toLowerCase();
     if(e && out.indexOf(e) < 0) out.push(e);
   });
-  return out.sort((a,b) => nameOf(a).localeCompare(nameOf(b),'ar'));
+  return out.filter(e => !isOldEmp(e) && !isStationEmp(e))   // 👋 موظفين قدام · 🖥️ جهاز ثابت
+            .sort((a,b) => nameOf(a).localeCompare(nameOf(b),'ar'));
 }
 
 async function loadSalaries(){
@@ -5007,7 +5194,7 @@ function prCardHtml(e){
       <div class="avatar" style="background:${avatarColor(e)}">${esc(nameOf(e).charAt(0))}</div>
       <div class="card-id">
         <b>${esc(nameOf(e))}</b>
-        <span>${isAdminEmp(e) ? '🏢 إداري · ' : ''}${(EMP_SET[e] || {}).is_partner ? '🤝 شريك · ' : ''}${esc(e)}</span>
+        <span>${isAdminEmp(e) ? '🕊️ مواعيد حرة · ' : ''}${(EMP_SET[e] || {}).is_partner ? '🤝 شريك · ' : ''}${esc(e)}</span>
       </div>
     </div>
 
@@ -5185,7 +5372,7 @@ function exwEmpCard(email, aliases){
         <span class="wd-arw">${open ? '▴' : '▾'}</span>
       </button>
       ${open ? `<div class="wd-body">
-        ${c.is_partner ? `<div class="wd-note">🤝 شريك — مسحوباته من ${esc(fmtDay(c.partner_since))} بتروح على «جاري الشركاء» مش على مرتبه</div>` : ''}
+        ${c.is_partner ? `<div class="wd-note">🤝 شريك — كل مسحوباته بتروح على «جاري الشركاء» مش على مرتبه</div>` : ''}
         ${list.length
           ? list.map(dedRowHtml).join('') +
             (waived ? `<div class="wd-note">✋ ${waived} سحبة متشالة — مش داخلة في المجموع</div>` : '')

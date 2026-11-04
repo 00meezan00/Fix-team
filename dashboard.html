@@ -1465,6 +1465,8 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
     <div class="mh mh-shop">🏪 المحل</div>   <!-- mh-shop: «📥 ترتيب الاستلامات» بيتحط تحتها (intake-board-view.js) -->
     <!-- 📊 للمحاسب العام بس (٢٠٢٦-١٠-٢٧) — toggleMenu بيخفيه عن الباقي -->
     <button id="analyticsMenuBtn" class="money-menu-item" style="display:none;" onclick="openAnalytics()">📊 الملخص المالي</button>
+    <!-- 🤝 (v148) للمحاسب العام بس — بيفتح «جاري الشركاء» في hr.html (يضيف/يشيل شريك ويكتب حركات) -->
+    <button id="partnersMenuBtn" style="display:none;" onclick="location.href='hr.html#partners'">🤝 جاري الشركاء</button>
     <!-- 📒 (1/11) الحسابات للمحاسب العادي قراية بس زي المالك — التعديل للمحاسب العام بس -->
     <button class="money-menu-item" onclick="ACC_CAN_EDIT = isSuperAdmin(); openAccounts()">📒 الحسابات</button>
     <!-- 💬 للسوبر أدمن بس — syncWaHeldMenu بيظهّره ويحط عليه العدد -->
@@ -7145,6 +7147,7 @@ function toggleMenu(){
     // 📊 إحصائية ما بعد البيع — للمحاسب العام بس
     // 📊 الملخص المالي — للمحاسب العام بس (المحاسبين التانيين مابيشوفوهوش)
     try{ const anb = document.getElementById('analyticsMenuBtn'); if(anb) anb.style.display = isSuperAdmin() ? '' : 'none'; }catch(e){}
+    try{ const ptb = document.getElementById('partnersMenuBtn'); if(ptb) ptb.style.display = isSuperAdmin() ? '' : 'none'; }catch(e){}
     try{ const asb = document.getElementById('asStatsMenuBtn'); if(asb) asb.style.display = (isSuperAdmin() && typeof openAfterSaleStats === 'function') ? '' : 'none'; }catch(e){}
     // 🏭 مدير الإنتاج: مفيش «فواتير المشتريات» ولا «مراجعة قطع الغيار»
     if(isProdMgr()){ ['purMenuBtn', 'partsReviewMenuBtn'].forEach(id => { const b = document.getElementById(id); if(b) b.remove(); }); }
