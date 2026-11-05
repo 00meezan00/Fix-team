@@ -489,6 +489,7 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
   html.app-booting .topbar,
   html.app-booting #board,
   html.app-booting #approvalsHost,
+  html.app-booting #creditReqHost,
   html.app-booting #ownerHoldHost,
   html.app-booting #partsLogHost{visibility:hidden !important;}
   html.app-booting #bootVeil{display:flex !important;}
@@ -521,6 +522,7 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
   body.role-technician > .topbar,
   body.role-technician > #board,
   body.role-technician > #approvalsHost,
+  body.role-technician > #creditReqHost,
   body.role-technician > #ownerHoldHost,
   body.role-technician > #partsLogHost,
   body.role-technician > #detailOverlay,
@@ -528,6 +530,7 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
   body.role-technician > #columnOverlay,
   body.role-technician > #summariesOverlay,
   body.role-technician > #analyticsOverlay,
+  body.role-technician > #crmOverlay,
   body.role-technician > #techEvalOverlay,
   body.role-technician > #accountsOverlay,
   body.role-technician > #broadcastOverlay,
@@ -613,6 +616,7 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
             padding:11px 13px; margin:0 0 14px; font-size:13.5px; font-weight:800; line-height:1.7;}
   /* قسم الاعتمادات — بيظهر للمحاسب/الأدمن فوق الأعمدة لما يكون فيه طلبات معلّقة، وبيختفي تماماً عند صفر */
   #approvalsHost:empty{display:none;}
+  #creditReqHost:empty{display:none;}
   .appr-panel{background:var(--surface); border:1px solid #FCD34D; border-radius:16px; margin:14px 22px 0; padding:14px 16px; box-shadow:0 4px 16px rgba(180,120,20,.10);}
   .appr-panel-head{display:flex; align-items:center; gap:8px; font-family:'Cairo',sans-serif; font-weight:900; font-size:15px; color:var(--warn-strong); margin-bottom:12px;}
   .appr-count{background:#DC2626; color:#fff; font-family:'Tajawal',sans-serif; font-weight:800; font-size:12px; min-width:22px; height:22px; border-radius:11px; display:inline-flex; align-items:center; justify-content:center; padding:0 6px;}
@@ -1465,6 +1469,7 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
     <div class="mh mh-shop">🏪 المحل</div>   <!-- mh-shop: «📥 ترتيب الاستلامات» بيتحط تحتها (intake-board-view.js) -->
     <!-- 📊 للمحاسب العام بس (٢٠٢٦-١٠-٢٧) — toggleMenu بيخفيه عن الباقي -->
     <button id="analyticsMenuBtn" class="money-menu-item" style="display:none;" onclick="openAnalytics()">📊 الملخص المالي</button>
+    <button id="crmMenuBtn" class="money-menu-item" style="display:none;" onclick="openCrm()">👥 CRM — العملاء</button>
     <!-- 👥 (v148) للمحاسب العام بس — خانة واحدة بتدخله صفحة شؤون العاملين على طول.
          جواها في قايمة ⋮ مجموعة «👑 المحاسب العام»: جاري الشركاء · ابعت كروت المرتبات للمالك · رجوع -->
     <button id="hrMenuBtn" style="display:none;" onclick="location.href='hr.html'">👥 شؤون العاملين</button>
@@ -1499,6 +1504,7 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
 <div id="sysBanner" class="sys-banner hidden"></div>
 <div id="errorBar" class="error-bar hidden"></div>
 <div id="approvalsHost"></div>
+<div id="creditReqHost"></div>
 <!-- ⏸️ أجهزة المالك قال إنها لسه في الصيانة — للسوبر أدمن بس -->
 <div id="ownerHoldHost"></div>
 <div id="partsLogHost"></div>
@@ -1604,7 +1610,7 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
            الاقتراح اللي تحت بقى من عندنا، وبيملّي أحدث رقم. -->
       <label class="field"><span data-i18n="add.customerName">اسم العميل</span><input id="f_customerName" list="custNameList" autocomplete="off" oninput="onCustomerNameInput()" /></label>
       <datalist id="custNameList"></datalist>
-      <label class="field"><span>اسم المحل <b style="color:var(--danger)">*</b></span><input id="f_shopName" list="shopNameList" autocomplete="off" placeholder="اسم المحل — لو عميل قطاعي اكتب I Fix Team" oninput="autoWholesaleCheck()" /></label>
+      <label class="field"><span>اسم المحل <b style="color:var(--danger)">*</b></span><input id="f_shopName" list="shopNameList" autocomplete="off" placeholder="اسم المحل — لو عميل قطاعي اكتب Fix Team" value="Fix Team" onfocus="if(this.value==='Fix Team') this.select()" oninput="autoWholesaleCheck()" /></label>
       <div id="wsAutoHint" style="display:none;background:var(--violet-bg,#F5F3FF);color:var(--violet);border:1px solid var(--violet);border-radius:9px;padding:8px 11px;font-size:12.5px;font-weight:800;margin-bottom:10px;">🏷️ عميل جملة معروف — اتظبط تلقائي (تقدر تغيّره تحت)</div>
       <datalist id="shopNameList"></datalist>
       <!-- 🛵 المندوب = اللي جاب الجهاز للمحل (مش صاحبه). اختياري.
@@ -1846,6 +1852,17 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
       <button class="close-btn" onclick="closeAnalytics()">×</button>
     </div>
     <div id="analyticsBody" style="padding:12px 20px 40px;"></div>
+  </div>
+</div>
+
+<!-- 👥 CRM (5/11) — للمحاسب العام بس -->
+<div id="crmOverlay" class="overlay hidden" style="align-items:stretch; justify-content:stretch; padding:0; overflow-y:auto;">
+  <div class="summaries-page">
+    <div class="modal-head" style="padding:16px 20px;">
+      <h2>👥 CRM — العملاء</h2>
+      <button class="close-btn" onclick="closeCrm()">×</button>
+    </div>
+    <div id="crmBody" style="padding:12px 20px 40px;"></div>
   </div>
 </div>
 
@@ -3767,6 +3784,7 @@ function hideImportProgress(){
 function render(){
   renderBoard();
   renderApprovalsPanel();
+  try{ renderCreditReqPanel(); }catch(e){ console.warn('طلبات الآجل:', e); }
   renderOwnerHoldPanel();
   try{ syncWaHeldMenu(); }catch(e){ console.warn('مسدجات الواتساب:', e); }
   renderPartsLogPanel();
@@ -4251,6 +4269,7 @@ function cardHtml(d, s){
     ${ownerNoteCardHtml(d)}
     ${(isSuperAdmin() && isOwnerHold(d)) ? `<div class="pending-appr-chip">⏸️ المالك قال: لسه في الصيانة ومتسلّمش</div>` : ''}
     ${(isSuperAdmin() && isOwnerRej(d)) ? `<div class="pending-appr-chip">🚫 المالك قال: الجهاز ده اترفض</div>` : ''}
+    ${(crPending(d) || crPending(d, true)) ? `<div class="pending-appr-chip">⏳ آجل مستني المحاسب العام</div>` : ''}
   </div>`;
 }
 
@@ -4303,6 +4322,8 @@ const addDue = IFixDue.picker('add', {
 function openAddModal(){
   ['customerName','shopName','broughtBy','registeredBy','customerPhone','deviceType','model','deviceColor','serialNumber','reportedIssue','conditionNotes','agreedPrice']
     .forEach(id => { const _e = document.getElementById('f_'+id); if(!_e) return; _e.value = ''; if(_e.dataset) _e.dataset.autoFill = ''; });
+  // 🏪 (5/11 — تعديل مؤقت) اسم المحل بيبدأ مكتوب «Fix Team» (زبون قطاعي) — يتغيّر بس لو اللي بيسجّل كتب محل تاني
+  { const _s = document.getElementById('f_shopName'); if(_s) _s.value = 'Fix Team'; }
   document.getElementById('accountantList').innerHTML = accountantOptions();
   // 🔒 اختيارات «مين سجّل الجهاز» — واسمي مختار لوحده
   try{
@@ -5655,12 +5676,13 @@ function renderDetailNow(){
             ? `<div style="background:var(--paid-bg);color:var(--paid);border-radius:8px;padding:9px 11px;font-size:13px;font-weight:700;margin-top:9px;">
                  ✓ ${t('det.paidViaAccount')}${d.billedShop?` "${esc(d.billedShop)}"`:''} — ${t('det.settled')}
                </div>`
-            : `<div style="background:var(--warn-bg);color:var(--warn);border-radius:8px;padding:9px 11px;font-size:13px;font-weight:700;margin-top:9px;">
+            : crPending(d) ? crDetailBox(d) : `<div style="background:var(--warn-bg);color:var(--warn);border-radius:8px;padding:9px 11px;font-size:13px;font-weight:700;margin-top:9px;">
                  🕐 ${t('det.deferredPending')}${d.billedShop?` "${esc(d.billedShop)}"`:''} — ${t('det.deferredPendingHint')}
                </div>`)
         : (isPaidDevice(d)
             ? `<div style="background:var(--paid-bg);color:var(--paid);border-radius:8px;padding:9px 11px;font-size:13px;font-weight:700;margin-top:9px;">✓ ${t('det.paidCash')}</div>`
             : `<button class="btn-primary" style="box-shadow:none;background:var(--paid);margin-top:9px;"${roB} onclick="markPaid()">💵 ${t('det.confirmPay')}</button>`)}
+      ${d.paymentType !== 'deferred' ? crDetailBox(d) : ''}
     </div>` : ''}
     ${hasRet ? `
     ${retRoundsHtml(d)}
@@ -5683,11 +5705,12 @@ function renderDetailNow(){
         <button type="button" class="pay-btn"${roRMB} style="border-color:var(--success);${d.returnPaymentType!=='deferred'?'background:#16A34A;color:#fff;':'color:var(--success);background:var(--surface);'}" onclick="editReturnPayType('cash')">${t('det.payCash')}</button>
         <button type="button" class="pay-btn"${roRMB} style="border-color:var(--warn);${d.returnPaymentType==='deferred'?'background:#B45309;color:#fff;':'color:var(--warn);background:var(--surface);'}" onclick="editReturnPayType('deferred')">${t('det.payDeferred')}</button>
       </div>
-      ${d.returnPaymentType === 'deferred'
+      ${d.returnPaymentType === 'deferred' && crPending(d, true) ? crDetailBox(d, true) : d.returnPaymentType === 'deferred'
         ? `<div style="background:var(--paid-bg);color:var(--paid);border-radius:8px;padding:9px 11px;font-size:13px;font-weight:700;margin-top:9px;">✓ ${t('det.paidViaAccount')}${(d.returnBilledShop||d.billedShop)?` "${esc(d.returnBilledShop||d.billedShop)}"`:''} — ${t('det.returnSettled')}</div>`
         : (d.returnPaymentStatus === 'paid'
             ? `<div style="background:var(--paid-bg);color:var(--paid);border-radius:8px;padding:9px 11px;font-size:13px;font-weight:700;margin-top:9px;">✓ ${t('det.paidCash')}</div>`
             : `<button class="btn-primary" style="box-shadow:none;background:var(--paid);margin-top:9px;" onclick="markReturnPaid()">💵 ${t('det.confirmPay')}</button>`)}
+      ${d.returnPaymentType !== 'deferred' ? crDetailBox(d, true) : ''}
     </div>` : ''}` : ''}
     ${d.billedShop ? `<div class="detail-row"><span>${t('det.billedTo')}</span><span style="font-weight:800;color:var(--accent);">${esc(d.billedShop)}</span></div>` : ''}
     </div><!-- /money-only -->
@@ -6701,9 +6724,17 @@ async function changeStatus(newStatus, paymentChoice, rejectedInShopChoice){
       // آجل: يتقيّد على حساب المحل (لو ماتقيّدش قبل كده) ويعتبر متسوّى
       newPaymentStatus = 'paid';
       const shop = (d.billedShop || d.shopName || 'بدون محل').trim() || 'بدون محل';
+      const _had = ledger.some(e => e.type === 'debit' && e.deviceId === d.id && !e.kind);
+      // 📒 (5/11) غير المحاسب العام → طلب للمحاسب العام بدل ما يتقيّد على طول
+      //    الجهاز بيفضل «اتسلّم بانتظار الدفع» لحد ما يوافق
+      if(!_had && crNeedsReq()){
+        newPaymentStatus = 'unpaid';
+        extra.billedShop = shop;
+        extra.creditReq = crMake(shop, price);
+        historyLabel = crAskLabel(price, shop);
+      } else {
       // 🔒 المحل مقفول للآجل ومفيش موافقة؟ → مايتسلّمش آجل
-      if(!ledger.some(e => e.type === 'debit' && e.deviceId === d.id && !e.kind)
-         && !(await creditAllowed(shop, creditOkKey(d)))){ renderDetail(); return; }
+      if(!_had && !(await creditAllowed(shop, creditOkKey(d)))){ renderDetail(); return; }
       extra.billedShop = shop;
       if(!ledger.some(e => e.type === 'debit' && e.deviceId === d.id && !e.kind)){
         addLedgerDebit({...d, billedShop: shop}, price);
@@ -6711,6 +6742,7 @@ async function changeStatus(newStatus, paymentChoice, rejectedInShopChoice){
       } else {
         historyKey = 'hist.deliveredDeferredPrev'; historyVars = { shop };
       }
+      }   // 📒 /طلب الآجل
     } else if(hasPrice){
       // فوري: مستني "تأكيد الدفع" — والصفر منهم
       newPaymentStatus = isPaidDevice(d) ? 'paid' : 'unpaid';
@@ -7148,6 +7180,7 @@ function toggleMenu(){
     // 📊 إحصائية ما بعد البيع — للمحاسب العام بس
     // 📊 الملخص المالي — للمحاسب العام بس (المحاسبين التانيين مابيشوفوهوش)
     try{ const anb = document.getElementById('analyticsMenuBtn'); if(anb) anb.style.display = isSuperAdmin() ? '' : 'none'; }catch(e){}
+    try{ const crb = document.getElementById('crmMenuBtn'); if(crb) crb.style.display = isSuperAdmin() ? '' : 'none'; }catch(e){}   // 👥 (5/11)
     try{ const hrb = document.getElementById('hrMenuBtn'); if(hrb) hrb.style.display = isSuperAdmin() ? '' : 'none'; }catch(e){}
     try{ const asb = document.getElementById('asStatsMenuBtn'); if(asb) asb.style.display = (isSuperAdmin() && typeof openAfterSaleStats === 'function') ? '' : 'none'; }catch(e){}
     // 🏭 مدير الإنتاج: مفيش «فواتير المشتريات» ولا «مراجعة قطع الغيار»
@@ -7862,7 +7895,7 @@ function openScannedDevice(hit){
     el.blur();
   }
   ['columnSearch','invSearch','scanInput','accSearch'].forEach(clearSearchBox);
-  ['columnOverlay','summariesOverlay','analyticsOverlay','techEvalOverlay','accountsOverlay','printOverlay','addOverlay','staffOverlay']
+  ['columnOverlay','summariesOverlay','analyticsOverlay','crmOverlay','techEvalOverlay','accountsOverlay','printOverlay','addOverlay','staffOverlay']
     .forEach(id => { const o = document.getElementById(id); if(o) o.classList.add('hidden'); });
   gScanBuf = '';
   openDetail(hit.id);
@@ -8113,7 +8146,7 @@ function openWa(phone, msg, pendingLabel){
 }
 
 // ============================================================
-// 💬 مسدجات الواتساب المتوقفة (أجهزة المالك اللي اتقيّدت آجل)
+// 💬 مسدجات الواتساب المتوقفة (أجهزة المالك + 📒 (5/11) كل جهاز اتقيّد آجل من الداشبورد)
 // ------------------------------------------------------------
 // 🧠 بالبلدي:
 //    المالك بيقيّد أجهزة آجل كتير من صفحته. مش عايزين الواتس يفتحله
@@ -8141,21 +8174,6 @@ function isWaHeld(d){
   return !!at && at >= new Date(SHOP_NOTICE_FROM).getTime();
 }
 
-// 🆕 الترتيب: **الأقدم دخولاً للحساب الأول**.
-//    🧠 ليه؟ كل رسالة فيها «إجمالي الحساب وقت ما الجهاز ده دخل».
-//       لو بعت الأحدث الأول وبعدين الأقدم، المحل هيشوف الرقم بيقل
-//       بدل ما يزيد — ويفتكر فيه غلط.
-function waHeldTime(d){
-  const e = ledger.find(x => x.type === 'debit' && x.deviceId === d.id && !x.kind);
-  return new Date((e && e.date) || (d.ownerPriced && d.ownerPriced.at) || 0).getTime();
-}
-function waHeldList(){
-  if(!isSuperAdmin()) return [];
-  return devices.filter(isWaHeld)
-    .sort((a,b) => waHeldTime(a) - waHeldTime(b));
-}
-
-// القيد اللي المالك عمله — ولو مش لاقيينه (الدفتر لسه بيتحمّل) بنبنيه من الجهاز
 function waHeldItem(d){
   const e = ledger.find(x => x.type === 'debit' && x.deviceId === d.id && !x.kind);
   const shop = ((e && e.shop) || d.billedShop || d.shopName || '').trim();
@@ -8193,30 +8211,78 @@ function openWaHeld(){
 }
 function closeWaHeld(){ const ov = document.getElementById('waHeldOv'); if(ov) ov.remove(); }
 
+// ============================================================
+// 📒 (5/11) الطابور بقى لكل جهاز يدخل حساب محل — مش المالك بس
+// ------------------------------------------------------------
+// 🧸 أي جهاز يتقيّد من الداشبورد (المحاسب العام بنفسه، أو بعد ما يوافق
+//    على طلب آجل) القيد بتاعه بيتعلّم heldNotice = true، ورسالته بتقف هنا
+//    بدل ما الواتس يفتح. + أجهزة المالك زي زمان (isWaHeld).
+//    كل رسالة = سطر (القيد). «ابعت/تجاهل» بيتعلّم على الجهاز في
+//    shopNoticeDone[رقم القيد] — والمالك القديم في shopNoticeAt زي زمان.
+// 🔢 الترتيب: بوقت دخول القيد للحساب — الأقدم الأول.
+// ============================================================
+function waHeldTimeOf(x){
+  return new Date((x.entry && x.entry.date) || (x.d && x.d.ownerPriced && x.d.ownerPriced.at) || 0).getTime();
+}
+function waHeldList(){
+  if(!isSuperAdmin()) return [];
+  const byId = {}; devices.forEach(d => { if(d) byId[d.id] = d; });
+  const out = [], seen = new Set();
+  (ledger || []).forEach(e => {
+    if(!e || !e.heldNotice) return;
+    // ⚠️ لسه ما اتأكدش إنه على السيرفر؟ مايتبعتش للمحل لحد ما يتحفظ
+    if(typeof _ledgerServerIds !== 'undefined' && !_ledgerServerIds.has(String(e.id))) return;
+    // 💵🏷️ (5/11) دفعة أو خصم — مالهمش جهاز، العلامة على القيد نفسه (noticeDone)
+    if(e.type === 'credit' || e.type === 'discount'){
+      if(e.noticeDone) return;
+      out.push({ key: String(e.id), d: null, entry: e, shop: String(e.shop || '').trim(), inLedger: true, money: true });
+      return;
+    }
+    if(e.type !== 'debit' || !e.deviceId) return;
+    const d = byId[e.deviceId];
+    if(!d || d.status === 'trashed') return;
+    if((d.shopNoticeDone || {})[e.id]) return;
+    out.push({ key: String(e.id), d, entry: e, shop: String(e.shop || '').trim(), inLedger: true });
+    seen.add(String(e.id));
+  });
+  devices.filter(isWaHeld).forEach(d => {
+    const it = waHeldItem(d);
+    if(it.inLedger && seen.has(String(it.entry.id))) return;
+    out.push({ key: 'own:' + d.id, d, entry: it.entry, shop: it.shop, inLedger: it.inLedger, owner: true });
+  });
+  // التعادل في الوقت: الدفتر بيحط الجديد في الأول، فاللي مكانه أبعد هو الأقدم (زي shopBalanceAt)
+  const ix = x => { const i = (ledger || []).indexOf(x.entry); return i < 0 ? -1 : i; };
+  return out.sort((a,b) => (waHeldTimeOf(a) - waHeldTimeOf(b)) || (ix(b) - ix(a)));
+}
+function waHeldShopKey(shop){ try{ return accShopOf(shop); }catch(e){ return shop; } }   // 🪪 المحل بكل أساميه
+
 function renderWaHeld(){
   const ov = document.getElementById('waHeldOv');
   if(!ov) return;
   const list = waHeldList();
-  // ترتيب كل جهاز جوه محله: «١ من ٣» — عشان تبعت بالترتيب
+  // ترتيب كل رسالة جوه محلها: «١ من ٣» — عشان تبعت بالترتيب
   const perShop = {}, seq = {};
-  list.forEach(d => { const sh = waHeldItem(d).shop; perShop[sh] = (perShop[sh] || 0) + 1; seq[d.id] = perShop[sh]; });
-  const rows = list.map(d => {
-    const { entry, shop, inLedger } = waHeldItem(d);
+  list.forEach(x => { const k = waHeldShopKey(x.shop); perShop[k] = (perShop[k] || 0) + 1; seq[x.key] = perShop[k]; });
+  const rows = list.map(x => {
+    if(x.money) return waHeldMoneyRow(x, perShop, seq);   // 💵🏷️ دفعة / خصم
+    const { d, entry, shop, inLedger } = x;
+    const k = waHeldShopKey(shop);
     const balAt = inLedger ? shopBalanceAt(shop, entry) : null;
-    const ord = perShop[shop] > 1 ? `<b style="color:#0891A8;">#${seq[d.id]} من ${perShop[shop]}</b> · ` : '';
-    const p = d.ownerPriced || {};
+    const ord = perShop[k] > 1 ? `<b style="color:#0891A8;">#${seq[x.key]} من ${perShop[k]}</b> · ` : '';
     let when = '';
-    try{ when = p.at ? new Date(p.at).toLocaleString(getLocale()) : ''; }catch(e){}
+    try{ const t0 = waHeldTimeOf(x); when = t0 ? new Date(t0).toLocaleString(getLocale()) : ''; }catch(e){}
+    const src = x.owner ? '👤 المالك' : (entry.by ? '✍️ ' + esc(entry.by) : '');
     const hasPh = !!shopPhoneOf(shop);
+    const keyJs = esc(x.key).replace(/'/g, "\\'");
     return `<div class="appr-row">
       <div class="appr-row-info" style="cursor:pointer;" onclick="closeWaHeld();openDetail('${d.id}')">
-        <div class="appr-row-dev">📱 ${esc(d.deviceType || '')} ${esc(d.model || '')}${d.customerName ? ' — ' + esc(d.customerName) : ''}</div>
-        <div class="appr-row-meta">${ord}🏬 ${esc(shop || 'من غير محل')} · 💰 ${(Number(entry.amount)||0).toLocaleString('en-EG')} ج.م${when ? ' · ' + esc(when) : ''}${shopGroupOf(shop) ? ' · 👥 له جروب' : ''}${(hasPh || shopGroupOf(shop)) ? '' : ' · <b style="color:var(--warn);">مفيش رقم ولا جروب للمحل</b>'}</div>
+        <div class="appr-row-dev">📱 ${esc(d.deviceType || '')} ${esc(d.model || '')}${d.customerName ? ' — ' + esc(d.customerName) : ''}${entry.kind === 'return' ? ' <span style="color:var(--violet);font-weight:800;">(مرتجع)</span>' : ''}</div>
+        <div class="appr-row-meta">${ord}🏬 ${esc(shop || 'من غير محل')} · 💰 ${(Number(entry.amount)||0).toLocaleString('en-EG')} ج.م${when ? ' · ' + esc(when) : ''}${src ? ' · ' + src : ''}${shopGroupOf(shop) ? ' · 👥 له جروب' : ''}${(hasPh || shopGroupOf(shop)) ? '' : ' · <b style="color:var(--warn);">مفيش رقم ولا جروب للمحل</b>'}</div>
         ${balAt !== null ? `<div class="appr-row-meta">📒 إجمالي الحساب وقتها: <b>${balAt.toLocaleString('en-EG')} ج.م</b></div>` : ''}
       </div>
       <div class="appr-row-actions" style="display:flex;gap:6px;flex-wrap:wrap;">
-        <button class="oh-btn" style="background:#16A34A;" onclick="event.stopPropagation();waHeldSend('${d.id}')">💬 ابعت</button>
-        <button class="oh-btn oh-cancel" onclick="event.stopPropagation();waHeldSkip('${d.id}')">تجاهل</button>
+        <button class="oh-btn" style="background:#16A34A;" onclick="event.stopPropagation();waHeldSend('${keyJs}')">💬 ابعت</button>
+        <button class="oh-btn oh-cancel" onclick="event.stopPropagation();waHeldSkip('${keyJs}')">تجاهل</button>
       </div>
     </div>`;
   }).join('');
@@ -8226,39 +8292,88 @@ function renderWaHeld(){
       <button class="acc-mini-btn" style="margin:0;" onclick="closeWaHeld()">✕</button>
     </div>
     <div style="font-size:12.5px;color:var(--muted);margin-bottom:12px;line-height:1.7;">
-      أجهزة المالك قيّدها آجل على حساب محل. دوس «ابعت» واختار: 📞 رقم المحل · 👥 جروب المحل · 📤 قايمة المشاركة.
+      كل جهاز اتقيّد آجل، وكل دفعة وخصم على حساب محل — مترتبين بالوقت من الأقدم للأحدث. ابعتهم بالدور.
+      دوس «ابعت» واختار: 📞 رقم المحل · 👥 جروب المحل · 📤 قايمة المشاركة.
     </div>
     ${list.length ? rows : `<div class="empty-col">✅ مفيش رسايل مستنية</div>`}
   </div>`;
 }
 
+// 💵🏷️ (5/11) سطر دفعة أو خصم في الطابور — الرصيد = لحظة القيد ده
+function waHeldMoneyRow(x, perShop, seq){
+  const { entry, shop } = x;
+  const k = waHeldShopKey(shop);
+  const bal = shopBalanceAt(shop, entry);
+  const ord = perShop[k] > 1 ? `<b style="color:#0891A8;">#${seq[x.key]} من ${perShop[k]}</b> · ` : '';
+  let when = ''; try{ when = new Date(entry.date).toLocaleString(getLocale()); }catch(e){}
+  const isDisc = entry.type === 'discount';
+  const hasPh = !!shopPhoneOf(shop);
+  const keyJs = esc(x.key).replace(/'/g, "\\'");
+  return `<div class="appr-row">
+    <div class="appr-row-info">
+      <div class="appr-row-dev"><span class="appr-row-kind" style="${isDisc ? 'background:#F5EEFC;color:#9333EA;' : 'background:#EAF6EE;color:#16A34A;'}">${isDisc ? '🏷️ خصم' : '💵 دفعة'}</span>🏬 ${esc(shop || 'من غير محل')}</div>
+      <div class="appr-row-meta">${ord}💰 ${(Number(entry.amount)||0).toLocaleString('en-EG')} ج.م${when ? ' · ' + esc(when) : ''}${entry.by ? ' · ✍️ ' + esc(entry.by) : ''}${entry.note ? ' · 📝 ' + esc(entry.note) : ''}${shopGroupOf(shop) ? ' · 👥 له جروب' : ''}${(hasPh || shopGroupOf(shop)) ? '' : ' · <b style="color:var(--warn);">مفيش رقم ولا جروب للمحل</b>'}</div>
+      <div class="appr-row-meta">📒 الرصيد بعدها: <b>${bal.toLocaleString('en-EG')} ج.م</b></div>
+    </div>
+    <div class="appr-row-actions" style="display:flex;gap:6px;flex-wrap:wrap;">
+      <button class="oh-btn" style="background:#16A34A;" onclick="event.stopPropagation();waHeldSend('${keyJs}')">💬 ابعت</button>
+      <button class="oh-btn oh-cancel" onclick="event.stopPropagation();waHeldSkip('${keyJs}')">تجاهل</button>
+    </div>
+  </div>`;
+}
+
 // ⚠️ الواتس بيتفتح **الأول** وبعدين الحفظ — عشان على الكمبيوتر
 //    المتصفح مبيسمحش يفتح تاب جديد غير في نفس لحظة الضغطة.
-async function waHeldSend(id){
-  const d = devices.find(x => x.id === id);
-  if(!d || !isWaHeld(d)){ renderWaHeld(); return; }
-  const { entry, shop, inLedger } = waHeldItem(d);
+async function waHeldSend(key){
+  const list = waHeldList();
+  const x = list.find(y => y.key === key);
+  if(!x){ renderWaHeld(); return; }
+  const { entry, d, shop, inLedger } = x;
   if(!shop){ alert('الجهاز ده مالوش اسم محل.'); return; }
-  // ⚠️ فيه جهاز أقدم لنفس المحل لسه مستني؟ نحذّرك — عشان الرقم عند المحل ما يقلّش
-  const older = waHeldList().filter(x => x.id !== id && waHeldItem(x).shop === shop && waHeldTime(x) < waHeldTime(d));
-  if(older.length && !confirm('فيه ' + older.length + ' جهاز أقدم لنفس المحل لسه ما اتبعتش.\n\n'
+  // ⚠️ فيه رسالة أقدم لنفس المحل لسه مستنية؟ نحذّرك — عشان الرقم عند المحل ما يقلّش
+  const k = waHeldShopKey(shop), tX = waHeldTimeOf(x);
+  const older = list.filter(y => y.key !== key && waHeldShopKey(y.shop) === k && waHeldTimeOf(y) < tX);
+  if(older.length && !confirm('فيه ' + older.length + ' رسالة أقدم لنفس المحل لسه ما اتبعتتش.\n\n'
       + 'لو بعت ده الأول، المحل هيشوف إجمالي الحساب في الرسالة الجاية أقل من دي.\n\nتبعت ده برضه؟')) return;
   // 🚪 البوابة (المحاسب العام): رقم · جروب · قايمة المشاركة
-  const ok = await sendShopMsg(shop, shopNoticeMsg([{ entry, d }], shop, inLedger ? entry : null), '💬 اضغط لإرسال رسالة الحساب للمحل');
+  const msg = x.money
+    ? paymentNoticeMsg(shop, entry.amount, shopBalanceAt(shop, entry), entry.date, entry.type)   // 💵🏷️
+    : shopNoticeMsg([{ entry, d }], shop, inLedger ? entry : null);
+  const ok = await sendShopMsg(shop, msg, '💬 اضغط لإرسال رسالة الحساب للمحل');
   if(!ok) return;                      // اتلغى أو النت مقطوع — منعلّمش إنه اتبعت
-  await waHeldMark(id, 'sent');
+  await waHeldMark(key, 'sent');
 }
 
-async function waHeldSkip(id){
+async function waHeldSkip(key){
   if(!confirm('تتجاهل الرسالة دي؟ مش هتتبعت للمحل، والجهاز هيختفي من القايمة.')) return;
-  await waHeldMark(id, 'skipped');
+  await waHeldMark(key, 'skipped');
 }
 
-async function waHeldMark(id, how){
+async function waHeldMark(key, how){
   const now = new Date().toISOString();
-  devices = devices.map(x => x.id === id
-    ? { ...x, shopNoticeAt: now, shopNoticeBy: currentUser.name, shopNoticeHow: how }
-    : x);
+  const x = waHeldList().find(y => y.key === key);
+  if(!x) return;
+  if(x.money){
+    // 💵🏷️ العلامة على القيد نفسه (مفيش جهاز) — بتتحفظ كتعديل للسطر في الدفتر
+    ledger = ledger.map(e => e.id === x.entry.id ? { ...e, noticeDone: { at: now, by: currentUser.name, how } } : e);
+    render();
+    await persistLedger();
+    try{ renderAccounts(); }catch(e){}
+    if(document.getElementById('waHeldOv')) renderWaHeld();
+    return;
+  }
+  const id = x.d.id;
+  const mark = { at: now, by: currentUser.name, how };
+  devices = devices.map(d => {
+    if(d.id !== id) return d;
+    const upd = { ...d };
+    if(x.inLedger && x.entry && x.entry.id) upd.shopNoticeDone = { ...(d.shopNoticeDone || {}), [x.entry.id]: mark };
+    // المالك (أو القيد الأصلي) → العلامة القديمة كمان، عشان isWaHeld يشيله
+    if(x.owner || !x.entry || x.entry.kind !== 'return'){
+      if(x.owner || !d.shopNoticeAt) Object.assign(upd, { shopNoticeAt: now, shopNoticeBy: currentUser.name, shopNoticeHow: how });
+    }
+    return upd;
+  });
   render();
   await persist();
 }
@@ -8677,7 +8792,11 @@ async function editPayType(t){
   const d = devices.find(x => x.id === selectedId);
   if(!d) return;
   const price = parseInt(d.agreedPrice) || 0;
-  if(t === d.paymentType && (t !== 'deferred' || isPaidDevice(d))) return;   // مفيش تغيير
+  if(t === d.paymentType && (t !== 'deferred' || isPaidDevice(d))){
+    // 📒 (5/11) آجل ومستني المحاسب العام؟ نفس الدوسة مالهاش لازمة
+    if(t === 'deferred' && crPending(d)) alert('⏳ الجهاز ده مستني موافقة المحاسب العام على الآجل خلاص.');
+    if(t !== 'deferred' || crPending(d) || d.status !== 'delivered') return;
+  }
 
   let extra = { paymentType: t, lastModifiedAt: new Date().toISOString(), lastModifiedBy: currentUser.name };
   let note = null; let noteKey = null; let noteVars = null;
@@ -8687,9 +8806,17 @@ async function editPayType(t){
     if(!isPriced(d) || price <= 0){ alert(t('msg.needPriceForCredit')); return; }
     const shop = (d.billedShop || d.shopName || '').trim();
     if(!shop){ alert(t('msg.needShopForCredit')); return; }
-    if(!(await creditAllowed(shop, creditOkKey(d)))){ renderDetail(); return; }   // 🔒
+    const _req = d.status === 'delivered' && crNeedsReq();   // 📒 (5/11) طلب للمحاسب العام
+    if(_req) await ledgerRefresh();
+    const _had0 = ledger.some(e => e.type === 'debit' && e.deviceId === d.id && !e.kind);
+    if(!(_req && !_had0) && !(await creditAllowed(shop, creditOkKey(d)))){ renderDetail(); return; }   // 🔒
     extra.billedShop = shop;
-    if(d.status === 'delivered'){
+    if(_req && !_had0){
+      // 📒 اتسلّم خلاص بس مش المحاسب العام → طلب، والجهاز بيفضل بانتظار الدفع
+      extra.paymentStatus = 'unpaid';
+      extra.creditReq = crMake(shop, price);
+      note = crAskLabel(price, shop); noteKey = null; noteVars = null;
+    } else if(d.status === 'delivered'){
       // اتسلّم خلاص → يتقيّد على حساب المحل دلوقتي ويعتبر متسوّى
       await ledgerRefresh();   // 📒 الطازة الأول (شوف changeStatus)
       if(!ledger.some(e => e.type === 'debit' && e.deviceId === d.id && !e.kind)){
@@ -8713,6 +8840,9 @@ async function editPayType(t){
     }
     extra.paymentStatus = 'unpaid';   // مستني "تأكيد الدفع"
     note = null; noteKey = had ? 'hist.toCashRemoved' : 'hist.toCash';
+    // 📒 (5/11) كان فيه طلب آجل مستني → اتلغى
+    if(crPending(d)){ extra.creditReq = { ...d.creditReq, state:'cancelled', decidedAt:new Date().toISOString(), decidedBy:currentUser.name };
+      noteKey = null; note = '↩️ اتحوّل فوري — طلب الآجل للمحاسب العام اتلغى'; }
   }
 
   devices = devices.map(x => x.id === selectedId
@@ -8741,7 +8871,18 @@ async function editPrice(value){
 
   // تسعير جهاز متسلّم بالفعل ومحدد عليه آجل → يتقيّد على حساب المحل فوراً
   // (لو لسه في المحل، القيد بيستنى لحد التسليم)
-  if(price && d.paymentType === 'deferred' && d.status === 'delivered' && !isPaidDevice(d)){
+  if(price && d.paymentType === 'deferred' && d.status === 'delivered' && !isPaidDevice(d) && crPending(d)){
+    // 📒 (5/11) مستني المحاسب العام → بنحدّث المبلغ اللي في الطلب بس (هو بيقيّد بالسعر وقت الموافقة)
+    extra.creditReq = { ...d.creditReq, amount: parseInt(price) };
+  } else if(price && d.paymentType === 'deferred' && d.status === 'delivered' && !isPaidDevice(d) && crNeedsReq()
+            && !ledger.some(e => e.type === 'debit' && e.deviceId === d.id && !e.kind)){
+    const shop = (d.billedShop || d.shopName || '').trim();
+    if(shop){
+      extra.billedShop = shop;
+      extra.creditReq = crMake(shop, parseInt(price));
+      histEntry = { status:d.status, label: crAskLabel(parseInt(price), shop), date:new Date().toISOString(), by: currentUser.name };
+    }
+  } else if(price && d.paymentType === 'deferred' && d.status === 'delivered' && !isPaidDevice(d)){
     await ledgerRefresh();   // 📒 الطازة الأول (شوف changeStatus)
     const shop = (d.billedShop || d.shopName || '').trim();
     // 🔒 المحل مقفول للآجل ومفيش موافقة؟ → السعر مايتحفظش (حوّله فوري الأول)
@@ -9266,6 +9407,184 @@ async function saveShareOwner(){
   }
 }
 
+// ============================================================
+// 📒 (5/11 · تعديل مؤقت على الإنتاج) طلبات الآجل للمحاسب العام
+// ------------------------------------------------------------
+// 🧸 بالبلدي: حساب المحل «كشكول». زمان أي حد يسلّم جهاز آجل كان
+//    بيكتب في الكشكول على طول. دلوقتي:
+//      • الاستقبال / مدير الإنتاج → بيكتب «ورقة طلب» على الجهاز
+//        (creditReq — والمرتجع returnCreditReq). الجهاز بيفضل
+//        «اتسلّم بانتظار الدفع» ومكتوب عليه «⏳ مستني المحاسب العام».
+//      • المحاسب العام → بيشوف الطلبات في لوحة فوق:
+//          ✅ قيّد  = يتكتب في الكشكول والجهاز يبقى «اتدفع»
+//          🚫 رفض   = الجهاز يرجع «فوري» ومستني الفلوس (السبب اختياري)
+//      • المحاسب العام نفسه لما يحدد آجل → على الكشكول على طول (زي زمان).
+//      • المالك → زي ما هو (على الحساب على طول، ومابيبعتش رسالة).
+//    وفي كل الحالات رسالة المحل **مابتفتحش واتساب** — بتقف في الطابور
+//    في «💬 مسدجات الواتساب المتوقفة» بالترتيب (الأقدم دخولاً للحساب الأول).
+//
+// 📍 الطلب: { state: pending|approved|rejected|cancelled, shop, amount,
+//            round (المرتجع), at, by, byEmail, decidedAt, decidedBy, note }
+//    المحاسب العام بيقيّد بالسعر والمحل **وقت الموافقة** (لو حد عدّلهم وهو مستني).
+// ============================================================
+function crNeedsReq(){ return !isSuperAdmin(); }
+function crReqOf(d, isRet){ return d ? (isRet ? d.returnCreditReq : d.creditReq) : null; }
+function crPending(d, isRet){
+  const r = crReqOf(d, isRet);
+  if(!r || r.state !== 'pending') return false;
+  if(!isRet) return d.paymentType === 'deferred' && !isPaidDevice(d);
+  return d.returnPaymentType === 'deferred' && d.returnPaymentStatus !== 'paid' && r.round === retRoundNo(d);
+}
+function crMake(shop, amount, round){
+  const r = { state:'pending', shop: String(shop || '').trim(), amount: Number(amount) || 0,
+              at: new Date().toISOString(), by: currentUser.name, byEmail: currentUser.email || '' };
+  if(round) r.round = round;
+  return r;
+}
+function crAskLabel(amount, shop, isRet){
+  return '📒 ' + (isRet ? 'المرتجع ' : '') + 'آجل — اتبعت طلب للمحاسب العام يقيّد '
+    + (Number(amount) || 0).toLocaleString('en-EG') + ' ج.م على حساب "' + shop + '" — بانتظار موافقته';
+}
+// صندوق في التفاصيل تحت طريقة الدفع
+function crDetailBox(d, isRet){
+  const r = crReqOf(d, isRet);
+  if(!r) return '';
+  const when = x => { try{ return x ? new Date(x).toLocaleString(getLocale()) : ''; }catch(e){ return ''; } };
+  if(crPending(d, isRet)){
+    return `<div style="background:var(--warn-bg);color:var(--warn);border-radius:8px;padding:9px 11px;font-size:13px;font-weight:700;margin-top:9px;line-height:1.7;">
+      ⏳ ${isRet ? 'المرتجع ' : ''}مستني موافقة المحاسب العام يقيّده على حساب "${esc(r.shop || '')}"
+      <div style="font-size:12px;font-weight:600;opacity:.9;">طلبه ${esc(r.by || '')} · ${esc(when(r.at))} — لحد ما يوافق الجهاز «بانتظار الدفع»</div>
+      ${isSuperAdmin() ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:7px;">
+        <button class="appr-btn-yes" onclick="crApprove('${d.id}',${isRet ? 'true' : 'false'})">✅ قيّد على الحساب</button>
+        <button class="appr-btn-no" onclick="crReject('${d.id}',${isRet ? 'true' : 'false'})">🚫 رفض</button></div>` : ''}
+    </div>`;
+  }
+  // آخر رفض — بيبان طول ما الجهاز لسه «فوري» ومادفعش
+  const stillCash = isRet ? (d.returnPaymentType !== 'deferred' && d.returnPaymentStatus !== 'paid' && r.round === retRoundNo(d))
+                          : (d.paymentType !== 'deferred' && !isPaidDevice(d));
+  if(r.state === 'rejected' && stillCash){
+    return `<div style="background:#FDECEC;color:#B42318;border-radius:8px;padding:9px 11px;font-size:13px;font-weight:700;margin-top:9px;line-height:1.7;">
+      🚫 المحاسب العام رفض ${isRet ? 'آجل المرتجع' : 'الآجل'} على "${esc(r.shop || '')}"${r.note ? ' — ' + esc(r.note) : ''}
+      <div style="font-size:12px;font-weight:600;opacity:.9;">${esc(r.decidedBy || '')} · ${esc(when(r.decidedAt))} — رجع فوري ومستني الفلوس</div>
+    </div>`;
+  }
+  return '';
+}
+
+// كل الطلبات المستنية — الأقدم الأول
+function crPendingList(){
+  const out = [];
+  devices.forEach(d => {
+    if(!d || d.status === 'trashed') return;
+    if(crPending(d))       out.push({ d, isRet:false, r:d.creditReq });
+    if(crPending(d, true)) out.push({ d, isRet:true,  r:d.returnCreditReq });
+  });
+  return out.sort((a,b) => new Date(a.r.at || 0) - new Date(b.r.at || 0));
+}
+function crCurShop(d, isRet){
+  return String((isRet ? (d.returnBilledShop || d.billedShop || d.shopName) : (d.billedShop || d.shopName)) || '').trim();
+}
+function crCurPrice(d, isRet){ return parseInt(isRet ? d.returnPrice : d.agreedPrice) || 0; }
+
+// 📋 اللوحة فوق — للمحاسب العام بس
+function creditReqPanelHtml(){
+  if(!isSuperAdmin()) return '';
+  const list = crPendingList();
+  if(!list.length) return '';
+  const rows = list.map(({ d, isRet, r }) => {
+    const shop = crCurShop(d, isRet), price = crCurPrice(d, isRet);
+    let when = ''; try{ when = new Date(r.at).toLocaleString(getLocale()); }catch(e){}
+    return `<div class="appr-row">
+      <div class="appr-row-info" style="cursor:pointer;" onclick="openDetail('${d.id}')">
+        <div class="appr-row-dev"><span class="appr-row-kind" style="background:#FEF3C7;color:#B45309;">📒 ${isRet ? 'آجل مرتجع' : 'آجل'}</span>📱 ${esc(d.deviceType || '')} ${esc(d.model || '')}${d.customerName ? ' — ' + esc(d.customerName) : ''}</div>
+        <div class="appr-row-meta">🏬 ${esc(shop || 'من غير محل')} · 💰 ${price.toLocaleString('en-EG')} ج.م</div>
+        <div class="appr-row-meta">${t('appr.logReqBy')} ${esc(r.by || '')} · ${esc(when)}</div>
+      </div>
+      <div class="appr-row-actions">
+        <button class="appr-btn-yes" onclick="event.stopPropagation();crApprove('${d.id}',${isRet})">✅ قيّد</button>
+        <button class="appr-btn-no" onclick="event.stopPropagation();crReject('${d.id}',${isRet})">🚫 رفض</button>
+      </div>
+    </div>`;
+  }).join('');
+  return `<div class="appr-panel">
+    <div class="appr-panel-head">📒 طلبات آجل على حساب محل <span class="appr-count">${list.length}</span></div>
+    <div style="font-size:12px;color:var(--muted);margin:-6px 0 10px;line-height:1.7;">بعد «قيّد» الجهاز بيدخل حساب المحل، ورسالته بتستنى في «💬 مسدجات الواتساب المتوقفة».</div>
+    ${rows}
+  </div>`;
+}
+function renderCreditReqPanel(){
+  const host = document.getElementById('creditReqHost');
+  if(host) host.innerHTML = creditReqPanelHtml();
+}
+
+let _crBusy = false;
+// ✅ المحاسب العام وافق → يتكتب في الكشكول بالسعر والمحل اللي على الجهاز دلوقتي
+async function crApprove(id, isRet){
+  if(!isSuperAdmin()){ showError('الموافقة للمحاسب العام بس'); return; }
+  if(_crBusy) return;
+  if(!isOnline()){ alert('محتاج نت عشان تقيّد على حساب محل.'); return; }
+  _crBusy = true;
+  try{
+    await ledgerRefresh();   // 📒 الطازة الأول
+    const d = devices.find(x => x.id === id);
+    if(!d || !crPending(d, isRet)){ render(); return; }
+    const shop = crCurShop(d, isRet), price = crCurPrice(d, isRet);
+    if(!shop || shop === 'بدون محل'){ alert(t('msg.needShopForCredit')); return; }
+    if(price <= 0){ alert(t('msg.needPriceForCredit')); return; }
+    if(!(await creditAllowed(shop, creditOkKey(d, isRet)))) return;   // 👑 بيسجّل التصريح لو المحل مقفول
+    const now = new Date().toISOString();
+    const had = isRet ? !!curReturnEntry(d) : ledger.some(e => e.type === 'debit' && e.deviceId === d.id && !e.kind);
+    if(!had){
+      if(isRet) addLedgerDebit({ ...d, billedShop: shop }, price, { kind: 'return', retRound: retRoundNo(d), issue: (d.discoveredFault || d.returnComplaint || '') });
+      else      addLedgerDebit({ ...d, billedShop: shop }, price);
+    }
+    const r = crReqOf(d, isRet);
+    const done = { ...r, state:'approved', decidedAt: now, decidedBy: currentUser.name, approvedShop: shop, approvedAmount: price };
+    const label = '✅ المحاسب العام وافق: ' + (isRet ? 'المرتجع ' : '') + 'اتقيّد ' + price.toLocaleString('en-EG')
+      + ' ج.م على حساب "' + shop + '"' + (r.by ? ' (طلب ' + r.by + ')' : '');
+    devices = devices.map(x => x.id === id
+      ? { ...x,
+          ...(isRet ? { returnPaymentStatus:'paid', returnBilledShop: shop, returnCreditReq: done }
+                    : { paymentStatus:'paid', billedShop: shop, creditReq: done }),
+          lastModifiedAt: now, lastModifiedBy: currentUser.name,
+          statusHistory: [...(x.statusHistory || []), { status: x.status, label, date: now, by: currentUser.name }] }
+      : x);
+    if(selectedId === id) renderDetail();
+    render();
+    await persist();
+    flushShopNotices();   // 💬 → المسدجات المتوقفة
+    const u = devices.find(x => x.id === id); if(u) syncTrack(u);
+  }catch(e){
+    console.error('crApprove:', e);
+    showError('فشل التقييد: ' + (e.message || e));
+  }finally{ _crBusy = false; }
+}
+
+// 🚫 رفض → الجهاز يرجع فوري ومستني الفلوس. السبب اختياري.
+async function crReject(id, isRet){
+  if(!isSuperAdmin()){ showError('الرفض للمحاسب العام بس'); return; }
+  const d0 = devices.find(x => x.id === id);
+  if(!d0 || !crPending(d0, isRet)){ render(); return; }
+  const note = prompt('🚫 رفض ' + (isRet ? 'آجل المرتجع' : 'الآجل') + ' — الجهاز هيرجع «فوري» ومستني الفلوس.\n\nالسبب (اختياري — سيبه فاضي لو مفيش):', '');
+  if(note === null) return;   // داس إلغاء
+  const now = new Date().toISOString();
+  const r = crReqOf(d0, isRet);
+  const done = { ...r, state:'rejected', decidedAt: now, decidedBy: currentUser.name, note: String(note).trim() };
+  const label = '🚫 المحاسب العام رفض ' + (isRet ? 'آجل المرتجع' : 'الآجل') + ' على "' + (r.shop || '') + '"'
+    + (done.note ? ' — ' + done.note : '') + ' — رجع فوري ومستني الدفع';
+  devices = devices.map(x => x.id === id
+    ? { ...x,
+        ...(isRet ? { returnPaymentType:'cash', returnPaymentStatus:'unpaid', returnCreditReq: done }
+                  : { paymentType:'cash', paymentStatus:'unpaid', creditReq: done }),
+        lastModifiedAt: now, lastModifiedBy: currentUser.name,
+        statusHistory: [...(x.statusHistory || []), { status: x.status, label, date: now, by: currentUser.name }] }
+    : x);
+  if(selectedId === id) renderDetail();
+  render();
+  await persist();
+  const u = devices.find(x => x.id === id); if(u) syncTrack(u);
+}
+
 function addLedgerDebit(d, price, opts){
   opts = opts || {};
   const entry = {
@@ -9283,7 +9602,9 @@ function addLedgerDebit(d, price, opts){
     // 🛵 نسخة من اسم المندوب — لو الجهاز اتمسح بعدين، الكشف يفضل فاكره
     broughtBy: String(d.broughtBy || '').trim(),
     date: new Date().toISOString(),
-    by: currentUser.name
+    by: currentUser.name,
+    // 📒 (5/11) رسالته بتستنى في «مسدجات الواتساب المتوقفة» بدل ما الواتس يفتح
+    heldNotice: true
   };
   if(opts.kind) entry.kind = opts.kind;   // 'return' = قيد حساب المرتجع، منفصل عن قيد الأصلي
   if(opts.retRound) entry.retRound = opts.retRound;   // رقم جولة المرتجع (١ = أول رجوع) — شوف curReturnEntry
@@ -9359,9 +9680,11 @@ function shopNoticeMsg(items, shop, asOf){
     return n + (d.customerName ? ` (${d.customerName})` : '') + (entry.kind === 'return' ? ' — صيانة مرتجع' : '');
   };
   const sum = items.reduce((t, x) => t + (Number(x.entry.amount) || 0), 0);
+  // 📒 (5/11) الرسالة ممكن تستنى أيام في الطابور → اليوم = يوم دخول الجهاز الحساب، مش يوم الإرسال
+  const _d0 = (asOf && asOf.date && !isNaN(new Date(asOf.date))) ? new Date(asOf.date) : new Date();
   let day = '';
-  try{ day = new Date().toLocaleDateString('ar-EG', { weekday:'long', year:'numeric', month:'long', day:'numeric' }); }
-  catch(e){ day = new Date().toLocaleDateString('ar-EG'); }
+  try{ day = _d0.toLocaleDateString('ar-EG', { weekday:'long', year:'numeric', month:'long', day:'numeric' }); }
+  catch(e){ day = _d0.toLocaleDateString('ar-EG'); }
   let bal = 0;
   try{
     // آخر قيد في الرسالة (لو فيها كذا جهاز مع بعض) هو «اللحظة» بتاعتها
@@ -9381,7 +9704,7 @@ function shopNoticeMsg(items, shop, asOf){
   const issueOf = ({ entry, d }) => String(entry.issue || d.reportedIssue || '').trim().replace(/\s+/g, ' ');
   const money = n => (Number(n) || 0).toLocaleString('en-EG');
   let dd = '';
-  try{ dd = new Date().toLocaleDateString('ar-EG', { weekday:'long', day:'numeric', month:'numeric' }); }catch(e){ dd = day; }
+  try{ dd = _d0.toLocaleDateString('ar-EG', { weekday:'long', day:'numeric', month:'numeric' }); }catch(e){ dd = day; }
   const L = ['السلام عليكم 🌹'];
   if(items.length > 1){
     L.push(`تم تسجيل ${items.length === 2 ? 'جهازين' : items.length + ' أجهزة'} على حسابكم يوم ${dd}:`);
@@ -9401,37 +9724,17 @@ function shopNoticeMsg(items, shop, asOf){
   return L.join('\n');
 }
 
+// 📒 (5/11) الواتس مابقاش بيفتح هنا خالص — الرسالة بتقف في
+//    «💬 مسدجات الواتساب المتوقفة» (القيد عليه heldNotice) والمحاسب العام
+//    بيبعتها من هناك بالدور. هنا بس بنستنى الحفظ ونقوله «الرسالة مستنياك هناك».
 async function flushShopNotices(){
   if(!_shopNoticeQueue.length) return;
-  // 📒 نستنى حفظ الدفتر يخلص — الرسالة مابتطلعش لجهاز ماتسجّلش فعلاً.
-  //    • اتحفظ على السيرفر        → يتبعت دلوقتي
-  //    • لسه في طابور الحفظ        → يستنى، وبيتبعت أول ما الحفظ ينجح
-  //    • السيرفر تجاهله (الجهاز متقيّد قبل كده) → مفيش رسالة تانية
+  const q = _shopNoticeQueue; _shopNoticeQueue = [];
   try{ await _ledgerChain; }catch(e){}
-  const pendingIds = new Set(_ledgerQ.filter(o => o && o.op === 'add' && o.entry).map(o => String(o.entry.id)));
-  const q = [], waiting = [];
-  _shopNoticeQueue.forEach(x => {
-    const id = String(x.entry && x.entry.id);
-    if(_ledgerServerIds.has(id)) q.push(x);
-    else if(pendingIds.has(id)) waiting.push(x);
-  });
-  _shopNoticeQueue = waiting;
-  if(waiting.length && !q.length){
-    alert('⚠️ الجهاز لسه ما اتسجّلش في حساب المحل على السيرفر (النت).\n'
-        + 'رسالة المحل هتستنى، وهتطلعلك أول ما الحفظ يتم — متبعتش حاجة للمحل دلوقتي.');
-  }
-  if(!q.length) return;
-  // لو أكتر من جهاز لنفس المحل في نفس اللحظة → رسالة واحدة بيهم كلهم
-  const byShop = {};
-  q.forEach(x => { const sh = x.entry.shop || 'بدون محل'; (byShop[sh] = byShop[sh] || []).push(x); });
-  for(const shop of Object.keys(byShop)){
-    if(shop === 'بدون محل') continue;
-    // 🚪 البوابة: غير المحاسب العام → الرقم زي زمان (ولو مفيش رقم بيسأل مرة)
-    //            المحاسب العام → يختار: رقم · جروب · قايمة المشاركة
-    //    لو اتلغى، الجهاز اتقيّد عادي ومفيش رسالة
-    const sent = await sendShopMsg(shop, shopNoticeMsg(byShop[shop], shop), '💬 اضغط لإرسال رسالة الحساب للمحل');
-    if(!sent) continue;
-    break;   // واتساب واحد في المرة — الموبايل مبيفتحش اتنين ورا بعض
+  try{ syncWaHeldMenu(); }catch(e){}
+  const saved = q.filter(x => _ledgerServerIds.has(String(x.entry && x.entry.id))).length;
+  if(saved && isSuperAdmin()){
+    showImportDone('💬 رسالة المحل مستنية في «مسدجات الواتساب المتوقفة» (قايمة ⋮) — ابعتها من هناك بالدور');
   }
 }
 
@@ -9512,6 +9815,16 @@ async function editReturnPrice(value){
     histEntry = { status:d.status,
       label: '✏️ تعديل حساب المرتجع (آجل): من ' + before.toLocaleString('en-EG') + ' إلى ' + parseInt(price).toLocaleString('en-EG') + ' ج.م — على حساب "' + (entry.shop || '') + '"',
       date:new Date().toISOString(), by: currentUser.name };
+  } else if(price && d.returnPaymentType === 'deferred' && d.returnPaymentStatus !== 'paid' && crPending(d, true)){
+    // 📒 (5/11) مستني المحاسب العام → المبلغ في الطلب بس
+    extra.returnCreditReq = { ...d.returnCreditReq, amount: parseInt(price) };
+  } else if(price && d.returnPaymentType === 'deferred' && d.returnPaymentStatus !== 'paid' && crNeedsReq()){
+    const shop = (d.returnBilledShop || d.billedShop || d.shopName || '').trim();
+    if(shop){
+      extra.returnBilledShop = shop;
+      extra.returnCreditReq = crMake(shop, parseInt(price), retRoundNo(d));
+      histEntry = { status:d.status, label: crAskLabel(parseInt(price), shop, true), date:new Date().toISOString(), by: currentUser.name };
+    }
   } else if(price && d.returnPaymentType === 'deferred' && d.returnPaymentStatus !== 'paid'){
     // محدد عليه آجل بالفعل واتسعّر دلوقتي → يتقيّد على حساب المحل فوراً
     const shop = (d.returnBilledShop || d.billedShop || d.shopName || '').trim();
@@ -9551,16 +9864,27 @@ async function editReturnPayType(pt){
   const d = devices.find(x => x.id === selectedId);
   if(!d) return;
   const price = parseInt(d.returnPrice) || 0;
-  if(pt === d.returnPaymentType && (pt !== 'deferred' || d.returnPaymentStatus === 'paid')) return;
+  if(pt === d.returnPaymentType && (pt !== 'deferred' || d.returnPaymentStatus === 'paid' || crPending(d, true))){
+    if(pt === 'deferred' && crPending(d, true)) alert('⏳ المرتجع ده مستني موافقة المحاسب العام على الآجل خلاص.');
+    return;
+  }
   if(!isOnline()){ alert('محتاج نت عشان تغيّر طريقة دفع المرتجع (بتأثر على حساب المحل).'); return; }
 
   let extra = { returnPaymentType: pt, lastModifiedAt: new Date().toISOString(), lastModifiedBy: currentUser.name };
   let noteKey = null, noteVars = null;
+  let _rNote = null;   // 📒 (5/11) سطر السجل لطلب الآجل
 
   if(pt === 'deferred'){
     if(!isReturnPriced(d) || price <= 0){ alert(t('msg.needPriceForCredit')); return; }
     const shop = (d.returnBilledShop || d.billedShop || d.shopName || '').trim();
     if(!shop){ alert(t('msg.needShopForCredit')); return; }
+    if(crNeedsReq() && !curReturnEntry(d)){
+      // 📒 (5/11) غير المحاسب العام → طلب، والمرتجع بيفضل بانتظار الدفع
+      extra.returnBilledShop = shop;
+      extra.returnCreditReq = crMake(shop, price, retRoundNo(d));
+      extra.returnPaymentStatus = 'unpaid';
+      _rNote = crAskLabel(price, shop, true);
+    } else {
     if(!(await creditAllowed(shop, creditOkKey(d, true)))){ renderDetail(); return; }   // 🔒
     extra.returnBilledShop = shop;
     // الجهاز مرتجع (اتسلّم قبل كده) → القيد بيتعمل فوراً ويعتبر متسوّى
@@ -9569,6 +9893,8 @@ async function editReturnPayType(pt){
     }
     extra.returnPaymentStatus = 'paid';
     noteKey = 'hist.returnToDeferred'; noteVars = { amount: price.toLocaleString('en-EG'), shop };
+    }
+    if(_rNote){ noteKey = null; noteVars = null; }
   } else {
     // رجوع لفوري: نشيل قيد المرتجع **بتاع الجولة دي بس** — لا الأصلي ولا جولة قديمة
     await ledgerRefresh();   // 📒 الطازة الأول (شوف editPayType)
@@ -9579,11 +9905,14 @@ async function editReturnPayType(pt){
     }
     extra.returnPaymentStatus = 'unpaid';   // مستني «تأكيد الدفع»
     noteKey = entry ? 'hist.returnToCashRemoved' : 'hist.returnToCash';
+    // 📒 (5/11) كان فيه طلب آجل للمرتجع مستني → اتلغى
+    if(crPending(d, true)){ extra.returnCreditReq = { ...d.returnCreditReq, state:'cancelled', decidedAt:new Date().toISOString(), decidedBy:currentUser.name };
+      noteKey = null; _rNote = '↩️ المرتجع اتحوّل فوري — طلب الآجل للمحاسب العام اتلغى'; }
   }
 
   devices = devices.map(x => x.id === selectedId
     ? { ...x, ...extra, statusHistory:[...(x.statusHistory||[]),
-        { status:x.status, labelKey:noteKey, labelVars:noteVars, date:new Date().toISOString(), by:currentUser.name }] }
+        { status:x.status, label:_rNote, labelKey:noteKey, labelVars:noteVars, date:new Date().toISOString(), by:currentUser.name }] }
     : x);
   renderDetail(); render(); await persist();
   flushShopNotices();   // 💬 لو المرتجع دخل حساب المحل دلوقتي → واتساب للمحل
@@ -9742,7 +10071,8 @@ async function recordPayment(){
   const entry = {
     id: 'led_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
     type: 'credit', shop, amount, note,
-    date: whenIso, by: currentUser.name
+    date: whenIso, by: currentUser.name,
+    heldNotice: true   // 📒 (5/11) رسالة «استلمنا دفعة» بتستنى في «💬 مسدجات الواتساب المتوقفة»
   };
   if(backdated){ entry.backdated = true; entry.enteredAt = nowIso; }
   ledger = [entry, ...ledger];
@@ -9757,13 +10087,13 @@ async function recordPayment(){
   if(!saved){
     alert('⚠️ الدفعة اتسجّلت هنا بس لسه ما وصلتش للسيرفر (النت).\n'
         + 'هتتحفظ لوحدها أول ما النت يرجع — والشريط الأحمر تحت هيختفي.\n'
-        + 'رسالة الواتساب للمحل ما اتبعتتش؛ ابعتها بعد ما الشريط يختفي.');
+        + 'رسالتها للمحل هتظهر في «💬 مسدجات الواتساب المتوقفة» أول ما الشريط يختفي.');
     return;
   }
-  // 💬 رسالة واتساب للمحل «استلمنا دفعة» — **بعد** الحفظ عن قصد:
-  //    الموبايل بيقلب على الواتس والصفحة بتنام، فلو فتحناه قبل الحفظ
-  //    الدفعة ممكن متتحفظش (نفس درس flushShopNotices).
-  try{ await sendPaymentNotice(shop, amount, backdated ? whenIso : null); }catch(e){ console.warn('رسالة الدفعة:', e); }
+  // 📒 (5/11) الواتس مابقاش بيفتح هنا — رسالة «استلمنا دفعة» بتقف في الطابور
+  //    في «💬 مسدجات الواتساب المتوقفة» وتتبعت من هناك بالدور
+  try{ syncWaHeldMenu(); }catch(e){}
+  showImportDone('💬 رسالة الدفعة مستنية في «مسدجات الواتساب المتوقفة» (قايمة ⋮) — ابعتها من هناك بالدور');
 }
 
 // ============================================================
@@ -9781,7 +10111,7 @@ async function recordPayment(){
 // ⚠️ مفيش رقم للمحل؟ بنسأل مرة ونحفظه. ولو اتلغى → الدفعة متسجّلة
 //    عادي ومفيش رسالة.
 // ============================================================
-function paymentNoticeMsg(shop, amount, balance, whenIso){
+function paymentNoticeMsg(shop, amount, balance, whenIso, kind){
   // whenIso = تاريخ الدفعة لو اتسجّلت بتاريخ سابق — غير كده «النهاردة» زي ما كان
   const at = whenIso ? new Date(whenIso) : new Date();
   let day = '';
@@ -9790,7 +10120,8 @@ function paymentNoticeMsg(shop, amount, balance, whenIso){
   const n = v => Number(v || 0).toLocaleString('en-EG');
 
   const L = ['السلام عليكم 🌹'];
-  L.push(`تم استلام دفعة بمبلغ *${n(amount)} ج.م* من حسابكم لدى *شركة Fix Team للصيانة* يوم ${day} ✅`);
+  if(kind === 'discount') L.push(`تم عمل خصم بمبلغ *${n(amount)} ج.م* على حسابكم لدى *شركة Fix Team للصيانة* يوم ${day} ✅`);   // 📒 (5/11)
+  else L.push(`تم استلام دفعة بمبلغ *${n(amount)} ج.م* من حسابكم لدى *شركة Fix Team للصيانة* يوم ${day} ✅`);
   if(balance > 0)      L.push(`📒 المتبقي على حسابكم: *${n(balance)} ج.م*`);
   else if(balance < 0) L.push(`📒 حسابكم خالص، وليكم رصيد عندنا *${n(-balance)} ج.م* 💚`);
   else                 L.push('📒 حسابكم بقى *خالص تمامًا* 🎉 متشكرين جدًا على التزامكم');
@@ -9857,10 +10188,13 @@ async function addDiscount(shop){
   ledger = [{
     id: 'led_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
     type: 'discount', shop, amount, note,
-    date: new Date().toISOString(), by: currentUser.name
+    date: new Date().toISOString(), by: currentUser.name,
+    heldNotice: true   // 📒 (5/11) رسالة «اتعمل خصم» بتستنى في «💬 مسدجات الواتساب المتوقفة»
   }, ...ledger];
-  await persistLedger();
+  const saved = await persistLedger();
   renderAccounts();
+  try{ syncWaHeldMenu(); }catch(e){}
+  if(saved) showImportDone('💬 رسالة الخصم مستنية في «مسدجات الواتساب المتوقفة» (قايمة ⋮) — ابعتها من هناك بالدور');
 }
 
 // إضافة حساب محل جديد برصيد افتتاحي (مديونية قديمة قبل السيستم)
@@ -10716,9 +11050,11 @@ function exportDeliveredUnpaidPdf(list){
 
 
 // ============================================================
-// صفحة الملخص: الفلوس + سرعة الفنيين ونسبة المرتجع + كبار العملاء
+// صفحة الملخص: الفلوس + سرعة الفنيين ونسبة المرتجع (كبار العملاء اتنقلت لـ«👥 CRM» ٥/١١)
 // ============================================================
-let anPeriod = { mode: 'month', from: '', to: '' };
+// 🗓️ (5/11) الفترة: شهر · ربع سنة · نص سنة · سنة — والمفتاح بيقول أنهي واحد
+//    month '2026-11' · quarter '2026-Q4' · half '2026-H2' · year '2026'
+let anPeriod = { mode: 'month', key: '' };
 
 function openAnalytics(){
   // 🔒 للمحاسب العام بس — حتى لو حد نده الدالة من مكان تاني
@@ -10731,26 +11067,67 @@ function openAnalytics(){
 }
 function closeAnalytics(){ document.getElementById('analyticsOverlay').classList.add('hidden'); }
 
-function setAnPeriod(mode){ anPeriod.mode = mode; renderAnalytics(); }
-function setAnCustom(){
-  anPeriod.mode = 'custom';
-  anPeriod.from = document.getElementById('anFrom').value;
-  anPeriod.to = document.getElementById('anTo').value;
+// 🗓️ (5/11) شهر · ربع سنة · نص سنة · سنة
+function anKeyNow(mode, d){
+  d = d || new Date();
+  const y = d.getFullYear(), m = d.getMonth();
+  if(mode === 'quarter') return y + '-Q' + (Math.floor(m / 3) + 1);
+  if(mode === 'half')    return y + '-H' + (m < 6 ? 1 : 2);
+  if(mode === 'year')    return String(y);
+  return y + '-' + String(m + 1).padStart(2, '0');
+}
+// [أول الفترة، آخر لحظة فيها]
+function anKeyRange(mode, key){
+  const y = parseInt(key, 10);
+  let m0 = 0, n = 12;
+  if(mode === 'month'){ m0 = parseInt(key.slice(5), 10) - 1; n = 1; }
+  else if(mode === 'quarter'){ m0 = (parseInt(key.split('-Q')[1], 10) - 1) * 3; n = 3; }
+  else if(mode === 'half'){ m0 = key.endsWith('H2') ? 6 : 0; n = 6; }
+  const f = new Date(y, m0, 1, 0, 0, 0, 0);
+  const t = new Date(y, m0 + n, 1, 0, 0, 0, 0); t.setMilliseconds(-1);
+  return [f, t];
+}
+function anKeyLabel(mode, key){
+  const y = parseInt(key, 10);
+  if(mode === 'month'){
+    try{ return new Date(y, parseInt(key.slice(5), 10) - 1, 1).toLocaleDateString('ar-EG', { month:'long', year:'numeric' }); }catch(e){ return key; }
+  }
+  if(mode === 'quarter'){
+    const q = parseInt(key.split('-Q')[1], 10);
+    return ['الربع الأول', 'الربع التاني', 'الربع التالت', 'الربع الأخير'][q - 1] + ' ' + y
+      + ' (' + ['يناير–مارس', 'أبريل–يونيو', 'يوليو–سبتمبر', 'أكتوبر–ديسمبر'][q - 1] + ')';
+  }
+  if(mode === 'half') return (key.endsWith('H2') ? 'النص التاني ' : 'النص الأول ') + y + (key.endsWith('H2') ? ' (يوليو–ديسمبر)' : ' (يناير–يونيو)');
+  return 'سنة ' + y;
+}
+// أقدم سنة فيها بيانات — عشان القايمة ماتبقاش طويلة على الفاضي
+function anFirstYear(){
+  let y = new Date().getFullYear();
+  devices.forEach(d => { const t = new Date(d.intakeDate || ''); if(!isNaN(t) && t.getFullYear() < y && t.getFullYear() > 2015) y = t.getFullYear(); });
+  (ledger || []).forEach(e => { const t = new Date(e.date || ''); if(!isNaN(t) && t.getFullYear() < y && t.getFullYear() > 2015) y = t.getFullYear(); });
+  return y;
+}
+// كل الفترات من دلوقتي لورا (الأحدث الأول)
+function anKeyList(mode){
+  const out = [], now = new Date(), y0 = anFirstYear();
+  let k = anKeyNow(mode, now), d = new Date(now.getFullYear(), now.getMonth(), 1);
+  const step = mode === 'quarter' ? 3 : mode === 'half' ? 6 : mode === 'year' ? 12 : 1;
+  while(d.getFullYear() >= y0 && out.length < 200){
+    k = anKeyNow(mode, d);
+    if(!out.includes(k)) out.push(k);
+    d = new Date(d.getFullYear(), d.getMonth() - step, 1);
+  }
+  return out;
+}
+function setAnPeriod(mode){
+  anPeriod.mode = mode;
+  anPeriod.key = anKeyNow(mode);   // كل نوع بيبدأ بالفترة الحالية
   renderAnalytics();
 }
+function setAnKey(key){ anPeriod.key = key; renderAnalytics(); }
 function anRange(){
-  const now = new Date();
-  const startOfDay = d => { const x = new Date(d); x.setHours(0,0,0,0); return x; };
-  if(anPeriod.mode === 'today') return [startOfDay(now), null];
-  if(anPeriod.mode === 'week'){ const s2 = startOfDay(now); s2.setDate(s2.getDate() - 6); return [s2, null]; }
-  if(anPeriod.mode === 'month'){ const s2 = startOfDay(now); s2.setDate(s2.getDate() - 29); return [s2, null]; }
-  if(anPeriod.mode === 'custom'){
-    const f = anPeriod.from ? startOfDay(new Date(anPeriod.from)) : null;
-    let t = null;
-    if(anPeriod.to){ t = new Date(anPeriod.to); t.setHours(23,59,59,999); }
-    return [f, t];
-  }
-  return [null, null];
+  if(!anPeriod.key) anPeriod.key = anKeyNow(anPeriod.mode);
+  return anKeyRange(anPeriod.mode, anPeriod.key);
 }
 function inAnRange(iso){
   if(!iso) return false;
@@ -10828,14 +11205,17 @@ async function anLoadPartsCost(force){
 }
 
 function renderAnalytics(){
+  // 🗓️ (5/11) شهر · ربع سنة · نص سنة · سنة + اختيار الفترة نفسها
+  anRange();   // بيملا المفتاح لو فاضي
   const chip = (mode, label) =>
     `<button class="inv-chip ${anPeriod.mode===mode?'active':''}" onclick="setAnPeriod('${mode}')">${label}</button>`;
   const filterBar = `
     <div class="inv-filter">
-      ${chip('today',t('inv.today'))}${chip('week',t('inv.week'))}${chip('month',t('inv.month'))}${chip('all',t('inv.all'))}
+      ${chip('month','📅 شهر')}${chip('quarter','🗓️ ربع سنة')}${chip('half','🌓 نص سنة')}${chip('year','📆 سنة')}
       <span class="inv-custom">
-        ${t('inv.from')} <input type="date" id="anFrom" value="${anPeriod.from}" onchange="setAnCustom()">
-        ${t('inv.to')} <input type="date" id="anTo" value="${anPeriod.to}" onchange="setAnCustom()">
+        <select onchange="setAnKey(this.value)" style="font:inherit;padding:6px 8px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--ink);">
+          ${anKeyList(anPeriod.mode).map(k => `<option value="${k}"${k === anPeriod.key ? ' selected' : ''}>${esc(anKeyLabel(anPeriod.mode, k))}</option>`).join('')}
+        </select>
       </span>
     </div>`;
 
@@ -10856,7 +11236,8 @@ function renderAnalytics(){
   //       اللي حصلت **لحد آخر يوم في الفترة المختارة**. الفترة اللي ملهاش نهاية
   //       (النهارده · ٧ أيام · ٣٠ يوم · الكل · «من» من غير «لحد») = لحد دلوقتي.
   //    ⚠️ أي حركة تاريخها بايظ أو فاضي بتتحسب (اعتبرناها قديمة) — زي ما كانت.
-  const anEnd = anRange()[1];
+  const anEnd0 = anRange()[1];
+  const anEnd = (anEnd0 && anEnd0 < new Date()) ? anEnd0 : null;   // 🗓️ الفترة لسه شغّالة → «لحد النهارده»
   const totalOutstanding = ledger.reduce((t, e) => {
     if(anEnd){
       const d = new Date(e.date || '');
@@ -10916,113 +11297,13 @@ function renderAnalytics(){
       <div class="inv-card"><div class="inv-card-num" style="color:${margin >= 0 ? 'var(--success)' : 'var(--danger)'};">${partsReady ? margin + '%' : wait}</div><div class="inv-card-label">${t('an.margin')}</div></div>
     </div>`;
 
-  // ============================================================
-  // ===== كبار العملاء =====
-  // ------------------------------------------------------------
-  // القاعدة: العميل اللي جاب VIP_MIN_DEVICES جهاز أو أكتر **في
-  // الشهر الميلادي الحالي** يدخل القايمة.
-  //
-  // ⚠️ القايمة دي **مش** متأثرة بفلتر الفترة اللي فوق — هي دايماً
-  //    على الشهر الحالي. وده مقصود: الفلتر بيخص أرقام الفلوس،
-  //    وكبار العملاء قاعدتها شهرية ثابتة زي ما اتطلبت.
-  //
-  // ⚠️ التجديد **بيحصل لوحده**، مفيش أي كود بيشتغل أول الشهر ولا
-  //    قايمة متخزّنة في أي مكان. العدّ بيتعمل من أول وجديد في كل
-  //    مرة تفتح الصفحة، وبيعدّ أجهزة الشهر الحالي بس.
-  //
-  //    يعني أول ما الشهر يقلب، أجهزة الشهر اللي فات بتخرج من
-  //    الحساب تلقائياً، والعميل اللي مجابش ٣ تانيين بيختفي لوحده.
-  //
-  //    تشبيه: زي عدّاد الكهرباء اللي بيتصفّر أول الشهر — مش محتاج
-  //    حد يفتكر يصفّره، الشهر الجديد بيبدأ من صفر بطبيعته.
-  //
-  //    والبديل (قايمة متخزّنة + مهمة شهرية تنضّفها) كان معناه
-  //    حاجة ممكن تنسى تشتغل، وبيانات ممكن تبقى غلط من غير ما يبان.
-  // ============================================================
-  const VIP_MIN_DEVICES = 3;   // ← غيّر الرقم ده لو عايز الحد يختلف
-
-  const _now      = new Date();
-  const monthFrom = new Date(_now.getFullYear(), _now.getMonth(), 1, 0, 0, 0, 0);
-  // ⚠️ حد أعلى كمان — مش من أول الشهر وخلاص.
-  //    من غيره، جهاز اتسجّل بالغلط بتاريخ في الشهر الجاي (غلطة
-  //    كتابة في التاريخ) هيتحسب في قايمة الشهر ده، والعميل يدخل
-  //    كبار العملاء وهو مستحقهاش.
-  const monthTo   = new Date(_now.getFullYear(), _now.getMonth() + 1, 1, 0, 0, 0, 0);
-  const monthName = _now.toLocaleDateString(
-    (typeof getLocale === 'function' ? getLocale() : 'ar-EG'),
-    { month: 'long', year: 'numeric' });
-  const inThisMonth = iso => {
-    if(!iso) return false;
-    const d = new Date(iso);
-    return !isNaN(d) && d >= monthFrom && d < monthTo;
-  };
-
-  // ⚠️ تمريرة أولى: خريطة اسم ← تليفون.
-  // العميل ساعات بيتسجّل من غير تليفون في تذكرة وبتليفون في تانية.
-  // من غير الخريطة دي كان بينقسم لصفّين: واحد بالاسم من غير زرار
-  // واتس، وواحد بالتليفون. ودي كانت سبب إن أغلب الصفوف من غير زرار.
-  const nameToPhone = {};
-  devices.forEach(d => {
-    const nm = (d.customerName || '').trim();
-    const ph = waPhone(d.customerPhone || '');
-    if(nm && ph && !nameToPhone[nm]) nameToPhone[nm] = d.customerPhone;
-  });
-
-  const byCustomer = {};
-  devices.forEach(d => {
-    if(!inThisMonth(d.intakeDate)) return;   // الشهر الحالي بس
-    const nm       = (d.customerName || '').trim();
-    // تليفون الجهاز نفسه، وإلا أي تليفون اتسجّل لنفس الاسم
-    const rawPhone = d.customerPhone || nameToPhone[nm] || '';
-    const phone    = waPhone(rawPhone);
-    const key      = phone || ('name:' + nm);
-    if(!key || key === 'name:') return;
-    byCustomer[key] = byCustomer[key] || { name: nm, phone: rawPhone, shop: d.shopName || '', count: 0, paid: 0 };
-    byCustomer[key].count++;
-    if(d.paymentStatus === 'paid' && d.paymentType !== 'deferred') byCustomer[key].paid += (parseInt(d.agreedPrice) || 0);
-    if(nm) byCustomer[key].name = nm;
-    // لو تليفون ظهر في تذكرة أحدث، نكمّل بيه الصف
-    if(!byCustomer[key].phone && rawPhone) byCustomer[key].phone = rawPhone;
-    if(!byCustomer[key].shop && d.shopName) byCustomer[key].shop = d.shopName;
-  });
-
-  const topCustomers = Object.values(byCustomer)
-    .filter(c => c.count >= VIP_MIN_DEVICES)
-    .sort((a,b) => b.count - a.count);
-
-  // اللي قرّبوا يوصلوا — بيوضّح إن القايمة شغّالة حتى لو فاضية
-  const nearlyThere = Object.values(byCustomer)
-    .filter(c => c.count === VIP_MIN_DEVICES - 1).length;
-
-  const custList = topCustomers.length === 0
-    ? `<div class="empty-col">
-         لسه محدش وصل لـ ${VIP_MIN_DEVICES} أجهزة في ${esc(monthName)}
-         ${nearlyThere ? `<br><span style="color:var(--muted-2);">${nearlyThere} عميل على بُعد جهاز واحد</span>` : ''}
-       </div>`
-    : topCustomers.map((c, i) => `
-      <div class="cust-item">
-        <div style="display:flex; align-items:center; gap:12px;">
-          <div class="cust-rank">${i + 1}</div>
-          <div>
-            <div style="font-weight:800;">${esc(c.name || t('an.noName'))}${c.shop ? ` <span style="color:var(--muted-2); font-weight:500; font-size:13px;">— ${esc(c.shop)}</span>` : ''}</div>
-            <div style="font-size:13px; color:var(--muted);">${c.count} ${t('an.devicesInPeriod')}${c.paid ? ` — ${t('an.paidCash')} ${fmt(c.paid)} ${t('acc.egp')}` : ''}</div>
-          </div>
-        </div>
-        ${c.phone ? `<button class="btn-secondary" style="color:var(--success); border-color:var(--success-border);" onclick="sendThanks('${esc(c.phone)}', '${esc(c.name || '').replace(/'/g, "\\\\'")}')">💬 ${t('an.thanksMsg')}</button>` : ''}
-      </div>`).join('');
+  // ⭐ (5/11) «كبار العملاء» اتشالت من هنا — بقت جوه «👥 CRM» (openCrm) بفلاتر
 
   document.getElementById('analyticsBody').innerHTML = `
     ${filterBar}
     ${moneyCards}
     ${profitCards}
     ${(window.IFixPlatformStats ? IFixPlatformStats.html({ delivered: deliveredInRange, inRange: inAnRange }) : '')}   <!-- 📱 آيفون ↔ أندرويد: مبيعات + نقاط + شغل كل فني (platform-stats.js) — مؤقت للإنتاج -->
-    <div class="inv-section-title">⭐ ${t('an.topCustomers')}</div>
-    <div style="font-size:12.5px; color:var(--muted-2); margin:-4px 0 10px; line-height:1.9;">
-      ${VIP_MIN_DEVICES} أجهزة فأكتر خلال <b>${esc(monthName)}</b>
-      · بتتجدّد لوحدها أول كل شهر
-      · <span style="color:var(--muted);">مش متأثرة بفلتر الفترة فوق</span>
-    </div>
-    ${custList}
   `;
 }
 
@@ -11619,6 +11900,186 @@ function toggleTeTech(i){
   if(!row) return;
   teOpenTech = (teOpenTech === row.t) ? null : row.t;
   renderTechEval();
+}
+
+// ============================================================
+// 👥 CRM — عملاء المحل (٥/١١ · تعديل مؤقت على الإنتاج) — للمحاسب العام بس
+// ------------------------------------------------------------
+// 🧸 بالبلدي: كشكول فيه كل عميل جاب أجهزة في الفترة اللي تختارها:
+//    جاب كام جهاز · بكام فلوس · جديد ولا راجع · آخر مرة جه إمتى.
+//    • 🛍️ قطاعي = اسم المحل «Fix Team» بأي شكل أو فاضي → العميل = الزبون نفسه
+//      (بالتليفون، وإلا بالاسم — نفس طريقة «كبار العملاء» القديمة)
+//    • 🏪 جملة  = أي محل تاني → العميل = المحل (🪪 كل أسامي المحل حساب واحد)
+//    القاعدة بالحرف زي «ترتيب الاستلامات» والكول سنتر (isOwnShop).
+//
+// 📍 التاريخ = يوم دخول الجهاز (intakeDate). الفلوس = سعر الأجهزة دي
+//    (المرفوض مابيتحسبش). «جديد» = أول جهاز ليه في السيستم كله جوه الفترة.
+// ⭐ اللي جاب ٣ أجهزة أو أكتر في الفترة = ⭐ (زي «كبار العملاء» القديمة).
+// ============================================================
+const CRM_VIP = 3;
+let crmF = { unit: 'month', day: '', month: '', year: '', type: 'retail', q: '' };
+
+function crmIsRetail(name){
+  const n = String(name || '').toLowerCase().replace(/[أإآ]/g, 'ا').replace(/[^a-z؀-ۿ]/g, '');
+  if(!n) return true;
+  return n === 'ifix' || n.includes('fixteam') || n.includes('فيكستيم') || n.includes('فكستيم');
+}
+function crmPad(n){ return String(n).padStart(2, '0'); }
+function crmYmd(d){ return d.getFullYear() + '-' + crmPad(d.getMonth() + 1) + '-' + crmPad(d.getDate()); }
+
+function openCrm(){
+  if(!isSuperAdmin()) return;   // 🔒
+  const _menu = document.getElementById('menuDropdown'); if(_menu) _menu.classList.add('hidden');
+  try{ shieldGhostClick(); }catch(e){}
+  const now = new Date();
+  if(!crmF.day)   crmF.day = crmYmd(now);
+  if(!crmF.month) crmF.month = now.getFullYear() + '-' + crmPad(now.getMonth() + 1);
+  if(!crmF.year)  crmF.year = String(now.getFullYear());
+  document.getElementById('crmOverlay').classList.remove('hidden');
+  renderCrm();
+}
+function closeCrm(){ document.getElementById('crmOverlay').classList.add('hidden'); }
+function crmSet(k, v){ crmF[k] = v; renderCrm(); }
+
+function crmRange(){
+  if(crmF.unit === 'day'){
+    const f = new Date(crmF.day + 'T00:00:00'); const t = new Date(f); t.setDate(t.getDate() + 1);
+    return [f, t];
+  }
+  if(crmF.unit === 'year'){
+    const y = parseInt(crmF.year, 10);
+    return [new Date(y, 0, 1), new Date(y + 1, 0, 1)];
+  }
+  const [y, m] = crmF.month.split('-').map(Number);
+  return [new Date(y, m - 1, 1), new Date(y, m, 1)];
+}
+function crmPeriodLabel(){
+  try{
+    if(crmF.unit === 'day') return new Date(crmF.day + 'T00:00:00').toLocaleDateString('ar-EG', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+    if(crmF.unit === 'year') return 'سنة ' + crmF.year;
+    const [y, m] = crmF.month.split('-').map(Number);
+    return new Date(y, m - 1, 1).toLocaleDateString('ar-EG', { month:'long', year:'numeric' });
+  }catch(e){ return ''; }
+}
+
+// كل العملاء (كل الأوقات) — عشان نعرف «جديد ولا راجع» وآخر زيارة
+function crmBuild(){
+  const retail = crmF.type === 'retail';
+  // اسم ← تليفون (الزبون ساعات بيتسجّل من غير تليفون في تذكرة)
+  const nameToPhone = {};
+  devices.forEach(d => {
+    const nm = (d.customerName || '').trim(), ph = waPhone(d.customerPhone || '');
+    if(nm && ph && !nameToPhone[nm]) nameToPhone[nm] = d.customerPhone;
+  });
+  const shopKey = s => { try{ return accShopOf(s) || String(s || '').trim(); }catch(e){ return String(s || '').trim(); } };
+  const all = {};
+  devices.forEach(d => {
+    if(!d || d.status === 'trashed') return;
+    const t = new Date(d.intakeDate || '');
+    if(isNaN(t)) return;
+    if(crmIsRetail(d.shopName) !== retail) return;
+    let key, name, phone = '';
+    if(retail){
+      name = (d.customerName || '').trim();
+      phone = d.customerPhone || nameToPhone[name] || '';
+      const p = waPhone(phone);
+      key = p || (name ? 'name:' + name : '');
+    } else {
+      name = String(d.shopName || '').trim();
+      key = 'shop:' + shopKey(name);
+    }
+    if(!key || key === 'shop:') return;
+    const c = all[key] = all[key] || { key, name, phone, names: {}, first: t, last: t, devs: [] };
+    if(name) c.names[name] = (c.names[name] || 0) + 1;
+    if(!c.phone && phone) c.phone = phone;
+    if(t < c.first) c.first = t;
+    if(t > c.last) c.last = t;
+    c.devs.push({ d, t });
+  });
+  return all;
+}
+
+function renderCrm(){
+  const body = document.getElementById('crmBody');
+  if(!body) return;
+  const [f, to] = crmRange();
+  const inR = t => t >= f && t < to;
+  const all = crmBuild();
+  const fmt = n => (Number(n) || 0).toLocaleString('en-EG');
+  const dshort = x => { try{ return x.toLocaleDateString('ar-EG', { day:'numeric', month:'numeric', year:'numeric' }); }catch(e){ return ''; } };
+
+  let rows = Object.values(all).map(c => {
+    const inP = c.devs.filter(x => inR(x.t));
+    if(!inP.length) return null;
+    const money = inP.reduce((s, x) => s + (x.d.status === 'rejected' ? 0 : (parseInt(x.d.agreedPrice) || 0)), 0);
+    const rejected = inP.filter(x => x.d.status === 'rejected').length;
+    // الاسم الأكتر تكرار (للمحل: الشكل الأكتر استعمال)
+    const disp = Object.keys(c.names).sort((a,b) => c.names[b] - c.names[a])[0] || c.name || '';
+    return { c, disp, cnt: inP.length, money, rejected, isNew: inR(c.first), allCnt: c.devs.length,
+             lastIn: inP.reduce((m, x) => x.t > m ? x.t : m, inP[0].t) };
+  }).filter(Boolean);
+
+  const q = (crmF.q || '').trim().toLowerCase();
+  if(q) rows = rows.filter(r => (r.disp + ' ' + (r.c.phone || '') + ' ' + Object.keys(r.c.names).join(' ')).toLowerCase().includes(q));
+  rows.sort((a,b) => (b.cnt - a.cnt) || (b.money - a.money));
+
+  const tot = rows.reduce((s, r) => ({ cnt: s.cnt + r.cnt, money: s.money + r.money, nw: s.nw + (r.isNew ? 1 : 0), vip: s.vip + (r.cnt >= CRM_VIP ? 1 : 0) }),
+                          { cnt: 0, money: 0, nw: 0, vip: 0 });
+  const retail = crmF.type === 'retail';
+  const chip = (k, v, label) => `<button class="inv-chip ${crmF[k]===v?'active':''}" onclick="crmSet('${k}','${v}')">${label}</button>`;
+  const now = new Date(); const years = [];
+  for(let y = now.getFullYear(); y >= Math.min(now.getFullYear(), (typeof anFirstYear === 'function' ? anFirstYear() : now.getFullYear())); y--) years.push(y);
+  const inpStyle = 'font:inherit;padding:6px 8px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--ink);';
+  const picker = crmF.unit === 'day'
+    ? `<input type="date" value="${esc(crmF.day)}" max="${crmYmd(now)}" onchange="if(this.value) crmSet('day', this.value)" style="${inpStyle}">`
+    : crmF.unit === 'year'
+      ? `<select onchange="crmSet('year', this.value)" style="${inpStyle}">${years.map(y => `<option value="${y}"${String(y) === crmF.year ? ' selected' : ''}>${y}</option>`).join('')}</select>`
+      : `<input type="month" value="${esc(crmF.month)}" onchange="if(this.value) crmSet('month', this.value)" style="${inpStyle}">`;
+
+  const list = rows.length ? rows.map((r, i) => {
+    const c = r.c;
+    const ph = retail ? (c.phone || '') : '';
+    const aka = !retail ? Object.keys(c.names).filter(n => n !== r.disp) : [];
+    return `<div class="cust-item">
+      <div style="display:flex; align-items:center; gap:12px; min-width:0;">
+        <div class="cust-rank">${i + 1}</div>
+        <div style="min-width:0;">
+          <div style="font-weight:800;">${r.cnt >= CRM_VIP ? '⭐ ' : ''}${esc(r.disp || t('an.noName'))}
+            <span style="font-size:11.5px;font-weight:800;border-radius:6px;padding:1px 6px;margin-inline-start:4px;${r.isNew ? 'background:var(--success-bg,#EAF6EE);color:var(--success);' : 'background:var(--surface-3);color:var(--muted);'}">${r.isNew ? '🆕 جديد' : '🔁 راجع'}</span></div>
+          ${ph ? `<div style="font-size:12.5px;color:var(--muted);direction:ltr;text-align:end;">${esc(ph)}</div>` : ''}
+          ${aka.length ? `<div style="font-size:11.5px;color:var(--muted-2);">بيتكتب كمان: ${esc(aka.slice(0, 4).join(' · '))}${aka.length > 4 ? ' …' : ''}</div>` : ''}
+          <div style="font-size:13px;color:var(--ink);margin-top:2px;">📱 ${r.cnt} جهاز · 💰 <b>${fmt(r.money)}</b> ج.م${r.rejected ? ` <span style="color:var(--muted);">(منهم ${r.rejected} مرفوض)</span>` : ''}</div>
+          <div style="font-size:12px;color:var(--muted-2);">آخر جهاز: ${esc(dshort(r.lastIn))} · من الأول: ${r.allCnt} جهاز${r.isNew ? '' : ' · أول مرة ' + esc(dshort(c.first))}</div>
+        </div>
+      </div>
+      ${ph ? `<button class="btn-secondary" style="color:var(--success); border-color:var(--success-border);" onclick="sendThanks('${esc(ph)}', '${esc(r.disp || '').replace(/'/g, "\\\\'")}')">💬 ${t('an.thanksMsg')}</button>` : ''}
+    </div>`;
+  }).join('') : `<div class="empty-col">مفيش عملاء ${retail ? 'قطاعي' : 'جملة'} جابوا أجهزة في ${esc(crmPeriodLabel())}</div>`;
+
+  body.innerHTML = `
+    <div class="inv-filter">
+      <span style="font-size:12.5px;color:var(--muted);font-weight:800;">🗓️ التاريخ</span>
+      ${chip('unit','day','يوم')}${chip('unit','month','شهر')}${chip('unit','year','سنة')}
+      <span class="inv-custom">${picker}</span>
+    </div>
+    <div class="inv-filter">
+      <span style="font-size:12.5px;color:var(--muted);font-weight:800;">👥 العملاء</span>
+      ${chip('type','retail','🛍️ قطاعي')}${chip('type','wholesale','🏪 جملة')}
+      <span class="inv-custom"><input type="search" placeholder="🔍 دوّر بالاسم أو الرقم" value="${esc(crmF.q)}" oninput="crmF.q=this.value;clearTimeout(window._crmT);window._crmT=setTimeout(()=>{renderCrm();const i=document.querySelector('#crmBody input[type=search]');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length);}},250)" style="${inpStyle}min-width:170px;"></span>
+    </div>
+    <div style="font-size:12.5px;color:var(--muted-2);margin:2px 0 10px;line-height:1.8;">
+      ${retail ? '🛍️ قطاعي = اسم المحل «Fix Team» أو فاضي — العميل = الزبون (بالرقم)' : '🏪 جملة = أي محل تاني — العميل = المحل بكل أساميه'}
+      · بتاريخ دخول الجهاز · ⭐ = ${CRM_VIP} أجهزة فأكتر في الفترة
+    </div>
+    <div class="inv-cards">
+      <div class="inv-card"><div class="inv-card-num">${rows.length}</div><div class="inv-card-label">${retail ? 'زبون' : 'محل'} — ${esc(crmPeriodLabel())}</div></div>
+      <div class="inv-card"><div class="inv-card-num" style="color:var(--success);">${tot.nw}</div><div class="inv-card-label">🆕 جديد</div></div>
+      <div class="inv-card"><div class="inv-card-num" style="color:var(--info);">${rows.length - tot.nw}</div><div class="inv-card-label">🔁 راجع</div></div>
+      <div class="inv-card"><div class="inv-card-num">${tot.cnt}</div><div class="inv-card-label">📱 أجهزة</div></div>
+      <div class="inv-card"><div class="inv-card-num" style="color:var(--success);">${fmt(tot.money)}</div><div class="inv-card-label">💰 ج.م</div></div>
+      <div class="inv-card"><div class="inv-card-num" style="color:#BE8A1C;">${tot.vip}</div><div class="inv-card-label">⭐ ${CRM_VIP}+ أجهزة</div></div>
+    </div>
+    ${list}`;
 }
 
 function sendThanks(phone, name){

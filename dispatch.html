@@ -923,7 +923,7 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
     <div class="frow">
       <div class="fld"><label data-i18n="dp.customerPhone">تليفون العميل</label><input id="f_phone" list="dpPhoneList" autocomplete="off" inputmode="tel" oninput="this.dataset.autoFill='';" placeholder="010..." style="direction:ltr;text-align:right;"></div>
       <datalist id="dpPhoneList"></datalist>
-      <div class="fld"><label>🏪 المحل <b style="color:var(--rejected)">*</b></label><input id="f_shop" list="dpShopList" autocomplete="off" placeholder="اسم المحل — لو عميل قطاعي اكتب I Fix Team"></div>
+      <div class="fld"><label>🏪 المحل <b style="color:var(--rejected)">*</b></label><input id="f_shop" list="dpShopList" autocomplete="off" placeholder="اسم المحل — لو عميل قطاعي اكتب Fix Team" value="Fix Team" onfocus="if(this.value==='Fix Team') this.select()"></div>
       <datalist id="dpShopList"></datalist>
     </div>
     <!-- 🛵 المندوب = اللي جاب الجهاز للمحل (مش صاحبه). اختياري.
@@ -2638,6 +2638,8 @@ function openIntake(){
   dpMountLock('dpLockHostIntake');   // 🔒 شاشة الباسورد (فاضية كل مرة)
   dpDue.reset();                      // ⏳ الميعاد يبدأ فاضي كل مرة
   const dep = $('dpDepHost'); if(dep) dep.innerHTML = IFixDue.depFieldHtml('f_depositNote');   // 💵
+  // 🏪 (5/11 — تعديل مؤقت) اسم المحل بيبدأ مكتوب «Fix Team» (زبون قطاعي) — يتغيّر بس لو اللي بيسجّل كتب محل تاني
+  const sh = $('f_shop'); if(sh && !sh.value.trim()) sh.value = 'Fix Team';
   const ph = $('f_phone'); if(ph && ph.dataset) ph.dataset.autoFill = '';
   $('sheet').classList.add('on'); $('sheetBg').classList.add('on');
   setTimeout(()=>$('f_type').focus(),300);

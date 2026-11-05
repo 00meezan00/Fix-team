@@ -57,7 +57,7 @@
   if(window.IFixIntakeBoard) return;
 
   // 🗓️ (v148) mode: 'day' (يوم من الشهر الحالي — S.day) · 'cm' · 'pm' · 'ym'
-  var S              = { mode:'cm', ym:'', day:'', rows:null, loading:false, err:'', admin:null, sa:null, seq:0, at:null };
+  var S              = { mode:'cm', ym:'', day:'', rows:null, loading:false, err:'', admin:null, sa:null, seq:0, at:null, split:null, splitErr:'' };
   function pad2(n){ return String(n).padStart(2, '0'); }
   function ymdOf(d){ return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
   function todayStr(){ return ymdOf(new Date()); }
@@ -141,6 +141,13 @@
       + '#ibvSheet td{padding:10px 6px;border-top:1px solid var(--line,var(--border,#ddd));text-align:center;}'
       + '#ibvSheet td.n{text-align:start;font-weight:800;}'
       + '#ibvSheet .mut{color:var(--muted,#666);}'
+      // 🛍️🏪 (5/11) قطاعي/جملة تحت الاسم
+      + '#ibvSheet .spl{display:flex;flex-wrap:wrap;gap:4px 6px;margin-top:4px;font-size:11.5px;font-weight:700;}'
+      + '#ibvSheet .spl span{border-radius:6px;padding:1px 6px;white-space:nowrap;}'
+      + '#ibvSheet .spl .ret{background:rgba(37,99,235,.12);color:#1D4ED8;}'
+      + '#ibvSheet .spl .ws{background:rgba(124,58,237,.12);color:#6D28D9;}'
+      + 'html[data-theme=dark] #ibvSheet .spl .ret{color:#93C5FD;}'
+      + 'html[data-theme=dark] #ibvSheet .spl .ws{color:#C4B5FD;}'
       + '#ibvSheet .cash{font-weight:900;color:var(--ifx-ember-ink,#B8460A);white-space:nowrap;}'
       // 🎯 التارجت
       + '#ibvSheet .tbar{height:7px;border-radius:9px;background:var(--line,var(--border,#ddd));overflow:hidden;margin-top:4px;}'
@@ -171,6 +178,23 @@
       if(res.error) throw res.error;
       if(my !== S.seq) return;
       S.rows = res.data || [];
+      // 🛍️🏪 (5/11) المحاسب العام بس: كل موظف قطاعي كام وجملة كام (عدد + فلوس)
+      //    دالة لوحدها (prod-intake-split.sql) — لو مش موجودة، الترتيب بيفضل شغّال عادي
+      S.split = null; S.splitErr = '';
+      if(S.sa){
+        try{
+          var sp = await sb.rpc('intake_board_split', { p_from: r[0].toISOString(), p_to: r[1].toISOString() });
+          if(sp.error) throw sp.error;
+          if(my !== S.seq) return;
+          S.split = {};
+          (sp.data || []).forEach(function(x){ S.split[x.pkey] = x; });
+        }catch(y){
+          console.error('[ترتيب الاستلامات · قطاعي/جملة]', y);
+          var ym2 = (y && y.message) ? y.message : String(y);
+          S.splitErr = /intake_board_split|schema cache|does not exist|PGRST202/i.test(ym2)
+            ? 'تقسيمة قطاعي/جملة محتاجة ملف prod-intake-split.sql على السيرفر' : ('قطاعي/جملة: ' + ym2);
+        }
+      }
     }catch(x     ){
       if(my !== S.seq) return;
       console.error('[ترتيب الاستلامات]', x);
@@ -257,6 +281,12 @@
       + '<div class="mut" style="font-size:11px;">من ' + money(r.target) + '</div>' + tbar(p);
   }
 
+  // 🛍️🏪 (5/11) سطر صغير تحت اسم الموظف: قطاعي (عدد · فلوس) | جملة (عدد · فلوس)
+  function splitLine(x){
+    if(!x) return '';
+    return '<div class="spl"><span class="ret">🛍️ قطاعي ' + (Number(x.r_cnt) || 0) + ' · ' + money(x.r_amt) + '</span>'
+      + '<span class="ws">🏪 جملة ' + (Number(x.w_cnt) || 0) + ' · ' + money(x.w_amt) + '</span></div>';
+  }
   function medal(rank        )         { return rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : ''; }
 
   function paint(){
@@ -315,20 +345,24 @@
         + rows.map(function(r){
             return '<tr style="' + (r.is_me ? 'background:rgba(252,104,24,' + (dark() ? '.14' : '.09') + ');' : '') + '">'
               + '<td class="mut" style="text-align:start;">' + (medal(r.rank) || r.rank) + '</td>'
-              + '<td class="n">' + e(r.name) + (r.is_me ? ' <span class="mut" style="font-weight:600;">(إنت)</span>' : '') + '</td>'
+              + '<td class="n">' + e(r.name) + (r.is_me ? ' <span class="mut" style="font-weight:600;">(إنت)</span>' : '')
+              +   (S.split ? splitLine(S.split[r.pkey] || { r_cnt:0, r_amt:0, w_cnt:0, w_amt:0 }) : '') + '</td>'
               + '<td>' + e(r.devices) + '</td>'
               + '<td>' + (r.amount === null || r.amount === undefined ? '<span class="mut">🔒</span>' : '<span class="cash">' + money(r.amount) + '</span>') + '</td>'
               + (tCol ? '<td style="min-width:92px;">' + tCell(r) + '</td>' : '')
               + '</tr>';
           }).join('')
-        + (seeAll ? '<tr><td></td><td class="n">∑ الإجمالي</td><td style="font-weight:900;">' + cnt + '</td><td class="cash">' + money(total) + '</td>'
+        + (seeAll ? '<tr><td></td><td class="n">∑ الإجمالي' + (S.split ? splitLine(Object.keys(S.split).reduce(function(a, k){
+              var x = S.split[k]; a.r_cnt += Number(x.r_cnt) || 0; a.r_amt += Number(x.r_amt) || 0; a.w_cnt += Number(x.w_cnt) || 0; a.w_amt += Number(x.w_amt) || 0; return a;
+            }, { r_cnt:0, r_amt:0, w_cnt:0, w_amt:0 })) : '') + '</td><td style="font-weight:900;">' + cnt + '</td><td class="cash">' + money(total) + '</td>'
             + (tCol ? '<td>' + (function(){
                 var tt = rows.reduce(function(s, r){ return s + (hasT(r) ? Number(r.target) : 0); }, 0);
                 var got = rows.reduce(function(s, r){ return s + (hasT(r) ? (Number(r.amount) || 0) : 0); }, 0);
                 return tt ? '<div class="tpct">' + Math.floor(got * 100 / tt) + '٪</div><div class="mut" style="font-size:11px;">من ' + money(tt) + '</div>' : '';
               })() + '</td>' : '')
             + '</tr>' : '')
-        + '</table>';
+        + '</table>'
+        + (S.splitErr ? '<div class="mut" style="font-size:11.5px;margin-top:8px;">⚠️ ' + e(S.splitErr) + '</div>' : '');
     }
 
     sh.innerHTML =
