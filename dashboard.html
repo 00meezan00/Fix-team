@@ -842,6 +842,8 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
   .timeline-duration{font-size:13px; color:var(--accent); font-weight:800; font-family:'Cairo',sans-serif;}
   .timeline-dates{font-size:11px; color:var(--muted-2); margin-top:3px;}
   .summaries-page{background:var(--bg); min-height:100vh; width:100%;}
+  /* 👥 CRM (5/11): الصفحة تطول على قد الكلام — من غيرها، اللي تحت أول شاشة بيطلع من غير خلفية */
+  #crmOverlay > .summaries-page, #crmCustOv > .summaries-page, #crmBulkOv > .summaries-page{align-self:flex-start;}
   .day-columns{display:flex; gap:14px; overflow-x:auto; padding:16px 2px 30px;}
   .day-column{background:var(--surface-alt); border-radius:14px; padding:12px; min-width:230px; flex:0 0 230px;}
   .day-column-head{font-family:'Cairo',sans-serif; font-weight:800; font-size:13px; margin-bottom:10px; text-align:center; color:var(--ink);}
@@ -1128,6 +1130,8 @@ try{ localStorage.setItem('ifix-lang', 'ar'); }catch(e){}
     background:var(--chrome); color:var(--chrome-ink); display:flex; align-items:center; justify-content:center;
     font-family:'Cairo',sans-serif; font-weight:900; font-size:15px;
   }
+  /* 👥 CRM (5/11) — علامة صغيرة (جديد/راجع · التصنيفات) */
+  .crm-tag{display:inline-block;font-size:11.5px;font-weight:800;border-radius:6px;padding:1px 6px;margin-inline-start:4px;background:var(--surface-3);color:var(--muted);}
   .cust-item:nth-child(1) .cust-rank{background:#BE8A1C;}
   .cust-item:nth-child(2) .cust-rank{background:#94A3B8;}
   .cust-item:nth-child(3) .cust-rank{background:#B45309;}
@@ -11905,20 +11909,59 @@ function toggleTeTech(i){
 // ============================================================
 // 👥 CRM — عملاء المحل (٥/١١ · تعديل مؤقت على الإنتاج) — للمحاسب العام بس
 // ------------------------------------------------------------
-// 🧸 بالبلدي: كشكول فيه كل عميل جاب أجهزة في الفترة اللي تختارها:
-//    جاب كام جهاز · بكام فلوس · جديد ولا راجع · آخر مرة جه إمتى.
-//    • 🛍️ قطاعي = اسم المحل «Fix Team» بأي شكل أو فاضي → العميل = الزبون نفسه
-//      (بالتليفون، وإلا بالاسم — نفس طريقة «كبار العملاء» القديمة)
+// 🧸 بالبلدي: كشكول فيه كل عميل: جاب كام جهاز · بكام · جديد ولا راجع ·
+//    آخر مرة جه إمتى. وجوه كل عميل ورقة فيها كل حاجة عنه.
+//    • 🛍️ قطاعي = اسم المحل «Fix Team» بأي شكل أو فاضي → العميل = الزبون
+//      (بالتليفون، وإلا بالاسم)
 //    • 🏪 جملة  = أي محل تاني → العميل = المحل (🪪 كل أسامي المحل حساب واحد)
 //    القاعدة بالحرف زي «ترتيب الاستلامات» والكول سنتر (isOwnShop).
 //
-// 📍 التاريخ = يوم دخول الجهاز (intakeDate). الفلوس = سعر الأجهزة دي
+// 📍 التاريخ = يوم دخول الجهاز (intakeDate). الفلوس = سعر الأجهزة
 //    (المرفوض مابيتحسبش). «جديد» = أول جهاز ليه في السيستم كله جوه الفترة.
-// ⭐ اللي جاب ٣ أجهزة أو أكتر في الفترة = ⭐ (زي «كبار العملاء» القديمة).
+//
+// 🗂️ ٣ شاشات (crmF.view):
+//    • period  — العملاء اللي جابوا أجهزة في الفترة (يوم · شهر · سنة)
+//                + ↑↓ مقارنة بالفترة اللي قبلها
+//    • lapsed  — 😴 بطّلوا ييجوا: جابوا جهازين أو أكتر وآخر مرة من أكتر من N يوم
+//    • events  — 🎂 مناسبات: عيد ميلاد النهارده وفي الـ٧ أيام الجايين
+//
+// 💾 اللي بيتحفظ على السيرفر (app_data — زي shop-groups):
+//    • crm-wa-templates — الرسايل الجاهزة اللي المحاسب العام ضافها
+//    • crm-data = { c: { [مفتاح العميل]: { note, tags[], bday 'MM-DD', log[] } },
+//                   s: { lapseDays, balAlert } }
+//      مفتاح العميل: قطاعي = رقم الواتس (أو 'name:الاسم') · جملة = 'shop:المحل'
+//      ⚠️ قبل أي حفظ بنقرا الطازة من السيرفر ونعدّل عليها (crmMutate)
+//         — عشان جهازين مايمسحوش شغل بعض.
 // ============================================================
 const CRM_VIP = 3;
-let crmF = { unit: 'month', day: '', month: '', year: '', type: 'retail', q: '' };
+const CRM_DATA_KEY = 'crm-data';
+const CRM_TPL_KEY = 'crm-wa-templates';
+const CRM_TAGS = [
+  { k: 'vip',     l: '⭐ VIP' },
+  { k: 'problem', l: '⚠️ مشاكل' },
+  { k: 'staff',   l: '👨‍🔧 موظف/قريب' },
+  { k: 'trader',  l: '🏪 تاجر' },
+  { k: 'late',    l: '💸 بيتأخر في الدفع' },
+  { k: 'quiet',   l: '🔕 مايتبعتلوش عروض' },
+];
+const CRM_TPL_BUILTIN = [
+  { id: 'b_thanks', t: '🙏 شكر', m: 'أهلاً {الاسم} 🌟\nكل الشكر لثقتك المستمرة في Fix Team — وجودك من أهم عملائنا شرف لينا.\nأي جهاز محتاج صيانة، إحنا دايماً في خدمتك 🙏' },
+  { id: 'b_check', t: '🔧 بنطمّن على الجهاز', m: 'أهلاً {الاسم} 👋\nمعاك Fix Team — بنطمّن على جهازك بعد الصيانة، شغال كويس؟\nلو فيه أي ملاحظة كلّمنا على طول 🙏' },
+  { id: 'b_miss', t: '💙 وحشتنا', m: 'أهلاً {الاسم} 💙\nبقالنا فترة ماشفناكش في Fix Team!\nلو عندك أي جهاز محتاج صيانة أو كشف، إحنا موجودين ومستنيينك 🙏' },
+  { id: 'b_offer', t: '🎁 عرض لعملائنا', m: 'أهلاً {الاسم} 🎁\nعشان إنت من عملائنا المميزين، عندنا عرض خاص ليك على الصيانة الجاية في Fix Team.\nكلّمنا واسأل على التفاصيل 🙏' },
+  { id: 'b_bday', t: '🎂 عيد ميلاد', m: 'كل سنة وإنت طيب يا {الاسم} 🎂🎉\nFix Team بتتمنالك سنة حلوة مليانة نجاح وسعادة 🙏' },
+];
+const CRM_LOG_MAX = 60;           // آخر كام رسالة نحتفظ بيها لكل عميل
+const CRM_REPEAT_DAYS = 30;       // نفس الرسالة لنفس العميل في أقل من كده → تحذير
 
+let crmF = { view: 'period', unit: 'month', day: '', month: '', year: '', type: 'retail', q: '', tag: '' };
+let crmData = null;               // من السيرفر (crm-data)
+let crmTpls = null;               // الرسايل المضافة (crm-wa-templates)
+let crmRows = [];                 // صفوف آخر رسمة — الورقة والتصدير بيشتغلوا عليها
+let crmCust = null;               // الصف المفتوح في الورقة
+let crmBulk = null;               // 📣 { tplId, list:[row], done:{key:true} }
+
+// ---------- أدوات ----------
 function crmIsRetail(name){
   const n = String(name || '').toLowerCase().replace(/[أإآ]/g, 'ا').replace(/[^a-z؀-ۿ]/g, '');
   if(!n) return true;
@@ -11926,7 +11969,47 @@ function crmIsRetail(name){
 }
 function crmPad(n){ return String(n).padStart(2, '0'); }
 function crmYmd(d){ return d.getFullYear() + '-' + crmPad(d.getMonth() + 1) + '-' + crmPad(d.getDate()); }
+function crmDshort(x){ try{ return x.toLocaleDateString('ar-EG', { day:'numeric', month:'numeric', year:'numeric' }); }catch(e){ return ''; } }
+function crmFmt(n){ return (Number(n) || 0).toLocaleString('en-EG'); }
+function crmDaysAgo(t){ return Math.floor((Date.now() - t.getTime()) / 86400000); }
+const CRM_INP = 'font:inherit;padding:6px 8px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--ink);';
 
+// ---------- 💾 السيرفر ----------
+async function crmLoadData(){
+  try{ const r = await window.storage.get(CRM_DATA_KEY); crmData = r ? JSON.parse(r.value) : null; }catch(e){ crmData = crmData || null; }
+  if(!crmData || typeof crmData !== 'object') crmData = {};
+  if(!crmData.c || typeof crmData.c !== 'object') crmData.c = {};
+  if(!crmData.s || typeof crmData.s !== 'object') crmData.s = {};
+}
+// بنقرا الطازة، نعدّل، ونحفظ — ولو الحفظ فشل بنقول
+async function crmMutate(fn){
+  await crmLoadData();
+  fn(crmData);
+  let r = null;
+  try{ r = await window.storage.set(CRM_DATA_KEY, JSON.stringify(crmData)); }catch(e){ r = null; }
+  if(!r){ alert('⚠️ ما اتحفظش على السيرفر (النت؟) — جرّب تاني.'); return false; }
+  return true;
+}
+function crmMeta(key){ return (crmData && crmData.c && crmData.c[key]) || {}; }
+function crmSet0(){ return (crmData && crmData.s) || {}; }
+function crmLapseDays(){ return Number(crmSet0().lapseDays) || 60; }
+function crmBalAlert(){ return Number(crmSet0().balAlert) || 5000; }
+
+async function crmLoadTpls(){
+  try{ const r = await window.storage.get(CRM_TPL_KEY); crmTpls = r ? (JSON.parse(r.value) || []) : []; }
+  catch(e){ crmTpls = crmTpls || []; }
+  if(!Array.isArray(crmTpls)) crmTpls = [];
+}
+async function crmSaveTpls(){
+  let r = null;
+  try{ r = await window.storage.set(CRM_TPL_KEY, JSON.stringify(crmTpls)); }catch(e){ r = null; }
+  if(!r){ alert('⚠️ الرسالة ما اتحفظتش على السيرفر (النت؟) — جرّب تاني.'); return false; }
+  return true;
+}
+function crmAllTpls(){ return CRM_TPL_BUILTIN.concat(crmTpls || []); }
+function crmFill(m, r){ return String(m || '').split('{الاسم}').join((r && r.disp) || 'يا فندم'); }
+
+// ---------- فتح وقفل ----------
 function openCrm(){
   if(!isSuperAdmin()) return;   // 🔒
   const _menu = document.getElementById('menuDropdown'); if(_menu) _menu.classList.add('hidden');
@@ -11937,21 +12020,25 @@ function openCrm(){
   if(!crmF.year)  crmF.year = String(now.getFullYear());
   document.getElementById('crmOverlay').classList.remove('hidden');
   renderCrm();
+  Promise.all([crmLoadData(), crmLoadTpls()]).then(() => { renderCrm(); if(crmCust) renderCrmCust(); });
 }
-function closeCrm(){ document.getElementById('crmOverlay').classList.add('hidden'); }
+function closeCrm(){ try{ closeCrmCust(); closeCrmBulk(); }catch(e){} document.getElementById('crmOverlay').classList.add('hidden'); }
 function crmSet(k, v){ crmF[k] = v; renderCrm(); }
 
-function crmRange(){
+// ---------- الفترة ----------
+function crmRange(shift){
+  shift = shift || 0;   // -1 = الفترة اللي قبلها
   if(crmF.unit === 'day'){
-    const f = new Date(crmF.day + 'T00:00:00'); const t = new Date(f); t.setDate(t.getDate() + 1);
+    const f = new Date(crmF.day + 'T00:00:00'); f.setDate(f.getDate() + shift);
+    const t = new Date(f); t.setDate(t.getDate() + 1);
     return [f, t];
   }
   if(crmF.unit === 'year'){
-    const y = parseInt(crmF.year, 10);
+    const y = parseInt(crmF.year, 10) + shift;
     return [new Date(y, 0, 1), new Date(y + 1, 0, 1)];
   }
   const [y, m] = crmF.month.split('-').map(Number);
-  return [new Date(y, m - 1, 1), new Date(y, m, 1)];
+  return [new Date(y, m - 1 + shift, 1), new Date(y, m + shift, 1)];
 }
 function crmPeriodLabel(){
   try{
@@ -11961,11 +12048,11 @@ function crmPeriodLabel(){
     return new Date(y, m - 1, 1).toLocaleDateString('ar-EG', { month:'long', year:'numeric' });
   }catch(e){ return ''; }
 }
+function crmPrevWord(){ return crmF.unit === 'day' ? 'امبارح' : crmF.unit === 'year' ? 'السنة اللي قبلها' : 'الشهر اللي قبله'; }
 
-// كل العملاء (كل الأوقات) — عشان نعرف «جديد ولا راجع» وآخر زيارة
+// ---------- العملاء (كل الأوقات) ----------
 function crmBuild(){
   const retail = crmF.type === 'retail';
-  // اسم ← تليفون (الزبون ساعات بيتسجّل من غير تليفون في تذكرة)
   const nameToPhone = {};
   devices.forEach(d => {
     const nm = (d.customerName || '').trim(), ph = waPhone(d.customerPhone || '');
@@ -11998,88 +12085,527 @@ function crmBuild(){
   });
   return all;
 }
+const crmMoneyOf = list => list.reduce((s, x) => s + (x.d.status === 'rejected' ? 0 : (parseInt(x.d.agreedPrice) || 0)), 0);
 
+// صف لكل عميل — في الفترة (أو كل الأوقات للشاشات التانية)
+function crmRowOf(c, R, P){
+  const inR = x => x.t >= R[0] && x.t < R[1];
+  const inP = c.devs.filter(inR);
+  const prev = P ? c.devs.filter(x => x.t >= P[0] && x.t < P[1]) : [];
+  const disp = Object.keys(c.names).sort((a,b) => c.names[b] - c.names[a])[0] || c.name || '';
+  const meta = crmMeta(c.key);
+  const log = Array.isArray(meta.log) ? meta.log : [];
+  return { c, disp, meta, lastLog: log.length ? log[log.length - 1] : null,
+           cnt: inP.length, money: crmMoneyOf(inP), rejected: inP.filter(x => x.d.status === 'rejected').length,
+           prevCnt: prev.length, isNew: c.first >= R[0] && c.first < R[1],
+           allCnt: c.devs.length, allMoney: crmMoneyOf(c.devs),
+           lastIn: inP.length ? inP.reduce((m, x) => x.t > m ? x.t : m, inP[0].t) : c.last };
+}
+// 🎂 فاضل كام يوم على عيد الميلاد (٠ = النهارده) — null لو مش متسجّل
+function crmBdayIn(bday){
+  if(!bday || !/^\d{2}-\d{2}$/.test(bday)) return null;
+  const now = new Date(); now.setHours(0,0,0,0);
+  const [m, d] = bday.split('-').map(Number);
+  let n = new Date(now.getFullYear(), m - 1, d);
+  if(n < now) n = new Date(now.getFullYear() + 1, m - 1, d);
+  return Math.round((n - now) / 86400000);
+}
+// 📒 رصيد المحل (الدفتر كله — المحل بكل أساميه)
+function crmShopBalance(name){
+  try{
+    const k = accShopOf(name);
+    return (ledger || []).reduce((s, e) => accShopOf(e.shop) !== k ? s
+      : s + ((e.type === 'debit' || e.type === 'opening') ? (Number(e.amount) || 0) : -(Number(e.amount) || 0)), 0);
+  }catch(e){ return null; }
+}
+// 📞 ينفع نبعتله واتس؟
+function crmCanWa(r){
+  if(crmF.type === 'retail') return !!waPhone(r.c.phone || '');
+  return !!(shopPhoneOf(r.disp) || shopGroupOf(r.disp));
+}
+
+// ---------- 📋 القايمة ----------
 function renderCrm(){
   const body = document.getElementById('crmBody');
   if(!body) return;
-  const [f, to] = crmRange();
-  const inR = t => t >= f && t < to;
-  const all = crmBuild();
-  const fmt = n => (Number(n) || 0).toLocaleString('en-EG');
-  const dshort = x => { try{ return x.toLocaleDateString('ar-EG', { day:'numeric', month:'numeric', year:'numeric' }); }catch(e){ return ''; } };
-
-  let rows = Object.values(all).map(c => {
-    const inP = c.devs.filter(x => inR(x.t));
-    if(!inP.length) return null;
-    const money = inP.reduce((s, x) => s + (x.d.status === 'rejected' ? 0 : (parseInt(x.d.agreedPrice) || 0)), 0);
-    const rejected = inP.filter(x => x.d.status === 'rejected').length;
-    // الاسم الأكتر تكرار (للمحل: الشكل الأكتر استعمال)
-    const disp = Object.keys(c.names).sort((a,b) => c.names[b] - c.names[a])[0] || c.name || '';
-    return { c, disp, cnt: inP.length, money, rejected, isNew: inR(c.first), allCnt: c.devs.length,
-             lastIn: inP.reduce((m, x) => x.t > m ? x.t : m, inP[0].t) };
-  }).filter(Boolean);
-
-  const q = (crmF.q || '').trim().toLowerCase();
-  if(q) rows = rows.filter(r => (r.disp + ' ' + (r.c.phone || '') + ' ' + Object.keys(r.c.names).join(' ')).toLowerCase().includes(q));
-  rows.sort((a,b) => (b.cnt - a.cnt) || (b.money - a.money));
-
-  const tot = rows.reduce((s, r) => ({ cnt: s.cnt + r.cnt, money: s.money + r.money, nw: s.nw + (r.isNew ? 1 : 0), vip: s.vip + (r.cnt >= CRM_VIP ? 1 : 0) }),
-                          { cnt: 0, money: 0, nw: 0, vip: 0 });
   const retail = crmF.type === 'retail';
+  const all = Object.values(crmBuild());
+  const R = crmRange(0), P = crmRange(-1);
+  const BIG = [new Date(0), new Date(8.64e15)];
+  let rows;
+  if(crmF.view === 'lapsed'){
+    const lim = crmLapseDays();
+    rows = all.filter(c => c.devs.length >= 2 && crmDaysAgo(c.last) > lim).map(c => crmRowOf(c, BIG));
+    rows.sort((a,b) => (b.allCnt - a.allCnt) || (b.allMoney - a.allMoney));
+  } else if(crmF.view === 'events'){
+    rows = all.map(c => crmRowOf(c, BIG)).filter(r => { const n = crmBdayIn(r.meta.bday); return n !== null && n <= 7; });
+    rows.sort((a,b) => crmBdayIn(a.meta.bday) - crmBdayIn(b.meta.bday));
+  } else {
+    rows = all.map(c => crmRowOf(c, R, P)).filter(r => r.cnt > 0);
+    rows.sort((a,b) => (b.cnt - a.cnt) || (b.money - a.money));
+  }
+  const q = (crmF.q || '').trim().toLowerCase();
+  if(q) rows = rows.filter(r => (r.disp + ' ' + (r.c.phone || '') + ' ' + Object.keys(r.c.names).join(' ') + ' ' + (r.meta.note || '')).toLowerCase().includes(q));
+  if(crmF.tag) rows = rows.filter(r => (r.meta.tags || []).includes(crmF.tag));
+  crmRows = rows;
+
   const chip = (k, v, label) => `<button class="inv-chip ${crmF[k]===v?'active':''}" onclick="crmSet('${k}','${v}')">${label}</button>`;
   const now = new Date(); const years = [];
   for(let y = now.getFullYear(); y >= Math.min(now.getFullYear(), (typeof anFirstYear === 'function' ? anFirstYear() : now.getFullYear())); y--) years.push(y);
-  const inpStyle = 'font:inherit;padding:6px 8px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--ink);';
   const picker = crmF.unit === 'day'
-    ? `<input type="date" value="${esc(crmF.day)}" max="${crmYmd(now)}" onchange="if(this.value) crmSet('day', this.value)" style="${inpStyle}">`
+    ? `<input type="date" value="${esc(crmF.day)}" max="${crmYmd(now)}" onchange="if(this.value) crmSet('day', this.value)" style="${CRM_INP}">`
     : crmF.unit === 'year'
-      ? `<select onchange="crmSet('year', this.value)" style="${inpStyle}">${years.map(y => `<option value="${y}"${String(y) === crmF.year ? ' selected' : ''}>${y}</option>`).join('')}</select>`
-      : `<input type="month" value="${esc(crmF.month)}" onchange="if(this.value) crmSet('month', this.value)" style="${inpStyle}">`;
+      ? `<select onchange="crmSet('year', this.value)" style="${CRM_INP}">${years.map(y => `<option value="${y}"${String(y) === crmF.year ? ' selected' : ''}>${y}</option>`).join('')}</select>`
+      : `<input type="month" value="${esc(crmF.month)}" onchange="if(this.value) crmSet('month', this.value)" style="${CRM_INP}">`;
 
+  // 🎂 النهارده عيد ميلاد مين؟ (القطاعي والجملة الاتنين)
+  let bdToday = 0;
+  //    (القطاعي مفتاحه رقم أو name: · الجملة shop: — بنعدّ النوع المفتوح بس)
+  if(crmData) Object.keys(crmData.c).forEach(k => { if((k.indexOf('shop:') === 0) === !retail && crmBdayIn(crmData.c[k].bday) === 0) bdToday++; });
+
+  const tagBadges = r => (r.meta.tags || []).map(k => { const x = CRM_TAGS.find(y => y.k === k); return x ? `<span class="crm-tag">${esc(x.l)}</span>` : ''; }).join('');
+  const bal = r => retail ? null : crmShopBalance(r.disp);
   const list = rows.length ? rows.map((r, i) => {
     const c = r.c;
-    const ph = retail ? (c.phone || '') : '';
-    const aka = !retail ? Object.keys(c.names).filter(n => n !== r.disp) : [];
-    return `<div class="cust-item">
+    const b = bal(r);
+    const arrow = crmF.view === 'period'
+      ? (r.cnt > r.prevCnt ? `<span style="color:var(--success);font-weight:800;">↑</span>` : r.cnt < r.prevCnt ? `<span style="color:var(--danger);font-weight:800;">↓</span>` : '<span style="color:var(--muted);">=</span>')
+        + ` <span style="color:var(--muted-2);">${esc(crmPrevWord())}: ${r.prevCnt}</span>` : '';
+    const bd = crmBdayIn(r.meta.bday);
+    const line2 = crmF.view === 'lapsed'
+      ? `😴 آخر مرة من <b>${crmDaysAgo(c.last)}</b> يوم (${esc(crmDshort(c.last))}) · من الأول ${r.allCnt} جهاز · 💰 ${crmFmt(r.allMoney)} ج.م`
+      : crmF.view === 'events'
+        ? `🎂 ${bd === 0 ? '<b style="color:var(--danger);">النهارده!</b>' : 'بعد ' + bd + ' يوم'} · من الأول ${r.allCnt} جهاز`
+        : `📱 ${r.cnt} جهاز · 💰 <b>${crmFmt(r.money)}</b> ج.م${r.rejected ? ` <span style="color:var(--muted);">(منهم ${r.rejected} مرفوض)</span>` : ''} · ${arrow}`;
+    return `<div class="cust-item" style="cursor:pointer;" onclick="openCrmCust(${i})">
       <div style="display:flex; align-items:center; gap:12px; min-width:0;">
         <div class="cust-rank">${i + 1}</div>
         <div style="min-width:0;">
-          <div style="font-weight:800;">${r.cnt >= CRM_VIP ? '⭐ ' : ''}${esc(r.disp || t('an.noName'))}
-            <span style="font-size:11.5px;font-weight:800;border-radius:6px;padding:1px 6px;margin-inline-start:4px;${r.isNew ? 'background:var(--success-bg,#EAF6EE);color:var(--success);' : 'background:var(--surface-3);color:var(--muted);'}">${r.isNew ? '🆕 جديد' : '🔁 راجع'}</span></div>
-          ${ph ? `<div style="font-size:12.5px;color:var(--muted);direction:ltr;text-align:end;">${esc(ph)}</div>` : ''}
-          ${aka.length ? `<div style="font-size:11.5px;color:var(--muted-2);">بيتكتب كمان: ${esc(aka.slice(0, 4).join(' · '))}${aka.length > 4 ? ' …' : ''}</div>` : ''}
-          <div style="font-size:13px;color:var(--ink);margin-top:2px;">📱 ${r.cnt} جهاز · 💰 <b>${fmt(r.money)}</b> ج.م${r.rejected ? ` <span style="color:var(--muted);">(منهم ${r.rejected} مرفوض)</span>` : ''}</div>
-          <div style="font-size:12px;color:var(--muted-2);">آخر جهاز: ${esc(dshort(r.lastIn))} · من الأول: ${r.allCnt} جهاز${r.isNew ? '' : ' · أول مرة ' + esc(dshort(c.first))}</div>
+          <div style="font-weight:800;">${(crmF.view === 'period' ? r.cnt : r.allCnt) >= CRM_VIP && crmF.view === 'period' ? '⭐ ' : ''}${esc(r.disp || t('an.noName'))}
+            ${crmF.view === 'period' ? `<span class="crm-tag" style="${r.isNew ? 'background:var(--success-bg,#EAF6EE);color:var(--success);' : ''}">${r.isNew ? '🆕 جديد' : '🔁 راجع'}</span>` : ''}${tagBadges(r)}</div>
+          ${retail && c.phone ? `<div style="font-size:12.5px;color:var(--muted);direction:ltr;text-align:end;">${esc(c.phone)}</div>` : ''}
+          <div style="font-size:13px;color:var(--ink);margin-top:2px;">${line2}</div>
+          <div style="font-size:12px;color:var(--muted-2);">${crmF.view === 'period' ? 'آخر جهاز: ' + esc(crmDshort(r.lastIn)) + ' · من الأول: ' + r.allCnt + ' جهاز' : ''}${r.lastLog ? (crmF.view === 'period' ? ' · ' : '') + '📜 آخر رسالة: ' + esc(r.lastLog.t || '') + ' (' + esc(crmDshort(new Date(r.lastLog.at))) + ')' : ''}</div>
+          ${b !== null && b >= crmBalAlert() ? `<div style="font-size:12px;font-weight:800;color:var(--danger);">🚨 رصيده ${crmFmt(b)} ج.م — عدّى ${crmFmt(crmBalAlert())}</div>` : ''}
+          ${r.meta.note ? `<div style="font-size:12px;color:var(--muted);">📝 ${esc(String(r.meta.note).slice(0, 80))}${String(r.meta.note).length > 80 ? '…' : ''}</div>` : ''}
         </div>
       </div>
-      ${ph ? `<button class="btn-secondary" style="color:var(--success); border-color:var(--success-border);" onclick="sendThanks('${esc(ph)}', '${esc(r.disp || '').replace(/'/g, "\\\\'")}')">💬 ${t('an.thanksMsg')}</button>` : ''}
     </div>`;
-  }).join('') : `<div class="empty-col">مفيش عملاء ${retail ? 'قطاعي' : 'جملة'} جابوا أجهزة في ${esc(crmPeriodLabel())}</div>`;
+  }).join('') : `<div class="empty-col">${crmF.view === 'lapsed' ? '✅ مفيش عملاء بطّلوا ييجوا' : crmF.view === 'events' ? 'مفيش أعياد ميلاد في الأسبوع ده — سجّلها من ورقة العميل' : 'مفيش عملاء ' + (retail ? 'قطاعي' : 'جملة') + ' جابوا أجهزة في ' + esc(crmPeriodLabel())}</div>`;
 
-  body.innerHTML = `
-    <div class="inv-filter">
-      <span style="font-size:12.5px;color:var(--muted);font-weight:800;">🗓️ التاريخ</span>
-      ${chip('unit','day','يوم')}${chip('unit','month','شهر')}${chip('unit','year','سنة')}
-      <span class="inv-custom">${picker}</span>
-    </div>
-    <div class="inv-filter">
-      <span style="font-size:12.5px;color:var(--muted);font-weight:800;">👥 العملاء</span>
-      ${chip('type','retail','🛍️ قطاعي')}${chip('type','wholesale','🏪 جملة')}
-      <span class="inv-custom"><input type="search" placeholder="🔍 دوّر بالاسم أو الرقم" value="${esc(crmF.q)}" oninput="crmF.q=this.value;clearTimeout(window._crmT);window._crmT=setTimeout(()=>{renderCrm();const i=document.querySelector('#crmBody input[type=search]');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length);}},250)" style="${inpStyle}min-width:170px;"></span>
-    </div>
-    <div style="font-size:12.5px;color:var(--muted-2);margin:2px 0 10px;line-height:1.8;">
-      ${retail ? '🛍️ قطاعي = اسم المحل «Fix Team» أو فاضي — العميل = الزبون (بالرقم)' : '🏪 جملة = أي محل تاني — العميل = المحل بكل أساميه'}
-      · بتاريخ دخول الجهاز · ⭐ = ${CRM_VIP} أجهزة فأكتر في الفترة
-    </div>
+  const tot = rows.reduce((s, r) => ({ cnt: s.cnt + r.cnt, money: s.money + r.money, nw: s.nw + (r.isNew ? 1 : 0), vip: s.vip + (r.cnt >= CRM_VIP ? 1 : 0), prev: s.prev + r.prevCnt }),
+                          { cnt: 0, money: 0, nw: 0, vip: 0, prev: 0 });
+  const canBulk = rows.filter(r => crmCanWa(r) && !(r.meta.tags || []).includes('quiet')).length;
+  const cards = crmF.view === 'period' ? `
     <div class="inv-cards">
       <div class="inv-card"><div class="inv-card-num">${rows.length}</div><div class="inv-card-label">${retail ? 'زبون' : 'محل'} — ${esc(crmPeriodLabel())}</div></div>
       <div class="inv-card"><div class="inv-card-num" style="color:var(--success);">${tot.nw}</div><div class="inv-card-label">🆕 جديد</div></div>
       <div class="inv-card"><div class="inv-card-num" style="color:var(--info);">${rows.length - tot.nw}</div><div class="inv-card-label">🔁 راجع</div></div>
-      <div class="inv-card"><div class="inv-card-num">${tot.cnt}</div><div class="inv-card-label">📱 أجهزة</div></div>
-      <div class="inv-card"><div class="inv-card-num" style="color:var(--success);">${fmt(tot.money)}</div><div class="inv-card-label">💰 ج.م</div></div>
+      <div class="inv-card"><div class="inv-card-num">${tot.cnt} <span style="font-size:13px;color:${tot.cnt >= tot.prev ? 'var(--success)' : 'var(--danger)'};">${tot.cnt > tot.prev ? '↑' : tot.cnt < tot.prev ? '↓' : '='}${tot.prev}</span></div><div class="inv-card-label">📱 أجهزة (${esc(crmPrevWord())})</div></div>
+      <div class="inv-card"><div class="inv-card-num" style="color:var(--success);">${crmFmt(tot.money)}</div><div class="inv-card-label">💰 ج.م</div></div>
       <div class="inv-card"><div class="inv-card-num" style="color:#BE8A1C;">${tot.vip}</div><div class="inv-card-label">⭐ ${CRM_VIP}+ أجهزة</div></div>
+    </div>` : '';
+
+  body.innerHTML = `
+    ${bdToday ? `<div class="cust-item" style="cursor:pointer;background:#FFF7E6;border-color:#F5C26B;" onclick="crmSet('view','events')"><b>🎂 النهارده عيد ميلاد ${bdToday} عميل — دوس عشان تبعتلهم</b></div>` : ''}
+    <div class="inv-filter">
+      ${chip('view','period','📋 العملاء')}${chip('view','lapsed','😴 بطّلوا ييجوا')}${chip('view','events','🎂 مناسبات')}
+      <span class="inv-custom"><button class="inv-chip" onclick="crmSettings()">⚙️</button></span>
+    </div>
+    ${crmF.view === 'period' ? `<div class="inv-filter">
+      <span style="font-size:12.5px;color:var(--muted);font-weight:800;">🗓️ التاريخ</span>
+      ${chip('unit','day','يوم')}${chip('unit','month','شهر')}${chip('unit','year','سنة')}
+      <span class="inv-custom">${picker}</span>
+    </div>` : `<div style="font-size:12.5px;color:var(--muted-2);margin:0 0 8px;">${crmF.view === 'lapsed'
+        ? `😴 جابوا جهازين أو أكتر، وآخر مرة من أكتر من <b>${crmLapseDays()}</b> يوم (تغيّرها من ⚙️) — الأكتر أجهزة الأول`
+        : '🎂 أعياد الميلاد النهارده وفي الـ٧ أيام الجايين — بتتسجّل من ورقة العميل'}</div>`}
+    <div class="inv-filter">
+      <span style="font-size:12.5px;color:var(--muted);font-weight:800;">👥 العملاء</span>
+      ${chip('type','retail','🛍️ قطاعي')}${chip('type','wholesale','🏪 جملة')}
+      <span class="inv-custom"><input type="search" placeholder="🔍 دوّر بالاسم أو الرقم أو الملاحظة" value="${esc(crmF.q)}" oninput="crmF.q=this.value;clearTimeout(window._crmT);window._crmT=setTimeout(()=>{renderCrm();const i=document.querySelector('#crmBody input[type=search]');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length);}},250)" style="${CRM_INP}min-width:170px;"></span>
+    </div>
+    <div class="inv-filter">
+      <span style="font-size:12.5px;color:var(--muted);font-weight:800;">🏷️</span>
+      ${chip('tag','','الكل')}${CRM_TAGS.map(x => chip('tag', x.k, esc(x.l))).join('')}
+    </div>
+    <div style="font-size:12.5px;color:var(--muted-2);margin:2px 0 10px;line-height:1.8;">
+      ${retail ? '🛍️ قطاعي = اسم المحل «Fix Team» أو فاضي — العميل = الزبون (بالرقم)' : '🏪 جملة = أي محل تاني — العميل = المحل بكل أساميه'}
+      · بتاريخ دخول الجهاز${crmF.view === 'period' ? ' · ⭐ = ' + CRM_VIP + ' أجهزة فأكتر في الفترة' : ''}
+    </div>
+    ${cards}
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 12px;">
+      ${rows.length ? `<button class="btn-secondary" style="color:var(--success);border-color:var(--success-border);font-weight:800;" onclick="openCrmBulk()">📣 رسالة لكل اللي في القايمة (${canBulk})</button>` : ''}
+      ${rows.length ? `<button class="btn-secondary" style="color:var(--info);border-color:var(--info);font-weight:800;" onclick="crmExport()">📥 Excel</button>` : ''}
     </div>
     ${list}`;
+}
+
+// ⚙️ الإعدادات: أيام «بطّلوا ييجوا» · حد تنبيه رصيد الجملة
+async function crmSettings(){
+  const a = prompt('😴 العميل يتحسب «بطّل ييجي» بعد كام يوم من آخر جهاز؟', String(crmLapseDays()));
+  if(a === null) return;
+  const b = prompt('🚨 نبّهني لو رصيد محل الجملة عدّى كام جنيه؟', String(crmBalAlert()));
+  if(b === null) return;
+  const na = parseInt(a, 10), nb = parseInt(b, 10);
+  if(!(na > 0) || !(nb > 0)){ alert('اكتب أرقام أكبر من صفر'); return; }
+  if(await crmMutate(D => { D.s.lapseDays = na; D.s.balAlert = nb; })) showImportDone('✅ الإعدادات اتحفظت');
+  renderCrm();
+}
+
+// ---------- 📥 Excel ----------
+async function crmExport(){
+  if(typeof ExcelJS === 'undefined'){ alert('مكتبة Excel ما اتحمّلتش — جرّب تاني بعد شوية'); return; }
+  const retail = crmF.type === 'retail';
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('CRM', { views:[{ rightToLeft:true }] });
+  const head = ['#', retail ? 'الزبون' : 'المحل', 'الرقم', 'أجهزة الفترة', 'فلوس الفترة', crmPrevWord(), 'كل الأجهزة', 'كل الفلوس', 'متوسط الجهاز',
+                'جديد/راجع', 'أول مرة', 'آخر مرة', 'التصنيفات', 'ملاحظة', 'آخر رسالة', 'عيد الميلاد'];
+  if(!retail) head.push('الرصيد دلوقتي');
+  ws.addRow(head).font = { bold: true };
+  crmRows.forEach((r, i) => {
+    const priced = r.c.devs.filter(x => x.d.status !== 'rejected' && isPriced(x.d)).length;
+    const row = [i + 1, r.disp, retail ? (r.c.phone || '') : (shopPhoneOf(r.disp) || ''), r.cnt, r.money, r.prevCnt, r.allCnt, r.allMoney,
+      priced ? Math.round(r.allMoney / priced) : 0, r.isNew ? 'جديد' : 'راجع', crmDshort(r.c.first), crmDshort(r.c.last),
+      (r.meta.tags || []).map(k => (CRM_TAGS.find(x => x.k === k) || {}).l || k).join('، '), r.meta.note || '',
+      r.lastLog ? (r.lastLog.t || '') + ' — ' + crmDshort(new Date(r.lastLog.at)) : '', r.meta.bday || ''];
+    if(!retail) row.push(crmShopBalance(r.disp));
+    ws.addRow(row);
+  });
+  ws.columns.forEach(c => { c.width = 16; });
+  const buf = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buf], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const tag = crmF.view === 'lapsed' ? 'بطلوا-ييجوا' : crmF.view === 'events' ? 'مناسبات' : crmPeriodLabel().replace(/\s+/g, '-');
+  a.href = url; a.download = `CRM-${retail ? 'قطاعي' : 'جملة'}-${tag}.xlsx`;
+  document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+}
+
+// ---------- 📣 رسالة لمجموعة ----------
+// 🧸 بتختار رسالة، وتبعتها لكل واحد في القايمة بالدور (الواتس مابيبعتش
+//    لكذا حد مرة واحدة — فدوسة لكل واحد). اللي اتبعتله بيتعلّم ✅
+//    وبيتسجّل في سجل تواصله. 🔕 «مايتبعتلوش عروض» ومين مالوش رقم مش في القايمة.
+function openCrmBulk(){
+  const list = crmRows.filter(r => crmCanWa(r) && !(r.meta.tags || []).includes('quiet'));
+  if(!list.length){ alert('مفيش حد في القايمة دي ليه رقم واتساب'); return; }
+  crmBulk = { tplId: crmF.view === 'lapsed' ? 'b_miss' : crmF.view === 'events' ? 'b_bday' : 'b_thanks', list, done: {} };
+  let ov = document.getElementById('crmBulkOv');
+  if(!ov){
+    ov = document.createElement('div'); ov.id = 'crmBulkOv'; ov.className = 'overlay';
+    ov.style.cssText = 'z-index:40;align-items:stretch;justify-content:stretch;padding:0;overflow-y:auto;';
+    document.body.appendChild(ov);
+  }
+  renderCrmBulk();
+}
+function closeCrmBulk(){ const ov = document.getElementById('crmBulkOv'); if(ov) ov.remove(); crmBulk = null; renderCrm(); }
+function renderCrmBulk(){
+  const ov = document.getElementById('crmBulkOv');
+  if(!ov || !crmBulk) return;
+  const tpl = crmAllTpls().find(x => x.id === crmBulk.tplId) || crmAllTpls()[0];
+  const n = Object.keys(crmBulk.done).length;
+  ov.innerHTML = `<div class="summaries-page">
+    <div class="modal-head" style="padding:16px 20px;"><h2 style="font-size:18px;">📣 رسالة لمجموعة (${n} من ${crmBulk.list.length})</h2>
+      <button class="close-btn" onclick="closeCrmBulk()">×</button></div>
+    <div style="padding:12px 20px 40px;">
+      <div style="font-size:12.5px;color:var(--muted);margin-bottom:8px;">اختار الرسالة، وبعدين دوس «ابعت» عند كل واحد بالدور. اللي اتبعتله بيتعلّم ✅ وبيتسجّل في سجله.</div>
+      <select onchange="crmBulk.tplId=this.value;renderCrmBulk()" style="${CRM_INP}width:100%;margin-bottom:8px;">
+        ${crmAllTpls().map(x => `<option value="${esc(x.id)}"${x.id === tpl.id ? ' selected' : ''}>${esc(x.t)}</option>`).join('')}
+      </select>
+      <div class="cust-item" style="display:block;white-space:pre-line;font-size:13px;color:var(--muted);">${esc(tpl.m)}</div>
+      ${crmBulk.list.map((r, i) => {
+        const ok = crmBulk.done[r.c.key];
+        return `<div class="cust-item"${ok ? ' style="opacity:.55;"' : ''}>
+          <div style="min-width:0;"><div style="font-weight:800;">${ok ? '✅ ' : ''}${esc(r.disp || t('an.noName'))}</div>
+            <div style="font-size:12px;color:var(--muted-2);">${r.lastLog ? '📜 آخر رسالة: ' + esc(r.lastLog.t || '') + ' (' + esc(crmDshort(new Date(r.lastLog.at))) + ')' : 'مفيش رسايل قبل كده'}</div></div>
+          <button class="oh-btn" style="background:#16A34A;" onclick="crmBulkSend(${i})">💬 ${ok ? 'تاني' : 'ابعت'}</button>
+        </div>`;
+      }).join('')}
+    </div></div>`;
+}
+function crmBulkSend(i){
+  const r = crmBulk && crmBulk.list[i]; if(!r) return;
+  const tpl = crmAllTpls().find(x => x.id === crmBulk.tplId); if(!tpl) return;
+  crmSendTo(r, tpl, () => { crmBulk.done[r.c.key] = true; renderCrmBulk(); });
+}
+
+// ---------- 💬 الإرسال + 📜 السجل ----------
+// ⚠️ الواتس بيتفتح جوه الضغطة نفسها (قبل أي await) — عشان المتصفح مايمنعهوش
+function crmSendTo(r, tpl, after){
+  const log = Array.isArray(r.meta.log) ? r.meta.log : [];
+  const same = log.slice().reverse().find(x => x.id === tpl.id);
+  if(same && (Date.now() - new Date(same.at).getTime()) < CRM_REPEAT_DAYS * 86400000
+     && !confirm('«' + tpl.t + '» اتبعتت لـ' + (r.disp || 'العميل ده') + ' يوم ' + crmDshort(new Date(same.at)) + '.\n\nتبعتها تاني؟')) return;
+  const msg = crmFill(tpl.m, r);
+  let p;
+  if(crmF.type === 'retail'){ openWa(r.c.phone, msg); p = Promise.resolve(true); }
+  else p = sendShopMsg(r.disp, msg, '💬 اضغط لإرسال الرسالة للمحل');   // 👑 رقم · جروب · قايمة المشاركة
+  Promise.resolve(p).then(async ok => {
+    if(ok === false) return;   // اتلغى
+    const ent = { at: new Date().toISOString(), by: currentUser.name, id: tpl.id, t: tpl.t };
+    await crmMutate(D => {
+      const m = D.c[r.c.key] = D.c[r.c.key] || {};
+      m.log = (Array.isArray(m.log) ? m.log : []).concat([ent]).slice(-CRM_LOG_MAX);
+    });
+    r.meta = crmMeta(r.c.key); r.lastLog = ent;
+    if(after) after();
+    if(crmCust && crmCust.c.key === r.c.key) renderCrmCust();
+  });
+}
+
+// ---------- 👤 ورقة العميل ----------
+function openCrmCust(i){
+  const r = crmRows[i];
+  if(!r) return;
+  crmCust = r;
+  let ov = document.getElementById('crmCustOv');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.id = 'crmCustOv';
+    ov.className = 'overlay';
+    ov.style.cssText = 'z-index:40;align-items:stretch;justify-content:stretch;padding:0;overflow-y:auto;';
+    document.body.appendChild(ov);
+  }
+  renderCrmCust();
+}
+function closeCrmCust(){ const ov = document.getElementById('crmCustOv'); if(ov) ov.remove(); crmCust = null; }
+
+// 📊 تحليل العميل
+function crmTop(list, keyFn, n){
+  const m = {};
+  list.forEach(x => { const k = keyFn(x); if(k) m[k] = (m[k] || 0) + 1; });
+  return Object.keys(m).sort((a,b) => m[b] - m[a]).slice(0, n || 3).map(k => ({ k, n: m[k] }));
+}
+function crmBrandOf(d){
+  const s = String(d.deviceType || '').trim().toLowerCase().replace(/[أإآ]/g, 'ا');
+  if(!s) return '';
+  if(/iphone|ايفون|افون|آيفون/.test(s)) return 'آيفون';
+  if(/samsung|سامسونج|سامسونغ/.test(s)) return 'سامسونج';
+  if(/oppo|اوبو/.test(s)) return 'أوبو';
+  if(/xiaomi|redmi|poco|شاومي|ريدمي/.test(s)) return 'شاومي';
+  if(/realme|ريلمي/.test(s)) return 'ريلمي';
+  if(/vivo|فيفو/.test(s)) return 'فيفو';
+  if(/huawei|هواوي/.test(s)) return 'هواوي';
+  if(/honor|هونر|هونور/.test(s)) return 'هونر';
+  if(/infinix|انفنكس|انفينكس/.test(s)) return 'إنفنكس';
+  if(/ipad|ايباد/.test(s)) return 'آيباد';
+  return s.split(/\s+/)[0];
+}
+function crmCustStats(r){
+  const devs = r.c.devs.slice().sort((a,b) => b.t - a.t);   // الأحدث الأول
+  const ok = devs.filter(x => x.d.status !== 'rejected' && isPriced(x.d));
+  const money = ok.reduce((s, x) => s + (parseInt(x.d.agreedPrice) || 0), 0);
+  const stars = devs.map(x => x.d.afterSale && Number(x.d.afterSale.stars)).filter(n => n > 0);
+  const heard = (devs.find(x => x.d.afterSale && x.d.afterSale.heardFrom) || {}).d;
+  const rej = devs.filter(x => x.d.status === 'rejected').length;
+  const ret = devs.filter(x => x.d.status === 'returned' || (Array.isArray(x.d.returnRounds) && x.d.returnRounds.length) || (x.d.returnPrice !== undefined && x.d.returnPrice !== null && x.d.returnPrice !== '')).length;
+  return { devs, money, pricedN: ok.length, avg: ok.length ? Math.round(money / ok.length) : 0, rejected: rej, returned: ret,
+           rejPct: devs.length ? Math.round(rej * 100 / devs.length) : 0, retPct: devs.length ? Math.round(ret * 100 / devs.length) : 0,
+           brands: crmTop(devs, x => crmBrandOf(x.d)),
+           issues: crmTop(devs, x => String(x.d.reportedIssue || '').trim().replace(/\s+/g, ' ').replace(/[ةه]$/, 'ه')),
+           stars: stars.length ? (stars.reduce((a,b) => a + b, 0) / stars.length) : 0, starsN: stars.length,
+           heard: heard ? heard.afterSale.heardFrom : '' };
+}
+// 💸 سداد الجملة: كام دفعة · آخر دفعة · بيدفع كل قد إيه في المتوسط
+function crmPayStats(name){
+  try{
+    const k = accShopOf(name);
+    const pays = (ledger || []).filter(e => e.type === 'credit' && accShopOf(e.shop) === k)
+      .map(e => new Date(e.date || '')).filter(d => !isNaN(d)).sort((a,b) => a - b);
+    if(!pays.length) return { n: 0 };
+    let gap = 0;
+    for(let i = 1; i < pays.length; i++) gap += (pays[i] - pays[i - 1]) / 86400000;
+    return { n: pays.length, last: pays[pays.length - 1], every: pays.length > 1 ? Math.round(gap / (pays.length - 1)) : null };
+  }catch(e){ return { n: 0 }; }
+}
+
+function renderCrmCust(){
+  const ov = document.getElementById('crmCustOv');
+  if(!ov || !crmCust) return;
+  const r = crmCust, c = r.c, retail = crmF.type === 'retail';
+  r.meta = crmMeta(c.key);
+  const M = r.meta;
+  const S = crmCustStats(r);
+  const phone = retail ? (c.phone || '') : (shopPhoneOf(r.disp) || '');
+  const group = retail ? '' : (shopGroupOf(r.disp) || '');
+  const canWa = crmCanWa(r);
+  const bal = retail ? null : crmShopBalance(r.disp);
+  const pay = retail ? null : crmPayStats(r.disp);
+  const HEARD = { facebook:'📘 فيسبوك', instagram:'📸 انستجرام', tiktok:'🎵 تيك توك', referral:'🗣️ حد عرّفه بينا', passby:'🚶 قابلنا صدفة' };
+  const card = (n, l, col, small) => `<div class="inv-card"><div class="inv-card-num" style="${col ? 'color:' + col + ';' : ''}${small ? 'font-size:16px;line-height:1.5;' : ''}">${n}</div><div class="inv-card-label">${l}</div></div>`;
+  const log = Array.isArray(M.log) ? M.log.slice().reverse() : [];
+  const tags = M.tags || [];
+  const bdIn = crmBdayIn(M.bday);
+  const bdVal = M.bday ? (new Date().getFullYear() + '-' + M.bday) : '';
+  const quiet = tags.includes('quiet');
+
+  const tpls = crmAllTpls().map(x => {
+    const last = log.find(y => y.id === x.id);
+    return `<div class="cust-item" style="align-items:flex-start;">
+      <div style="min-width:0;flex:1;">
+        <div style="font-weight:800;">${esc(x.t)}${last ? ` <span style="font-size:11.5px;color:var(--muted-2);font-weight:600;">· اتبعتت ${esc(crmDshort(new Date(last.at)))}</span>` : ''}</div>
+        <div style="font-size:12.5px;color:var(--muted);white-space:pre-line;line-height:1.7;">${esc(crmFill(x.m, r))}</div>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button class="oh-btn" style="background:#16A34A;"${canWa ? '' : ' disabled'} onclick="crmSendTpl('${esc(x.id)}')">💬 ابعت</button>
+        ${x.id.startsWith('b_') ? '' : `<button class="oh-btn oh-cancel" onclick="crmDelTpl('${esc(x.id)}')">🗑️</button>`}
+      </div>
+    </div>`;
+  }).join('');
+
+  const devList = S.devs.map(x => {
+    const d = x.d, st = statusInfo(d.status === 'delivered' ? (isPaidDevice(d) ? 'delivered_paid' : 'delivered_unpaid') : d.status);
+    return `<div class="cust-item" style="cursor:pointer;" onclick="openDetail('${d.id}')">
+      <div style="min-width:0;">
+        <div style="font-weight:800;">📱 ${esc(((d.deviceType || '') + ' ' + (d.model || '')).trim() || 'جهاز')}${retail ? '' : (d.customerName ? ` <span style="color:var(--muted-2);font-weight:500;">— ${esc(d.customerName)}</span>` : '')}</div>
+        ${d.reportedIssue ? `<div style="font-size:12.5px;color:var(--muted);">🛠️ ${esc(d.reportedIssue)}</div>` : ''}
+        <div style="font-size:12px;color:var(--muted-2);">📅 ${esc(crmDshort(x.t))} · ${esc(st ? stLabel(st) : (d.status || ''))}</div>
+      </div>
+      <div style="font-weight:900;white-space:nowrap;${d.status === 'rejected' ? 'color:var(--muted);text-decoration:line-through;' : 'color:var(--success);'}">${isPriced(d) ? crmFmt(d.agreedPrice) + ' ج.م' : '<span style="color:var(--muted);font-weight:600;">لسه</span>'}</div>
+    </div>`;
+  }).join('');
+
+  const tops = (arr, word) => arr.length ? arr.map(a => `${esc(a.k)} <b>(${a.n})</b>`).join(' · ') : `<span style="color:var(--muted);">${word}</span>`;
+
+  ov.innerHTML = `<div class="summaries-page">
+    <div class="modal-head" style="padding:16px 20px;">
+      <h2 style="font-size:18px;">${esc(r.disp || t('an.noName'))}</h2>
+      <button class="close-btn" onclick="closeCrmCust()">×</button>
+    </div>
+    <div style="padding:12px 20px 40px;">
+      <div style="font-size:12.5px;color:var(--muted);margin-bottom:10px;">${retail ? '🛍️ زبون قطاعي' : '🏪 محل جملة'} · ${S.devs.length > 1 ? '🔁 عميل راجع' : '🆕 أول مرة'}${S.heard ? ' · 📣 عرفنا من ' + esc(HEARD[S.heard] || S.heard) : ''}${bdIn !== null ? ' · 🎂 ' + (bdIn === 0 ? '<b style="color:var(--danger);">عيد ميلاده النهارده!</b>' : 'عيد ميلاده بعد ' + bdIn + ' يوم') : ''}</div>
+      <div class="cust-item">
+        <div style="min-width:0;">
+          <div style="font-size:12px;color:var(--muted-2);">${retail ? '📞 رقم التليفون' : '📞 رقم المحل'}</div>
+          <div style="font-weight:900;font-size:17px;direction:ltr;text-align:end;">${phone ? esc(phone) : '<span style="color:var(--muted);font-size:13px;">مفيش رقم متسجّل</span>'}</div>
+          ${group ? '<div style="font-size:12px;color:var(--muted-2);">👥 له جروب واتساب</div>' : ''}
+        </div>
+        ${phone ? `<div style="display:flex;gap:6px;">
+          <a class="oh-btn" style="background:#2563EB;text-decoration:none;" href="tel:${esc(String(phone).replace(/[^0-9+]/g, ''))}">📞 اتصال</a>
+          <button class="oh-btn oh-cancel" onclick="if(waCopyText('${esc(phone)}')) showImportDone('📋 الرقم اتنسخ')">📋</button></div>` : ''}
+      </div>
+
+      <div class="inv-section-title">🏷️ التصنيف</div>
+      <div class="inv-filter">${CRM_TAGS.map(x => `<button class="inv-chip ${tags.includes(x.k) ? 'active' : ''}" onclick="crmToggleTag('${x.k}')">${esc(x.l)}</button>`).join('')}</div>
+
+      <div class="inv-cards">
+        ${card(S.devs.length, '📱 كل الأجهزة')}
+        ${card(crmFmt(S.money), '💰 كل الفلوس (ج.م)', 'var(--success)')}
+        ${card(crmFmt(S.avg), '💡 متوسط الخدمة للجهاز', 'var(--info)')}
+        ${card(r.cnt + ' جهاز<br>' + crmFmt(r.money) + ' ج.م', '📅 في ' + esc(crmF.view === 'period' ? crmPeriodLabel() : 'كل الوقت'), '', true)}
+        ${card(esc(crmDshort(c.first)), '🗓️ أول مرة', '', true)}
+        ${card(esc(crmDshort(c.last)) + '<br><span style="font-size:12px;color:var(--muted);">من ' + crmDaysAgo(c.last) + ' يوم</span>', '🕒 آخر مرة', '', true)}
+        ${S.starsN ? card(S.stars.toFixed(1) + ' ⭐', 'رأيه (' + S.starsN + ' مكالمة)', '#BE8A1C') : ''}
+        ${bal !== null ? card(crmFmt(bal), '📒 رصيد حسابه دلوقتي' + (bal >= crmBalAlert() ? ' 🚨' : ''), bal > 0 ? 'var(--danger)' : 'var(--success)') : ''}
+      </div>
+
+      <div class="inv-section-title">📊 تحليل</div>
+      <div class="cust-item" style="display:block;font-size:13px;line-height:2;">
+        <div>📱 أكتر ماركات: ${tops(S.brands, 'مفيش')}</div>
+        <div>🛠️ أكتر أعطال: ${tops(S.issues, 'مفيش أعطال مكتوبة')}</div>
+        <div>🚫 الرفض: <b style="color:${S.rejPct >= 20 ? 'var(--danger)' : 'var(--ink)'};">${S.rejPct}٪</b> (${S.rejected} من ${S.devs.length}) · ↩️ المرتجع: <b style="color:${S.retPct >= 10 ? 'var(--danger)' : 'var(--ink)'};">${S.retPct}٪</b> (${S.returned})</div>
+        ${pay ? `<div>💸 السداد: ${pay.n ? `${pay.n} دفعة · آخر دفعة ${esc(crmDshort(pay.last))} (من ${crmDaysAgo(pay.last)} يوم)${pay.every !== null ? ' · بيدفع كل <b>' + pay.every + '</b> يوم في المتوسط' : ''}` : '<span style="color:var(--danger);">لسه مادفعش ولا دفعة</span>'}</div>` : ''}
+        ${bal !== null && bal >= crmBalAlert() ? `<div style="color:var(--danger);font-weight:800;">🚨 الرصيد عدّى ${crmFmt(crmBalAlert())} ج.م</div>` : ''}
+      </div>
+
+      <div class="inv-section-title">📝 ملاحظات</div>
+      <textarea id="crmNote" rows="3" placeholder="مثلاً: بيحب يدفع آجل · صعب في السعر · قريب صاحب المحل" style="${CRM_INP}width:100%;box-sizing:border-box;">${esc(M.note || '')}</textarea>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0 4px;">
+        <button class="oh-btn" style="background:#16A34A;" onclick="crmSaveNote()">💾 احفظ الملاحظة</button>
+        ${M.noteBy ? `<span style="font-size:11.5px;color:var(--muted-2);">آخر تعديل: ${esc(M.noteBy)} · ${esc(crmDshort(new Date(M.noteAt)))}</span>` : ''}
+      </div>
+
+      <div class="inv-section-title">🎂 عيد الميلاد</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <input id="crmBday" type="date" value="${esc(bdVal)}" style="${CRM_INP}">
+        <button class="oh-btn" style="background:#16A34A;" onclick="crmSaveBday()">💾 احفظ</button>
+        ${M.bday ? `<button class="oh-btn oh-cancel" onclick="crmSaveBday(true)">🗑️</button>` : ''}
+        <span style="font-size:11.5px;color:var(--muted-2);">السنة مش مهمة — اليوم والشهر بس</span>
+      </div>
+
+      <div class="inv-section-title">💬 واتساب — رسايل جاهزة</div>
+      ${quiet ? '<div style="font-size:12.5px;color:var(--warn);margin:-4px 0 8px;">🔕 متعلّم «مايتبعتلوش عروض» — مش هيدخل في «رسالة لمجموعة»، بس تقدر تبعتله من هنا.</div>' : ''}
+      ${canWa ? '' : `<div style="font-size:12.5px;color:var(--warn);margin:-4px 0 8px;">${retail ? 'مفيش رقم للزبون ده' : 'المحل مالوش رقم ولا جروب — ضيفهم من 🧾 الحسابات'}</div>`}
+      <div style="font-size:12px;color:var(--muted-2);margin:-4px 0 8px;">{الاسم} بيتبدّل باسم العميل لوحده. الرسايل اللي بتضيفها بتبان عند كل العملاء.</div>
+      ${crmTpls === null ? '<div class="empty-col">لحظة…</div>' : tpls}
+      <div id="crmTplForm" class="cust-item" style="display:block;">
+        <button class="btn-secondary" style="width:100%;color:var(--success);border-color:var(--success-border);font-weight:800;" onclick="crmTplFormOpen()">➕ رسالة جديدة</button>
+      </div>
+
+      <div class="inv-section-title">📜 سجل التواصل (${log.length})</div>
+      ${log.length ? log.slice(0, 15).map(x => `<div class="cust-item" style="padding:9px 13px;"><div style="font-size:13px;"><b>${esc(x.t || '')}</b><div style="font-size:12px;color:var(--muted-2);">${esc(crmDshort(new Date(x.at)))} · ${esc(x.by || '')}</div></div></div>`).join('')
+        : '<div class="empty-col">لسه مااتبعتلوش رسايل من هنا</div>'}
+
+      <div class="inv-section-title">📱 الأجهزة — من الأحدث للأقدم (${S.devs.length})</div>
+      ${devList}
+    </div>
+  </div>`;
+}
+
+async function crmToggleTag(k){
+  const r = crmCust; if(!r) return;
+  await crmMutate(D => {
+    const m = D.c[r.c.key] = D.c[r.c.key] || {};
+    const t0 = Array.isArray(m.tags) ? m.tags : [];
+    m.tags = t0.includes(k) ? t0.filter(x => x !== k) : t0.concat([k]);
+  });
+  renderCrmCust(); renderCrm();
+}
+async function crmSaveNote(){
+  const r = crmCust; if(!r) return;
+  const v = String((document.getElementById('crmNote') || {}).value || '').trim().slice(0, 2000);
+  if(await crmMutate(D => {
+    const m = D.c[r.c.key] = D.c[r.c.key] || {};
+    m.note = v; m.noteBy = currentUser.name; m.noteAt = new Date().toISOString();
+  })) showImportDone('✅ الملاحظة اتحفظت');
+  renderCrmCust(); renderCrm();
+}
+async function crmSaveBday(clear){
+  const r = crmCust; if(!r) return;
+  let v = '';
+  if(!clear){
+    const raw = String((document.getElementById('crmBday') || {}).value || '');
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(raw)){ alert('اختار اليوم من الخانة'); return; }
+    v = raw.slice(5);   // MM-DD
+  }
+  if(await crmMutate(D => { const m = D.c[r.c.key] = D.c[r.c.key] || {}; if(v) m.bday = v; else delete m.bday; }))
+    showImportDone(v ? '🎂 عيد الميلاد اتحفظ' : '🗑️ عيد الميلاد اتشال');
+  renderCrmCust(); renderCrm();
+}
+
+function crmTplFormOpen(){
+  const f = document.getElementById('crmTplForm');
+  if(!f) return;
+  const st = CRM_INP + 'width:100%;box-sizing:border-box;margin-bottom:8px;';
+  f.innerHTML = `<input id="crmTplT" placeholder="اسم الرسالة (مثلاً: 🎉 عيد سعيد)" maxlength="40" style="${st}">
+    <textarea id="crmTplM" rows="5" placeholder="نص الرسالة — اكتب {الاسم} في المكان اللي عايز اسم العميل فيه" style="${st}">أهلاً {الاسم} 👋\n</textarea>
+    <div style="display:flex;gap:6px;"><button class="oh-btn" style="background:#16A34A;flex:1;" onclick="crmAddTpl()">💾 احفظ لكل العملاء</button>
+    <button class="oh-btn oh-cancel" onclick="renderCrmCust()">إلغاء</button></div>`;
+  const i = document.getElementById('crmTplT'); if(i) i.focus();
+}
+async function crmAddTpl(){
+  if(!isSuperAdmin()) return;
+  const tt = (document.getElementById('crmTplT') || {}).value || '';
+  const mm = (document.getElementById('crmTplM') || {}).value || '';
+  if(!tt.trim()){ alert('اكتب اسم للرسالة'); return; }
+  if(mm.trim().length < 5){ alert('نص الرسالة قصير أوي'); return; }
+  await crmLoadTpls();   // الطازة الأول — يمكن حد ضاف من جهاز تاني
+  crmTpls.push({ id: 'u_' + Date.now(), t: tt.trim(), m: mm.trim(), by: currentUser.name, at: new Date().toISOString() });
+  if(await crmSaveTpls()) showImportDone('✅ الرسالة اتحفظت — بقت عند كل العملاء');
+  renderCrmCust();
+}
+async function crmDelTpl(id){
+  if(!isSuperAdmin()) return;
+  const x = (crmTpls || []).find(y => y.id === id);
+  if(!x || !confirm('تمسح رسالة «' + x.t + '»؟ هتختفي من عند كل العملاء.')) return;
+  await crmLoadTpls();
+  crmTpls = crmTpls.filter(y => y.id !== id);
+  await crmSaveTpls();
+  renderCrmCust();
+}
+function crmSendTpl(id){
+  const r = crmCust; if(!r) return;
+  const x = crmAllTpls().find(y => y.id === id); if(!x) return;
+  crmSendTo(r, x);
 }
 
 function sendThanks(phone, name){
